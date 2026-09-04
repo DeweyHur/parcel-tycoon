@@ -208,7 +208,7 @@
   // ---------- summary ----------
   function showSummary() {
     const s = game.summary;
-    BGM.oneShot('fanfare', 0.7);
+    BGM.stinger('fanfare', 0.9);
     const body = `<div class="kv">
       <span>배송 수익</span><span class="v good">+${s.revenue}</span>
       <span>월말 운영비</span><span class="v bad">-${s.opCost}</span>

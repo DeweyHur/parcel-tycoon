@@ -4,7 +4,8 @@ window.BGM = (function () {
     title: 'audio/title.mp3', warehouse: 'audio/warehouse.mp3', overflow: 'audio/overflow.mp3', market: 'audio/market.mp3',
     gameover: 'audio/gameover.mp3', fanfare: 'audio/fanfare.mp3',
   };
-  let ctx = null, master = null, buffers = {}, loading = {};
+  let ctx = null, master = null, duck = null, buffers = {}, loading = {};
+  let duckTimer = null;
   let cur = null;                     // { name, src, gain }
   let pending = null;                 // 컨텍스트가 잠겨 있을 때 예약된 재생
   let enabled = true, volume = 0.6;
@@ -14,6 +15,7 @@ window.BGM = (function () {
     try {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       master = ctx.createGain(); master.gain.value = enabled ? volume : 0; master.connect(ctx.destination);
+      duck = ctx.createGain(); duck.gain.value = 1; duck.connect(master); // BGM 전용 (스팅어 재생 시 낮춤)
     } catch (e) { ctx = null; }
   }
   function resume() {
@@ -45,7 +47,7 @@ window.BGM = (function () {
       const src = ctx.createBufferSource(); src.buffer = buf; src.loop = opts.loop !== false;
       const gain = ctx.createGain(); gain.gain.setValueAtTime(0.0001, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(1, ctx.currentTime + fade);
-      src.connect(gain); gain.connect(master); src.start();
+      src.connect(gain); gain.connect(duck); src.start();
       _fadeOut(cur, fade);
       cur = { name, src, gain };
       if (!src.loop) src.onended = () => { if (cur && cur.src === src) cur = null; };
@@ -63,6 +65,21 @@ window.BGM = (function () {
     init(); if (!ctx || !enabled || ctx.state !== 'running') return;
     load(name).then(buf => { const s = ctx.createBufferSource(); s.buffer = buf; const g = ctx.createGain(); g.gain.value = vol; s.connect(g); g.connect(master); s.start(); }).catch(() => { });
   }
+  // 스팅어: BGM을 잠깐 껐다가(덕킹) 원샷을 재생하고 끝나면 BGM을 다시 올림
+  function stinger(name, vol = 1) {
+    init(); if (!ctx || !enabled) return;
+    if (ctx.state !== 'running') return;
+    load(name).then(buf => {
+      const t = ctx.currentTime;
+      clearTimeout(duckTimer);
+      duck.gain.cancelScheduledValues(t); duck.gain.setValueAtTime(Math.max(duck.gain.value, 0.0001), t);
+      duck.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+      const s = ctx.createBufferSource(); s.buffer = buf; const g = ctx.createGain(); g.gain.value = vol; s.connect(g); g.connect(master); s.start(t + 0.2);
+      const back = t + 0.2 + buf.duration - 0.6;
+      duck.gain.setValueAtTime(0.0001, back); duck.gain.exponentialRampToValueAtTime(1, back + 1.0);
+      duckTimer = setTimeout(() => { if (ctx) { duck.gain.cancelScheduledValues(ctx.currentTime); duck.gain.setValueAtTime(1, ctx.currentTime); } }, (buf.duration + 1.5) * 1000);
+    }).catch(() => { });
+  }
   function setEnabled(v) { enabled = v; if (master) master.gain.setTargetAtTime(enabled ? volume : 0, ctx.currentTime, 0.05); }
   function setVolume(v) { volume = Math.max(0, Math.min(1, v)); if (master && enabled) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.05); }
   function current() { return cur ? cur.name : null; }
@@ -72,5 +89,5 @@ window.BGM = (function () {
     if (!ctx) return;
     if (document.hidden) ctx.suspend(); else ctx.resume();
   });
-  return { init, resume, preload, play, stop, oneShot, setEnabled, setVolume, current, isEnabled: () => enabled, getVolume: () => volume };
+  return { init, resume, preload, play, stop, oneShot, stinger, setEnabled, setVolume, current, isEnabled: () => enabled, getVolume: () => volume };
 })();
