@@ -1,0 +1,22 @@
+{
+  "name": "parcel-tycoon",
+  "version": "0.2.0",
+  "private": true,
+  "description": "택배 타이쿤 — 턴제 물류 경영 로그라이크 (프로토타입)",
+  "scripts": {
+    "serve": "python3 -m http.server 8765 --directory www",
+    "test": "node test/unit.js && node test/sim.js 200",
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "apk": "bash build-apk.sh"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/core": "^6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

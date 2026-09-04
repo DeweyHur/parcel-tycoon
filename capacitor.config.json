@@ -1,0 +1,13 @@
+{
+  "appId": "com.dewey.parceltycoon",
+  "appName": "택배 타이쿤",
+  "webDir": "www",
+  "backgroundColor": "#1b1a2e",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#1b1a2e"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

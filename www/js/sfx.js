@@ -1,0 +1,52 @@
+// 8비트 효과음 (WebAudio 합성, 외부 에셋 없음)
+window.SFX = (function () {
+  let ctx = null, master = null, enabled = true;
+  function init() {
+    if (ctx) return;
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain(); master.gain.value = 0.25; master.connect(ctx.destination);
+    } catch (e) { ctx = null; }
+  }
+  function resume() { init(); if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  function tone(freq, dur, type = 'square', vol = 1, when = 0, slide = 0) {
+    if (!ctx || !enabled) return;
+    const t0 = ctx.currentTime + when;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq + slide), t0 + dur);
+    g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function noise(dur, vol = 0.5, when = 0) {
+    if (!ctx || !enabled) return;
+    const t0 = ctx.currentTime + when;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+    const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900;
+    s.connect(f); f.connect(g); g.connect(master); s.start(t0);
+  }
+  const S = {
+    resume, init,
+    setEnabled(v) { enabled = v; },
+    isEnabled() { return enabled; },
+    click() { tone(880, 0.05, 'square', 0.4); },
+    select() { tone(660, 0.06, 'square', 0.4); tone(990, 0.06, 'square', 0.3, 0.05); },
+    cancel() { tone(440, 0.08, 'square', 0.4, 0, -200); },
+    arrive() { tone(220, 0.08, 'triangle', 0.7, 0, -100); noise(0.08, 0.3, 0.02); },
+    thud() { tone(120, 0.12, 'triangle', 0.9, 0, -80); noise(0.1, 0.35); },
+    coin(n = 1) { for (let i = 0; i < Math.min(n, 5); i++) { tone(1046, 0.07, 'square', 0.35, i * 0.08); tone(1318, 0.12, 'square', 0.3, i * 0.08 + 0.06); } },
+    truck() { tone(70, 0.6, 'sawtooth', 0.5, 0, 30); noise(0.5, 0.25); tone(90, 0.5, 'sawtooth', 0.4, 0.5, -30); },
+    horn() { tone(392, 0.18, 'square', 0.5); tone(523, 0.25, 'square', 0.5, 0.18); },
+    wait() { tone(330, 0.1, 'triangle', 0.5); tone(262, 0.15, 'triangle', 0.4, 0.1); },
+    penalty() { tone(160, 0.2, 'sawtooth', 0.6, 0, -60); tone(120, 0.3, 'sawtooth', 0.6, 0.15, -40); },
+    discard() { noise(0.3, 0.5); tone(200, 0.3, 'sawtooth', 0.5, 0, -150); },
+    buy() { tone(523, 0.07, 'square', 0.4); tone(659, 0.07, 'square', 0.4, 0.07); tone(784, 0.12, 'square', 0.4, 0.14); },
+    levelup() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.12, 'square', 0.4, i * 0.09)); },
+    win() { [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => tone(f, 0.16, 'square', 0.45, i * 0.14)); },
+    over() { [392, 349, 311, 262].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.5, i * 0.28, -20)); },
+  };
+  return S;
+})();
