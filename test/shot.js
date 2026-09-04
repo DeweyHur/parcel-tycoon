@@ -60,6 +60,7 @@ const fs = require('fs');
     await page.screenshot({ path: 'shots/12-title-continue.png' });
     const cont = await page.$('#t-continue'); if (cont) { await cont.click(); await page.waitForTimeout(800); await page.screenshot({ path: 'shots/13-continued.png' }); }
   }
+  console.log('bgm:', await page.evaluate(() => window.BGM.current()));
   console.log('phase:', phase, 'state:', await page.evaluate(() => { const g = window.PT.game; return g && { month: g.month, turn: g.turn, cash: g.cash, stress: g.stress, phase: g.phase, parcels: g.parcels.length }; }));
   console.log(errors.length ? errors.join('\n') : 'no errors');
   await browser.close();

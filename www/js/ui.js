@@ -4,8 +4,8 @@
   const $ = s => document.querySelector(s);
   const SAVE_KEY = 'pt_save_v1', REC_KEY = 'pt_records_v1', OPT_KEY = 'pt_opts_v1';
   let game = null, scene = null, busy = false;
-  const opts = load(OPT_KEY) || { sound: true };
-  SFX.setEnabled(opts.sound);
+  const opts = Object.assign({ sound: true, music: true, musicVol: 0.6 }, load(OPT_KEY) || {});
+  SFX.setEnabled(opts.sound); BGM.setEnabled(opts.music); BGM.setVolume(opts.musicVol);
 
   function load(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
@@ -41,13 +41,15 @@
       <button class="btn gold" id="t-new">새 런 시작</button>
       <button class="btn" id="t-help">게임 방법</button>
       <button class="btn" id="t-rec">기록 보기 <small style="color:var(--dim)">최고 ${rec.best}점</small></button>
-      <button class="btn" id="t-sound">효과음: ${opts.sound ? '켜짐' : '꺼짐'}</button></div>`;
+      <div style="display:flex;gap:8px"><button class="btn" id="t-sound" style="flex:1">효과음: ${opts.sound ? '켜짐' : '꺼짐'}</button><button class="btn" id="t-music" style="flex:1">음악: ${opts.music ? '켜짐' : '꺼짐'}</button></div></div>`;
     const m = modal('택배 회사 게임', body, null, 'v0.2 prototype');
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
     m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save && !confirm('진행 중인 런이 있습니다. 새로 시작하면 사라집니다. 계속할까요?')) return; newRun(); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
     m.querySelector('#t-sound').onclick = () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); store(OPT_KEY, opts); SFX.resume(); SFX.click(); showTitle(); };
+    m.querySelector('#t-music').onclick = () => { opts.music = !opts.music; BGM.setEnabled(opts.music); store(OPT_KEY, opts); SFX.resume(); BGM.resume(); SFX.click(); showTitle(); };
+    BGM.play('title');
   }
   function newRun() {
     game = new Game();
@@ -71,9 +73,16 @@
     renderAll();
     checkPhase();
   }
+  function updateMusic() {
+    if (!game) { BGM.play('title'); return; }
+    const g = game;
+    if (g.phase === 'play') BGM.play(g.usage() > 0.9 || g.stress >= 16 ? 'overflow' : 'warehouse', { fade: 1.2 });
+    else if (g.phase === 'market') BGM.play('market');
+  }
   function renderAll() {
     if (!game) return;
     const g = game;
+    updateMusic();
     $('#hud-month').textContent = `${g.month}개월차`;
     $('#hud-turn').textContent = `${g.turn}/${D.TURNS_PER_MONTH}턴`;
     $('#hud-cash').textContent = g.cash;
@@ -199,6 +208,7 @@
   // ---------- summary ----------
   function showSummary() {
     const s = game.summary;
+    BGM.oneShot('fanfare', 0.7);
     const body = `<div class="kv">
       <span>배송 수익</span><span class="v good">+${s.revenue}</span>
       <span>월말 운영비</span><span class="v bad">-${s.opCost}</span>
@@ -218,6 +228,7 @@
   // ---------- market ----------
   function showMarket() {
     const mk = game.market;
+    BGM.play('market');
     const render = () => {
       const items = mk.items.map((it, i) => {
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
@@ -268,7 +279,8 @@
       rec.runs = rec.runs.slice(0, 10);
       store(REC_KEY, rec);
       try { localStorage.removeItem(SAVE_KEY); } catch (e) { }
-      if (r.win) SFX.win(); else SFX.over();
+      BGM.stop(0.5);
+      if (r.win) { SFX.win(); BGM.oneShot('fanfare'); } else { SFX.over(); setTimeout(() => BGM.oneShot('gameover'), 300); }
     }
     const body = `<p style="text-align:center">${esc(r.reason)}</p><div class="big-num">${r.score}점${r.score >= rec.best && r.score > 0 ? ' ★ 최고 기록' : ''}</div>
       <div class="kv"><span>도달</span><span class="v">${r.month}개월차 ${r.turn}턴</span><span>총 배송 수익</span><span class="v">${r.revenue}c</span><span>총 지출</span><span class="v">${r.spent}c</span><span>최종 자금</span><span class="v">${r.cash}c</span><span>스트레스</span><span class="v">${r.stress}</span><span>호출 / 대기</span><span class="v">${r.calls} / ${r.waits}</span><span>처리 택배 / 폐기</span><span class="v">${r.delivered} / ${r.discarded}</span><span>Perk</span><span class="v">${r.perks.map(p => D.PERKS[p].name).join(', ')}</span><span>시드</span><span class="v">${r.seed}</span></div>`;
@@ -296,11 +308,13 @@
     modal('게임 방법', body, [{ label: '닫기', onClick: back }]);
   }
   function showMenu() {
-    modal('메뉴', `<p>진행 상황은 매 턴 자동 저장됩니다.</p>`, [
+    const m = modal('메뉴', `<p>진행 상황은 매 턴 자동 저장됩니다.</p><label style="display:flex;align-items:center;gap:8px;font-size:12px">음악 볼륨 <input type="range" id="vol" min="0" max="1" step="0.05" value="${opts.musicVol}" style="flex:1"></label>`, [
       { label: '계속하기', cls: 'primary', onClick: closeModal },
       { label: `효과음 ${opts.sound ? '끄기' : '켜기'}`, onClick: () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); store(OPT_KEY, opts); closeModal(); } },
+      { label: `음악 ${opts.music ? '끄기' : '켜기'}`, onClick: () => { opts.music = !opts.music; BGM.setEnabled(opts.music); store(OPT_KEY, opts); closeModal(); } },
       { label: '런 포기', cls: 'warn', onClick: () => { if (confirm('이 런을 포기하고 타이틀로 돌아갈까요? (기록에는 남지 않습니다)')) { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } closeModal(); game = null; showTitle(); } } },
     ]);
+    m.querySelector('#vol').oninput = e => { opts.musicVol = +e.target.value; BGM.setVolume(opts.musicVol); store(OPT_KEY, opts); };
   }
 
   // ---------- init ----------
@@ -311,8 +325,9 @@
     $('#log-btn').onclick = () => { if (game) { SFX.click(); showLog(closeModal); } };
     $('#help-btn').onclick = () => { SFX.click(); showHelp(closeModal); };
     $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
-    document.addEventListener('touchstart', () => SFX.resume(), { once: true });
-    document.addEventListener('click', () => SFX.resume(), { once: true });
+    document.addEventListener('touchstart', () => { SFX.resume(); BGM.resume(); }, { once: true });
+    document.addEventListener('click', () => { SFX.resume(); BGM.resume(); }, { once: true });
+    BGM.preload(['title', 'warehouse']);
     if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
       window.Capacitor.Plugins.App.addListener('backButton', () => { if ($('#modal-root').classList.contains('show') && game && game.phase === 'play') closeModal(); });
     }

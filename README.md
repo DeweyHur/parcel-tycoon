@@ -30,9 +30,27 @@ bash build-apk.sh    # → dist/parcel-tycoon-debug.apk (USB 연결된 폰이 �
 | `www/js/ui.js` | 화면/모달/저장/기록 |
 | `www/js/scene3d.js` | Three.js 로우폴리 창고·트럭 연출 |
 | `www/js/sfx.js` | WebAudio 8비트 효과음 |
+| `www/js/bgm.js` | BGM 시스템 (WebAudio 끊김 없는 루프, 크로스페이드, 원샷) |
+| `www/audio/` | 게임용 BGM (루프 가공본). 원본은 `audio-src/` |
+| `tools/make_loops.py` | Suno 원본 → 루프 가공 (루프 지점 자동 탐색, 라우드니스 정규화) |
 | `test/unit.js` | 규칙 단위 테스트 `node test/unit.js` |
 | `test/sim.js` | 봇 밸런스 시뮬레이션 `node test/sim.js 300` |
 | `test/shot.js` | Playwright UI 스모크 테스트 + 스크린샷 |
+
+## 음악 (BGM)
+
+Suno로 만든 칩튠 6곡. `audio-src/`의 원본을 `python3 tools/make_loops.py`로 가공해 `www/audio/`에 넣는다 (ffmpeg, numpy 필요).
+
+| 곡 | 용도 | 전환 조건 |
+|---|---|---|
+| title | 타이틀·Perk 선택 | 게임 밖 |
+| warehouse | 영업 단계 | 창고 사용률 ≤ 90%, 스트레스 < 16 |
+| overflow | 위기 | 사용률 > 90% 또는 스트레스 ≥ 16 (크로스페이드 1.2초) |
+| market | 월말 마켓 | 마켓 화면 |
+| fanfare | 월말 정산, 런 성공 | 원샷 |
+| gameover | 게임오버 | 원샷 |
+
+루프 이음새가 어색하면 `tools/make_loops.py`의 `OVERRIDE`에 곡별 루프 끝 지점(초)을 넣고 다시 실행. 음악 켜기/끄기와 볼륨은 타이틀·메뉴에서.
 
 ## 구현 범위 (프로토타입)
 
