@@ -69,7 +69,8 @@
   }
 
   // ---------- 런 준비: 시나리오 → 회사 → 퍽 ----------
-  function unlockText(achId) { const a = M.ACHIEVEMENTS[achId]; return a ? `🔒 ${a.name}: ${a.desc}` : '🔒'; }
+  function unlockText(achId) { const a = M.ACHIEVEMENTS[achId]; if (!a) return '🔒'; let pr = ''; try { if (a.prog) { const P = Profile.get(); const [h, n] = a.prog(P.stats, P); pr = ` (${Math.min(h, n)}/${n})`; } } catch (e) { } return `🔒 ${a.name}: ${a.desc}${pr}`; }
+  const TIER_NAMES = ['시작', '1단계 · 하다 보면 열림', '2단계 · 특화 누적', '3단계 · 도전'];
   const prep = { scenario: 'standard', company: 'local', perks: [] };
   function showScenarioSelect() {
     const P = Profile.get(), dc = Game.dailyConfig ? null : null;
@@ -93,7 +94,7 @@
   function showCompanySelect() {
     const P = Profile.get();
     if (!P.unlocked.companies.includes(prep.company)) prep.company = 'local';
-    const cards = Object.keys(M.COMPANIES).map(id => {
+    const cards = Object.keys(M.COMPANIES).sort((x, y) => (M.COMPANIES[x].tier || 0) - (M.COMPANIES[y].tier || 0)).map(id => {
       const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id);
       const rec = (P.records[prep.scenario] || {})[id];
       return `<div class="card ${un ? '' : 'dis'} ${prep.company === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${co.icon} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${rec ? rec.bestScore + '점' : ''}</span></div>
@@ -405,7 +406,7 @@
     const P = Profile.get();
     const tabs = [['companies', '회사'], ['perks', '퍽'], ['scenarios', '시나리오'], ['achievements', '도전과제'], ['stats', '통계']];
     let body = `<div class="tabs">${tabs.map(([id, nm]) => `<button class="btn small ${tab === id ? 'gold' : ''}" data-tab="${id}">${nm}</button>`).join('')}</div>`;
-    if (tab === 'companies') body += Object.keys(M.COMPANIES).map(id => { const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id); const clears = P.stats.clearsByCompany[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? co.icon : '🔒'} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${clears ? clears + '승' : ''}</span></div>${un ? companyInfo(co, id) : `<div class="d">${esc(unlockText(co.unlock))}</div>`}</div>`; }).join('');
+    if (tab === 'companies') body += [0, 1, 2, 3].map(t => `<div class="perk-count">${TIER_NAMES[t]}</div>` + Object.keys(M.COMPANIES).filter(id => (M.COMPANIES[id].tier || 0) === t).map(id => { const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id); const clears = P.stats.clearsByCompany[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? co.icon : '🔒'} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${clears ? clears + '승' : ''}</span></div>${un ? companyInfo(co, id) : `<div class="d">${esc(unlockText(co.unlock))}</div>`}</div>`; }).join('')).join('');
     else if (tab === 'perks') body += `<div class="perk-count">퍽 슬롯 ${Profile.perkSlots()}개 · 같은 계열은 하나만 장착</div>` + Object.keys(M.PERK_FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${M.PERK_FAMILIES[f]} 계열</div>` + Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f).map(id => { const pk = M.PERKS[id], un = P.unlocked.perks.includes(id); return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t">${un ? '' : '🔒 '}${esc(pk.name)}</div><div class="d">${esc(pk.desc)}${un ? '' : `<br>${esc(unlockText(pk.unlock))}`}</div></div>`; }).join('')).join('');
     else if (tab === 'scenarios') body += Object.keys(M.SCENARIOS).map(id => { const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id); const clears = P.stats.clearsByScenario[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? s.icon : '🔒'} ${esc(s.name)}</span><span class="price">${clears ? clears + '승' : ''}</span></div><div class="d">${esc(s.desc)}<br>승리: ${esc(s.win)}${un ? '' : `<br>${esc(unlockText(s.unlock))}`}</div></div>`; }).join('');
     else if (tab === 'achievements') {
@@ -427,7 +428,7 @@
   function showHelp(back) {
     const body = `<div class="help">
       <p>택배가 매 턴 창고로 들어옵니다. 운송 업체를 호출해 처리하거나 <b>대기</b>해서 택배를 모아 두세요. 호출 비용은 택배 개수가 아니라 <b>호출 횟수</b> 기준이므로, 한 번에 많이 처리할수록 이득입니다.</p>
-      <h3>런 준비</h3><p><b>시나리오</b>(길이·규칙) → <b>회사</b>(시작 창고·계약·고유 특성) → <b>퍽</b>(작은 규칙 변경) 순서로 고릅니다. 회사·퍽·시나리오는 <b>도전과제</b>로 해금되며, 도감에서 조건을 볼 수 있습니다.</p>
+      <h3>런 준비</h3><p><b>시나리오</b>(길이·규칙) → <b>회사</b>(시작 창고·계약·고유 특성) → <b>퍽</b>(작은 규칙 변경) 순서로 고릅니다. 회사·퍽·시나리오는 <b>도전과제</b>로 해금되며, 도감에서 조건과 진행도를 볼 수 있습니다. 회사는 <b>1단계</b>(런 3회·첫 클리어·2회 클리어 — 하다 보면 열림) → <b>2단계</b>(택배 종류별 누적 30개) → <b>3단계</b>(회사 3개로 클리어) 순으로 열립니다.</p>
       <h3>한 턴의 순서</h3><p>입고 → 업체 호출 또는 대기 → 배송 → 신선도·기한 진행 → 창고 초과·지연 페널티</p>
       <h3>택배 종류</h3><table><tr><th>종류</th><th>크기</th><th>기한</th><th>전문 업체</th></tr>
       <tr><td>일반</td><td>1~2</td><td>6턴</td><td>자체 배송 / 대량 분류</td></tr><tr><td>신선식품</td><td>2~4</td><td>3턴(부패)</td><td>냉장 물류</td></tr><tr><td>파손주의</td><td>2~4</td><td>7턴</td><td>프래자일 전문</td></tr><tr><td>국제운송</td><td>4~7</td><td>8턴</td><td>국제 특송</td></tr><tr><td>대형화물</td><td>4~7</td><td>8턴</td><td>대형 화물 (4개월차~)</td></tr></table>

@@ -69,7 +69,9 @@ t('회사별 시작 상태', () => {
 t('시나리오 규칙', () => {
   const p = new Game({ seed: 3, scenario: 'peak' }); assert.equal(p.rules.months, 2); assert.ok(p.schedule.reduce((a, b) => a + b.length, 0) >= 18);
   const c = new Game({ seed: 3, scenario: 'cashcrunch' }); assert.equal(c.cash, 300);
-  const h = new Game({ seed: 3, scenario: 'heatwave' }); assert.equal(h.heatTurns.length, 2);
+  const h = new Game({ seed: 3, scenario: 'heatwave' }); assert.equal(h.heatTurns.length, 3);
+  const a = new Game({ seed: 3, scenario: 'audit' }); assert.equal(a.rules.winMaxOverdue, 4); assert.equal(a.rules.deadlineAll, -1);
+  const b = new Game({ seed: 3, scenario: 'blackfriday' }); assert.equal(b.rules.months, 1); assert.ok(b.schedule.reduce((x, y) => x + y.length, 0) >= 24);
   const s = new Game({ seed: 3, scenario: 'strike' }); assert.ok(s.strikeCarrier);
   const e = new Game({ seed: 3, scenario: 'endless' }); assert.ok(e.rules.endless);
 });
@@ -95,4 +97,12 @@ t('신뢰도는 업체에 귀속 (계약 교체해도 유지)', () => {
   assert.deepEqual(g.trustNext('cold'), { need: 15, have: 9, effect: '전용 능력' });
 });
 t('대기 예상치', () => { const g = NG(10); const f = g.forecast(); assert.ok(f.cap === 24 && f.used >= g.usedVolume()); });
+t('회사 해금 체인: 1단계는 누적으로 열림', () => {
+  const A = M.ACHIEVEMENTS; const prof = { unlocked: { companies: ['local'] } };
+  assert.ok(A.rookie.check({}, { runs: 3 }, null, prof)); assert.ok(!A.rookie.check({}, { runs: 2 }, null, prof));
+  assert.ok(A.two_clears.check({}, { clears: 2 }, null, prof));
+  assert.ok(A.first_clear.reward.includes('company:postal'));
+  for (const id in M.COMPANIES) { const c = M.COMPANIES[id]; if (c.unlock) assert.ok(A[c.unlock] && (A[c.unlock].rewardType === 'company' || A[c.unlock].reward.includes('company:' + id)), id); }
+  assert.deepEqual(A.big20.prog({ bigDelivered: 7 }), [7, 20]);
+});
 console.log(`\n${n} tests passed`);

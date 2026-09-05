@@ -6,7 +6,7 @@ window.Profile = (function () {
 
   function emptyStats() {
     return { runs: 0, clears: 0, deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0 }, waits: 0, calls: 0, contractsBought: 0, discarded: 0, tidyMonths: 0,
-      bestScore: 0, clearsByCompany: {}, clearsByCompanyStandard: {}, clearsByScenario: {}, dailyStreak: 0, lastDaily: null, dailyDone: {} };
+      bigDelivered: 0, bestScore: 0, clearsByCompany: {}, clearsByCompanyStandard: {}, clearsByScenario: {}, dailyStreak: 0, lastDaily: null, dailyDone: {} };
   }
   function fresh() {
     return { version: 1, unlocked: JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), achievements: {}, stats: emptyStats(), records: {}, recentRuns: [], createdAt: Date.now() };
@@ -33,6 +33,7 @@ window.Profile = (function () {
     P.stats = Object.assign(emptyStats(), P.stats);
     P.unlocked = Object.assign(JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), P.unlocked);
     for (const k of ['companies', 'perks', 'scenarios']) for (const d of M.DEFAULT_UNLOCK[k]) if (!P.unlocked[k].includes(d)) P.unlocked[k].push(d);
+    evaluate(null, null); // 해금 조건이 바뀐 경우(누적·메타) 기존 기록으로 즉시 반영
     return P;
   }
   function save() { Store.set(KEY, P); }
@@ -85,7 +86,7 @@ window.Profile = (function () {
     const s = game.stats, p = P.stats;
     p.runs++;
     for (const t in s.deliveredByType) p.deliveredByType[t] = (p.deliveredByType[t] || 0) + s.deliveredByType[t];
-    p.waits += s.waits; p.calls += s.calls; p.contractsBought += s.contractsBought; p.discarded += s.discarded; p.tidyMonths += s.tidyMonths;
+    p.waits += s.waits; p.calls += s.calls; p.contractsBought += s.contractsBought; p.discarded += s.discarded; p.tidyMonths += s.tidyMonths; p.bigDelivered = (p.bigDelivered || 0) + (s.bigDelivered || 0);
     p.bestScore = Math.max(p.bestScore, result.score);
     if (result.win) {
       p.clears++;

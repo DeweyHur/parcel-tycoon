@@ -39,7 +39,7 @@
     firstContractDiscount: 0, rebuyTrust: 0, spareCall: false, bundleRefund: null, overflowGrace: 0, capDelta: 0, freezer: 0, xlDelta: 0, xlPenalty: 3,
     insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
     arrivalsMult: 1, burstTurns: 0, winDelivered: 0, typeShift: null, typeOverride: null, freshSizes: null, warmMult: 2, heatAlerts: 0, winMaxDiscard: null,
-    strike: false, xlWeight: null, winCash: 0, noRefresh: false, bigWeight: 1, bigCallBonus: null,
+    strike: false, xlWeight: null, winCash: 0, noRefresh: false, bigWeight: 1, bigCallBonus: null, winMaxOverdue: null,
     selfCapDelta: 0, allStartTrust: 0,
   };
   const MULT_KEYS = ['cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
@@ -112,7 +112,7 @@
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
         overdueDelivered: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
-        brokeMonthEnd: false, maxMonthDelivered: 0, distinctCarriersAtEnd: 0, monthsDone: 0, selfCalls: 0, urgentCalls: 0 };
+        brokeMonthEnd: false, maxMonthDelivered: 0, distinctCarriersAtEnd: 0, monthsDone: 0, selfCalls: 0, urgentCalls: 0, bigDelivered: 0 };
     }
     _buildRules() {
       const c = this.cfg;
@@ -390,7 +390,7 @@
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
         if (specialist && t.bonus) { r += t.bonus + R.bonusDelta; special = true; if (c.carrier === 'fragile' && lv >= 3) r += 15; if (!this.stats.specialistTypes.includes(p.type)) this.stats.specialistTypes.push(p.type); }
         r = Math.round(r * (R.rewardMult[p.type] || 1));
-        if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else { onTime++; this.stats.onTimeByType[p.type]++; if (p.baseSize >= 7) this.stats.xlOnTime++; }
+        if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else { onTime++; this.stats.onTimeByType[p.type]++; if (p.baseSize >= 7) this.stats.xlOnTime++; if (p.baseSize >= 4) this.stats.bigDelivered++; }
         if (p.type === 'fresh' && p.fresh <= 0) { r = Math.round(r * 0.5); if (c.carrier === 'urgent') this.stats.urgentClutch = true; }
         if (p.type === 'fresh' && p.fresh === 1 && c.carrier === 'urgent') this.stats.urgentClutch = true;
         revenue += Math.max(0, r);
@@ -545,6 +545,7 @@
       if (R.winDelivered && this.run.delivered < R.winDelivered) return this._gameOver(`처리량 부족: ${this.run.delivered}/${R.winDelivered}개`), true;
       if (R.winMaxDiscard != null && this.run.discarded > R.winMaxDiscard) return this._gameOver(`부패 폐기 초과: ${this.run.discarded}개 (허용 ${R.winMaxDiscard})`), true;
       if (R.winCash && this.cash < R.winCash) return this._gameOver(`자금 부족: ${this.cash}/${R.winCash}c`), true;
+      if (R.winMaxOverdue != null && this.stats.overdueDelivered > R.winMaxOverdue) return this._gameOver(`기한 초과 처리 초과: ${this.stats.overdueDelivered}개 (허용 ${R.winMaxOverdue})`), true;
       return this._win();
     }
     _gameOver(reason) {
