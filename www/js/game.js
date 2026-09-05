@@ -40,9 +40,10 @@
     insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
     arrivalsMult: 1, burstTurns: 0, winDelivered: 0, typeShift: null, typeOverride: null, freshSizes: null, warmMult: 2, heatAlerts: 0, winMaxDiscard: null,
     strike: false, xlWeight: null, winCash: 0, noRefresh: false, bigWeight: 1, bigCallBonus: null,
+    selfCapDelta: 0, allStartTrust: 0,
   };
   const MULT_KEYS = ['cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
-  const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'burstTurns'];
+  const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'burstTurns', 'selfCapDelta', 'allStartTrust'];
   const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust'];
   const MAP_MULT_KEYS = ['rewardMult', 'marketWeight'];
   const LIST_KEYS = ['banCarriers', 'guaranteeCarriers'];
@@ -101,6 +102,8 @@
       this.stats = Game.emptyStats();
       this.summary = null; this.result = null;
       this.strikeCarrier = null; this.heatTurns = []; this.burstTurns = [];
+      this.trust = {}; // 업체별 신뢰도 경험치 (런 내 유지)
+      for (const k of Object.keys(D.CARRIERS)) this.trust[k] = (this.rules.carrierStartTrust[k] || 0) + this.rules.allStartTrust;
       this._initCompany();
       this._startMonth(1);
     }
@@ -109,7 +112,7 @@
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
         overdueDelivered: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
-        brokeMonthEnd: false, maxMonthDelivered: 0, distinctCarriersAtEnd: 0, monthsDone: 0 };
+        brokeMonthEnd: false, maxMonthDelivered: 0, distinctCarriersAtEnd: 0, monthsDone: 0, selfCalls: 0, urgentCalls: 0 };
     }
     _buildRules() {
       const c = this.cfg;
@@ -147,14 +150,42 @@
       const c = D.CARRIERS[carrier], g = D.GRADES[grade], R = this.rules;
       const maxCalls = Math.max(1, c.calls + g.calls + R.callsDelta + (isStart ? R.startCallsDelta : 0));
       return { id: this.nextId++, carrier, grade, maxCalls, calls: calls == null ? maxCalls : calls,
-        trust: R.carrierStartTrust[carrier] || 0, enh: { limit: 0, cap: 0, regular: false, express: false }, successCalls: 0, totalCalls: 0, delivered: 0 };
+        enh: { limit: 0, cap: 0, regular: false, express: false }, successCalls: 0, totalCalls: 0, delivered: 0 };
     }
     hasPerk(p) { return this.perks.includes(p); }
     say(msg) { this.log.unshift(msg); if (this.log.length > 60) this.log.pop(); }
     emit(type, data) { this.events.push({ type, ...data }); }
     takeEvents() { const e = this.events; this.events = []; return e; }
 
-    trustLevel(c) { let lv = 0; for (let i = 1; i < D.TRUST_LEVELS.length; i++) if (c.trust >= D.TRUST_LEVELS[i]) lv = i; return lv; }
+    trustXp(c) { return this.trust[typeof c === 'string' ? c : c.carrier] || 0; }
+    trustLevel(c) { const xp = this.trustXp(c); let lv = 0; for (let i = 1; i < D.TRUST_LEVELS.length; i++) if (xp >= D.TRUST_LEVELS[i]) lv = i; return lv; }
+    trustNext(c) { const lv = this.trustLevel(c); return lv >= 3 ? null : { need: D.TRUST_LEVELS[lv + 1], have: this.trustXp(c), effect: D.TRUST_EFFECTS[lv + 1] }; }
+    // 이 호출로 얻을 신뢰도 경험치 예상 (정상 처리 +1, 처리량 80% 이상 +1, 특수 택배 전문 처리 +1)
+    trustGainPreview(c, count) {
+      const R = this.rules, cap = this.callCapacity(c);
+      let xp = 1; const parts = ['정상 처리 +1'];
+      if (count >= Math.ceil(cap * 0.8)) { xp++; parts.push('처리량 80%↑ +1'); }
+      if (['cold', 'fragile', 'intl', 'large'].includes(c.carrier) || (c.carrier === 'target' && this.trustLevel(c) >= 3)) { xp++; parts.push('전문 처리 +1'); }
+      if (c.carrier === 'cold' && R.coldTrustBonus) { xp += R.coldTrustBonus; parts.push('콜드체인 +1'); }
+      xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
+      return { xp, parts };
+    }
+    selfCapacity() { return Math.max(1, D.SELF_DELIVERY.cap + this.rules.selfCapDelta); }
+    // 자체 배송 대상: 대기열 앞의 일반 택배를 부피 한도(칸)까지
+    selfEligible() { const cap = this.selfCapacity(); const out = []; let v = 0; for (const p of this.parcels) { if (p.type !== 'normal') continue; if (v + p.size > cap) { if (out.length) break; else continue; } out.push(p); v += p.size; } return out; }
+    canSelfDeliver() { return this.phase === 'play' && this.selfEligible().length > 0; }
+    // 대기했을 때 다음 턴 예상: 창고 사용량, 기한 초과·부패 예정
+    forecast() {
+      const R = this.rules, nxt = this.schedule[this.turn] || [];
+      let incoming = 0; for (const s of nxt) { let sz = s.size + R.sizeDelta; if (s.size >= 4) sz += R.bigSizeDelta; incoming += Math.max(1, sz); }
+      let overdue = 0, spoil = 0;
+      const heat = this.isHeatTurn();
+      for (const p of this.parcels) {
+        if (!p.overdue && p.deadline - 1 <= 0) overdue++;
+        if (p.type === 'fresh') { const drop = heat && !p.inCold ? 99 : (p.inCold && R.freezer && p.age + 1 <= R.freezer) ? 0 : (p.inCold ? 1 : R.warmMult); if (p.fresh - drop <= -1) spoil++; }
+      }
+      return { used: this.usedVolume() + incoming, cap: this.warehouse.cap, incoming, count: nxt.length, overdue, spoil, monthEnd: this.turn >= D.TURNS_PER_MONTH };
+    }
     contractName(c) { return D.CARRIERS[c.carrier].name + (c.grade !== 'normal' ? ` (${D.GRADES[c.grade].name})` : ''); }
     isStruck(c) { return this.rules.strike && this.strikeCarrier === c.carrier; }
 
@@ -163,7 +194,7 @@
       let cap = D.CARRIERS[c.carrier].cap + D.GRADES[c.grade].cap + c.enh.cap + (R.carrierCapDelta[c.carrier] || 0);
       const lv = this.trustLevel(c);
       if (lv >= 1) cap += 1;
-      if (lv >= 3 && ['line', 'bulk', 'intl', 'large', 'urgent'].includes(c.carrier)) cap += 1;
+      if (lv >= 3 && ['bulk', 'intl', 'large', 'urgent'].includes(c.carrier)) cap += 1;
       return Math.max(1, cap);
     }
     callCapacity(c) {
@@ -376,8 +407,8 @@
       if (c.carrier === 'cold' && R.coldTrustBonus) xp += R.coldTrustBonus;
       if (xp > 0) xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       const beforeLv = lv;
-      c.trust += xp;
-      if (this.trustLevel(c) > beforeLv) { this.say(`${this.contractName(c)} 신뢰도 ${this.trustLevel(c)}단계 달성!`); if (this.trustLevel(c) >= 3) this.stats.trustL3++; }
+      this.trust[c.carrier] = (this.trust[c.carrier] || 0) + xp;
+      if (this.trustLevel(c) > beforeLv) { this.say(`${car.name} 신뢰도 ${this.trustLevel(c)}단계 달성! (${D.TRUST_EFFECTS[this.trustLevel(c)]})`); this.emit('trustup', { carrier: c.carrier, level: this.trustLevel(c) }); if (this.trustLevel(c) >= 3) this.stats.trustL3++; }
       // 호출 횟수 소모
       let refunded = false;
       if (useSpare) { this.monthStats.spareUsed = true; this.say('예비 기사 투입 (잔여 호출 없이 호출)'); }
@@ -393,14 +424,44 @@
       this.waitStack = 0;
       this._assignCold();
       const freezeFresh = c.carrier === 'cold' && lv >= 3;
-      this.say(`${this.contractName(c)} 호출: ${chosen.length}개 처리, +${revenue}c${refunded ? ' (묶음 할인: 호출 미소모)' : ''} (잔여 ${c.calls}회)`);
-      this.emit('call', { contract: c, count: chosen.length, revenue });
+      this.say(`${this.contractName(c)} 호출: ${chosen.length}개 처리, +${revenue}c${refunded ? ' (묶음 할인: 호출 미소모)' : ''} (잔여 ${c.calls}회)${car.instant ? ' ⚡즉시' : ''}`);
+      this.emit('call', { contract: c, count: chosen.length, revenue, instant: !!car.instant });
       this._updateTrustStats();
+      if (car.instant) { this.stats.urgentCalls++; this.stats.maxCash = Math.max(this.stats.maxCash, this.cash); return { ok: true, revenue, count: chosen.length, instant: true }; }
       this._endTurn(false, freezeFresh);
       return { ok: true, revenue, count: chosen.length };
     }
+    // 자체 배송: 대기열 앞 일반 택배를 무료로 처리. 턴 소모, 계약·신뢰도 무관
+    selfDeliver() {
+      if (this.phase !== 'play') return { ok: false, msg: '지금은 배송할 수 없습니다' };
+      const R = this.rules, chosen = this.selfEligible();
+      if (!chosen.length) return { ok: false, msg: '처리할 일반 택배가 없습니다' };
+      let revenue = 0;
+      for (const p of chosen) {
+        let r = p.reward + (R.rewardDelta.normal || 0) + R.rewardAll;
+        r = Math.round(r * (R.rewardMult.normal || 1) * D.SELF_DELIVERY.rewardMult);
+        if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else this.stats.onTimeByType.normal++;
+        revenue += Math.max(0, r);
+        this.stats.deliveredByType.normal++;
+        this.parcels.splice(this.parcels.indexOf(p), 1);
+        this.emit('deliver', { parcel: p, reward: r });
+      }
+      revenue = Math.round(revenue * R.revenueMult);
+      this.cash += revenue;
+      this.monthStats.revenue += revenue; this.monthStats.delivered += chosen.length;
+      this.run.revenue += revenue; this.run.delivered += chosen.length;
+      this.stats.selfCalls++; this.stats.callStreak++; this.stats.maxCallStreak = Math.max(this.stats.maxCallStreak, this.stats.callStreak);
+      this.stats.maxCash = Math.max(this.stats.maxCash, this.cash);
+      this.waitStack = 0;
+      this._assignCold();
+      this.say(`자체 배송: 일반 ${chosen.length}개 처리, +${revenue}c`);
+      this.emit('call', { contract: null, self: true, count: chosen.length, revenue });
+      this._endTurn(false, false);
+      return { ok: true, revenue, count: chosen.length };
+    }
     _updateTrustStats() {
-      const l2 = this.contracts.filter(c => c && this.trustLevel(c) >= 2).length, l3 = this.contracts.filter(c => c && this.trustLevel(c) >= 3).length;
+      const seen = new Set(this.contracts.filter(Boolean).map(c => c.carrier));
+      const l2 = [...seen].filter(k => this.trustLevel(k) >= 2).length, l3 = [...seen].filter(k => this.trustLevel(k) >= 3).length;
       this.stats.maxTrustL2Simul = Math.max(this.stats.maxTrustL2Simul, l2); this.stats.maxTrustL3Simul = Math.max(this.stats.maxTrustL3Simul, l3);
       if (this.contracts.some(c => c && c.grade === 'master')) this.stats.masterOwned = true;
     }
@@ -576,7 +637,6 @@
         if (old) {
           if (old.calls >= 3) this.stats.replacedWithCalls = Math.max(this.stats.replacedWithCalls, old.calls);
           if (R.keepCalls && old.calls > 0) nc.calls = Math.min(nc.maxCalls + R.keepCalls, nc.calls + Math.min(R.keepCalls, old.calls));
-          if (R.rebuyTrust && old.carrier === nc.carrier) nc.trust = Math.max(nc.trust, R.rebuyTrust);
         }
         this.contracts[target] = nc;
         this.monthStats.firstContractBought = true; this.stats.contractsBought++;
@@ -590,7 +650,7 @@
         else if (e.kind === 'cap') { if (c.enh.cap >= 3) return { ok: false, msg: '처리 용량 강화는 계약당 3단계까지' }; c.enh.cap++; }
         else if (e.kind === 'regular') { if (c.enh.regular) return { ok: false, msg: '이미 정기 배차가 적용된 계약' }; c.enh.regular = true; }
         else if (e.kind === 'express') { if (c.enh.express) return { ok: false, msg: '이미 고속 배차가 적용된 계약' }; c.enh.express = true; }
-        else if (e.kind === 'trust') { c.trust += e.value; if (this.trustLevel(c) >= 3) this.stats.trustL3++; }
+        else if (e.kind === 'trust') { const b = this.trustLevel(c); this.trust[c.carrier] = (this.trust[c.carrier] || 0) + e.value; if (this.trustLevel(c) > b && this.trustLevel(c) >= 3) this.stats.trustL3++; }
         this._updateTrustStats();
         this.say(`강화 적용: ${e.name} → ${this.contractName(c)} (-${price}c)`);
       } else if (it.kind === 'fac') {
@@ -628,6 +688,7 @@
       delete g.rngCalls;
       g.events = [];
       if (!g.stats) g.stats = Game.emptyStats();
+      if (!g.trust) g.trust = {};
       return g;
     }
   }

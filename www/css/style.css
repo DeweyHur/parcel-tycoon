@@ -76,8 +76,15 @@ body { touch-action: manipulation; }
 .contract .sub { font-size: 11px; color: var(--dim); }
 .contract .sub b { color: var(--ink); }
 .contract.ready { border-color: var(--gold); }
-#wait-btn { grid-column: 1 / -1; font-size: 15px; }
-#wait-btn small { display: block; font-size: 11px; font-weight: 400; color: var(--dim); }
+#wait-btn, #self-btn { font-size: 14px; text-align: center; font-weight: 700; }
+#wait-btn small, #self-btn small { display: block; font-size: 11px; font-weight: 400; color: var(--dim); }
+#wait-btn.danger { background: #6b3d3d; }
+.contract.urgent { border-color: var(--red); background: #4a2a3a; }
+.trust { display: inline-block; font-size: 10px; color: var(--gold); }
+.trust i { display: inline-block; width: 5px; height: 7px; margin-right: 1px; background: #444; vertical-align: middle; } .trust i.on { background: var(--gold); }
+.urg { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+.urg.r { background: var(--red); animation: blink .7s steps(2) infinite; } .urg.o { background: var(--orange); } .urg.y { background: var(--gold); } .urg.g { background: #3a3a55; }
+.parcel .st b { color: var(--ink); }
 #bottom-bar { display: flex; gap: 6px; grid-column: 1 / -1; }
 #bottom-bar .btn { flex: 1; text-align: center; padding: 4px; font-size: 12px; }
 

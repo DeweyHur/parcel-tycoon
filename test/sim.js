@@ -10,10 +10,12 @@ function urgency(g) {
 function nextVolume(g) { const u = g.upcoming()[0]; return u.specs ? u.specs.reduce((s, x) => s + x.size, 0) : 0; }
 
 function pickBest(g, threshold) {
-  // 각 계약별 처리 가능 수 계산, 가장 많이 처리하는 계약 선택 (급한 것 우선)
+  // 각 계약별 처리 가능 수 계산, 가장 많이 처리하는 계약 선택 (급한 것 우선). 자체 배송도 후보(i = -1)
   let best = null;
+  const selfE = g.selfEligible();
+  if (selfE.length) { const urgent = selfE.some(p => p.deadline <= 1 || p.overdue); const fill = selfE.length / g.selfCapacity(); const score = (urgent ? 100 : 0) + selfE.length * 10 + fill * 5 + 4; best = { i: -1, ids: selfE.map(p => p.id), score, urgent, fill }; }
   g.contracts.forEach((c, i) => {
-    if (!g.canCall(c)) return;
+    if (!g.canCall(c) || D.CARRIERS[c.carrier].instant) return;
     const cap = g.callCapacity(c);
     const elig = g.eligibleParcels(c);
     // 급한 순: 부패 임박, 기한 임박
@@ -69,8 +71,11 @@ function runOne(seed, strat, cfg) {
   let guard = 0;
   while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 500) {
     if (g.phase === 'play') {
+      // 긴급 특송: 부패 직전·기한 임박 택배가 있으면 즉시 사용
+      const ui = g.contracts.findIndex(c => c && D.CARRIERS[c.carrier].instant && g.canCall(c));
+      if (ui >= 0) { const p = g.parcels.find(p => (p.type === 'fresh' && p.fresh <= 1) || p.deadline <= 1); if (p) { g.callCarrier(ui, [p.id]); continue; } }
       const b = STRATS[strat](g);
-      if (b) g.callCarrier(b.i, b.ids); else g.wait();
+      if (!b) g.wait(); else if (b.i === -1) g.selfDeliver(); else g.callCarrier(b.i, b.ids);
     } else if (g.phase === 'summary') g.closeSummary();
     else if (g.phase === 'market') { marketBot(g); g.closeMarket(); }
   }

@@ -4,14 +4,14 @@
     local: {
       name: '동네 택배', tag: '균형형 · 기준선', icon: '🏠',
       warehouse: { cap: 24, cold: 6, xl: 1 }, cash: 600,
-      contracts: [{ carrier: 'line', calls: 4 }, { carrier: 'target', calls: 3 }, { carrier: 'cold', calls: 2 }, { carrier: 'bulk', calls: 1 }],
+      contracts: [{ carrier: 'target', calls: 3 }, { carrier: 'cold', calls: 2 }, { carrier: 'bulk', calls: 1 }],
       passive: '동네 단골: 매월 첫 호출의 처리량 +1', weakness: '없음',
       mods: { firstCallBonus: 1 }, unlock: null,
     },
     fresh: {
       name: '프레시 로지스틱스', tag: '신선식품 특화', icon: '🧊',
       warehouse: { cap: 22, cold: 10, xl: 1 }, cash: 450,
-      contracts: [{ carrier: 'cold', grade: 'trusted', calls: 3 }, { carrier: 'line', calls: 4 }, { carrier: 'target', calls: 2 }, { carrier: 'bulk', calls: 1 }],
+      contracts: [{ carrier: 'cold', grade: 'trusted', calls: 3 }, { carrier: 'target', calls: 2 }, { carrier: 'bulk', calls: 2 }],
       passive: '콜드체인: 신선식품 부패 카운트 +1턴. 냉장 물류 호출 시 신뢰도 +1 추가', weakness: '냉장 편중: 파손·국제 보상 -10%. 대형 화물 업체 마켓 미등장',
       mods: { freshExtra: 1, coldTrustBonus: 1, rewardMult: { fragile: 0.9, intl: 0.9 }, banCarriers: ['large'], marketWeight: { cold: 2, cold1: 2, cold2: 2 } },
       unlock: 'fresh_king',
@@ -19,7 +19,7 @@
     steel: {
       name: '강철 창고', tag: '대형화물 · 공간', icon: '🏗️',
       warehouse: { cap: 34, cold: 0, xl: 3 }, cash: 400,
-      contracts: [{ carrier: 'large', calls: 2 }, { carrier: 'bulk', calls: 2 }, { carrier: 'line', calls: 4 }, { carrier: 'target', calls: 4 }],
+      contracts: [{ carrier: 'large', calls: 2 }, { carrier: 'bulk', calls: 2 }, { carrier: 'target', calls: 4 }],
       passive: '적재 전문: 크기 4 이상 택배의 점유량 -1. 대형 화물 회당 처리량 +1', weakness: '냉장 없음: 신선식품은 항상 상온(부패 2배). 냉장 용량 최대 4',
       mods: { bigSizeDelta: -1, carrierCapDelta: { large: 1 }, coldCapMax: 4, marketWeight: { large: 2, expand1: 1.5, expand2: 1.5, expand3: 1.5, cold: 0.5 } },
       unlock: 'giant',
@@ -27,15 +27,15 @@
     quick: {
       name: '도심 퀵', tag: '좁은 창고 · 잦은 호출', icon: '🛵',
       warehouse: { cap: 16, cold: 4, xl: 0 }, cash: 500,
-      contracts: [{ carrier: 'line', calls: 8 }, { carrier: 'target', calls: 5 }, { carrier: 'cold', calls: 2 }],
-      passive: '빠른 배차: 모든 계약의 최대·잔여 호출 +2. 일반 라인 회당 처리량 +1', weakness: '협소: 창고 확장 효과 절반. 초대형은 항상 임시 공간 +3',
-      mods: { callsDelta: 2, carrierCapDelta: { line: 1 }, facilityCapMult: 0.5, marketWeight: { limit1: 2, limit2: 2, expand1: 0.5, expand2: 0.5, expand3: 0.5 } },
+      contracts: [{ carrier: 'target', calls: 5 }, { carrier: 'cold', calls: 2 }, { carrier: 'bulk', calls: 2 }],
+      passive: '빠른 배차: 모든 계약의 최대·잔여 호출 +2. 자체 배송 +1칸', weakness: '협소: 창고 확장 효과 절반. 초대형은 항상 임시 공간 +3',
+      mods: { callsDelta: 2, selfCapDelta: 1, facilityCapMult: 0.5, marketWeight: { limit1: 2, limit2: 2, expand1: 0.5, expand2: 0.5, expand3: 0.5 } },
       unlock: 'nonstop',
     },
     global: {
       name: '글로벌 익스프레스', tag: '국제운송 · 고보상', icon: '✈️',
       warehouse: { cap: 26, cold: 4, xl: 2 }, cash: 450,
-      contracts: [{ carrier: 'intl', calls: 3 }, { carrier: 'target', calls: 3 }, { carrier: 'line', calls: 3 }, { carrier: 'bulk', calls: 1 }],
+      contracts: [{ carrier: 'intl', calls: 3 }, { carrier: 'target', calls: 3 }, { carrier: 'bulk', calls: 2 }],
       passive: '관세 환급: 국제운송 보상 +20. 국제 특송 계약은 신뢰 3단계로 시작', weakness: '환율 변동: 월말 운영비 100~160 무작위. 일반 보상 -5',
       mods: { rewardDelta: { intl: 20, normal: -5 }, carrierStartTrust: { intl: 20 }, opCostRandom: [100, 150], marketWeight: { intl: 2 }, gradeShift: 0.3 },
       unlock: 'worldwide',
@@ -43,7 +43,7 @@
     glass: {
       name: '유리방 물류', tag: '파손주의 · 정밀', icon: '🫙',
       warehouse: { cap: 24, cold: 4, xl: 1 }, cash: 500,
-      contracts: [{ carrier: 'fragile', calls: 3 }, { carrier: 'target', calls: 3 }, { carrier: 'line', calls: 4 }, { carrier: 'cold', calls: 1 }],
+      contracts: [{ carrier: 'fragile', calls: 3 }, { carrier: 'target', calls: 3 }, { carrier: 'cold', calls: 1 }, { carrier: 'bulk', calls: 1 }],
       passive: '완충 포장: 파손주의 처리 기한 +2턴, 보상 +15', weakness: '조심조심: 대량 분류 처리량 -1. 한 호출 5개 이상이면 그 호출 보상 -10%',
       mods: { deadlineDelta: { fragile: 2 }, rewardDelta: { fragile: 15 }, carrierCapDelta: { bulk: -1 }, bigCallPenalty: 5, marketWeight: { fragile: 2, cap1: 0.7 } },
       unlock: 'unbreakable',
@@ -51,7 +51,7 @@
     thrifty: {
       name: '짠돌이 운송', tag: '절약형의 극단', icon: '🪙',
       warehouse: { cap: 30, cold: 6, xl: 1 }, cash: 700,
-      contracts: [{ carrier: 'bulk', calls: 2 }, { carrier: 'cold', calls: 2 }, { carrier: 'target', calls: 2 }, { carrier: 'line', calls: 2 }],
+      contracts: [{ carrier: 'bulk', calls: 2 }, { carrier: 'cold', calls: 2 }, { carrier: 'target', calls: 2 }],
       passive: '알뜰 계약: 모든 마켓 가격 -20%. 대기한 턴마다 다음 호출 처리량 +1 (최대 +3)', weakness: '인력 부족: 모든 계약 최대 호출 -1. 월말 운영비 +40',
       mods: { priceMult: 0.8, waitStack: 3, callsDelta: -1, opCostDelta: 40, marketWeight: { cap1: 1.5, limit1: 0.7, limit2: 0.7 } },
       unlock: 'patience',
@@ -66,9 +66,9 @@
     postal: {
       name: '국영 우편', tag: '안정형 · 장기전', icon: '📮',
       warehouse: { cap: 28, cold: 6, xl: 1 }, cash: 550,
-      contracts: [{ carrier: 'line', grade: 'trusted', calls: 6 }, { carrier: 'bulk', calls: 2 }, { carrier: 'cold', calls: 2 }, { carrier: 'target', calls: 2 }],
-      passive: '공공 서비스: 운영비 80 고정. 스트레스 10 이상이면 월초 -2. 계약 교체 시 잔여 호출 1회 보존', weakness: '느린 결재: 마켓 매월 2개까지. 전문·마스터는 5개월차부터. 특수 보너스 -5',
-      mods: { opCostFixed: 80, stressRelief: { min: 10, amount: 2 }, keepCalls: 1, marketMaxBuy: 2, expertFrom: 5, bonusDelta: -5, marketWeight: { trusted: 1.3, expert: 0.5, master: 0.5 } },
+      contracts: [{ carrier: 'bulk', grade: 'trusted', calls: 3 }, { carrier: 'cold', calls: 2 }, { carrier: 'target', calls: 2 }],
+      passive: '공공 서비스: 운영비 80 고정. 자체 배송 +1칸. 스트레스 10 이상이면 월초 -2. 계약 교체 시 잔여 호출 1회 보존', weakness: '느린 결재: 마켓 매월 2개까지. 전문·마스터는 5개월차부터. 특수 보너스 -5',
+      mods: { opCostFixed: 80, selfCapDelta: 1, stressRelief: { min: 10, amount: 2 }, keepCalls: 1, marketMaxBuy: 2, expertFrom: 5, bonusDelta: -5, marketWeight: { trusted: 1.3, expert: 0.5, master: 0.5 } },
       unlock: 'long_service',
     },
   };
@@ -78,7 +78,7 @@
     longdeal:  { name: '장기 거래', family: 'contract', desc: '모든 계약 비용 -10%', mods: { contractPriceMult: 0.9 }, unlock: null },
     prepay:    { name: '선불 할인', family: 'contract', desc: '매월 첫 계약 구매 -40', mods: { firstContractDiscount: 40 }, unlock: 'buyer' },
     protect:   { name: '재계약 보호', family: 'contract', desc: '계약 교체 시 잔여 호출 1회 보존', mods: { keepCalls: 1 }, unlock: 'fresh_start' },
-    regularco: { name: '단골 업체', family: 'contract', desc: '같은 운송 업체 계약을 다시 사면 신뢰도 5로 시작', mods: { rebuyTrust: 5 }, unlock: 'trust3' },
+    regularco: { name: '단골 업체', family: 'contract', desc: '모든 업체 신뢰도 3xp(1단계)로 시작', mods: { allStartTrust: 3 }, unlock: 'trust3' },
     spare:     { name: '예비 기사', family: 'contract', desc: '매월 1회, 잔여 호출 0인 계약을 한 번 더 호출', mods: { spareCall: true }, unlock: 'empty_tank' },
     bundle:    { name: '묶음 할인', family: 'contract', desc: '한 호출로 4개 이상 처리하면 호출 횟수 미소모 (월 1회)', mods: { bundleRefund: 4 }, unlock: 'big_haul' },
     // 창고 계열
@@ -135,7 +135,7 @@
     // 회사 해금
     fresh_king:   { name: '신선 배송왕', desc: '한 런에서 신선식품 15개를 부패 없이 처리', kind: 'run', rewardType: 'company', reward: 'fresh', check: s => s.deliveredByType.fresh >= 15 && s.discarded === 0 },
     giant:        { name: '거인의 어깨', desc: '한 런에서 초대형(7) 택배 5개를 기한 내 처리', kind: 'run', rewardType: 'company', reward: 'steel', check: s => s.xlOnTime >= 5 },
-    nonstop:      { name: '무정차', desc: '대기 없이 30턴 연속 호출하고 생존', kind: 'run', rewardType: 'company', reward: 'quick', check: s => s.maxCallStreak >= 30 },
+    nonstop:      { name: '무정차', desc: '대기 없이 30턴 연속 배송(자체 배송 포함)하고 생존', kind: 'run', rewardType: 'company', reward: 'quick', check: s => s.maxCallStreak >= 30 },
     worldwide:    { name: '세계로', desc: '국제운송 누적 30개 처리', kind: 'cum', rewardType: 'company', reward: 'global', check: (s, p) => p.deliveredByType.intl >= 30 },
     unbreakable:  { name: '깨지지 않는', desc: '한 런에서 파손주의 12개를 기한 내 처리', kind: 'run', rewardType: 'company', reward: 'glass', check: s => s.onTimeByType.fragile >= 12 },
     patience:     { name: '기다림의 미학', desc: '월평균 호출 4회 이하로 런 클리어', kind: 'end', needWin: true, rewardType: 'company', reward: 'thrifty', check: (s, p, r) => s.calls / Math.max(1, r.monthsDone) <= 4 },
@@ -154,7 +154,7 @@
     // 퍽 해금
     buyer:        { name: '단골 손님', desc: '계약 누적 10개 구매', kind: 'cum', rewardType: 'perk', reward: 'prepay', check: (s, p) => p.contractsBought >= 10 },
     fresh_start:  { name: '과감한 교체', desc: '잔여 호출 3회 이상인 계약을 교체하고 클리어', kind: 'end', needWin: true, rewardType: 'perk', reward: 'protect', check: s => s.replacedWithCalls >= 3 },
-    trust3:       { name: '신뢰의 정점', desc: '한 계약을 신뢰 3단계까지 올림', kind: 'run', rewardType: 'perk', reward: 'regularco', check: s => s.trustL3 >= 1 },
+    trust3:       { name: '신뢰의 정점', desc: '한 업체를 신뢰 3단계까지 올림', kind: 'run', rewardType: 'perk', reward: 'regularco', check: s => s.trustL3 >= 1 },
     empty_tank:   { name: '빈 탱크', desc: '잔여 호출 0인 계약 4개로 월말을 맞고 생존', kind: 'run', rewardType: 'perk', reward: 'spare', check: s => s.zeroCallsMonthEnd },
     big_haul:     { name: '한 방', desc: '한 호출로 6개 이상 처리', kind: 'run', rewardType: 'perk', reward: 'bundle', check: s => s.maxSingleCall >= 6 },
     no_spoil:     { name: '무부패', desc: '신선식품 부패 0회로 클리어', kind: 'end', needWin: true, rewardType: 'perk', reward: 'coldpro', check: s => s.discarded === 0 && s.deliveredByType.fresh >= 5 },
@@ -169,7 +169,7 @@
     normal100:    { name: '일반 백 개', desc: '일반 택배 누적 100개', kind: 'cum', rewardType: 'perk', reward: 'regulars', check: (s, p) => p.deliveredByType.normal >= 100 },
     all_special:  { name: '만능 물류', desc: '특수 택배 4종을 한 런에서 모두 전문 업체로 처리', kind: 'run', rewardType: 'perk', reward: 'premium', check: s => s.specialistTypes.length >= 4 },
     tidy:         { name: '깔끔한 마감', desc: '월말 사용률 40% 이하로 월 마감 3회 (누적)', kind: 'cum', rewardType: 'perk', reward: 'closing', check: (s, p) => p.tidyMonths >= 3 },
-    trusted_three:{ name: '신뢰 삼각', desc: '신뢰 2단계 계약 3개 동시 보유', kind: 'run', rewardType: 'perk', reward: 'consult', check: s => s.maxTrustL2Simul >= 3 },
+    trusted_three:{ name: '신뢰 삼각', desc: '신뢰 2단계 업체 3개', kind: 'run', rewardType: 'perk', reward: 'consult', check: s => s.maxTrustL2Simul >= 3 },
     rich:         { name: '여유 자금', desc: '자금 1,500 이상으로 클리어', kind: 'end', needWin: true, rewardType: 'perk', reward: 'taxsave', check: (s, p, r) => r.cash >= 1500 },
     broke:        { name: '간당간당', desc: '자금 100 이하로 월말을 넘기고 클리어', kind: 'end', needWin: true, rewardType: 'perk', reward: 'investor', check: s => s.brokeMonthEnd },
     // 기록용
@@ -177,7 +177,7 @@
     full_house:   { name: '만석', desc: '창고 사용률 100% 이상에서 페널티 없이 다음 턴', kind: 'run', rewardType: 'none', check: s => s.fullNoPenalty },
     big_hand:     { name: '큰 손', desc: '한 호출로 8개 처리', kind: 'run', rewardType: 'none', check: s => s.maxSingleCall >= 8 },
     master_deal:  { name: '마스터 계약', desc: '마스터 등급 계약 보유', kind: 'run', rewardType: 'none', check: s => s.masterOwned },
-    trust_badge:  { name: '신뢰의 증표', desc: '신뢰 3단계 계약 2개 동시 보유', kind: 'run', rewardType: 'none', check: s => s.maxTrustL3Simul >= 2 },
+    trust_badge:  { name: '신뢰의 증표', desc: '신뢰 3단계 업체 2개', kind: 'run', rewardType: 'none', check: s => s.maxTrustL3Simul >= 2 },
     millionaire:  { name: '백만장자', desc: '자금 2,000', kind: 'run', rewardType: 'none', check: s => s.maxCash >= 2000 },
     all_companies:{ name: '전 회사 클리어', desc: '9개 회사 모두 표준 클리어', kind: 'meta', rewardType: 'none', check: (s, p) => Object.keys(p.clearsByCompanyStandard || {}).length >= 9 },
     all_scenarios:{ name: '전 시나리오 클리어', desc: '무한 운영 제외 8개 클리어', kind: 'meta', rewardType: 'none', check: (s, p) => Object.keys(p.clearsByScenario).filter(k => k !== 'endless').length >= 8 },

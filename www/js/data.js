@@ -37,32 +37,26 @@
     FRESH_TURNS: 3,
 
     CARRIERS: {
-      line:    { name: '일반 라인',     short: '라인', desc: '대기열 맨 앞의 일반 택배를 처리', cap: 1, calls: 6, price: 180, mode: 'queue', types: ['normal'] },
       target:  { name: '타겟 멀티모달', short: '타겟', desc: '원하는 택배 1개를 골라 처리 (특수 보너스 없음)', cap: 1, calls: 4, price: 200, mode: 'pick', types: ['normal', 'fresh', 'fragile', 'intl', 'large'] },
       cold:    { name: '냉장 물류',     short: '냉장', desc: '신선식품을 골라 처리, 신선 보너스', cap: 3, calls: 3, price: 210, mode: 'pick', types: ['fresh'] },
       bulk:    { name: '대량 분류',     short: '대량', desc: '일반 택배를 골라 한 번에 처리', cap: 4, calls: 2, price: 160, mode: 'pick', types: ['normal'] },
       fragile: { name: '프래자일 전문', short: '프래', desc: '파손주의 택배를 골라 처리, 파손 보너스', cap: 3, calls: 3, price: 210, mode: 'pick', types: ['fragile'], marketOnly: true },
       intl:    { name: '국제 특송',     short: '국제', desc: '국제운송 택배를 골라 처리, 국제 보너스', cap: 2, calls: 3, price: 240, mode: 'pick', types: ['intl'], marketOnly: true },
       large:   { name: '대형 화물',     short: '대형', desc: '대형화물과 크기 4 이상 택배를 처리, 대형 보너스', cap: 2, calls: 2, price: 220, mode: 'pick', types: ['large'], minSizeAny: 4, marketOnly: true },
-      urgent:  { name: '긴급 특송',     short: '긴급', desc: '종류와 관계없이 1개 처리. 대기 전략의 안전장치', cap: 1, calls: 2, price: 300, mode: 'pick', types: ['normal', 'fresh', 'fragile', 'intl', 'large'], marketOnly: true },
+      urgent:  { name: '긴급 특송',     short: '긴급', desc: '⚡턴을 쓰지 않고 즉시 1개 처리. 어떤 택배든 가능, 보너스 없음', cap: 1, calls: 2, price: 300, mode: 'pick', types: ['normal', 'fresh', 'fragile', 'intl', 'large'], marketOnly: true, instant: true },
     },
     CARRIER_L3: {
-      line: '신뢰 3단계: 대기열 앞 일반 택배 2개 처리',
       target: '신뢰 3단계: 특수 택배 처리 시 특수 운송 보너스 적용',
       cold: '신뢰 3단계: 호출 턴에 신선식품 부패 카운트 정지',
       bulk: '신뢰 3단계: 일반 택배 1개 추가 처리',
       fragile: '신뢰 3단계: 파손주의 처리 시 보상 +15',
       intl: '신뢰 3단계: 국제 택배 1개 추가 처리',
       large: '신뢰 3단계: 초대형 화물 2개를 한 번에 처리 (처리량 +1)',
-      urgent: '신뢰 3단계: 처리량 +1',
+      urgent: '신뢰 3단계: 한 번에 2개 처리',
     },
 
-    START_CONTRACTS: [
-      { carrier: 'line', calls: 4 },
-      { carrier: 'target', calls: 3 },
-      { carrier: 'cold', calls: 2 },
-      { carrier: 'bulk', calls: 1 },
-    ],
+    // 자체 배송: 계약과 무관한 상설 행동. 대기열 앞의 일반 택배를 처리, 무제한·무료, 턴 소모
+    SELF_DELIVERY: { name: '자체 배송', cap: 2, rewardMult: 0.7 }, // cap은 부피(칸). 직접 배송은 마진이 낮다
 
     GRADES: {
       normal:  { name: '일반', cap: 0, calls: 0, price: 1.0 },
@@ -79,7 +73,9 @@
       6: { normal: 15, trusted: 35, expert: 30, master: 20 },
     },
 
-    TRUST_LEVELS: [0, 5, 12, 20],
+    // 업체 신뢰도 (런 내, 업체별 누적 — 계약을 바꿔도 유지)
+    TRUST_LEVELS: [0, 3, 8, 15],
+    TRUST_EFFECTS: ['기본', '회당 처리량 +1', '4번째 호출마다 +1개', '전용 능력'],
 
     ENHANCEMENTS: {
       limit1:  { name: '호출 한도 +1', desc: '계약 최대/잔여 호출 횟수 +1 (계약당 2회)', price: 90, kind: 'limit', value: 1 },

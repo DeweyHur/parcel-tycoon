@@ -174,26 +174,46 @@
       const can = g.canCall(c) && !busy, struck = g.isStruck(c);
       btn.disabled = !can; btn.className = 'btn contract' + (can ? ' ready' : '');
       const spare = c.calls === 0 && R.spareCall && !g.monthStats.spareUsed;
-      btn.innerHTML = `<div class="nm"><span>${esc(car.name)}${gradeBadge(c.grade)}</span><span class="calls ${c.calls === 0 ? 'zero' : ''}">${struck ? '파업' : spare ? '예비' : `${c.calls}/${c.maxCalls}회`}</span></div>
-        <div class="sub">회당 <b>${cp}</b>개 · 대상 <b>${elig}</b>개${lv ? ` · 신뢰 Lv${lv}` : ''}${c.enh.regular ? ' · 정기' : ''}${c.enh.express ? ' · 고속' : ''}</div>`;
+      if (car.instant) btn.className += ' urgent';
+      btn.innerHTML = `<div class="nm"><span>${car.instant ? '⚡' : ''}${esc(car.short)}${gradeBadge(c.grade)}</span><span class="calls ${c.calls === 0 ? 'zero' : ''}">${struck ? '파업' : spare ? '예비' : `${c.calls}/${c.maxCalls}`}</span></div>
+        <div class="sub"><b>${cp}</b>개 · 대상 <b>${elig}</b>${car.instant ? ' · 턴 미소모' : ''}${c.enh.regular ? ' · 정기' : ''}${c.enh.express ? ' · 고속' : ''} ${trustBar(g, c.carrier)}</div>`;
     }
-    $('#wait-btn').disabled = busy || g.phase !== 'play';
+    const sb = $('#self-btn'), se = g.selfEligible();
+    sb.disabled = busy || !g.canSelfDeliver();
+    sb.innerHTML = `🚚 자체 배송<small>일반 ${se.length}개 (${g.selfCapacity()}칸) · 보상 ${Math.round(D.SELF_DELIVERY.rewardMult * 100)}%</small>`;
+    const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
+    const f = g.forecast();
+    const warn = [];
+    if (f.overdue) warn.push(`⏳초과 ${f.overdue}`); if (f.spoil) warn.push(`🥀부패 ${f.spoil}`);
+    wb.className = 'btn primary' + (f.used > f.cap || f.spoil ? ' danger' : '');
+    wb.innerHTML = `⏭ 대기<small>${f.monthEnd ? '월말 정산' : `다음 턴 창고 ${f.used}/${f.cap}${f.used > f.cap ? ' 초과!' : ''}`}${warn.length ? ' · ' + warn.join(' ') : ''}</small>`;
   }
+  function trustBar(g, carrier) {
+    const lv = g.trustLevel(carrier), nx = g.trustNext(carrier);
+    const bars = [1, 2, 3].map(i => `<i class="${i <= lv ? 'on' : ''}"></i>`).join('');
+    return `<span class="trust" title="${nx ? `다음 ${nx.have}/${nx.need}: ${nx.effect}` : '최고 단계'}">${bars}${nx ? ` ${nx.have}/${nx.need}` : ' MAX'}</span>`;
+  }
+  function urgencyOf(p) {
+    if (p.overdue || (p.type === 'fresh' && p.fresh <= 0)) return 0;
+    const t = p.type === 'fresh' ? Math.min(p.fresh, p.deadline) : p.deadline;
+    return t;
+  }
+  function sortByUrgency(list) { return list.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || b.size - a.size); }
   function parcelStatus(p) {
     const parts = [];
     if (p.type === 'fresh') {
-      if (p.fresh <= 0) parts.push('부패 직전(50%)'); else parts.push(`신선 ${p.fresh}턴`);
-      parts.push(p.inCold ? '<span class="tag cold">냉장</span>' : '<span class="tag warm">상온!</span>');
+      parts.push(p.fresh <= 0 ? '<b style="color:var(--orange)">🥀 부패 직전</b>' : `${p.inCold ? '❄' : '🔥'} <b>${p.fresh}</b>턴`);
     }
-    if (p.overdue) parts.push(`기한 초과(-${Math.round((1 - game.rules.overdueMult) * 100)}%)`); else parts.push(`기한 ${p.deadline}턴`);
-    return parts.join(' ');
+    if (p.overdue) parts.push(`<b style="color:var(--red)">⏳ 초과</b>`); else parts.push(`⏳ <b>${p.deadline}</b>턴`);
+    return parts.join(' · ');
   }
+  function urgDot(p) { const u = urgencyOf(p); return `<span class="urg ${u <= 0 ? 'r' : u <= 1 ? 'r' : u <= 2 ? 'o' : u <= 3 ? 'y' : 'g'}"></span>`; }
   function renderParcels(container, parcels, selectable) {
     if (!parcels.length) { container.innerHTML = '<div id="empty">창고가 비어 있습니다</div>'; return; }
-    container.innerHTML = parcels.map(p => {
+    container.innerHTML = sortByUrgency(parcels).map(p => {
       const t = ptype(p), s = selectable;
       const cls = (p.overdue ? ' overdue' : '') + (p.type === 'fresh' && p.fresh <= 0 ? ' rot' : '') + (s && s.sel.has(p.id) ? ' sel' : '') + (s && !s.elig.has(p.id) ? ' dis' : '');
-      return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div><span class="nm">${esc(t.name)}</span> 크기 ${p.size}${p.baseSize !== p.size ? `(${p.baseSize})` : ''} · ${25 + p.baseSize * 15}c</div><div class="st">${parcelStatus(p)}</div></div>`;
+      return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="nm">${esc(t.short)}</span> ${p.size}칸 · ${25 + p.baseSize * 15}c</div><div class="st">${parcelStatus(p)}</div></div>`;
     }).join('');
   }
 
@@ -204,6 +224,7 @@
     const car = D.CARRIERS[c.carrier], cap = game.callCapacity(c), notes = game.capacityBonusNote(c);
     const elig = game.eligibleParcels(c);
     const after = c.calls > 0 ? `${c.calls}회 → ${c.calls - 1}회` : '예비 기사 (월 1회)';
+    const trustInfo = n => { const g = game.trustGainPreview(c, n), nx = game.trustNext(c.carrier); return `<div class="d" style="font-size:11px;margin-bottom:6px">${trustBar(game, c.carrier)} 이 호출 <b>+${g.xp}xp</b> (${g.parts.join(', ')})${nx ? ` · 다음 단계: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 3 && D.CARRIER_L3[c.carrier] ? ` · ${esc(D.CARRIER_L3[c.carrier].replace('신뢰 3단계: ', ''))}` : ''}</div>`; };
     if (car.mode === 'queue') {
       const body = `<p>${esc(car.desc)}</p><div class="pickinfo"><span>처리량 <b>${cap}</b>개${notes.length ? ` (${notes.join(', ')})` : ''}</span><span>잔여 <b>${after}</b></span></div><div id="pick-list" style="display:flex;flex-direction:column;gap:3px"></div>`;
       const m = modal(game.contractName(c), body, [{ label: '취소', onClick: closeModal }, { label: '호출', cls: 'primary', onClick: () => { closeModal(); doCall(i, elig.map(p => p.id)); } }]);
@@ -212,9 +233,9 @@
     }
     const sel = new Set();
     const render = () => {
-      const body = `<p>${esc(car.desc)}</p><div class="pickinfo"><span>선택 <b>${sel.size}</b>/${cap}개${notes.length ? ` (${notes.join(', ')})` : ''}</span><span>잔여 <b>${after}</b></span></div><div id="pick-list" style="display:flex;flex-direction:column;gap:3px"></div>
+      const body = `<p style="font-size:12px;color:var(--dim)">${esc(car.desc)}${notes.length ? `<br>보너스: ${notes.join(', ')}` : ''}</p><div class="pickinfo"><span>선택 <b>${sel.size}</b>/${cap}개</span><span>잔여 <b>${after}</b></span></div>${trustInfo(Math.max(1, sel.size))}<div id="pick-list" style="display:flex;flex-direction:column;gap:3px"></div>
         <div style="margin-top:8px;display:flex;gap:6px"><button class="btn small" id="pick-urgent">급한 순 자동 선택</button><button class="btn small" id="pick-clear">선택 해제</button></div>`;
-      const m = modal(game.contractName(c), body, [{ label: '취소', onClick: closeModal }, { label: `호출 (${sel.size}개)`, cls: 'primary', disabled: sel.size === 0, onClick: () => { closeModal(); doCall(i, [...sel]); } }]);
+      const m = modal(game.contractName(c), body, [{ label: '취소', onClick: closeModal }, { label: `${car.instant ? '⚡즉시 처리' : '호출'} (${sel.size}개)`, cls: 'primary', disabled: sel.size === 0, onClick: () => { closeModal(); doCall(i, [...sel]); } }], car.instant ? '턴을 쓰지 않음' : undefined);
       const list = m.querySelector('#pick-list');
       renderParcels(list, game.parcels, { sel, elig: new Set(elig.map(p => p.id)) });
       list.querySelectorAll('.parcel').forEach(el => el.onclick = () => {
@@ -241,8 +262,22 @@
     SFX.truck();
     scene.deliver(delivered, () => {
       SFX.coin(delivered.length); floatText(`+${r.revenue}c`, false, 70);
+      if (r.instant) { busy = false; renderAll(); saveGame(); announce(Profile.evaluate(game, null)); announceTrust(events); return; }
       afterTurn(events);
     });
+    saveGame();
+  }
+  function announceTrust(events) { for (const e of events) if (e.type === 'trustup') toastLater(`⭐ ${D.CARRIERS[e.carrier].name} 신뢰 ${e.level}단계: ${D.TRUST_EFFECTS[e.level]}`, 2400); }
+  function doSelf() {
+    if (busy || !game.canSelfDeliver()) return;
+    SFX.resume(); SFX.click();
+    const r = game.selfDeliver();
+    if (!r.ok) { toast(r.msg); return; }
+    busy = true; renderAll();
+    const events = game.takeEvents();
+    const delivered = events.filter(e => e.type === 'deliver').map(e => e.parcel.id);
+    SFX.truck();
+    scene.deliver(delivered, () => { SFX.coin(delivered.length); floatText(`+${r.revenue}c`, false, 70); afterTurn(events); });
     saveGame();
   }
   function doWait() {
@@ -262,6 +297,7 @@
       scene.sync(game, { animate: true });
       if (events.some(e => e.type === 'arrive')) SFX.thud();
       busy = false; renderAll(); saveGame();
+      announceTrust(events);
       if (game.phase === 'play' || game.phase === 'summary') announce(Profile.evaluate(game, null));
       checkPhase();
     }, pen ? 500 : 150);
@@ -301,13 +337,13 @@
     const render = () => {
       const items = mk.items.map((it, i) => {
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], g = D.GRADES[it.grade]; desc = `${car.desc}<br>회당 ${car.cap + g.cap + (R.carrierCapDelta[it.carrier] || 0)}개 · 최대 ${Math.max(1, car.calls + g.calls + R.callsDelta)}회 호출`; }
+        if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], g = D.GRADES[it.grade]; desc = `${car.desc}<br>회당 ${car.cap + g.cap + (R.carrierCapDelta[it.carrier] || 0)}개 · 최대 ${Math.max(1, car.calls + g.calls + R.callsDelta)}회 · ${trustBar(game, it.carrier)}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'fac') desc = it.fac ? D.FACILITIES[it.fac].desc + (R.facilityCapMult !== 1 && D.FACILITIES[it.fac].cap ? ` (이 회사: +${Math.round(D.FACILITIES[it.fac].cap * R.facilityCapMult)})` : '') : '이미 모든 시설을 구매했습니다';
         const kindLbl = { contract: '계약', enh: '강화', fac: '시설' }[it.kind];
         return `<div class="card ${it.sold ? 'sold' : ''}" data-i="${i}"><div class="t"><span>[${kindLbl}] ${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? '판매됨' : price + 'c'}</span></div><div class="d">${desc}</div></div>`;
       }).join('');
-      const contracts = `<hr><div style="font-size:12px;color:var(--dim);margin-bottom:4px">현재 계약 (교체 시 잔여 호출·신뢰도·강화 소멸${R.keepCalls ? `, 잔여 ${R.keepCalls}회 보존` : ''})</div>` + game.contracts.map(c => c ? `<div style="font-size:12px">· ${esc(game.contractName(c))} — 잔여 ${c.calls}/${c.maxCalls}회, 회당 ${game.baseCapacity(c)}개${game.trustLevel(c) ? `, 신뢰 Lv${game.trustLevel(c)}` : ''}</div>` : '<div style="font-size:12px">· (빈 슬롯)</div>').join('');
+      const contracts = `<hr><div style="font-size:12px;color:var(--dim);margin-bottom:4px">현재 계약 (교체 시 잔여 호출·강화 소멸${R.keepCalls ? `, 잔여 ${R.keepCalls}회 보존` : ''}. 업체 신뢰도는 유지)</div>` + game.contracts.map(c => c ? `<div style="font-size:12px">· ${esc(game.contractName(c))} — 잔여 ${c.calls}/${c.maxCalls}회, 회당 ${game.baseCapacity(c)}개 ${trustBar(game, c.carrier)}</div>` : '<div style="font-size:12px">· (빈 슬롯)</div>').join('');
       const rc = game.refreshCost();
       const body = `<div class="pickinfo"><span>자금 <b>${game.cash}</b>c</span><span>구매 <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>${items}
         ${R.noRefresh ? '<div class="d" style="font-size:12px;color:var(--dim)">이 시나리오에서는 새로고침할 수 없습니다</div>' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>마켓 새로고침 (${rc ? rc + 'c' : '무료'})</button>`}${contracts}`;
@@ -327,9 +363,9 @@
   }
   function chooseSlot(it, idx, back) {
     const isContract = it.kind === 'contract';
-    const body = `<p>${isContract ? '어느 슬롯의 계약을 교체할까요? 기존 계약의 잔여 호출·신뢰도·강화는 사라집니다.' : '어느 계약에 적용할까요?'}</p>` + game.contracts.map((c, s) => {
+    const body = `<p style="font-size:12px;color:var(--dim)">${isContract ? '교체할 슬롯을 고르세요. 잔여 호출·강화는 사라지고 업체 신뢰도는 남습니다.' : '적용할 계약을 고르세요.'}</p>` + game.contracts.map((c, s) => {
       if (!c) return isContract ? `<div class="card" data-s="${s}"><div class="t">빈 슬롯</div><div class="d">여기에 새 계약을 넣습니다</div></div>` : '';
-      const info = `잔여 ${c.calls}/${c.maxCalls}회 · 회당 ${game.baseCapacity(c)}개 · 신뢰 ${c.trust}xp` + (c.enh.limit ? ` · 한도강화 ${c.enh.limit}/2` : '') + (c.enh.cap ? ` · 용량강화 ${c.enh.cap}/3` : '') + (c.enh.regular ? ' · 정기 배차' : '') + (c.enh.express ? ' · 고속 배차' : '');
+      const info = `잔여 ${c.calls}/${c.maxCalls}회 · 회당 ${game.baseCapacity(c)}개 · ${trustBar(game, c.carrier)}` + (c.enh.limit ? ` · 한도강화 ${c.enh.limit}/2` : '') + (c.enh.cap ? ` · 용량강화 ${c.enh.cap}/3` : '') + (c.enh.regular ? ' · 정기 배차' : '') + (c.enh.express ? ' · 고속 배차' : '');
       return `<div class="card" data-s="${s}"><div class="t">${esc(game.contractName(c))}</div><div class="d">${info}</div></div>`;
     }).join('');
     const m = modal(it.name, body, [{ label: '취소', onClick: back }]);
@@ -394,11 +430,14 @@
       <h3>런 준비</h3><p><b>시나리오</b>(길이·규칙) → <b>회사</b>(시작 창고·계약·고유 특성) → <b>퍽</b>(작은 규칙 변경) 순서로 고릅니다. 회사·퍽·시나리오는 <b>도전과제</b>로 해금되며, 도감에서 조건을 볼 수 있습니다.</p>
       <h3>한 턴의 순서</h3><p>입고 → 업체 호출 또는 대기 → 배송 → 신선도·기한 진행 → 창고 초과·지연 페널티</p>
       <h3>택배 종류</h3><table><tr><th>종류</th><th>크기</th><th>기한</th><th>전문 업체</th></tr>
-      <tr><td>일반</td><td>1~2</td><td>6턴</td><td>일반 라인 / 대량 분류</td></tr><tr><td>신선식품</td><td>2~4</td><td>3턴(부패)</td><td>냉장 물류</td></tr><tr><td>파손주의</td><td>2~4</td><td>7턴</td><td>프래자일 전문</td></tr><tr><td>국제운송</td><td>4~7</td><td>8턴</td><td>국제 특송</td></tr><tr><td>대형화물</td><td>4~7</td><td>8턴</td><td>대형 화물 (4개월차~)</td></tr></table>
-      <p>타겟 멀티모달은 어떤 택배든 1개, 긴급 특송도 어떤 택배든 1개를 처리합니다(특수 보너스 없음). 기한을 넘기면 보상 감소와 스트레스 +1. 신선식품은 3턴이 지나면 보상 50%, 그 다음 턴에 폐기(+3)됩니다. 냉장 구역 밖(상온)의 신선식품은 2배 빨리 상합니다.</p>
+      <tr><td>일반</td><td>1~2</td><td>6턴</td><td>자체 배송 / 대량 분류</td></tr><tr><td>신선식품</td><td>2~4</td><td>3턴(부패)</td><td>냉장 물류</td></tr><tr><td>파손주의</td><td>2~4</td><td>7턴</td><td>프래자일 전문</td></tr><tr><td>국제운송</td><td>4~7</td><td>8턴</td><td>국제 특송</td></tr><tr><td>대형화물</td><td>4~7</td><td>8턴</td><td>대형 화물 (4개월차~)</td></tr></table>
+      <h3>세 가지 배송 수단</h3><p><b>자체 배송</b>: 계약 없이 언제나. 오래된 순 일반 택배를 2칸까지(크기 1은 2개, 크기 2는 1개), 턴 소모, 보상 70%. <b>업체 호출</b>: 계약의 잔여 호출을 1회 쓰고 턴 소모. 전문 업체는 보너스. <b>⚡긴급 특송</b>: 턴을 쓰지 않고 즉시 1개 처리 — 대기 전략의 안전장치.</p>
+      <p>타겟 멀티모달은 어떤 택배든 1개(보너스 없음). 기한을 넘기면 보상 감소와 스트레스 +1. 신선식품은 3턴이 지나면 보상 50%, 그 다음 턴에 폐기(+3). 상온(❄ 아님)의 신선식품은 2배 빨리 상합니다.</p>
       <h3>창고</h3><p>용량 초과 1~2: +1, 3~5: +2, 6 이상: +4 스트레스. 스트레스 ${D.GAMEOVER_STRESS}이면 게임오버. 월말에는 운영비와 기한 초과 택배 부피 3당 +1이 정산됩니다.</p>
       <h3>계약과 마켓</h3><p>계약마다 잔여 호출 횟수가 있고 월중에는 새 계약을 살 수 없습니다. 월말 마켓에서 계약 교체·강화·시설을 구매하세요. 계약을 교체하면 잔여 호출·신뢰도·강화가 사라집니다. 등급: 일반 &lt; 신뢰 &lt; 전문 &lt; 마스터.</p>
-      <h3>신뢰도</h3><p>호출마다 경험치가 쌓입니다(정상 처리 +1, 처리량 80% 이상 +1, 특수 택배 기한 내 +1). 5xp: 회당 +1, 12xp: 4번째 호출마다 +1, 20xp: 전용 능력.</p></div>`;
+      <h3>업체 신뢰도</h3><p>신뢰도는 <b>업체</b>에 쌓이고 계약을 바꿔도 유지됩니다. 호출 1회마다: 정상 처리 +1, 처리량 80% 이상 +1, 전문 업체로 특수 택배 +1. 호출 화면에서 이번 호출의 예상 xp를 보여줍니다.</p>
+      <table><tr><th>단계</th><th>필요 xp</th><th>효과</th></tr><tr><td>1</td><td>3</td><td>회당 처리량 +1</td></tr><tr><td>2</td><td>8</td><td>4번째 호출마다 +1개</td></tr><tr><td>3</td><td>15</td><td>전용 능력 (냉장: 부패 정지 / 대량·국제·대형·긴급: +1개 / 타겟: 특수 보너스 / 프래자일: +15c)</td></tr></table>
+      <p>가장 빠른 길: 같은 업체를 <b>가득 채워서</b>(80%↑) 부르면 매번 +2~3xp라 5~6회 호출로 3단계에 닿습니다.</p></div>`;
     modal('게임 방법', body, [{ label: '닫기', onClick: back }]);
   }
   function showMenu() {
@@ -418,6 +457,7 @@
     scene = new Scene3D($('#scene'));
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) $('#c' + i).onclick = () => onContractTap(i);
     $('#wait-btn').onclick = doWait;
+    $('#self-btn').onclick = doSelf;
     $('#log-btn').onclick = () => { if (game) { SFX.click(); showLog(closeModal); } };
     $('#help-btn').onclick = () => { SFX.click(); showHelp(closeModal); };
     $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
