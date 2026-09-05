@@ -26,7 +26,10 @@ bash build-apk.sh    # → dist/parcel-tycoon-debug.apk (USB 연결된 폰이 �
 | 경로 | 내용 |
 |---|---|
 | `www/js/data.js` | 밸런스 수치 (기획서 표를 그대로 옮김) — 튜닝은 여기서 |
-| `www/js/game.js` | 코어 규칙 상태 머신 (브라우저/Node 공용, UI 의존 없음) |
+| `www/js/game.js` | 코어 규칙 상태 머신 (브라우저/Node 공용). 시나리오·회사·퍽 설정 → `rules` 객체 → 규칙 적용 |
+| `www/js/meta.js` | 회사 9 · 퍽 24 · 시나리오 9 · 데일리 변형 8 · 도전과제 46 정의 (`docs/META_DESIGN.md`) |
+| `www/js/storage.js` | 저장소 어댑터 (localStorage. 구글 플레이 게임즈 등으로 백엔드 교체 지점) |
+| `www/js/profile.js` | 프로필: 해금·도전과제·누적 통계·기록. 이전 기록 마이그레이션 |
 | `www/js/ui.js` | 화면/모달/저장/기록 |
 | `www/js/scene3d.js` | Three.js 로우폴리 창고·트럭 연출 |
 | `www/js/sfx.js` | WebAudio 8비트 효과음 |
@@ -51,6 +54,13 @@ Suno로 만든 칩튠 6곡. `audio-src/`의 원본을 `python3 tools/make_loops.
 | gameover | 게임오버 | 원샷 |
 
 루프 이음새가 어색하면 `tools/make_loops.py`의 `OVERRIDE`에 곡별 루프 끝 지점(초)을 넣고 다시 실행. 음악 켜기/끄기와 볼륨은 타이틀·메뉴에서.
+
+## 메타 진행 (v0.3)
+
+런 준비는 **시나리오 → 회사 → 퍽** 순서. 회사·퍽·시나리오는 도전과제로만 해금되며 메인 메뉴의 **도감**에서 조건과 진행 상황을 볼 수 있다. 상세는 `docs/META_DESIGN.md`.
+프로필(`Store` 키 `pt_profile_v1`)은 기기 localStorage에 저장된다. `Store.setBackend()`로 클라우드 저장소(구글 플레이 게임즈 Saved Games 등)로 교체할 수 있게 어댑터를 분리해 두었다.
+
+시뮬레이션: `node test/sim.js 200 companies` / `node test/sim.js 200 scenarios` — 균형형 봇 기준 회사·시나리오별 생존률. 봇이 전문 업체를 잘 안 사서 항만·반기는 실제보다 낮게 나온다.
 
 ## 구현 범위 (프로토타입)
 

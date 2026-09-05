@@ -1,7 +1,6 @@
-// 밸런스 데이터 (기획서 v0.2, 프로토타입 범위)
+// 밸런스 데이터 (기획서 v0.2 전체 범위 + 메타 기획서 v0.1)
 (function (root) {
   const DATA = {
-    MONTHS: 3,
     TURNS_PER_MONTH: 10,
     START_CASH: 600,
     GAMEOVER_STRESS: 20,
@@ -12,35 +11,40 @@
 
     WAREHOUSE: { cap: 24, cold: 6, xl: 1 },
 
-    // 월별 추가 입고 수 (기본 10 + 추가)
-    EXTRA_ARRIVALS: { 1: 2, 2: 3, 3: 4 },
+    // 월별 추가 입고 수 (기본 10 + 추가). 7개월차 이후는 무한 모드에서 확장
+    EXTRA_ARRIVALS: { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7 },
 
-    // 월별 택배 종류 비율
+    // 월별 택배 종류 비율 (large = 대형화물, 4개월차부터)
     TYPE_RATIO: {
-      1: { normal: 60, fresh: 20, fragile: 15, intl: 5 },
-      2: { normal: 50, fresh: 20, fragile: 20, intl: 10 },
-      3: { normal: 45, fresh: 20, fragile: 20, intl: 15 },
+      1: { normal: 60, fresh: 20, fragile: 15, intl: 5, large: 0 },
+      2: { normal: 50, fresh: 20, fragile: 20, intl: 10, large: 0 },
+      3: { normal: 45, fresh: 20, fragile: 20, intl: 15, large: 0 },
+      4: { normal: 35, fresh: 22, fragile: 23, intl: 15, large: 5 },
+      5: { normal: 30, fresh: 25, fragile: 25, intl: 15, large: 5 },
+      6: { normal: 25, fresh: 25, fragile: 25, intl: 20, large: 5 },
     },
 
     // 크기 등장 비율 (1 소형, 2 중형, 4 대형, 7 초대형)
     SIZE_WEIGHT: { 1: 50, 2: 35, 4: 12, 7: 3 },
 
     PARCEL_TYPES: {
-      normal:  { name: '일반',     short: '일반', sizes: [1, 2],  deadline: 6, bonus: 0,  specialist: null,   color: 0xc9a06c, css: '#c9a06c' },
-      fresh:   { name: '신선식품', short: '신선', sizes: [2, 4],  deadline: 3, bonus: 10, specialist: 'cold', color: 0x5ee0d8, css: '#5ee0d8' },
+      normal:  { name: '일반',     short: '일반', sizes: [1, 2],  deadline: 6, bonus: 0,  specialist: null,      color: 0xc9a06c, css: '#c9a06c' },
+      fresh:   { name: '신선식품', short: '신선', sizes: [2, 4],  deadline: 3, bonus: 10, specialist: 'cold',    color: 0x5ee0d8, css: '#5ee0d8' },
       fragile: { name: '파손주의', short: '파손', sizes: [2, 4],  deadline: 7, bonus: 15, specialist: 'fragile', color: 0xf0a04b, css: '#f0a04b' },
-      intl:    { name: '국제운송', short: '국제', sizes: [4, 7],  deadline: 8, bonus: 20, specialist: 'intl', color: 0x6c8cff, css: '#6c8cff' },
+      intl:    { name: '국제운송', short: '국제', sizes: [4, 7],  deadline: 8, bonus: 20, specialist: 'intl',    color: 0x6c8cff, css: '#6c8cff' },
+      large:   { name: '대형화물', short: '대형', sizes: [4, 7],  deadline: 8, bonus: 25, specialist: 'large',   color: 0xb08bd8, css: '#b08bd8' },
     },
     FRESH_TURNS: 3,
 
     CARRIERS: {
-      line:   { name: '일반 라인',     short: '라인', desc: '대기열 맨 앞의 일반 택배를 처리', cap: 1, calls: 6, price: 180, mode: 'queue',  types: ['normal'] },
-      target: { name: '타겟 멀티모달', short: '타겟', desc: '원하는 택배 1개를 골라 처리 (특수 보너스 없음)', cap: 1, calls: 4, price: 200, mode: 'pick', types: ['normal', 'fresh', 'fragile', 'intl'] },
-      cold:   { name: '냉장 물류',     short: '냉장', desc: '신선식품을 골라 처리, 신선 보너스', cap: 3, calls: 3, price: 210, mode: 'pick', types: ['fresh'] },
-      bulk:   { name: '대량 분류',     short: '대량', desc: '일반 택배를 골라 한 번에 처리', cap: 4, calls: 2, price: 160, mode: 'pick', types: ['normal'] },
-      // 마켓에서만 등장하는 전문 업체
+      line:    { name: '일반 라인',     short: '라인', desc: '대기열 맨 앞의 일반 택배를 처리', cap: 1, calls: 6, price: 180, mode: 'queue', types: ['normal'] },
+      target:  { name: '타겟 멀티모달', short: '타겟', desc: '원하는 택배 1개를 골라 처리 (특수 보너스 없음)', cap: 1, calls: 4, price: 200, mode: 'pick', types: ['normal', 'fresh', 'fragile', 'intl', 'large'] },
+      cold:    { name: '냉장 물류',     short: '냉장', desc: '신선식품을 골라 처리, 신선 보너스', cap: 3, calls: 3, price: 210, mode: 'pick', types: ['fresh'] },
+      bulk:    { name: '대량 분류',     short: '대량', desc: '일반 택배를 골라 한 번에 처리', cap: 4, calls: 2, price: 160, mode: 'pick', types: ['normal'] },
       fragile: { name: '프래자일 전문', short: '프래', desc: '파손주의 택배를 골라 처리, 파손 보너스', cap: 3, calls: 3, price: 210, mode: 'pick', types: ['fragile'], marketOnly: true },
       intl:    { name: '국제 특송',     short: '국제', desc: '국제운송 택배를 골라 처리, 국제 보너스', cap: 2, calls: 3, price: 240, mode: 'pick', types: ['intl'], marketOnly: true },
+      large:   { name: '대형 화물',     short: '대형', desc: '대형화물과 크기 4 이상 택배를 처리, 대형 보너스', cap: 2, calls: 2, price: 220, mode: 'pick', types: ['large'], minSizeAny: 4, marketOnly: true },
+      urgent:  { name: '긴급 특송',     short: '긴급', desc: '종류와 관계없이 1개 처리. 대기 전략의 안전장치', cap: 1, calls: 2, price: 300, mode: 'pick', types: ['normal', 'fresh', 'fragile', 'intl', 'large'], marketOnly: true },
     },
     CARRIER_L3: {
       line: '신뢰 3단계: 대기열 앞 일반 택배 2개 처리',
@@ -49,6 +53,8 @@
       bulk: '신뢰 3단계: 일반 택배 1개 추가 처리',
       fragile: '신뢰 3단계: 파손주의 처리 시 보상 +15',
       intl: '신뢰 3단계: 국제 택배 1개 추가 처리',
+      large: '신뢰 3단계: 초대형 화물 2개를 한 번에 처리 (처리량 +1)',
+      urgent: '신뢰 3단계: 처리량 +1',
     },
 
     START_CONTRACTS: [
@@ -61,30 +67,38 @@
     GRADES: {
       normal:  { name: '일반', cap: 0, calls: 0, price: 1.0 },
       trusted: { name: '신뢰', cap: 1, calls: 1, price: 1.35 },
+      expert:  { name: '전문', cap: 2, calls: 1, price: 1.7 },
+      master:  { name: '마스터', cap: 2, calls: 2, price: 2.1, special: true },
     },
-    GRADE_PROB: { 1: { normal: 70, trusted: 30 }, 2: { normal: 55, trusted: 45 }, 3: { normal: 40, trusted: 60 } },
+    GRADE_PROB: {
+      1: { normal: 70, trusted: 30, expert: 0, master: 0 },
+      2: { normal: 55, trusted: 40, expert: 5, master: 0 },
+      3: { normal: 40, trusted: 45, expert: 15, master: 0 },
+      4: { normal: 30, trusted: 45, expert: 20, master: 5 },
+      5: { normal: 20, trusted: 40, expert: 25, master: 15 },
+      6: { normal: 15, trusted: 35, expert: 30, master: 20 },
+    },
 
     TRUST_LEVELS: [0, 5, 12, 20],
 
     ENHANCEMENTS: {
+      limit1:  { name: '호출 한도 +1', desc: '계약 최대/잔여 호출 횟수 +1 (계약당 2회)', price: 90, kind: 'limit', value: 1 },
       limit2:  { name: '호출 한도 +2', desc: '계약 최대/잔여 호출 횟수 +2 (계약당 2회)', price: 160, kind: 'limit', value: 2 },
       cap1:    { name: '처리 용량 강화 I', desc: '회당 처리량 +1 (계약당 3회)', price: 160, kind: 'cap', value: 1 },
       regular: { name: '정기 배차', desc: '해당 계약의 4번째 성공 호출마다 추가 1개 처리', price: 180, kind: 'regular' },
+      express: { name: '고속 배차', desc: '해당 계약의 3번째 성공 호출마다 추가 1개 처리', price: 300, kind: 'express' },
       seal:    { name: '신뢰도 인장', desc: '선택한 계약의 신뢰도 경험치 +3', price: 90, kind: 'trust', value: 3 },
+      record:  { name: '장기 거래 기록', desc: '선택한 계약의 신뢰도 경험치 +6', price: 170, kind: 'trust', value: 6 },
     },
     FACILITIES: {
       expand1: { name: '창고 확장 1단계', desc: '전체 용량 +8', price: 160, cap: 8 },
+      expand2: { name: '창고 확장 2단계', desc: '전체 용량 +10', price: 260, cap: 10, requires: 'expand1' },
+      expand3: { name: '창고 확장 3단계', desc: '전체 용량 +12', price: 400, cap: 12, requires: 'expand2' },
       cold1:   { name: '냉장고 증설', desc: '냉장 용량 +4', price: 140, cold: 4 },
+      cold2:   { name: '냉장고 증설 2', desc: '냉장 용량 +6', price: 240, cold: 6, requires: 'cold1' },
+      yard:    { name: '대형 적재장', desc: '초대형 보관 +1', price: 180, xl: 1 },
     },
-    PRICE_MULT: { 1: 1.0, 2: 1.1, 3: 1.2 },
-
-    PERKS: {
-      longdeal: { name: '장기 거래', desc: '모든 계약 비용 -10%' },
-      coldpro:  { name: '냉장 전문가', desc: '신선식품 유통기한 +1턴' },
-      compact:  { name: '공간 최적화', desc: '모든 택배 크기 -1 (최소 1)' },
-      skip:     { name: '스킵 보너스', desc: '대기 후 다음 호출의 처리량 +1' },
-      insure:   { name: '폐기 보험', desc: '첫 번째 폐기 택배의 페널티 무효화' },
-    },
+    PRICE_MULT: { 1: 1.0, 2: 1.1, 3: 1.2, 4: 1.35, 5: 1.5, 6: 1.7 },
 
     STRESS_STATES: [[5, '안정'], [10, '주의'], [15, '위험'], [19, '위기'], [20, '게임오버']],
   };

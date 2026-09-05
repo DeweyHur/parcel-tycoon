@@ -118,6 +118,9 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .pickinfo b { color: var(--gold); }
 .badge { display: inline-block; font-size: 10px; padding: 0 4px; border: 2px solid var(--line); background: var(--panel); margin-left: 4px; vertical-align: middle; }
 .badge.trusted { background: #2d4f7a; color: #bcd6ff; }
+.badge.expert { background: #5a2d7a; color: #e0bcff; } .badge.master { background: #7a5a1a; color: var(--gold); }
+.chip.heat { border-color: var(--red); color: var(--orange); }
+.tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; } .tabs .btn { flex: 1; text-align: center; padding: 4px 2px; font-size: 12px; }
 .perk-count { color: var(--dim); font-size: 12px; margin-bottom: 6px; }
 .big-num { font-size: 22px; color: var(--gold); text-align: center; margin: 6px 0; }
 

@@ -56,17 +56,16 @@ function marketBot(g) {
   const used = new Set();
   for (const { it, i } of contractItems) {
     let slot = -1, min = 99;
-    g.contracts.forEach((c, s) => { if (!used.has(s) && c.calls < min) { min = c.calls; slot = s; } });
+    g.contracts.forEach((c, s) => { if (used.has(s)) return; const v = c ? c.calls : -1; if (v < min) { min = v; slot = s; } });
     if (min > 2) break;
     const r = g.buy(i, slot); if (r.ok) used.add(slot);
   }
   items.forEach((it, i) => { if (it.kind === 'fac' && it.fac && g.cash - it.price > 150) g.buy(i, null); });
-  items.forEach((it, i) => { if (it.kind === 'enh' && g.cash - it.price > 250) { let slot = 0, max = -1; g.contracts.forEach((c, s) => { if (c.calls > max) { max = c.calls; slot = s; } }); g.buy(i, slot); } });
+  items.forEach((it, i) => { if (it.kind === 'enh' && g.cash - it.price > 250) { let slot = 0, max = -1; g.contracts.forEach((c, s) => { if (c && c.calls > max) { max = c.calls; slot = s; } }); g.buy(i, slot); } });
 }
 
-function runOne(seed, strat) {
-  const g = new Game(seed);
-  g.choosePerks(['skip', 'insure']);
+function runOne(seed, strat, cfg) {
+  const g = new Game(Object.assign({ seed, perks: ['skip', 'insure'] }, cfg || {}));
   let guard = 0;
   while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 500) {
     if (g.phase === 'play') {
@@ -79,9 +78,22 @@ function runOne(seed, strat) {
 }
 
 module.exports = { runOne, STRATS };
+function report(label, N, strat, cfg) {
+  let wins = 0, cash = 0, calls = 0, waits = 0, stress = 0, rev = 0, months = 0;
+  for (let s = 1; s <= N; s++) {
+    const g = runOne(s, strat, cfg);
+    if (g.phase === 'win') wins++;
+    cash += g.cash; calls += g.run.calls; waits += g.run.waits; stress += g.stress; rev += g.run.revenue; months += (g.stats.monthsDone || 0) + (g.phase === 'win' ? 0 : g.turn / 10);
+  }
+  const mo = months / N;
+  console.log(`${label.padEnd(14)} 생존 ${String(Math.round(wins / N * 100)).padStart(3)}%  평균개월 ${mo.toFixed(1)}  현금 ${(cash / N).toFixed(0).padStart(5)}  월호출 ${(calls / N / mo).toFixed(1)}  월대기 ${(waits / N / mo).toFixed(1)}  스트레스 ${(stress / N).toFixed(1)}  수익 ${(rev / N).toFixed(0)}`);
+}
 if (require.main === module) {
 const N = +process.argv[2] || 200;
-for (const strat of Object.keys(STRATS)) {
+const mode = process.argv[3] || 'strats';
+if (mode === 'companies') { for (const id of Object.keys(require('../www/js/meta.js').COMPANIES)) report(id, N, 'balanced', { company: id }); }
+else if (mode === 'scenarios') { const M = require('../www/js/meta.js'); for (const id of Object.keys(M.SCENARIOS)) { if (id === 'endless') continue; report(id, N, 'balanced', { scenario: id, company: id === 'daily' ? 'local' : 'local', variants: id === 'daily' ? ['fog', 'trustboom'] : [] }); } }
+else for (const strat of Object.keys(STRATS)) {
   let wins = 0, m2 = 0, m3 = 0, cash = 0, calls = 0, waits = 0, stress = 0, rev = 0;
   for (let s = 1; s <= N; s++) {
     const g = runOne(s, strat);
