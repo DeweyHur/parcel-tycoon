@@ -37,12 +37,12 @@
     priceMult: 1, contractPriceMult: 1, itemPriceMult: 1, facilityPriceMult: 1, waitStack: 0, skipBonus: 0,
     randomStart: false, freeRefresh: 0, marketContractSlots: 2, erosion: false, stressRelief: null, keepCalls: 0, marketMaxBuy: D.MARKET_MAX_BUY, expertFrom: 1,
     firstContractDiscount: 0, rebuyTrust: 0, spareCall: false, bundleRefund: null, overflowGrace: 0, capDelta: 0, freezer: 0, xlDelta: 0, xlPenalty: 3,
-    insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], guaranteeBlocked: true, closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
+    insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], guaranteeBlocked: true, returnGrace: D.RETURN_GRACE, theftMult: 1, overdueTurnStress: 0, closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
     arrivalsMult: 1, burstTurns: 0, winDelivered: 0, typeShift: null, typeOverride: null, freshSizes: null, warmMult: 2, heatAlerts: 0, winMaxDiscard: null,
     strike: false, xlWeight: null, winCash: 0, noRefresh: false, bigWeight: 1, bigCallBonus: null, winMaxOverdue: null,
     selfCapDelta: 0, allStartTrust: 0,
   };
-  const MULT_KEYS = ['cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
+  const MULT_KEYS = ['theftMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
   const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'burstTurns', 'selfCapDelta', 'allStartTrust'];
   const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust'];
   const MAP_MULT_KEYS = ['rewardMult', 'marketWeight'];
@@ -111,7 +111,7 @@
       return { deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0 }, onTimeByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0 },
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
-        overdueDelivered: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
+        overdueDelivered: 0, returned: 0, stolen: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
         brokeMonthEnd: false, maxMonthDelivered: 0, distinctCarriersAtEnd: 0, monthsDone: 0, selfCalls: 0, urgentCalls: 0, bigDelivered: 0 };
     }
     _buildRules() {
@@ -245,7 +245,23 @@
         if (p.type !== 'fresh') continue;
         if (p.size <= left) { p.inCold = true; left -= p.size; } else p.inCold = false;
       }
+      this._assignOutdoor();
     }
+    // 야외 적재: 창고 초과분만큼 가장 최근 입고분부터 밖으로. (적재 리오더링은 3.5단계)
+    _assignOutdoor() {
+      let over = this.usedVolume() - this.warehouse.cap;
+      for (const p of this.parcels) p.outdoor = false;
+      if (over <= 0) return;
+      for (const p of this.parcels.slice().sort((a, b) => b.id - a.id)) { if (over <= 0) break; p.outdoor = true; over -= p.size; }
+    }
+    outdoorParcels() { return this.parcels.filter(p => p.outdoor); }
+    outdoorVolume() { return this.outdoorParcels().reduce((s, p) => s + p.size, 0); }
+    theftProb() {
+      const over = this.usedVolume() - this.warehouse.cap; if (over <= 0) return 0;
+      for (const [max, pr] of D.THEFT_PROB) if (over <= max) return Math.min(0.95, pr * this.rules.theftMult);
+      return 0;
+    }
+    returnIn(p) { return p.overdue ? Math.max(0, this.rules.returnGrace - (p.overdueTurns || 0)) : null; }
     stressState() { for (const [max, name] of D.STRESS_STATES) if (this.stress <= max) return name; return '게임오버'; }
     monthsTotal() { return this.rules.endless ? Infinity : this.rules.months; }
 
@@ -282,7 +298,7 @@
     _startMonth(m) {
       const R = this.rules;
       this.month = m; this.turn = 0;
-      this.monthStats = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, firstContractBought: false, spareUsed: false, bundleUsed: false };
+      this.monthStats = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, firstContractBought: false, spareUsed: false, bundleUsed: false };
       for (const c of this.contracts) if (c) c.successCalls = 0;
       this.schedule = this._makeSchedule(m);
       this.heatTurns = R.heatAlerts ? this.rng.shuffle([...Array(D.TURNS_PER_MONTH).keys()].map(i => i + 1)).slice(0, R.heatAlerts).sort((a, b) => a - b) : [];
@@ -471,11 +487,12 @@
       this.waitedLastTurn = waited;
       const usageBefore = this.usage();
       let pen = 0; const reasons = [];
-      const discard = [];
+      const discard = [], returned = [];
       const heat = this.isHeatTurn();
       for (const p of this.parcels) {
         p.age++;
-        if (!p.overdue) { p.deadline--; if (p.deadline <= 0) { p.overdue = true; pen += 1; reasons.push(`기한 초과 ${D.PARCEL_TYPES[p.type].short}`); this.monthStats.overdue++; } }
+        if (!p.overdue) { p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; pen += 1; reasons.push(`기한 초과 ${D.PARCEL_TYPES[p.type].short}`); this.monthStats.overdue++; } }
+        else { p.overdueTurns = (p.overdueTurns || 0) + 1; if (p.overdueTurns >= R.returnGrace) returned.push(p); else if (R.overdueTurnStress) { pen += R.overdueTurnStress; reasons.push(`초과 지속 ${D.PARCEL_TYPES[p.type].short}`); } }
         if (p.type === 'fresh' && !freezeFresh) {
           if (heat && !p.inCold) { p.fresh = -1; }
           else if (p.inCold && R.freezer && p.age <= R.freezer) { /* 냉동고: 첫 N턴 부패 정지 */ }
@@ -490,12 +507,29 @@
         else { pen += 3; reasons.push(heat && !p.inCold ? '폭염 부패 폐기 +3' : '신선식품 부패 폐기 +3'); }
         this.emit('discard', { parcel: p });
       }
+      for (const p of returned) {
+        this.parcels.splice(this.parcels.indexOf(p), 1);
+        this.monthStats.returned++; this.stats.returned++;
+        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push('반송 (보험 적용)'); }
+        else { pen += 2; reasons.push(`반송 ${D.PARCEL_TYPES[p.type].short} +2`); }
+        this.emit('returned', { parcel: p });
+      }
+      this._assignCold();
+      // 도난: 야외 적재 택배는 각각 판정
+      const tp = this.theftProb();
+      if (tp > 0) for (const p of this.outdoorParcels()) {
+        if (this.rng.next() >= tp) continue;
+        this.parcels.splice(this.parcels.indexOf(p), 1);
+        this.monthStats.stolen++; this.stats.stolen++;
+        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push('도난 (보험 적용)'); }
+        else { pen += 2; reasons.push(`도난 ${D.PARCEL_TYPES[p.type].short}${p.size} +2`); }
+        this.emit('stolen', { parcel: p });
+      }
       this._assignCold();
       const over = this.usedVolume() - this.warehouse.cap;
       if (over > 0) { this.stats.overflowTurns++; this.stats.maxOverflowTurns = Math.max(this.stats.maxOverflowTurns, this.stats.overflowTurns); } else this.stats.overflowTurns = 0;
       const effOver = over > R.overflowGrace ? over : 0;
-      if (effOver >= 6) { let p4 = 4; if (R.endless && this.month >= 10) p4 += Math.floor((effOver - 6) / 3); pen += p4; reasons.push(`창고 초과 ${over} (+${p4})`); }
-      else if (effOver >= 3) { pen += 2; reasons.push(`창고 초과 ${over} (+2)`); }
+      if (effOver >= 3) { let p2 = 2; if (R.endless && this.month >= 10 && effOver >= 6) p2 += Math.floor((effOver - 6) / 3); pen += p2; reasons.push(`창고 초과 ${over} (+${p2})`); }
       else if (effOver >= 1) { pen += 1; reasons.push(`창고 초과 ${over} (+1)`); }
       else if (over > 0) reasons.push(`창고 초과 ${over} (임시 적재장)`);
       if (usageBefore >= 1 && pen === 0) this.stats.fullNoPenalty = true;
@@ -512,8 +546,7 @@
     _endMonth() {
       const R = this.rules, ms = this.monthStats;
       const overdueVol = this.parcels.filter(p => p.overdue).reduce((s, p) => s + p.size, 0);
-      const unproc = Math.floor(overdueVol / 3);
-      this.stress += unproc; ms.penalty += unproc;
+      const unproc = 0; // v0.3.5: 월말 미처리 페널티는 반송이 대신한다
       const opCost = this._opCost(this.month);
       this.cash -= opCost; ms.spent += opCost; this.run.spent += opCost;
       let closing = 0;
@@ -527,10 +560,9 @@
       if (this.contracts.filter(Boolean).length >= 4 && this.contracts.every(c => c && c.calls === 0)) this.stats.zeroCallsMonthEnd = true;
       if (this.cash >= 0 && this.cash <= 100) this.stats.brokeMonthEnd = true;
       this.summary = { month: this.month, revenue: ms.revenue, opCost, calls: ms.calls, waits: ms.waits,
-        delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, closing,
+        delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, closing,
         cash: this.cash, stress: this.stress, usage: Math.round(this.usage() * 100), left: this.parcels.length };
-      this.say(`${this.month}월 정산: 수익 ${ms.revenue}, 운영비 ${opCost}${closing ? `, 월말 결산 +${closing}` : ''}, 미처리 페널티 +${unproc}`);
-      if (this.stress >= D.GAMEOVER_STRESS) return this._gameOver('월말 미처리 물량으로 스트레스가 한계에 도달했습니다');
+      this.say(`${this.month}월 정산: 수익 ${ms.revenue}, 운영비 ${opCost}${closing ? `, 월말 결산 +${closing}` : ''}`);
       if (this.cash < 0) return this._gameOver('운영비를 지불하지 못해 파산했습니다');
       this.phase = 'summary';
     }
@@ -579,7 +611,7 @@
       for (const k of Object.keys(D.CARRIERS)) { if (R.banCarriers.includes(k)) continue; w[k] = R.marketWeight[k] || 1; }
       return w;
     }
-    // 막힌 속성: 창고에 있거나 다음 2턴 입고 예정인 특수 택배 중, 현재 계약(타겟·긴급 제외, 잔여 호출 있는 것)으로 처리할 수 없는 종류. 부피 큰 순
+    // 막힌 속성: 창고에 있거나 다음 2턴 입고 예정인 특수 택배 중, 현재 계약(용달·긴급 제외, 잔여 호출 있는 것)으로 처리할 수 없는 종류. 부피 큰 순
     blockedTypes() {
       const pseudo = [];
       for (const p of this.parcels) if (p.type !== 'normal') pseudo.push({ type: p.type, size: p.size });
@@ -595,7 +627,7 @@
       const gp = this._gradeProb(m);
       const weights = this._carrierWeights();
       const forced = R.guaranteeCarriers.filter(k => weights[k]).map(k => ({ carrier: k }));
-      // 막힌 속성 보장: 처리할 계약이 없는 특수 택배가 있으면 그것을 처리할 업체(타겟·긴급 제외)를 반드시 하나 배치
+      // 막힌 속성 보장: 처리할 계약이 없는 특수 택배가 있으면 그것을 처리할 업체(용달·긴급 제외)를 반드시 하나 배치
       if (R.guaranteeBlocked) {
         for (const b of this.blockedTypes()) {
           if (forced.some(f => this._carrierAccepts(D.CARRIERS[f.carrier], { type: b.type, size: b.maxSize }))) break;

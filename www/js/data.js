@@ -35,9 +35,13 @@
       large:   { name: '대형화물', short: '대형', sizes: [4, 7],  deadline: 8, bonus: 25, specialist: 'large',   color: 0xb08bd8, css: '#b08bd8' },
     },
     FRESH_TURNS: 3,
+    // 반송: 기한 초과 후 유예 턴. 유예가 끝나면 반송(폐기)
+    RETURN_GRACE: 3,
+    // 도난: 야외 적재(창고 초과분) 택배당 확률, 초과 부피 구간별
+    THEFT_PROB: [[2, 0.15], [5, 0.30], [Infinity, 0.50]],
 
     CARRIERS: {
-      target:  { name: '타겟 멀티모달', short: '타겟', desc: '원하는 택배 1개를 골라 처리 (특수 보너스 없음)', cap: 1, calls: 4, price: 200, mode: 'pick', types: ['normal', 'fresh', 'fragile', 'intl', 'large'] },
+      target:  { name: '용달', short: '용달', desc: '원하는 택배 1개를 골라 차를 불러 보냄 (특수 보너스 없음)', cap: 1, calls: 4, price: 200, mode: 'pick', types: ['normal', 'fresh', 'fragile', 'intl', 'large'] },
       cold:    { name: '냉장 물류',     short: '냉장', desc: '신선식품을 골라 처리, 신선 보너스', cap: 3, calls: 3, price: 210, mode: 'pick', types: ['fresh'] },
       bulk:    { name: '대량 분류',     short: '대량', desc: '일반 택배를 골라 한 번에 처리', cap: 4, calls: 2, price: 160, mode: 'pick', types: ['normal'] },
       fragile: { name: '프래자일 전문', short: '프래', desc: '파손주의 택배를 골라 처리, 파손 보너스', cap: 3, calls: 3, price: 210, mode: 'pick', types: ['fragile'], marketOnly: true },

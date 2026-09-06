@@ -114,4 +114,23 @@ t('마켓 막힌 속성 보장: 처리 못 하는 특수 택배가 있으면 슬
   assert.ok(checked > 5);
 });
 t('신뢰도 단계 문구는 한 곳에서 나온다', () => { assert.equal(D.trustEffectText('cold', 1), '회당 처리량 +1'); assert.equal(D.trustEffectText('cold', 3), '호출 턴에 신선식품 부패 카운트 정지'); });
+t('반송: 기한 초과 후 유예 3턴 지나면 폐기 + 스트레스 +2', () => {
+  const g = NG(4, { perks: ['skip', 'longdeal'] });
+  g.parcels = []; g.schedule = g.schedule.map(() => []); g.warehouse.cap = 99;
+  g.parcels.push({ id: 900, type: 'normal', size: 1, baseSize: 1, reward: 40, deadline: 1, overdue: false, inCold: false, age: 0 });
+  g.wait(); assert.ok(g.parcels[0].overdue); assert.equal(g.returnIn(g.parcels[0]), 3); const s1 = g.stress;
+  g.wait(); assert.equal(g.returnIn(g.parcels[0]), 2); g.wait(); assert.equal(g.returnIn(g.parcels[0]), 1);
+  g.wait(); assert.equal(g.parcels.length, 0); assert.equal(g.stats.returned, 1); assert.equal(g.stress, s1 + 2);
+});
+t('도난: 창고 초과분은 최근 입고부터 야외 적재, 확률 판정', () => {
+  const g = NG(4, { perks: ['skip', 'longdeal'] });
+  g.parcels = []; g.schedule = g.schedule.map(() => []); g.warehouse.cap = 3;
+  for (let i = 0; i < 4; i++) g.parcels.push({ id: 900 + i, type: 'normal', size: 2, baseSize: 2, reward: 55, deadline: 6, overdue: false, inCold: false, age: 0 });
+  g._assignCold();
+  assert.deepEqual(g.parcels.map(p => !!p.outdoor), [false, true, true, true]); // 초과 5 → 최근 3개(6칸)
+  assert.equal(g.theftProb(), 0.30); assert.equal(g.outdoorVolume(), 6);
+  let stolen = 0; for (let s = 1; s <= 30; s++) { const h = NG(s, { perks: ['skip', 'longdeal'] }); h.parcels = []; h.schedule = h.schedule.map(() => []); h.warehouse.cap = 1; for (let i = 0; i < 4; i++) h.parcels.push({ id: 900 + i, type: 'normal', size: 2, baseSize: 2, reward: 55, deadline: 6, overdue: false, inCold: false, age: 0 }); h._assignCold(); h.wait(); stolen += h.stats.stolen; }
+  assert.ok(stolen > 10 && stolen < 110, `stolen ${stolen}`);
+  const q = NG(2, { rulesOverride: {} }); assert.equal(q.theftProb(), 0);
+});
 console.log(`\n${n} tests passed`);
