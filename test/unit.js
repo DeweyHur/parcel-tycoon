@@ -22,15 +22,45 @@ t('스킵 보너스: 대기 후 처리량 +1 (동네 단골 +1 포함)', () => {
 t('보상 공식 25 + 크기×15', () => { const g = NG(2); for (const p of g.parcels) assert.equal(p.reward, 25 + p.baseSize * 15); });
 t('공간 최적화: 크기 -1 (최소 1)', () => { const g = NG(2, { perks: ['compact', 'insure'] }); for (const p of g.parcels) assert.equal(p.size, Math.max(1, p.baseSize - 1)); });
 t('창고 초과 페널티 단계', () => { const g = NG(11); g.warehouse.cap = 0; const s0 = g.stress; g.wait(); assert.ok(g.stress > s0); });
-t('신선식품 부패 → 폐기 + 페널티', () => {
+t('신선: 냉장 안이면 기한만 진행, 밖이면 1턴 뒤 폐기(+2)', () => {
   const g = NG(4, { perks: ['skip', 'longdeal'] });
+  g.parcels = []; g.schedule = g.schedule.map(() => []); g.warehouse.cold = 2;
+  g.parcels.push({ id: 900, type: 'fresh', size: 2, baseSize: 2, reward: 55, deadline: 3, overdue: false, age: 0, warm: 0, customs: 0 });
+  g.parcels.push({ id: 901, type: 'fresh', size: 2, baseSize: 2, reward: 55, deadline: 3, overdue: false, age: 0, warm: 0, customs: 0 });
+  g._assignCold(); assert.ok(g.parcels[0].inCold && !g.parcels[1].inCold);
+  const s0 = g.stress; g.wait();
+  assert.equal(g.parcels.length, 1); assert.equal(g.parcels[0].id, 900); assert.equal(g.parcels[0].deadline, 2); assert.equal(g.stress, s0 + 2); assert.equal(g.stats.discarded, 1);
+  g.wait(); g.wait(); assert.ok(g.parcels[0].overdue); g.wait(); assert.equal(g.parcels.length, 0); assert.equal(g.stats.returned, 1); // 신선 반송 유예 1턴
+});
+t('통관: 대기 중 기한 정지·일반 업체 불가, 통관 대행은 가능', () => {
+  const g = NG(4, { perks: ['skip', 'longdeal'] }); g.warehouse.cap = 99;
   g.parcels = []; g.schedule = g.schedule.map(() => []);
-  g.parcels.push({ id: 900, type: 'fresh', size: 2, baseSize: 2, reward: 55, deadline: 3, overdue: false, inCold: true, age: 0, fresh: 3 });
-  g._assignCold();
-  g.wait(); g.wait(); g.wait(); // fresh 0 → 50% 상태
-  assert.equal(g.parcels[0].fresh, 0);
-  g.wait(); // 폐기
-  assert.equal(g.parcels.length, 0); assert.ok(g.stress >= 3 + 1);
+  const p = g._spawnParcel({ type: 'intl', size: 4 }); g.parcels.push(p); g._assignCold();
+  assert.ok(p.customs >= 2); const target = g.contracts.find(c => c && c.carrier === 'target');
+  assert.ok(!g.canHandle(target, p)); g.contracts[3] = g._makeContract('intl', 'normal'); assert.ok(g.canHandle(g.contracts[3], p));
+  const d = p.deadline; g.wait(); assert.equal(p.deadline, d); assert.equal(p.customs, p.customsDelayed ? 2 : 1);
+  g.wait(); if (p.customsDelayed) g.wait(); assert.equal(p.customs, 0); assert.ok(g.canHandle(target, p)); g.wait(); assert.equal(p.deadline, d - 1);
+});
+t('냉동: 냉동 구역 없으면 즉시 폐기, 냉동 물류만 처리', () => {
+  const g = NG(4, { perks: ['skip', 'longdeal'] }); g.warehouse.frozen = 2; g.parcels = [];
+  g.schedule = g.schedule.map(() => []); g.schedule[g.turn] = [{ type: 'frozen', size: 2 }, { type: 'frozen', size: 2 }];
+  const s0 = g.stress; g.wait();
+  assert.equal(g.parcels.filter(p => p.type === 'frozen').length, 1); assert.equal(g.stress, s0 + 2);
+  const p = g.parcels.find(p => p.type === 'frozen'); assert.ok(!g.canHandle(g.contracts.find(c => c && c.carrier === 'target'), p));
+  g.contracts[3] = g._makeContract('frozen', 'normal'); assert.ok(g.canHandle(g.contracts[3], p));
+});
+t('파손: ⚠ 능력 없는 업체는 25% 파손, 프래자일·특약은 0%', () => {
+  const g = NG(4); const target = g.contracts.find(c => c && c.carrier === 'target');
+  const p = { id: 1, type: 'fragile', size: 2, attrs: ['fragile'] };
+  assert.equal(g.breakProb(target, p), 0.25); g.contracts[3] = g._makeContract('fragile', 'normal'); assert.equal(g.breakProb(g.contracts[3], p), 0);
+  target.enh.opt = 'optFragile'; assert.equal(g.breakProb(target, p), 0);
+  let broken = 0, n = 0; for (let s = 1; s <= 60; s++) { const h = NG(s); h.warehouse.cap = 99; h.parcels = [{ id: 5, type: 'fragile', size: 2, baseSize: 2, reward: 55, deadline: 7, overdue: false, attrs: ['fragile'], age: 0, warm: 0, customs: 0 }]; h.schedule = h.schedule.map(() => []); const t = h.contracts.findIndex(c => c && c.carrier === 'target'); const r = h.callCarrier(t, [5]); assert.ok(r.ok); broken += r.broken; n++; }
+  assert.ok(broken > 3 && broken < 35, `broken ${broken}/${n}`);
+});
+t('지연 입금: 철도는 다음 턴에 입금', () => {
+  const g = NG(4); g.warehouse.cap = 99; g.parcels = [{ id: 5, type: 'normal', size: 1, baseSize: 1, reward: 40, deadline: 6, overdue: false, attrs: [], age: 0, warm: 0, customs: 0 }]; g.schedule = g.schedule.map(() => []);
+  g.contracts[3] = g._makeContract('rail', 'normal'); const cash = g.cash; const r = g.callCarrier(3, [5]);
+  assert.ok(r.ok && r.delay === 1); assert.equal(g.cash, cash); g.wait(); assert.equal(g.cash, cash + r.revenue);
 });
 t('월말 정산 → 마켓 → 다음 달', () => {
   const g = NG(9);
@@ -85,7 +115,7 @@ t('자체 배송: 일반 2개 무료 처리, 턴 소모', () => {
 });
 t('긴급 특송: 턴 미소모', () => {
   const g = NG(8); g.contracts[3] = g._makeContract('urgent', 'normal');
-  g.parcels = []; g.parcels.push({ id: 950, type: 'fresh', size: 2, baseSize: 2, reward: 55, deadline: 3, overdue: false, inCold: true, age: 0, fresh: 1 });
+  g.parcels = []; g.parcels.push({ id: 950, type: 'fresh', size: 2, baseSize: 2, reward: 55, deadline: 3, overdue: false, inCold: true, age: 0, warm: 0, customs: 0 });
   const turn = g.turn; const r = g.callCarrier(3, [950]);
   assert.ok(r.ok && r.instant); assert.equal(g.turn, turn); assert.equal(g.contracts[3].calls, 1); assert.equal(g.parcels.length, 0);
 });
@@ -113,7 +143,7 @@ t('마켓 막힌 속성 보장: 처리 못 하는 특수 택배가 있으면 슬
     const b = blocked[0]; assert.ok(g._carrierAccepts(D.CARRIERS[it.carrier], { type: b.type, size: b.maxSize }), `seed ${s}: ${it.carrier} vs ${b.type}`); assert.ok(it.hint && !['target', 'urgent'].includes(it.carrier)); checked++; }
   assert.ok(checked > 5);
 });
-t('신뢰도 단계 문구는 한 곳에서 나온다', () => { assert.equal(D.trustEffectText('cold', 1), '회당 처리량 +1'); assert.equal(D.trustEffectText('cold', 3), '호출 턴에 신선식품 부패 카운트 정지'); });
+t('신뢰도 단계 문구는 한 곳에서 나온다', () => { assert.equal(D.trustEffectText('cold', 1), '회당 처리량 +1'); assert.equal(D.trustEffectText('cold', 3), '호출 턴에 신선식품 기한 정지'); });
 t('반송: 기한 초과 후 유예 3턴 지나면 폐기 + 스트레스 +2', () => {
   const g = NG(4, { perks: ['skip', 'longdeal'] });
   g.parcels = []; g.schedule = g.schedule.map(() => []); g.warehouse.cap = 99;

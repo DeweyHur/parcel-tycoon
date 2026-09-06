@@ -148,3 +148,8 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .pickinfo.whinfo { flex-wrap: wrap; gap: 4px 10px; }
 .pickinfo.whinfo .bad, .pickinfo .bad { color: var(--red); }
 .pickinfo.whinfo .btn.small { margin-left: auto; }
+
+/* 속성 아이콘 칩 · 파손 위험 행 */
+.attr { display: inline-block; font-size: 11px; margin-left: 2px; line-height: 1; }
+.attr.cold { color: var(--cyan); } .attr.fragile { color: var(--orange); } .attr.customs { color: var(--blue); } .attr.frozen { color: #9ad7ff; }
+.parcel.risk:not(.dis) { border-color: var(--orange); }

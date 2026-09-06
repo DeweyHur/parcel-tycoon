@@ -37,12 +37,12 @@
     priceMult: 1, contractPriceMult: 1, itemPriceMult: 1, facilityPriceMult: 1, waitStack: 0, skipBonus: 0,
     randomStart: false, freeRefresh: 0, marketContractSlots: 2, erosion: false, stressRelief: null, keepCalls: 0, marketMaxBuy: D.MARKET_MAX_BUY, expertFrom: 1,
     firstContractDiscount: 0, rebuyTrust: 0, spareCall: false, bundleRefund: null, overflowGrace: 0, capDelta: 0, freezer: 0, xlDelta: 0, xlPenalty: 3,
-    insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], guaranteeBlocked: true, returnGrace: D.RETURN_GRACE, theftMult: 1, overdueTurnStress: 0, closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
+    insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], guaranteeBlocked: true, returnGrace: D.RETURN_GRACE, theftMult: 1, overdueTurnStress: 0, breakMult: 1, warmLimit: D.WARM_LIMIT, customsWait: D.CUSTOMS_WAIT, customsDelayProb: D.CUSTOMS_DELAY_PROB, returnGraceFresh: 1, frozenCapMax: null, closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
     arrivalsMult: 1, burstTurns: 0, winDelivered: 0, typeShift: null, typeOverride: null, freshSizes: null, warmMult: 2, heatAlerts: 0, winMaxDiscard: null,
     strike: false, xlWeight: null, winCash: 0, noRefresh: false, bigWeight: 1, bigCallBonus: null, winMaxOverdue: null,
     selfCapDelta: 0, allStartTrust: 0,
   };
-  const MULT_KEYS = ['theftMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
+  const MULT_KEYS = ['theftMult', 'breakMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
   const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'burstTurns', 'selfCapDelta', 'allStartTrust'];
   const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust'];
   const MAP_MULT_KEYS = ['rewardMult', 'marketWeight'];
@@ -108,7 +108,7 @@
       this._startMonth(1);
     }
     static emptyStats() {
-      return { deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0 }, onTimeByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0 },
+      return { deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, onTimeByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, broken: 0,
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
         overdueDelivered: 0, returned: 0, stolen: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
@@ -134,6 +134,8 @@
       } else { wh = { ...co.warehouse }; contracts = co.contracts; }
       wh.cap += R.capDelta; wh.xl += R.xlDelta;
       if (R.coldCapMax != null) wh.cold = Math.min(wh.cold, R.coldCapMax);
+      if (wh.frozen == null) wh.frozen = R.coldCapMax === 0 ? 0 : (wh.cold > 0 ? D.WAREHOUSE.frozen : 0);
+      if (R.frozenCapMax != null) wh.frozen = Math.min(wh.frozen, R.frozenCapMax);
       this.warehouse = wh;
       this.cash = Math.round((co.cash + R.cashDelta) * R.cashMult);
       this.contracts = contracts.map(s => {
@@ -150,7 +152,7 @@
       const c = D.CARRIERS[carrier], g = D.GRADES[grade], R = this.rules;
       const maxCalls = Math.max(1, c.calls + g.calls + R.callsDelta + (isStart ? R.startCallsDelta : 0));
       return { id: this.nextId++, carrier, grade, maxCalls, calls: calls == null ? maxCalls : calls,
-        enh: { limit: 0, cap: 0, regular: false, express: false }, successCalls: 0, totalCalls: 0, delivered: 0 };
+        enh: { limit: 0, cap: 0, regular: false, express: false, opt: null, capDelta: 0 }, successCalls: 0, totalCalls: 0, delivered: 0 };
     }
     hasPerk(p) { return this.perks.includes(p); }
     say(msg) { this.log.unshift(msg); if (this.log.length > 60) this.log.pop(); }
@@ -165,7 +167,7 @@
       const R = this.rules, cap = this.callCapacity(c);
       let xp = 1; const parts = ['정상 처리 +1'];
       if (count >= Math.ceil(cap * 0.8)) { xp++; parts.push('처리량 80%↑ +1'); }
-      if (['cold', 'fragile', 'intl', 'large'].includes(c.carrier) || (c.carrier === 'target' && this.trustLevel(c) >= 3)) { xp++; parts.push('전문 처리 +1'); }
+      if (D.CARRIERS[c.carrier].specialist || (c.carrier === 'target' && this.trustLevel(c) >= 3)) { xp++; parts.push('전문 처리 +1'); }
       if (c.carrier === 'cold' && R.coldTrustBonus) { xp += R.coldTrustBonus; parts.push('콜드체인 +1'); }
       xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       return { xp, parts };
@@ -182,7 +184,8 @@
       const heat = this.isHeatTurn();
       for (const p of this.parcels) {
         if (!p.overdue && p.deadline - 1 <= 0) overdue++;
-        if (p.type === 'fresh') { const drop = heat && !p.inCold ? 99 : (p.inCold && R.freezer && p.age + 1 <= R.freezer) ? 0 : (p.inCold ? 1 : R.warmMult); if (p.fresh - drop <= -1) spoil++; }
+        if (p.type === 'fresh' && !p.inCold && (heat || (p.warm || 0) + 1 >= R.warmLimit)) spoil++;
+        if (this._attrs(p).includes('frozen') && !p.inFrozen) spoil++;
       }
       return { used: this.usedVolume() + incoming, cap: this.warehouse.cap, incoming, count: nxt.length, overdue, spoil, monthEnd: this.turn >= D.TURNS_PER_MONTH };
     }
@@ -191,10 +194,10 @@
 
     baseCapacity(c) {
       const R = this.rules;
-      let cap = D.CARRIERS[c.carrier].cap + D.GRADES[c.grade].cap + c.enh.cap + (R.carrierCapDelta[c.carrier] || 0);
+      let cap = D.CARRIERS[c.carrier].cap + D.GRADES[c.grade].cap + c.enh.cap + c.enh.capDelta + (R.carrierCapDelta[c.carrier] || 0);
       const lv = this.trustLevel(c);
       if (lv >= 1) cap += 1;
-      if (lv >= 3 && ['bulk', 'intl', 'large', 'urgent'].includes(c.carrier)) cap += 1;
+      if (lv >= 3 && ['bulk', 'intl', 'large', 'urgent', 'frozen'].includes(c.carrier)) cap += 1;
       return Math.max(1, cap);
     }
     callCapacity(c) {
@@ -220,12 +223,24 @@
       if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) notes.push('동네 단골 +1');
       return notes;
     }
-    _carrierAccepts(car, p) { return car.types.includes(p.type) || (car.minSizeAny && p.size >= car.minSizeAny); }
-    eligibleParcels(c) {
-      const car = D.CARRIERS[c.carrier];
-      if (car.mode === 'queue') return this.parcels.filter(p => p.type === 'normal').slice(0, this.callCapacity(c));
-      return this.parcels.filter(p => this._carrierAccepts(car, p));
+    // ----- 능력 매칭 (CARRIER_CAPABILITY_DESIGN v0.2) -----
+    contractCaps(c) { const car = D.CARRIERS[c.carrier]; const caps = car.caps.slice(); if (c.enh.opt) { const a = D.ENHANCEMENTS[c.enh.opt].attr; if (!caps.includes(a)) caps.push(a); } return caps; }
+    contractSizeMax(c) { const car = D.CARRIERS[c.carrier]; return car.sizeMax + (c.carrier === 'air' && this.trustLevel(c) >= 3 ? 2 : 0); }
+    // car: 업체 데이터, p: 택배(또는 {type,size,attrs,customs} 의사 택배), caps: 계약 단위 능력, sizeMax: 계약 단위 최대 크기
+    _carrierAccepts(car, p, caps, sizeMax) {
+      caps = caps || car.caps; sizeMax = sizeMax == null ? car.sizeMax : sizeMax;
+      const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs;
+      if (p.size < car.sizeMin || p.size > sizeMax) return false;
+      if (car.onlyPlain && attrs.length) return false;
+      if (car.need && !car.need.some(a => attrs.includes(a))) return false;
+      if (attrs.includes('frozen') && !caps.includes('frozen')) return false;
+      if (attrs.includes('customs') && (p.customs || 0) > 0 && !caps.includes('customs')) return false;
+      return true;
     }
+    canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c)); }
+    // ⚠ 파손 확률: 능력에 fragile이 없으면
+    breakProb(c, p) { const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs; if (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile')) return 0; return Math.min(0.95, D.BREAK_PROB * this.rules.breakMult); }
+    eligibleParcels(c) { return this.parcels.filter(p => this.canHandle(c, p)); }
     canCall(c) {
       if (!c || this.isStruck(c)) return false;
       if (c.calls <= 0 && !(this.rules.spareCall && !this.monthStats.spareUsed)) return false;
@@ -237,16 +252,19 @@
       if (xl > this.warehouse.xl) v += (xl - this.warehouse.xl) * this.rules.xlPenalty;
       return v;
     }
-    coldUsed() { return this.parcels.filter(p => p.type === 'fresh').reduce((s, p) => s + p.size, 0); }
+    coldUsed() { return this.parcels.filter(p => this._attrs(p).includes('cold')).reduce((s, p) => s + p.size, 0); }
     usage() { return this.usedVolume() / this.warehouse.cap; }
     _assignCold() {
-      let left = this.warehouse.cold;
+      let left = this.warehouse.cold, fl = this.warehouse.frozen || 0;
       for (const p of this.parcels) {
-        if (p.type !== 'fresh') continue;
+        if (this._attrs(p).includes('frozen')) { if (p.size <= fl) { p.inFrozen = true; fl -= p.size; } else p.inFrozen = false; continue; }
+        if (!this._attrs(p).includes('cold')) continue;
         if (p.size <= left) { p.inCold = true; left -= p.size; } else p.inCold = false;
       }
       this._assignOutdoor();
     }
+    _attrs(p) { return p.attrs || D.PARCEL_TYPES[p.type].attrs; }
+    frozenUsed() { return this.parcels.filter(p => this._attrs(p).includes('frozen')).reduce((s, p) => s + p.size, 0); }
     // 야외 적재: 창고 초과분만큼 가장 최근 입고분부터 밖으로. (적재 리오더링은 3.5단계)
     _assignOutdoor() {
       let over = this.usedVolume() - this.warehouse.cap;
@@ -298,7 +316,7 @@
     _startMonth(m) {
       const R = this.rules;
       this.month = m; this.turn = 0;
-      this.monthStats = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, firstContractBought: false, spareUsed: false, bundleUsed: false };
+      this.monthStats = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, firstContractBought: false, spareUsed: false, bundleUsed: false };
       for (const c of this.contracts) if (c) c.successCalls = 0;
       this.schedule = this._makeSchedule(m);
       this.heatTurns = R.heatAlerts ? this.rng.shuffle([...Array(D.TURNS_PER_MONTH).keys()].map(i => i + 1)).slice(0, R.heatAlerts).sort((a, b) => a - b) : [];
@@ -341,9 +359,10 @@
       let size = spec.size + R.sizeDelta;
       if (spec.size >= 4) size += R.bigSizeDelta;
       size = Math.max(1, size);
-      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward: 25 + spec.size * 15,
-        deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll), overdue: false, inCold: false, age: 0 };
-      if (spec.type === 'fresh') p.fresh = D.FRESH_TURNS + R.freshExtra;
+      const attrs = (spec.attrs || t.attrs).slice();
+      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward: 25 + spec.size * 15, attrs,
+        deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0 };
+      if (attrs.includes('customs')) { p.customs = R.customsWait; if (this.rng.next() < R.customsDelayProb) { p.customs += 1; p.customsDelayed = true; } }
       return p;
     }
     _startTurn() {
@@ -353,6 +372,16 @@
       this.parcels.push(...arrived);
       this._assignCold();
       for (const p of arrived) this.emit('arrive', { parcel: p });
+      this.totalTurn = (this.totalTurn || 0) + 1;
+      // 지연 입금 (철도·해상)
+      if (this.pendingRevenue && this.pendingRevenue.length) {
+        const due = this.pendingRevenue.filter(x => x.turn <= this.totalTurn); this.pendingRevenue = this.pendingRevenue.filter(x => x.turn > this.totalTurn);
+        for (const x of due) { this.cash += x.amount; this.monthStats.revenue += x.amount; this.run.revenue += x.amount; this.say(`${x.name} 입금 +${x.amount}c (${x.count}개)`); this.emit('paid', x); }
+        this.stats.maxCash = Math.max(this.stats.maxCash, this.cash);
+      }
+      // 냉동: 냉동 구역에 못 들어가면 즉시 폐기
+      for (const p of arrived) if (this._attrs(p).includes('frozen') && !p.inFrozen) this._discardParcel(p, '냉동 구역 없음', 2, 'discard');
+      this._assignCold();
       const xl = this.parcels.filter(p => p.baseSize >= 7).length; this.stats.maxXlSimul = Math.max(this.stats.maxXlSimul, xl);
       let note = '';
       if (this.heatTurns.includes(this.turn)) note = ' 🌡폭염 경보!';
@@ -399,21 +428,40 @@
       if (chosen.length === 0) return { ok: false, msg: '처리할 택배가 없습니다' };
 
       const lv = this.trustLevel(c);
-      const specialist = ['cold', 'fragile', 'intl', 'large'].includes(c.carrier) || (c.carrier === 'target' && lv >= 3);
-      let revenue = 0, xp = 1, special = false, onTime = 0;
+      const specialistAll = c.carrier === 'target' && lv >= 3;
+      let revenue = 0, xp = 1, special = false, onTime = 0, broken = 0, delivered = [];
+      const bp = chosen.length ? this.breakProb(c, chosen[0]) : 0;
       for (const p of chosen) {
         const t = D.PARCEL_TYPES[p.type];
+        // ⚠ 파손 판정 (능력 없는 업체)
+        if (this.breakProb(c, p) > 0 && this.rng.next() < this.breakProb(c, p)) {
+          broken++; this.monthStats.broken++; this.stats.broken++;
+          this._discardParcel(p, `${this.contractName(c)} 운송 중 파손`, 2, 'broken');
+          continue;
+        }
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
-        if (specialist && t.bonus) { r += t.bonus + R.bonusDelta; special = true; if (c.carrier === 'fragile' && lv >= 3) r += 15; if (!this.stats.specialistTypes.includes(p.type)) this.stats.specialistTypes.push(p.type); }
+        const isSpec = specialistAll || car.specialist === p.type;
+        if (isSpec && t.bonus) { r += t.bonus + R.bonusDelta; special = true; if (c.carrier === 'fragile' && lv >= 3) r += 15; if (!this.stats.specialistTypes.includes(p.type)) this.stats.specialistTypes.push(p.type); }
         r = Math.round(r * (R.rewardMult[p.type] || 1));
         if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else { onTime++; this.stats.onTimeByType[p.type]++; if (p.baseSize >= 7) this.stats.xlOnTime++; if (p.baseSize >= 4) this.stats.bigDelivered++; }
-        if (p.type === 'fresh' && p.fresh <= 0) { r = Math.round(r * 0.5); if (c.carrier === 'urgent') this.stats.urgentClutch = true; }
-        if (p.type === 'fresh' && p.fresh === 1 && c.carrier === 'urgent') this.stats.urgentClutch = true;
+        if (this._attrs(p).includes('cold') && !p.inCold && c.carrier === 'urgent') this.stats.urgentClutch = true;
         revenue += Math.max(0, r);
         this.stats.deliveredByType[p.type]++;
+        delivered.push(p);
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.emit('deliver', { parcel: p, reward: r });
       }
+      if (!delivered.length && broken) {
+        // 전부 파손: 호출은 소모, 보상 없음
+        if (!useSpare) c.calls--; c.totalCalls++;
+        this.monthStats.calls++; this.run.calls++; this.stats.calls++;
+        this.waitStack = 0; this._assignCold();
+        this.say(`${this.contractName(c)} 호출: ${broken}개 전부 파손!`);
+        this.emit('call', { contract: c, count: 0, revenue: 0, broken, instant: !!car.instant });
+        if (car.instant) return { ok: true, revenue: 0, count: 0, broken, instant: true };
+        this._endTurn(false, false); return { ok: true, revenue: 0, count: 0, broken };
+      }
+      chosen = delivered;
       if (R.bigCallPenalty && chosen.length >= R.bigCallPenalty) revenue = Math.round(revenue * 0.9);
       if (R.bigCallBonus && chosen.length >= R.bigCallBonus.min) revenue = Math.round(revenue * R.bigCallBonus.mult);
       revenue = Math.round(revenue * R.revenueMult);
@@ -431,21 +479,23 @@
       else if (R.bundleRefund && chosen.length >= R.bundleRefund && !this.monthStats.bundleUsed) { this.monthStats.bundleUsed = true; refunded = true; }
       else c.calls--;
       c.successCalls++; c.totalCalls++; c.delivered += chosen.length;
-      this.cash += revenue;
-      this.monthStats.revenue += revenue; this.monthStats.calls++; this.monthStats.delivered += chosen.length;
-      this.run.revenue += revenue; this.run.calls++; this.run.delivered += chosen.length;
+      const delay = car.delay ? Math.max(0, car.delay - (lv >= 3 ? 1 : 0)) : 0;
+      if (delay > 0) { (this.pendingRevenue = this.pendingRevenue || []).push({ turn: (this.totalTurn || 0) + delay + 1, amount: revenue, count: chosen.length, name: car.name }); }
+      else { this.cash += revenue; this.monthStats.revenue += revenue; this.run.revenue += revenue; }
+      this.monthStats.calls++; this.monthStats.delivered += chosen.length;
+      this.run.calls++; this.run.delivered += chosen.length;
       this.stats.calls++; this.stats.callStreak++; this.stats.maxCallStreak = Math.max(this.stats.maxCallStreak, this.stats.callStreak);
       this.stats.maxSingleCall = Math.max(this.stats.maxSingleCall, chosen.length);
       this.stats.maxCash = Math.max(this.stats.maxCash, this.cash);
       this.waitStack = 0;
       this._assignCold();
       const freezeFresh = c.carrier === 'cold' && lv >= 3;
-      this.say(`${this.contractName(c)} 호출: ${chosen.length}개 처리, +${revenue}c${refunded ? ' (묶음 할인: 호출 미소모)' : ''} (잔여 ${c.calls}회)${car.instant ? ' ⚡즉시' : ''}`);
-      this.emit('call', { contract: c, count: chosen.length, revenue, instant: !!car.instant });
+      this.say(`${this.contractName(c)} 호출: ${chosen.length}개 처리, +${revenue}c${delay ? ` (${delay}턴 뒤 입금)` : ''}${broken ? `, 파손 ${broken}개` : ''}${refunded ? ' (묶음 할인: 호출 미소모)' : ''} (잔여 ${c.calls}회)${car.instant ? ' ⚡즉시' : ''}`);
+      this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, instant: !!car.instant });
       this._updateTrustStats();
-      if (car.instant) { this.stats.urgentCalls++; this.stats.maxCash = Math.max(this.stats.maxCash, this.cash); return { ok: true, revenue, count: chosen.length, instant: true }; }
+      if (car.instant) { this.stats.urgentCalls++; this.stats.maxCash = Math.max(this.stats.maxCash, this.cash); return { ok: true, revenue, count: chosen.length, broken, delay, instant: true }; }
       this._endTurn(false, freezeFresh);
-      return { ok: true, revenue, count: chosen.length };
+      return { ok: true, revenue, count: chosen.length, broken, delay };
     }
     // 자체 배송: 대기열 앞 일반 택배를 무료로 처리. 턴 소모, 계약·신뢰도 무관
     selfDeliver() {
@@ -482,6 +532,16 @@
       if (this.contracts.some(c => c && c.grade === 'master')) this.stats.masterOwned = true;
     }
 
+    _discardParcel(p, why, stress, evt) {
+      const R = this.rules, i = this.parcels.indexOf(p); if (i < 0) return;
+      this.parcels.splice(i, 1);
+      this.monthStats.discarded++; this.run.discarded++; this.stats.discarded++;
+      let pen = stress;
+      if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; pen = 0; why += ' (보험 적용)'; }
+      if (pen) { this.stress += pen; this.monthStats.penalty += pen; }
+      this.say(`폐기: ${D.PARCEL_TYPES[p.type].short}${p.size} — ${why}${pen ? ` +${pen}` : ''}`);
+      this.emit(evt || 'discard', { parcel: p, why });
+    }
     _endTurn(waited, freezeFresh) {
       const R = this.rules;
       this.waitedLastTurn = waited;
@@ -491,22 +551,19 @@
       const heat = this.isHeatTurn();
       for (const p of this.parcels) {
         p.age++;
-        if (!p.overdue) { p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; pen += 1; reasons.push(`기한 초과 ${D.PARCEL_TYPES[p.type].short}`); this.monthStats.overdue++; } }
-        else { p.overdueTurns = (p.overdueTurns || 0) + 1; if (p.overdueTurns >= R.returnGrace) returned.push(p); else if (R.overdueTurnStress) { pen += R.overdueTurnStress; reasons.push(`초과 지속 ${D.PARCEL_TYPES[p.type].short}`); } }
-        if (p.type === 'fresh' && !freezeFresh) {
-          if (heat && !p.inCold) { p.fresh = -1; }
-          else if (p.inCold && R.freezer && p.age <= R.freezer) { /* 냉동고: 첫 N턴 부패 정지 */ }
-          else p.fresh -= p.inCold ? 1 : R.warmMult;
-          if (p.fresh <= -1) discard.push(p);
-        }
+        const isCold = this._attrs(p).includes('cold'), isFrozen = this._attrs(p).includes('frozen');
+        // 통관 대기: 기한은 통관 뒤 시작
+        if (p.customs > 0) { p.customs--; continue; }
+        // 신선: 냉장 구역 밖이면 폭염 즉시 / warmLimit턴 뒤 폐기. 안이면 기한만 진행(냉동고 퍽·냉장 L3는 기한 정지)
+        if (isCold && !p.inCold) { p.warm = (p.warm || 0) + 1; if (heat || p.warm >= R.warmLimit) { discard.push([p, heat ? '폭염 부패' : '상온 부패']); continue; } }
+        else if (isCold) p.warm = 0;
+        if (isFrozen && !p.inFrozen) { discard.push([p, '냉동 구역 밖']); continue; }
+        const freeze = isCold && (freezeFresh || (p.inCold && R.freezer && p.age <= R.freezer));
+        const grace = isCold ? R.returnGraceFresh : R.returnGrace;
+        if (!p.overdue) { if (!freeze) p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; pen += 1; reasons.push(`기한 초과 ${D.PARCEL_TYPES[p.type].short}`); this.monthStats.overdue++; } }
+        else { p.overdueTurns = (p.overdueTurns || 0) + 1; if (p.overdueTurns >= grace) returned.push(p); else if (R.overdueTurnStress) { pen += R.overdueTurnStress; reasons.push(`초과 지속 ${D.PARCEL_TYPES[p.type].short}`); } }
       }
-      for (const p of discard) {
-        this.parcels.splice(this.parcels.indexOf(p), 1);
-        this.monthStats.discarded++; this.run.discarded++; this.stats.discarded++;
-        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push('부패 폐기 (보험 적용)'); }
-        else { pen += 3; reasons.push(heat && !p.inCold ? '폭염 부패 폐기 +3' : '신선식품 부패 폐기 +3'); }
-        this.emit('discard', { parcel: p });
-      }
+      for (const [p, why] of discard) { this._discardParcel(p, why, 2, 'discard'); reasons.push(`${why} 폐기 ${D.PARCEL_TYPES[p.type].short}`); }
       for (const p of returned) {
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.monthStats.returned++; this.stats.returned++;
@@ -614,11 +671,11 @@
     // 막힌 속성: 창고에 있거나 다음 2턴 입고 예정인 특수 택배 중, 현재 계약(용달·긴급 제외, 잔여 호출 있는 것)으로 처리할 수 없는 종류. 부피 큰 순
     blockedTypes() {
       const pseudo = [];
-      for (const p of this.parcels) if (p.type !== 'normal') pseudo.push({ type: p.type, size: p.size });
-      for (let t = this.turn - 1; t < this.turn + 1; t++) for (const s of (this.schedule[t] || [])) if (s.type !== 'normal') pseudo.push({ type: s.type, size: Math.max(1, s.size + this.rules.sizeDelta + (s.size >= 4 ? this.rules.bigSizeDelta : 0)) });
-      const covers = this.contracts.filter(c => c && c.calls > 0 && !['target', 'urgent'].includes(c.carrier)).map(c => D.CARRIERS[c.carrier]);
+      for (const p of this.parcels) if (p.type !== 'normal') pseudo.push({ type: p.type, size: p.size, attrs: p.attrs, customs: 0 });
+      for (let t = this.turn - 1; t < this.turn + 1; t++) for (const s of (this.schedule[t] || [])) if (s.type !== 'normal') pseudo.push({ type: s.type, size: Math.max(1, s.size + this.rules.sizeDelta + (s.size >= 4 ? this.rules.bigSizeDelta : 0)), customs: 0 });
+      const covers = this.contracts.filter(c => c && c.calls > 0 && !['target', 'urgent'].includes(c.carrier));
       const acc = {};
-      for (const p of pseudo) { if (covers.some(car => this._carrierAccepts(car, p))) continue; const a = acc[p.type] || (acc[p.type] = { type: p.type, volume: 0, count: 0, maxSize: 0 }); a.volume += p.size; a.count++; a.maxSize = Math.max(a.maxSize, p.size); }
+      for (const p of pseudo) { if (covers.some(c => this.canHandle(c, p) && this.breakProb(c, p) === 0)) continue; const a = acc[p.type] || (acc[p.type] = { type: p.type, volume: 0, count: 0, maxSize: 0 }); a.volume += p.size; a.count++; a.maxSize = Math.max(a.maxSize, p.size); }
       return Object.values(acc).sort((a, b) => b.volume - a.volume);
     }
     _genMarketItems() {
@@ -630,8 +687,10 @@
       // 막힌 속성 보장: 처리할 계약이 없는 특수 택배가 있으면 그것을 처리할 업체(용달·긴급 제외)를 반드시 하나 배치
       if (R.guaranteeBlocked) {
         for (const b of this.blockedTypes()) {
-          if (forced.some(f => this._carrierAccepts(D.CARRIERS[f.carrier], { type: b.type, size: b.maxSize }))) break;
-          const cand = {}; for (const k of Object.keys(weights)) if (!['target', 'urgent'].includes(k) && this._carrierAccepts(D.CARRIERS[k], { type: b.type, size: b.maxSize })) cand[k] = weights[k];
+          const pp = { type: b.type, size: b.maxSize, customs: 0 };
+          const safe = k => { const car = D.CARRIERS[k]; return this._carrierAccepts(car, pp) && (!D.PARCEL_TYPES[b.type].attrs.includes('fragile') || car.caps.includes('fragile')); };
+          if (forced.some(f => safe(f.carrier))) break;
+          const cand = {}; for (const k of Object.keys(weights)) if (!['target', 'urgent'].includes(k) && safe(k)) cand[k] = weights[k];
           if (!Object.keys(cand).length) continue;
           forced.unshift({ carrier: this.rng.weighted(cand), hint: `창고의 ${D.PARCEL_TYPES[b.type].short} ${b.count}개 처리 가능` });
           break;
@@ -651,7 +710,7 @@
       const picked = []; for (let i = 0; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }
       for (const e of picked) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });
       const facW = {};
-      for (const f of Object.keys(D.FACILITIES)) { const F = D.FACILITIES[f]; if (this.warehouse[f]) continue; if (F.requires && !this.warehouse[F.requires]) continue; if (F.cold && R.coldCapMax != null && this.warehouse.cold >= R.coldCapMax) continue; facW[f] = R.marketWeight[f] || 1; }
+      for (const f of Object.keys(D.FACILITIES)) { const F = D.FACILITIES[f]; if (this.warehouse[f]) continue; if (F.requires && !this.warehouse[F.requires]) continue; if (F.cold && R.coldCapMax != null && this.warehouse.cold >= R.coldCapMax) continue; if (F.frozen && R.frozenCapMax != null && (this.warehouse.frozen || 0) >= R.frozenCapMax) continue; facW[f] = R.marketWeight[f] || 1; }
       if (Object.keys(facW).length) {
         const f = this.rng.weighted(facW);
         let price = D.FACILITIES[f].price * mult * R.facilityPriceMult; if (R.facilityPriceMap && R.facilityPriceMap[f]) price *= R.facilityPriceMap[f];
@@ -705,6 +764,15 @@
         else if (e.kind === 'regular') { if (c.enh.regular) return { ok: false, msg: '이미 정기 배차가 적용된 계약' }; c.enh.regular = true; }
         else if (e.kind === 'express') { if (c.enh.express) return { ok: false, msg: '이미 고속 배차가 적용된 계약' }; c.enh.express = true; }
         else if (e.kind === 'trust') { const b = this.trustLevel(c); this.trust[c.carrier] = (this.trust[c.carrier] || 0) + e.value; if (this.trustLevel(c) > b && this.trustLevel(c) >= 3) this.stats.trustL3++; }
+        else if (e.kind === 'opt') {
+          const car = D.CARRIERS[c.carrier];
+          if (c.enh.opt) return { ok: false, msg: '특약은 계약당 1개' };
+          if (car.caps.includes(e.attr)) return { ok: false, msg: '이미 그 속성을 다루는 업체' };
+          if (car.instant) return { ok: false, msg: '긴급 특송에는 특약을 붙일 수 없음' };
+          if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return { ok: false, msg: `크기 최대 ${e.maxSizeMax} 이하 계약만` };
+          if (car.onlyPlain) return { ok: false, msg: '속성 없는 택배 전용 업체에는 붙일 수 없음' };
+          c.enh.opt = it.enh; if (e.capDelta) c.enh.capDelta += e.capDelta; if (e.callsDelta) { c.maxCalls = Math.max(1, c.maxCalls + e.callsDelta); c.calls = Math.max(0, Math.min(c.calls, c.maxCalls)); }
+        }
         this._updateTrustStats();
         this.say(`강화 적용: ${e.name} → ${this.contractName(c)} (-${price}c)`);
       } else if (it.kind === 'fac') {
@@ -714,6 +782,7 @@
         if (f.cap) { this.warehouse.cap += Math.round(f.cap * R.facilityCapMult); this.stats.expansions++; }
         if (f.cold) { this.warehouse.cold += f.cold; if (R.coldCapMax != null) this.warehouse.cold = Math.min(this.warehouse.cold, R.coldCapMax); this.stats.coldUpgrades++; }
         if (f.xl) this.warehouse.xl += f.xl;
+        if (f.frozen) { this.warehouse.frozen = (this.warehouse.frozen || 0) + f.frozen; if (R.frozenCapMax != null) this.warehouse.frozen = Math.min(this.warehouse.frozen, R.frozenCapMax); }
         this.warehouse[it.fac] = true;
         this._assignCold();
         this.say(`시설 구매: ${f.name} (-${price}c)`);
