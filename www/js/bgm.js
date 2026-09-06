@@ -27,7 +27,10 @@ window.BGM = (function () {
     if (buffers[name]) return Promise.resolve(buffers[name]);
     if (loading[name]) return loading[name];
     init(); if (!ctx) return Promise.reject(new Error('no audio'));
-    loading[name] = fetch(FILES[name]).then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej)))
+    // 단일 파일 웹 빌드(tools/build-web.py)는 오디오를 base64로 인라인한다
+    const inline = window.__AUDIO_B64__ && window.__AUDIO_B64__[name];
+    const fetchBuf = inline ? Promise.resolve((() => { const bin = atob(inline); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; })()) : fetch(FILES[name]).then(r => r.arrayBuffer());
+    loading[name] = fetchBuf.then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej)))
       .then(buf => { buffers[name] = buf; delete loading[name]; return buf; })
       .catch(e => { delete loading[name]; throw e; });
     return loading[name];

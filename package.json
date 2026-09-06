@@ -9,7 +9,8 @@
     "android:add": "cap add android",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
-    "apk": "bash build-apk.sh"
+    "apk": "bash build-apk.sh",
+    "web": "python3 tools/build-web.py && python3 tools/build-web.py --artifact"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.0",
