@@ -70,7 +70,7 @@
 
   // ---------- 런 준비: 시나리오 → 회사 → 퍽 ----------
   function unlockText(achId) { const a = M.ACHIEVEMENTS[achId]; if (!a) return '🔒'; let pr = ''; try { if (a.prog) { const P = Profile.get(); const [h, n] = a.prog(P.stats, P); pr = ` (${Math.min(h, n)}/${n})`; } } catch (e) { } return `🔒 ${a.name}: ${a.desc}${pr}`; }
-  const TIER_NAMES = ['시작', '1단계 · 하다 보면 열림', '2단계 · 특화 누적', '3단계 · 도전'];
+  const TIER_NAMES = ['시작', '1단계 · 기본', '2단계 · 특화 누적', '3단계 · 도전'];
   const prep = { scenario: 'standard', company: 'local', perks: [] };
   function showScenarioSelect() {
     const P = Profile.get(), dc = Game.dailyConfig ? null : null;
@@ -194,6 +194,15 @@
     const bars = [1, 2, 3].map(i => `<i class="${i <= lv ? 'on' : ''}"></i>`).join('');
     return `<span class="trust" title="${nx ? `다음 ${nx.have}/${nx.need}: ${nx.effect}` : '최고 단계'}">${bars}${nx ? ` ${nx.have}/${nx.need}` : ' MAX'}</span>`;
   }
+  // 신뢰도 트랙: 단계별 효과·필요 xp·달성 여부. xp가 null이면 진행도 없이 정적 표시(도감)
+  function trustTrack(carrier, xp) {
+    const rows = [1, 2, 3].map(lv => {
+      const need = D.TRUST_LEVELS[lv], on = xp != null && xp >= need;
+      const state = xp == null ? `${need}xp` : on ? '✓' : `${Math.max(0, need - xp)}xp 남음`;
+      return `<div class="ttrow ${on ? 'on' : ''}"><span class="lv">${lv}</span><span class="ef">${esc(D.trustEffectText(carrier, lv))}</span><span class="st">${state}</span></div>`;
+    }).join('');
+    return `<div class="ttrack">${rows}</div>`;
+  }
   function urgencyOf(p) {
     if (p.overdue || (p.type === 'fresh' && p.fresh <= 0)) return 0;
     const t = p.type === 'fresh' ? Math.min(p.fresh, p.deadline) : p.deadline;
@@ -225,7 +234,7 @@
     const car = D.CARRIERS[c.carrier], cap = game.callCapacity(c), notes = game.capacityBonusNote(c);
     const elig = game.eligibleParcels(c);
     const after = c.calls > 0 ? `${c.calls}회 → ${c.calls - 1}회` : '예비 기사 (월 1회)';
-    const trustInfo = n => { const g = game.trustGainPreview(c, n), nx = game.trustNext(c.carrier); return `<div class="d" style="font-size:11px;margin-bottom:6px">${trustBar(game, c.carrier)} 이 호출 <b>+${g.xp}xp</b> (${g.parts.join(', ')})${nx ? ` · 다음 단계: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 3 && D.CARRIER_L3[c.carrier] ? ` · ${esc(D.CARRIER_L3[c.carrier].replace('신뢰 3단계: ', ''))}` : ''}</div>`; };
+    const trustInfo = n => { const g = game.trustGainPreview(c, n), nx = game.trustNext(c.carrier); return `<div class="d" style="font-size:11px;margin-bottom:6px">${trustBar(game, c.carrier)} 이 호출 <b>+${g.xp}xp</b> (${g.parts.join(', ')})${nx ? ` · 다음 단계: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 3 && D.CARRIER_L3[c.carrier] ? ` · ${esc(D.CARRIER_L3[c.carrier].replace('신뢰 3단계: ', ''))}` : ''}<details><summary style="cursor:pointer;color:var(--dim)">단계별 해금</summary>${trustTrack(c.carrier, game.trustXp(c.carrier))}</details></div>`; };
     if (car.mode === 'queue') {
       const body = `<p>${esc(car.desc)}</p><div class="pickinfo"><span>처리량 <b>${cap}</b>개${notes.length ? ` (${notes.join(', ')})` : ''}</span><span>잔여 <b>${after}</b></span></div><div id="pick-list" style="display:flex;flex-direction:column;gap:3px"></div>`;
       const m = modal(game.contractName(c), body, [{ label: '취소', onClick: closeModal }, { label: '호출', cls: 'primary', onClick: () => { closeModal(); doCall(i, elig.map(p => p.id)); } }]);
@@ -338,7 +347,7 @@
     const render = () => {
       const items = mk.items.map((it, i) => {
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], g = D.GRADES[it.grade]; desc = `${car.desc}<br>회당 ${car.cap + g.cap + (R.carrierCapDelta[it.carrier] || 0)}개 · 최대 ${Math.max(1, car.calls + g.calls + R.callsDelta)}회 · ${trustBar(game, it.carrier)}`; }
+        if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], g = D.GRADES[it.grade]; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${car.desc}<br>회당 ${car.cap + g.cap + (R.carrierCapDelta[it.carrier] || 0)}개 · 최대 ${Math.max(1, car.calls + g.calls + R.callsDelta)}회 · ${trustBar(game, it.carrier)}${trustTrack(it.carrier, game.trustXp(it.carrier))}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'fac') desc = it.fac ? D.FACILITIES[it.fac].desc + (R.facilityCapMult !== 1 && D.FACILITIES[it.fac].cap ? ` (이 회사: +${Math.round(D.FACILITIES[it.fac].cap * R.facilityCapMult)})` : '') : '이미 모든 시설을 구매했습니다';
         const kindLbl = { contract: '계약', enh: '강화', fac: '시설' }[it.kind];
@@ -404,9 +413,10 @@
   // ---------- 도감 ----------
   function showCodex(tab, back) {
     const P = Profile.get();
-    const tabs = [['companies', '회사'], ['perks', '퍽'], ['scenarios', '시나리오'], ['achievements', '도전과제'], ['stats', '통계']];
+    const tabs = [['companies', '회사'], ['carriers', '업체'], ['perks', '퍽'], ['scenarios', '시나리오'], ['achievements', '도전과제'], ['stats', '통계']];
     let body = `<div class="tabs">${tabs.map(([id, nm]) => `<button class="btn small ${tab === id ? 'gold' : ''}" data-tab="${id}">${nm}</button>`).join('')}</div>`;
     if (tab === 'companies') body += [0, 1, 2, 3].map(t => `<div class="perk-count">${TIER_NAMES[t]}</div>` + Object.keys(M.COMPANIES).filter(id => (M.COMPANIES[id].tier || 0) === t).map(id => { const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id); const clears = P.stats.clearsByCompany[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? co.icon : '🔒'} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${clears ? clears + '승' : ''}</span></div>${un ? companyInfo(co, id) : `<div class="d">${esc(unlockText(co.unlock))}</div>`}</div>`; }).join('')).join('');
+    else if (tab === 'carriers') { const live = game && game.phase !== 'over' && game.phase !== 'win'; body += `<div class="perk-count">운송 업체 · 신뢰도는 업체에 쌓이고 계약을 바꿔도 유지${live ? ' (현재 런 진행도)' : ''}</div>` + Object.keys(D.CARRIERS).map(k => { const car = D.CARRIERS[k]; return `<div class="card" style="cursor:default"><div class="t"><span>${esc(car.name)}${car.instant ? ' ⚡' : ''}</span><span class="price">회당 ${car.cap} · ${car.calls}회 · ${car.price}c</span></div><div class="d">${esc(car.desc)}${trustTrack(k, live ? game.trustXp(k) : null)}</div></div>`; }).join(''); }
     else if (tab === 'perks') body += `<div class="perk-count">퍽 슬롯 ${Profile.perkSlots()}개 · 같은 계열은 하나만 장착</div>` + Object.keys(M.PERK_FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${M.PERK_FAMILIES[f]} 계열</div>` + Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f).map(id => { const pk = M.PERKS[id], un = P.unlocked.perks.includes(id); return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t">${un ? '' : '🔒 '}${esc(pk.name)}</div><div class="d">${esc(pk.desc)}${un ? '' : `<br>${esc(unlockText(pk.unlock))}`}</div></div>`; }).join('')).join('');
     else if (tab === 'scenarios') body += Object.keys(M.SCENARIOS).map(id => { const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id); const clears = P.stats.clearsByScenario[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? s.icon : '🔒'} ${esc(s.name)}</span><span class="price">${clears ? clears + '승' : ''}</span></div><div class="d">${esc(s.desc)}<br>승리: ${esc(s.win)}${un ? '' : `<br>${esc(unlockText(s.unlock))}`}</div></div>`; }).join('');
     else if (tab === 'achievements') {
@@ -428,7 +438,7 @@
   function showHelp(back) {
     const body = `<div class="help">
       <p>택배가 매 턴 창고로 들어옵니다. 운송 업체를 호출해 처리하거나 <b>대기</b>해서 택배를 모아 두세요. 호출 비용은 택배 개수가 아니라 <b>호출 횟수</b> 기준이므로, 한 번에 많이 처리할수록 이득입니다.</p>
-      <h3>런 준비</h3><p><b>시나리오</b>(길이·규칙) → <b>회사</b>(시작 창고·계약·고유 특성) → <b>퍽</b>(작은 규칙 변경) 순서로 고릅니다. 회사·퍽·시나리오는 <b>도전과제</b>로 해금되며, 도감에서 조건과 진행도를 볼 수 있습니다. 회사는 <b>1단계</b>(런 3회·첫 클리어·2회 클리어 — 하다 보면 열림) → <b>2단계</b>(택배 종류별 누적 30개) → <b>3단계</b>(회사 3개로 클리어) 순으로 열립니다.</p>
+      <h3>런 준비</h3><p><b>시나리오</b>(길이·규칙) → <b>회사</b>(시작 창고·계약·고유 특성) → <b>퍽</b>(작은 규칙 변경) 순서로 고릅니다. 회사·퍽·시나리오는 <b>도전과제</b>로 해금되며, 도감에서 조건과 진행도를 볼 수 있습니다. 회사는 <b>1단계</b>(런 3회·첫 클리어·2회 클리어) → <b>2단계</b>(택배 종류별 누적 30개) → <b>3단계</b>(회사 3개로 클리어) 순으로 열립니다.</p>
       <h3>한 턴의 순서</h3><p>입고 → 업체 호출 또는 대기 → 배송 → 신선도·기한 진행 → 창고 초과·지연 페널티</p>
       <h3>택배 종류</h3><table><tr><th>종류</th><th>크기</th><th>기한</th><th>전문 업체</th></tr>
       <tr><td>일반</td><td>1~2</td><td>6턴</td><td>자체 배송 / 대량 분류</td></tr><tr><td>신선식품</td><td>2~4</td><td>3턴(부패)</td><td>냉장 물류</td></tr><tr><td>파손주의</td><td>2~4</td><td>7턴</td><td>프래자일 전문</td></tr><tr><td>국제운송</td><td>4~7</td><td>8턴</td><td>국제 특송</td></tr><tr><td>대형화물</td><td>4~7</td><td>8턴</td><td>대형 화물 (4개월차~)</td></tr></table>

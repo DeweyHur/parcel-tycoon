@@ -76,6 +76,8 @@
     // 업체 신뢰도 (런 내, 업체별 누적 — 계약을 바꿔도 유지)
     TRUST_LEVELS: [0, 3, 8, 15],
     TRUST_EFFECTS: ['기본', '회당 처리량 +1', '4번째 호출마다 +1개', '전용 능력'],
+    // 단계별 효과 문구 (마켓 카드·호출 모달·도감이 같은 문자열을 읽는다)
+    trustEffectText(carrier, lv) { if (lv >= 3 && DATA.CARRIER_L3[carrier]) return DATA.CARRIER_L3[carrier].replace('신뢰 3단계: ', ''); return DATA.TRUST_EFFECTS[lv]; },
 
     ENHANCEMENTS: {
       limit1:  { name: '호출 한도 +1', desc: '계약 최대/잔여 호출 횟수 +1 (계약당 2회)', price: 90, kind: 'limit', value: 1 },

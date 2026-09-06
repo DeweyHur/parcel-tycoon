@@ -133,3 +133,11 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 
 @media (max-height: 640px) { #scene { flex-basis: 30%; min-height: 160px; } }
 @media (min-width: 600px) { #app { max-width: 480px; margin: 0 auto; border-left: 4px solid var(--line); border-right: 4px solid var(--line); } }
+
+/* 신뢰도 트랙 (마켓 카드·호출 모달·도감 공용) */
+.ttrack { margin-top: 4px; font-size: 10px; color: var(--dim); }
+.ttrow { display: flex; gap: 6px; align-items: baseline; line-height: 1.5; }
+.ttrow .lv { flex: 0 0 12px; color: var(--gold); font-weight: bold; }
+.ttrow .ef { flex: 1; }
+.ttrow .st { flex: 0 0 auto; }
+.ttrow.on { color: #e8e8e8; } .ttrow.on .st { color: var(--green); }

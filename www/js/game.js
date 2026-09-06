@@ -37,7 +37,7 @@
     priceMult: 1, contractPriceMult: 1, itemPriceMult: 1, facilityPriceMult: 1, waitStack: 0, skipBonus: 0,
     randomStart: false, freeRefresh: 0, marketContractSlots: 2, erosion: false, stressRelief: null, keepCalls: 0, marketMaxBuy: D.MARKET_MAX_BUY, expertFrom: 1,
     firstContractDiscount: 0, rebuyTrust: 0, spareCall: false, bundleRefund: null, overflowGrace: 0, capDelta: 0, freezer: 0, xlDelta: 0, xlPenalty: 3,
-    insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
+    insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], guaranteeBlocked: true, closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
     arrivalsMult: 1, burstTurns: 0, winDelivered: 0, typeShift: null, typeOverride: null, freshSizes: null, warmMult: 2, heatAlerts: 0, winMaxDiscard: null,
     strike: false, xlWeight: null, winCash: 0, noRefresh: false, bigWeight: 1, bigCallBonus: null, winMaxOverdue: null,
     selfCapDelta: 0, allStartTrust: 0,
@@ -579,20 +579,41 @@
       for (const k of Object.keys(D.CARRIERS)) { if (R.banCarriers.includes(k)) continue; w[k] = R.marketWeight[k] || 1; }
       return w;
     }
+    // 막힌 속성: 창고에 있거나 다음 2턴 입고 예정인 특수 택배 중, 현재 계약(타겟·긴급 제외, 잔여 호출 있는 것)으로 처리할 수 없는 종류. 부피 큰 순
+    blockedTypes() {
+      const pseudo = [];
+      for (const p of this.parcels) if (p.type !== 'normal') pseudo.push({ type: p.type, size: p.size });
+      for (let t = this.turn - 1; t < this.turn + 1; t++) for (const s of (this.schedule[t] || [])) if (s.type !== 'normal') pseudo.push({ type: s.type, size: Math.max(1, s.size + this.rules.sizeDelta + (s.size >= 4 ? this.rules.bigSizeDelta : 0)) });
+      const covers = this.contracts.filter(c => c && c.calls > 0 && !['target', 'urgent'].includes(c.carrier)).map(c => D.CARRIERS[c.carrier]);
+      const acc = {};
+      for (const p of pseudo) { if (covers.some(car => this._carrierAccepts(car, p))) continue; const a = acc[p.type] || (acc[p.type] = { type: p.type, volume: 0, count: 0, maxSize: 0 }); a.volume += p.size; a.count++; a.maxSize = Math.max(a.maxSize, p.size); }
+      return Object.values(acc).sort((a, b) => b.volume - a.volume);
+    }
     _genMarketItems() {
       const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(6, m)] * R.itemPriceMult * R.priceMult;
       const items = [];
       const gp = this._gradeProb(m);
       const weights = this._carrierWeights();
-      const guarantee = R.guaranteeCarriers.filter(k => weights[k]);
+      const forced = R.guaranteeCarriers.filter(k => weights[k]).map(k => ({ carrier: k }));
+      // 막힌 속성 보장: 처리할 계약이 없는 특수 택배가 있으면 그것을 처리할 업체(타겟·긴급 제외)를 반드시 하나 배치
+      if (R.guaranteeBlocked) {
+        for (const b of this.blockedTypes()) {
+          if (forced.some(f => this._carrierAccepts(D.CARRIERS[f.carrier], { type: b.type, size: b.maxSize }))) break;
+          const cand = {}; for (const k of Object.keys(weights)) if (!['target', 'urgent'].includes(k) && this._carrierAccepts(D.CARRIERS[k], { type: b.type, size: b.maxSize })) cand[k] = weights[k];
+          if (!Object.keys(cand).length) continue;
+          forced.unshift({ carrier: this.rng.weighted(cand), hint: `창고의 ${D.PARCEL_TYPES[b.type].short} ${b.count}개 처리 가능` });
+          break;
+        }
+      }
       for (let i = 0; i < R.marketContractSlots; i++) {
         let grade = this.rng.weighted(gp);
         // 보호 규칙: 계약 슬롯 중 하나는 현재 보유 등급보다 높게
         if (i === 1 && items[0].grade === 'normal' && grade === 'normal' && this.contracts.every(c => !c || c.grade === 'normal')) grade = 'trusted';
-        const carrier = i < guarantee.length ? guarantee[i] : this.rng.weighted(weights);
+        const f = forced[i];
+        const carrier = f ? f.carrier : this.rng.weighted(weights);
         let price = Math.round(D.CARRIERS[carrier].price * D.GRADES[grade].price * R.priceMult);
         if (carrier === 'urgent') price = Math.round(price * R.urgentDiscount);
-        items.push({ kind: 'contract', carrier, grade, price, name: D.CARRIERS[carrier].name + (grade !== 'normal' ? ` (${D.GRADES[grade].name})` : ''), sold: false });
+        items.push({ kind: 'contract', carrier, grade, price, name: D.CARRIERS[carrier].name + (grade !== 'normal' ? ` (${D.GRADES[grade].name})` : ''), sold: false, hint: f && f.hint || null });
       }
       const enhW = {}; for (const k of Object.keys(D.ENHANCEMENTS)) enhW[k] = R.marketWeight[k] || 1;
       const picked = []; for (let i = 0; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }

@@ -105,4 +105,13 @@ t('회사 해금 체인: 1단계는 누적으로 열림', () => {
   for (const id in M.COMPANIES) { const c = M.COMPANIES[id]; if (c.unlock) assert.ok(A[c.unlock] && (A[c.unlock].rewardType === 'company' || A[c.unlock].reward.includes('company:' + id)), id); }
   assert.deepEqual(A.big20.prog({ bigDelivered: 7 }), [7, 20]);
 });
+t('마켓 막힌 속성 보장: 처리 못 하는 특수 택배가 있으면 슬롯 A에 처리 가능한 업체', () => {
+  let checked = 0;
+  for (let s = 1; s < 40; s++) { const g = NG(s); for (let i = 0; i < 10 && g.phase === 'play'; i++) g.wait(); if (g.phase !== 'summary') continue;
+    const blocked = g.blockedTypes(); g.closeSummary(); const it = g.market.items[0];
+    if (!blocked.length) { assert.ok(!it.hint); continue; }
+    const b = blocked[0]; assert.ok(g._carrierAccepts(D.CARRIERS[it.carrier], { type: b.type, size: b.maxSize }), `seed ${s}: ${it.carrier} vs ${b.type}`); assert.ok(it.hint && !['target', 'urgent'].includes(it.carrier)); checked++; }
+  assert.ok(checked > 5);
+});
+t('신뢰도 단계 문구는 한 곳에서 나온다', () => { assert.equal(D.trustEffectText('cold', 1), '회당 처리량 +1'); assert.equal(D.trustEffectText('cold', 3), '호출 턴에 신선식품 부패 카운트 정지'); });
 console.log(`\n${n} tests passed`);
