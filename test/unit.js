@@ -94,7 +94,7 @@ t('회사별 시작 상태', () => {
   for (const id of Object.keys(M.COMPANIES)) { const g = new Game({ seed: 2, company: id }); assert.ok(g.cash > 0, id); assert.ok(g.warehouse.cap >= 16, id); assert.ok(g.contracts.filter(Boolean).length >= 3, id); }
   const q = new Game({ seed: 2, company: 'quick' }); assert.equal(q.contracts[0].maxCalls, 6); assert.equal(q.selfCapacity(), 3);
   const st = new Game({ seed: 2, company: 'steel' }); assert.equal(st.warehouse.cold, 0);
-  const th = new Game({ seed: 2, company: 'thrifty' }); th.wait(); th.wait(); assert.equal(th.callCapacity(th.contracts[0]), 4 + 2);
+  const th = new Game({ seed: 2, company: 'thrifty' }); th.wait(); th.wait(); assert.equal(th.callCapacity(th.contracts[0]), 4 + 2 + 1); // 큰마트 2단계: 대량 +1
 });
 t('시나리오 규칙', () => {
   const p = new Game({ seed: 3, scenario: 'peak' }); assert.equal(p.rules.months, 2); assert.ok(p.schedule.reduce((a, b) => a + b.length, 0) >= 18);
@@ -173,5 +173,20 @@ t('세이브 마이그레이션: v0.3 형식(enh.capDelta·attrs 없음)에서 N
   for (const c of h.contracts) if (c) { assert.ok(Number.isFinite(h.callCapacity(c)), 'cap'); assert.ok(Number.isFinite(c.calls) && Number.isFinite(c.maxCalls)); }
   for (const p of h.parcels) assert.ok(Array.isArray(p.attrs));
   assert.equal(h.warehouse.frozen, 2); h.wait(); assert.ok(Number.isFinite(h.stress));
+});
+t('고객: 입고 배정·신뢰 xp·손해배상·거래 중단', () => {
+  const g = NG(3, { perks: ['skip', 'longdeal'] }); assert.ok(g.customers.mart && g.customerLevel('mart') === 1);
+  assert.ok(g.schedule.flat().every(sp => sp.customer));
+  g.warehouse.cap = 99; g.parcels = [{ id: 5, type: 'normal', size: 1, baseSize: 1, reward: 40, deadline: 6, overdue: false, attrs: [], age: 0, warm: 0, customs: 0, customer: 'glass', arrivalTurn: 1 }]; g.schedule = g.schedule.map(() => []);
+  const t = g.contracts.findIndex(c => c && c.carrier === 'target'); const r = g.callCarrier(t, [5]); assert.ok(r.ok); assert.equal(g.customers.glass.xp, 1);
+  g.parcels = [{ id: 6, type: 'fragile', size: 2, baseSize: 2, reward: 55, deadline: 1, overdue: false, attrs: ['fragile'], age: 0, warm: 0, customs: 0, customer: 'glass', arrivalTurn: 1 }];
+  const cash = g.cash; g.wait(); g.wait(); g.wait(); g.wait();
+  assert.equal(g.stats.returned, 1); assert.ok(g.cash <= cash - 110, `claim ${cash - g.cash}`); assert.ok(g.customers.glass.suspended); assert.equal(g.customerLevel('glass'), 0);
+  assert.ok(!('glass' in g._customerWeightsFor(1)));
+});
+t('고객 규칙: 새벽배송(입고 당 턴 처리 +20)', () => {
+  const g = NG(3); g.warehouse.cap = 99; g.schedule = g.schedule.map(() => []);
+  g.parcels = [{ id: 7, type: 'normal', size: 1, baseSize: 1, reward: 40, deadline: 6, overdue: false, attrs: [], age: 0, warm: 0, customs: 0, customer: 'dawn', arrivalTurn: g.totalTurn }];
+  const t = g.contracts.findIndex(c => c && c.carrier === 'target'); const r = g.callCarrier(t, [7]); assert.equal(r.revenue, 40 + 20); assert.equal(g.customers.dawn.xp, 2);
 });
 console.log(`\n${n} tests passed`);

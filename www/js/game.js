@@ -37,15 +37,15 @@
     priceMult: 1, contractPriceMult: 1, itemPriceMult: 1, facilityPriceMult: 1, waitStack: 0, skipBonus: 0,
     randomStart: false, freeRefresh: 0, marketContractSlots: 2, erosion: false, stressRelief: null, keepCalls: 0, marketMaxBuy: D.MARKET_MAX_BUY, expertFrom: 1,
     firstContractDiscount: 0, rebuyTrust: 0, spareCall: false, bundleRefund: null, overflowGrace: 0, capDelta: 0, freezer: 0, xlDelta: 0, xlPenalty: 3,
-    insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], guaranteeBlocked: true, returnGrace: D.RETURN_GRACE, theftMult: 1, overdueTurnStress: 0, breakMult: 1, warmLimit: D.WARM_LIMIT, customsWait: D.CUSTOMS_WAIT, customsDelayProb: D.CUSTOMS_DELAY_PROB, returnGraceFresh: 1, frozenCapMax: null, closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
+    insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], guaranteeBlocked: true, returnGrace: D.RETURN_GRACE, theftMult: 1, overdueTurnStress: 0, breakMult: 1, warmLimit: D.WARM_LIMIT, customsWait: D.CUSTOMS_WAIT, customsDelayProb: D.CUSTOMS_DELAY_PROB, returnGraceFresh: 1, frozenCapMax: null, claimMult: 1, customerWeights: {}, forceCustomers: [], noAnon: false, closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
     arrivalsMult: 1, burstTurns: 0, winDelivered: 0, typeShift: null, typeOverride: null, freshSizes: null, warmMult: 2, heatAlerts: 0, winMaxDiscard: null,
     strike: false, xlWeight: null, winCash: 0, noRefresh: false, bigWeight: 1, bigCallBonus: null, winMaxOverdue: null,
     selfCapDelta: 0, allStartTrust: 0,
   };
-  const MULT_KEYS = ['theftMult', 'breakMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
+  const MULT_KEYS = ['theftMult', 'breakMult', 'claimMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
   const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'burstTurns', 'selfCapDelta', 'allStartTrust'];
   const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust'];
-  const MAP_MULT_KEYS = ['rewardMult', 'marketWeight'];
+  const MAP_MULT_KEYS = ['rewardMult', 'marketWeight', 'customerWeights'];
   const LIST_KEYS = ['banCarriers', 'guaranteeCarriers'];
   // 뒤에 오는 설정이 앞을 덮는다: 시나리오 → 회사 → 퍽 → 데일리 변형 순
   function mergeMods(list) {
@@ -105,10 +105,11 @@
       this.trust = {}; // 업체별 신뢰도 경험치 (런 내 유지)
       for (const k of Object.keys(D.CARRIERS)) this.trust[k] = (this.rules.carrierStartTrust[k] || 0) + this.rules.allStartTrust;
       this._initCompany();
+      this._initCustomers();
       this._startMonth(1);
     }
     static emptyStats() {
-      return { deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, onTimeByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, broken: 0,
+      return { deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, onTimeByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, broken: 0, claims: 0, customerL3: 0,
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
         overdueDelivered: 0, returned: 0, stolen: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
@@ -146,6 +147,78 @@
       while (this.contracts.length < D.CONTRACT_SLOTS) this.contracts.push(null);
       this.startContractIds = this.contracts.filter(Boolean).map(c => c.id);
     }
+
+    // ----- 고객(화주) (docs/CUSTOMER_DESIGN.md 2장) -----
+    _initCustomers() {
+      const R = this.rules, co = this.company;
+      let list = co.customers;
+      if (!list) { const pool = this.rng.shuffle(Object.keys(M.CUSTOMERS).filter(k => k !== 'anon')).slice(0, 3); list = pool.map(k => [k, this.rng.int(3)]).concat([['anon', 0]]); }
+      for (const k of R.forceCustomers) if (!list.some(x => x[0] === k)) list = list.concat([[k, 0]]);
+      if (R.noAnon) list = list.filter(x => x[0] !== 'anon');
+      this.customers = {};
+      for (const [id, lv] of list) {
+        const c = this.customers[id] || (this.customers[id] = { id, xp: 0, slots: 0, suspended: false, streak: 0, perkApplied: {}, month: this._emptyCustMonth(), total: { delivered: 0, revenue: 0, claims: 0, discarded: 0 } });
+        c.slots++; c.xp = Math.max(c.xp, M.CUSTOMER_LEVELS[lv] || 0);
+      }
+      for (const id in this.customers) this._applyCustomerPerks(id);
+    }
+    _emptyCustMonth() { return { delivered: 0, revenue: 0, claims: 0, discarded: 0, lvStart: 0 }; }
+    customerLevel(id) { const c = this.customers && this.customers[id]; if (!c || c.suspended) return 0; let lv = 0; for (let i = 1; i < M.CUSTOMER_LEVELS.length; i++) if (c.xp >= M.CUSTOMER_LEVELS[i]) lv = i; return lv; }
+    customerNext(id) { const lv = this.customerLevel(id); const c = this.customers[id]; return lv >= 3 ? null : { need: M.CUSTOMER_LEVELS[lv + 1], have: Math.max(0, c.xp) }; }
+    customerPerk(id, key) { const cust = M.CUSTOMERS[id]; if (!cust || !cust.perks) return null; const lv = this.customerLevel(id); let v = null; for (const l of [2, 3]) if (lv >= l && cust.perks[l] && cust.perks[l][key] != null) v = cust.perks[l][key]; return v; }
+    // 창고에 직접 적용되는 혜택(냉장·초대형)은 단계 도달 시 더하고, 거래 중단 시 뺀다
+    _applyCustomerPerks(id) {
+      const cust = M.CUSTOMERS[id], c = this.customers[id]; if (!cust || !cust.perks) return;
+      for (const l of [2, 3]) { const pk = cust.perks[l]; if (!pk) continue; const should = this.customerLevel(id) >= l; const has = !!c.perkApplied[l];
+        if (should && !has) { if (pk.cold) this.warehouse.cold += pk.cold; if (pk.xl) this.warehouse.xl += pk.xl; c.perkApplied[l] = true; }
+        else if (!should && has) { if (pk.cold) this.warehouse.cold = Math.max(0, this.warehouse.cold - pk.cold); if (pk.xl) this.warehouse.xl = Math.max(0, this.warehouse.xl - pk.xl); c.perkApplied[l] = false; } }
+    }
+    _custXp(id, delta, why) {
+      const c = this.customers && this.customers[id]; if (!c || id === 'anon') return;
+      const before = this.customerLevel(id);
+      c.xp += delta;
+      if (c.xp < 0) { c.xp = 0; if (!c.suspended) { c.suspended = true; this.say(`${M.CUSTOMERS[id].name} 거래 중단 (${why}) — 다음 달 재개`); this.emit('custSuspend', { customer: id }); } }
+      const after = this.customerLevel(id);
+      if (after !== before) { this._applyCustomerPerks(id); this._assignCold(); if (after > before) { this.say(`${M.CUSTOMERS[id].name} 신뢰 ${after}단계!`); this.emit('custLevel', { customer: id, level: after }); if (after >= 3) this.stats.customerL3++; } }
+    }
+    // 폐기 시 손해배상 (부패·반송·도난·파손 공통)
+    _claim(p, why) {
+      const R = this.rules, id = p.customer || 'anon', cust = M.CUSTOMERS[id] || M.CUSTOMERS.anon, c = this.customers && this.customers[id];
+      const amount = Math.round((25 + p.baseSize * 15) * cust.claimMult * R.claimMult);
+      this.cash -= amount; this.monthStats.claims += amount; this.run.spent += amount; this.stats.claims += amount;
+      if (c) { c.month.claims += amount; c.month.discarded++; c.total.claims += amount; c.total.discarded++; }
+      this.say(`손해배상 -${amount}c (${cust.name}, ${why})`);
+      this.emit('claim', { parcel: p, amount, customer: id, why });
+      this._custXp(id, -3, why);
+    }
+    // 처리 시 고객 보너스·xp. delivered: 이 호출로 처리한 같은 고객 택배들
+    _custDeliver(p, r, onTime, group) {
+      const id = p.customer || 'anon', cust = M.CUSTOMERS[id] || M.CUSTOMERS.anon, c = this.customers && this.customers[id];
+      const lv = this.customerLevel(id); let bonus = M.CUSTOMER_BONUS[lv] || 0, xp = onTime ? 1 : 0, ruleHit = false;
+      const rd = this.customerPerk(id, 'rewardDelta'); if (rd) bonus += rd;
+      const rule = cust.rule;
+      if (rule && onTime) {
+        if (rule.kind === 'sameTurn' && p.age === 0) { bonus += rule.bonus; ruleHit = true; }
+        else if (rule.kind === 'bundle' && group.length >= rule.min) { bonus += Math.round(r * (rule.mult - 1)); ruleHit = true; }
+        else if (rule.kind === 'streak' && c) { c.streak++; if (c.streak % rule.n === 0) { bonus += rule.bonus; ruleHit = true; } }
+        else if (rule.kind === 'sameArrival' && group.length >= 2 && group.filter(q => q.arrivalTurn === p.arrivalTurn).length >= 2 && group.find(q => q.arrivalTurn === p.arrivalTurn) === p) { bonus += rule.bonus; ruleHit = true; }
+        else if (rule.kind === 'frozenSafe' && p.type === 'frozen') { bonus += rule.bonus; ruleHit = true; }
+        else if (rule.kind === 'coldCustoms' && this._attrs(p).includes('customs') && p.coldDuringCustoms) { bonus += rule.bonus; ruleHit = true; }
+        else if (rule.kind === 'customsFast') { ruleHit = true; }
+      }
+      if (ruleHit) xp += 1;
+      if (c) { c.month.delivered++; c.total.delivered++; }
+      if (xp) this._custXp(id, xp, '처리');
+      return bonus;
+    }
+    _custRevenue(p, amount) { const c = this.customers && this.customers[p.customer || 'anon']; if (c) { c.month.revenue += amount; c.total.revenue += amount; } }
+    _customerWeightsFor(m) {
+      const R = this.rules, w = {};
+      for (const id in this.customers) { const c = this.customers[id]; if (c.suspended) continue; const vol = id === 'anon' ? 1 : M.CUSTOMER_VOLUME[this.customerLevel(id)]; w[id] = c.slots * vol * (R.customerWeights[id] || 1); }
+      if (!Object.keys(w).length) w.anon = 1;
+      return w;
+    }
+    customerSummary() { return Object.keys(this.customers || {}).map(id => ({ id, ...M.CUSTOMERS[id], level: this.customerLevel(id), xp: this.customers[id].xp, suspended: this.customers[id].suspended, month: this.customers[id].month, total: this.customers[id].total, next: this.customerNext(id), slots: this.customers[id].slots })); }
 
     // ----- helpers -----
     _makeContract(carrier, grade, calls, isStart) {
@@ -195,6 +268,7 @@
     baseCapacity(c) {
       const R = this.rules;
       let cap = D.CARRIERS[c.carrier].cap + D.GRADES[c.grade].cap + c.enh.cap + c.enh.capDelta + (R.carrierCapDelta[c.carrier] || 0);
+      for (const id in this.customers || {}) { const cc = this.customerPerk(id, 'carrierCap'); if (cc && cc[c.carrier]) cap += cc[c.carrier]; }
       const lv = this.trustLevel(c);
       if (lv >= 1) cap += 1;
       if (lv >= 3 && ['bulk', 'intl', 'large', 'urgent', 'frozen'].includes(c.carrier)) cap += 1;
@@ -239,7 +313,7 @@
     }
     canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c)); }
     // ⚠ 파손 확률: 능력에 fragile이 없으면
-    breakProb(c, p) { const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs; if (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile')) return 0; return Math.min(0.95, D.BREAK_PROB * this.rules.breakMult); }
+    breakProb(c, p) { const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs; if (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile')) return 0; return Math.min(0.95, D.BREAK_PROB * this.rules.breakMult * (this.customerPerk(p.customer, 'breakMult') || 1)); }
     eligibleParcels(c) { return this.parcels.filter(p => this.canHandle(c, p)); }
     canCall(c) {
       if (!c || this.isStruck(c)) return false;
@@ -316,7 +390,8 @@
     _startMonth(m) {
       const R = this.rules;
       this.month = m; this.turn = 0;
-      this.monthStats = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, firstContractBought: false, spareUsed: false, bundleUsed: false };
+      if (this.customers) for (const id in this.customers) { const c = this.customers[id]; if (c.suspended && m > 1) { c.suspended = false; c.xp = 0; this.say(`${M.CUSTOMERS[id].name} 거래 재개`); } c.month = this._emptyCustMonth(); c.month.lvStart = this.customerLevel(id); }
+      this.monthStats = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false };
       for (const c of this.contracts) if (c) c.successCalls = 0;
       this.schedule = this._makeSchedule(m);
       this.heatTurns = R.heatAlerts ? this.rng.shuffle([...Array(D.TURNS_PER_MONTH).keys()].map(i => i + 1)).slice(0, R.heatAlerts).sort((a, b) => a - b) : [];
@@ -337,32 +412,47 @@
     _makeSchedule(m) {
       const R = this.rules, turns = D.TURNS_PER_MONTH;
       const sched = Array.from({ length: turns }, () => []);
-      const ratio = this._typeRatio(m);
-      for (let t = 0; t < turns; t++) sched[t].push(this._genParcelSpec(ratio));
+      const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
+      const gen = () => this._genParcelSpec(ratio, m, cw);
+      for (let t = 0; t < turns; t++) sched[t].push(gen());
       let extra = Math.round(this._extraArrivals(m) * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0));
       const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
-      for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(this._genParcelSpec(ratio));
+      for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
       this.burstTurns = [];
-      if (R.burstTurns) { const bt = this.rng.shuffle([...Array(turns - 2).keys()].map(i => i + 2)).slice(0, R.burstTurns); for (const t of bt) { sched[t].push(this._genParcelSpec(ratio)); this.burstTurns.push(t + 1); } }
+      if (R.burstTurns) { const bt = this.rng.shuffle([...Array(turns - 2).keys()].map(i => i + 2)).slice(0, R.burstTurns); for (const t of bt) { sched[t].push(gen()); this.burstTurns.push(t + 1); } }
       return sched;
     }
-    _genParcelSpec(ratio) {
+    // 고객 품목 분포에 시나리오·월별 비율의 편차를 곱한다 (항만이면 모든 고객의 통관 비중이 오르는 식)
+    _genParcelSpec(ratio, m, cw) {
       const R = this.rules;
-      const type = this.rng.weighted(ratio);
-      let allowed = D.PARCEL_TYPES[type].sizes;
-      if (type === 'fresh' && R.freshSizes) allowed = R.freshSizes;
-      const w = {}; for (const s of allowed) { let wt = D.SIZE_WEIGHT[s]; if (s === 7 && R.xlWeight != null) wt = R.xlWeight; if (s >= 4) wt *= R.bigWeight; w[s] = wt; }
-      return { type, size: +this.rng.weighted(w) };
+      const customer = cw ? this.rng.weighted(cw) : 'anon';
+      const cust = M.CUSTOMERS[customer] || M.CUSTOMERS.anon;
+      let type, attrs, sizes;
+      if (!cust.items) type = this.rng.weighted(ratio);
+      else {
+        const base = D.TYPE_RATIO[Math.min(6, m || this.month)], w = {};
+        for (const k in cust.items) { const t = M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k; const f = base[t] > 0 ? (ratio[t] || 0) / base[t] : 1; w[k] = Math.max(0.05, cust.items[k] * Math.max(0.25, Math.min(3, f))); }
+        const k = this.rng.weighted(w);
+        if (M.CUSTOMER_ITEMS[k]) { type = M.CUSTOMER_ITEMS[k].type; attrs = M.CUSTOMER_ITEMS[k].attrs; sizes = M.CUSTOMER_ITEMS[k].sizes; } else type = k;
+      }
+      let allowed = sizes || D.PARCEL_TYPES[type].sizes;
+      if (type === 'fresh' && R.freshSizes && !sizes) allowed = R.freshSizes;
+      const w = {}; for (const s of allowed) { let wt = D.SIZE_WEIGHT[s]; if (s === 7 && R.xlWeight != null) wt = R.xlWeight; if (s >= 4) wt *= R.bigWeight; if (cust.sizeBias === 'small' && s >= 2) wt *= s >= 4 ? 0.2 : 0.6; if (cust.sizeBias === 'big' && s < 4) wt *= 0.3; if (cust.sizeBias === 'mid' && s !== 2) wt *= 0.5; w[s] = wt; }
+      const spec = { type, size: +this.rng.weighted(w), customer };
+      if (attrs) spec.attrs = attrs;
+      return spec;
     }
     _spawnParcel(spec) {
       const R = this.rules, t = D.PARCEL_TYPES[spec.type];
       let size = spec.size + R.sizeDelta;
       if (spec.size >= 4) size += R.bigSizeDelta;
       size = Math.max(1, size);
-      const attrs = (spec.attrs || t.attrs).slice();
-      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward: 25 + spec.size * 15, attrs,
-        deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0 };
-      if (attrs.includes('customs')) { p.customs = R.customsWait; if (this.rng.next() < R.customsDelayProb) { p.customs += 1; p.customsDelayed = true; } }
+      const attrs = (spec.attrs || t.attrs).slice(), customer = spec.customer || 'anon';
+      const cust = M.CUSTOMERS[customer] || M.CUSTOMERS.anon;
+      const bsd = this.customerPerk(customer, 'bigSizeDelta'); if (bsd && spec.size >= 4) size = Math.max(1, size + bsd);
+      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward: 25 + spec.size * 15, attrs, customer,
+        deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1 };
+      if (attrs.includes('customs')) { p.customs = R.customsWait; if (this.rng.next() < R.customsDelayProb) { p.customs += 1; p.customsDelayed = true; } if (cust.rule && cust.rule.kind === 'customsFast') p.customs += cust.rule.delta; const cd = this.customerPerk(customer, 'customsDelta'); if (cd) p.customs += cd; p.customs = Math.max(0, p.customs); p.coldDuringCustoms = true; }
       return p;
     }
     _startTurn() {
@@ -441,11 +531,13 @@
         }
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
         const isSpec = specialistAll || car.specialist === p.type;
-        if (isSpec && t.bonus) { r += t.bonus + R.bonusDelta; special = true; if (c.carrier === 'fragile' && lv >= 3) r += 15; if (!this.stats.specialistTypes.includes(p.type)) this.stats.specialistTypes.push(p.type); }
+        if (isSpec && t.bonus) { r += t.bonus + R.bonusDelta + (this.customerPerk(p.customer, 'bonusDelta') || 0); special = true; if (c.carrier === 'fragile' && lv >= 3) r += 15; if (!this.stats.specialistTypes.includes(p.type)) this.stats.specialistTypes.push(p.type); }
         r = Math.round(r * (R.rewardMult[p.type] || 1));
         if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else { onTime++; this.stats.onTimeByType[p.type]++; if (p.baseSize >= 7) this.stats.xlOnTime++; if (p.baseSize >= 4) this.stats.bigDelivered++; }
         if (this._attrs(p).includes('cold') && !p.inCold && c.carrier === 'urgent') this.stats.urgentClutch = true;
-        revenue += Math.max(0, r);
+        r += this._custDeliver(p, r, !p.overdue, chosen.filter(q => q.customer === p.customer));
+        r = Math.max(0, r); this._custRevenue(p, r);
+        revenue += r;
         this.stats.deliveredByType[p.type]++;
         delivered.push(p);
         this.parcels.splice(this.parcels.indexOf(p), 1);
@@ -507,7 +599,9 @@
         let r = p.reward + (R.rewardDelta.normal || 0) + R.rewardAll;
         r = Math.round(r * (R.rewardMult.normal || 1) * D.SELF_DELIVERY.rewardMult);
         if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else this.stats.onTimeByType.normal++;
-        revenue += Math.max(0, r);
+        r += this._custDeliver(p, r, !p.overdue, chosen.filter(q => q.customer === p.customer));
+        r = Math.max(0, r); this._custRevenue(p, r);
+        revenue += r;
         this.stats.deliveredByType.normal++;
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.emit('deliver', { parcel: p, reward: r });
@@ -536,11 +630,13 @@
       const R = this.rules, i = this.parcels.indexOf(p); if (i < 0) return;
       this.parcels.splice(i, 1);
       this.monthStats.discarded++; this.run.discarded++; this.stats.discarded++;
-      let pen = stress;
-      if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; pen = 0; why += ' (보험 적용)'; }
+      let pen = stress, insured = false;
+      if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; pen = 0; insured = true; why += ' (보험 적용)'; }
       if (pen) { this.stress += pen; this.monthStats.penalty += pen; }
       this.say(`폐기: ${D.PARCEL_TYPES[p.type].short}${p.size} — ${why}${pen ? ` +${pen}` : ''}`);
       this.emit(evt || 'discard', { parcel: p, why });
+      if (!insured) this._claim(p, why);
+      if (evt === 'broken') { const cc = this.customers && this.customers[p.customer]; if (cc) cc.streak = 0; }
     }
     _endTurn(waited, freezeFresh) {
       const R = this.rules;
@@ -553,7 +649,7 @@
         p.age++;
         const isCold = this._attrs(p).includes('cold'), isFrozen = this._attrs(p).includes('frozen');
         // 통관 대기: 기한은 통관 뒤 시작
-        if (p.customs > 0) { p.customs--; continue; }
+        if (p.customs > 0) { if (isCold && !p.inCold) p.coldDuringCustoms = false; p.customs--; continue; }
         // 신선: 냉장 구역 밖이면 폭염 즉시 / warmLimit턴 뒤 폐기. 안이면 기한만 진행(냉동고 퍽·냉장 L3는 기한 정지)
         if (isCold && !p.inCold) { p.warm = (p.warm || 0) + 1; if (heat || p.warm >= R.warmLimit) { discard.push([p, heat ? '폭염 부패' : '상온 부패']); continue; } }
         else if (isCold) p.warm = 0;
@@ -567,9 +663,8 @@
       for (const p of returned) {
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.monthStats.returned++; this.stats.returned++;
-        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push('반송 (보험 적용)'); }
-        else { pen += 2; reasons.push(`반송 ${D.PARCEL_TYPES[p.type].short} +2`); }
-        this.emit('returned', { parcel: p });
+        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push('반송 (보험 적용)'); this.emit('returned', { parcel: p }); }
+        else { pen += 2; reasons.push(`반송 ${D.PARCEL_TYPES[p.type].short} +2`); this.emit('returned', { parcel: p }); this._claim(p, '반송'); }
       }
       this._assignCold();
       // 도난: 야외 적재 택배는 각각 판정
@@ -578,9 +673,8 @@
         if (this.rng.next() >= tp) continue;
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.monthStats.stolen++; this.stats.stolen++;
-        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push('도난 (보험 적용)'); }
-        else { pen += 2; reasons.push(`도난 ${D.PARCEL_TYPES[p.type].short}${p.size} +2`); }
-        this.emit('stolen', { parcel: p });
+        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push('도난 (보험 적용)'); this.emit('stolen', { parcel: p }); }
+        else { pen += 2; reasons.push(`도난 ${D.PARCEL_TYPES[p.type].short}${p.size} +2`); this.emit('stolen', { parcel: p }); this._claim(p, '도난'); }
       }
       this._assignCold();
       const over = this.usedVolume() - this.warehouse.cap;
@@ -617,7 +711,7 @@
       if (this.contracts.filter(Boolean).length >= 4 && this.contracts.every(c => c && c.calls === 0)) this.stats.zeroCallsMonthEnd = true;
       if (this.cash >= 0 && this.cash <= 100) this.stats.brokeMonthEnd = true;
       this.summary = { month: this.month, revenue: ms.revenue, opCost, calls: ms.calls, waits: ms.waits,
-        delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, closing,
+        delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, closing, customers: this.customerSummary(),
         cash: this.cash, stress: this.stress, usage: Math.round(this.usage() * 100), left: this.parcels.length };
       this.say(`${this.month}월 정산: 수익 ${ms.revenue}, 운영비 ${opCost}${closing ? `, 월말 결산 +${closing}` : ''}`);
       if (this.cash < 0) return this._gameOver('운영비를 지불하지 못해 파산했습니다');
@@ -666,6 +760,7 @@
     _carrierWeights() {
       const R = this.rules, w = {};
       for (const k of Object.keys(D.CARRIERS)) { if (R.banCarriers.includes(k)) continue; w[k] = R.marketWeight[k] || 1; }
+      for (const id in this.customers || {}) { const mw = this.customerPerk(id, 'marketWeight'); if (mw) for (const k in mw) if (w[k]) w[k] *= mw[k]; }
       return w;
     }
     // 막힌 속성: 창고에 있거나 다음 2턴 입고 예정인 특수 택배 중, 현재 계약(용달·긴급 제외, 잔여 호출 있는 것)으로 처리할 수 없는 종류. 부피 큰 순
@@ -714,6 +809,7 @@
       if (Object.keys(facW).length) {
         const f = this.rng.weighted(facW);
         let price = D.FACILITIES[f].price * mult * R.facilityPriceMult; if (R.facilityPriceMap && R.facilityPriceMap[f]) price *= R.facilityPriceMap[f];
+        for (const id in this.customers || {}) { const fp = this.customerPerk(id, 'facilityPrice'); if (fp && fp[f]) price *= fp[f]; }
         items.push({ kind: 'fac', fac: f, price: Math.round(price), name: D.FACILITIES[f].name, sold: false });
       } else items.push({ kind: 'fac', fac: null, price: 0, name: '시설 매진', sold: true });
       return items;
@@ -820,6 +916,9 @@
       if (g.warehouse && g.warehouse.frozen == null) g.warehouse.frozen = g.warehouse.cold > 0 ? D.WAREHOUSE.frozen : 0;
       if (g.monthStats) for (const k of ['returned', 'stolen', 'broken']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
       if (!g.pendingRevenue) g.pendingRevenue = []; if (g.totalTurn == null) g.totalTurn = (g.month - 1) * D.TURNS_PER_MONTH + g.turn;
+      if (!g.customers) { g._initCustomers(); for (const p of g.parcels) if (!p.customer) p.customer = 'anon'; }
+      for (const id in g.customers) { const c = g.customers[id]; if (!c.total) c.total = { delivered: 0, revenue: 0, claims: 0, discarded: 0 }; if (!c.month) c.month = g._emptyCustMonth(); }
+      if (g.monthStats && g.monthStats.claims == null) g.monthStats.claims = 0;
       g._assignCold();
       return g;
     }
