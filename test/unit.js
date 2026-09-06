@@ -163,4 +163,15 @@ t('도난: 창고 초과분은 최근 입고부터 야외 적재, 확률 판정'
   assert.ok(stolen > 10 && stolen < 110, `stolen ${stolen}`);
   const q = NG(2, { rulesOverride: {} }); assert.equal(q.theftProb(), 0);
 });
+t('세이브 마이그레이션: v0.3 형식(enh.capDelta·attrs 없음)에서 NaN 없이 복원', () => {
+  const g = NG(6); for (let i = 0; i < 3; i++) g.wait();
+  const j = JSON.parse(JSON.stringify(g.toJSON()));
+  for (const c of j.contracts) if (c) { delete c.enh.capDelta; delete c.enh.opt; }
+  for (const p of j.parcels) { delete p.attrs; delete p.warm; delete p.customs; p.fresh = 3; }
+  delete j.warehouse.frozen; delete j.totalTurn; delete j.pendingRevenue; delete j.stats.broken;
+  const h = Game.fromJSON(j);
+  for (const c of h.contracts) if (c) { assert.ok(Number.isFinite(h.callCapacity(c)), 'cap'); assert.ok(Number.isFinite(c.calls) && Number.isFinite(c.maxCalls)); }
+  for (const p of h.parcels) assert.ok(Array.isArray(p.attrs));
+  assert.equal(h.warehouse.frozen, 2); h.wait(); assert.ok(Number.isFinite(h.stress));
+});
 console.log(`\n${n} tests passed`);

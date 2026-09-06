@@ -43,6 +43,8 @@
     m.querySelector('.body').scrollTop = 0;
     return m;
   }
+  // window.confirm은 웹뷰·아티팩트 샌드박스에서 막히므로 자체 확인 모달
+  function askConfirm(msg, onYes, yesLabel = '확인') { modal('확인', `<p>${esc(msg)}</p>`, [{ label: '취소', onClick: closeModal }, { label: yesLabel, cls: 'warn', onClick: () => { closeModal(); onYes(); } }]); }
   function closeModal() { $('#modal-root').classList.remove('show'); $('#modal').innerHTML = ''; }
 
   // ---------- title ----------
@@ -59,7 +61,7 @@
       <div style="display:flex;gap:8px"><button class="btn" id="t-sound" style="flex:1">효과음: ${opts.sound ? '켜짐' : '꺼짐'}</button><button class="btn" id="t-music" style="flex:1">음악: ${opts.music ? '켜짐' : '꺼짐'}</button></div></div>`;
     const m = modal('택배 회사 게임', body, null, 'v0.3 meta');
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
-    m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save && !confirm('진행 중인 런이 있습니다. 새로 시작하면 사라집니다. 계속할까요?')) return; showScenarioSelect(); };
+    m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm('진행 중인 런이 있습니다. 새로 시작하면 사라집니다. 계속할까요?', () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, '새로 시작'); return; } showScenarioSelect(); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex('companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
@@ -462,7 +464,7 @@
     }
     const m = modal('도감', body, [{ label: '닫기', onClick: back }]);
     m.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { SFX.click(); showCodex(b.dataset.tab, back); });
-    const rs = m.querySelector('#cx-reset'); if (rs) rs.onclick = () => { if (confirm('해금·도전과제·기록을 모두 지웁니다. 계속할까요?')) { Profile.reset(); SFX.cancel(); showCodex('stats', back); } };
+    const rs = m.querySelector('#cx-reset'); if (rs) rs.onclick = () => askConfirm('해금·도전과제·기록을 모두 지웁니다. 계속할까요?', () => { Profile.reset(); SFX.cancel(); showCodex('stats', back); }, '초기화');
   }
 
   function showLog(back) {
@@ -496,7 +498,7 @@
       { label: '계속하기', cls: 'primary', onClick: closeModal },
       { label: `효과음 ${opts.sound ? '끄기' : '켜기'}`, onClick: () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); closeModal(); } },
       { label: `음악 ${opts.music ? '끄기' : '켜기'}`, onClick: () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); closeModal(); } },
-      { label: '런 포기', cls: 'warn', onClick: () => { if (confirm('이 런을 포기하고 타이틀로 돌아갈까요? (기록에는 남지 않습니다)')) { Store.remove(SAVE_KEY); closeModal(); game = null; showTitle(); } } },
+      { label: '런 포기', cls: 'warn', onClick: () => askConfirm('이 런을 포기하고 타이틀로 돌아갈까요? (기록에는 남지 않습니다)', () => { Store.remove(SAVE_KEY); game = null; showTitle(); }, '포기') },
     ]);
     m.querySelector('#vol').oninput = e => { opts.musicVol = +e.target.value; BGM.setVolume(opts.musicVol); saveOpts(); };
   }
