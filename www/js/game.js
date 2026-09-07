@@ -44,11 +44,13 @@
     // 3.5단계: 보험·날씨·보관·적재
     premiumMult: 1, premiumDelta: {}, noInsurance: false, season: null, weatherWeights: {}, tent: false, forecastTurns: 2,
     storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, eventGoods: false, storageAnon: false,
+    // 4단계: 난이도·시나리오 고객 규칙
+    gameoverStress: D.GAMEOVER_STRESS, noDualAttrs: false, dualAttrBonus: 0, burstDeadlineDelta: 0, customerClaimMult: {}, storageOfferEvery: 0, winStorage: 0, bigCustomer: false, winBigCustomer: false,
   };
   const MULT_KEYS = ['theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
   const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'burstTurns', 'selfCapDelta', 'allStartTrust'];
   const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust', 'premiumDelta'];
-  const MAP_MULT_KEYS = ['rewardMult', 'marketWeight', 'customerWeights', 'weatherWeights'];
+  const MAP_MULT_KEYS = ['rewardMult', 'marketWeight', 'customerWeights', 'weatherWeights', 'customerClaimMult'];
   const LIST_KEYS = ['banCarriers', 'guaranteeCarriers'];
   // 뒤에 오는 설정이 앞을 덮는다: 시나리오 → 회사 → 퍽 → 데일리 변형 순
   function mergeMods(list) {
@@ -82,7 +84,8 @@
   // ---------- Game ----------
   class Game {
     constructor(cfg) {
-      cfg = Object.assign({ scenario: 'standard', company: 'local', perks: [], variants: [] }, cfg || {});
+      cfg = Object.assign({ scenario: 'standard', company: 'local', perks: [], variants: [], difficulty: 'normal' }, cfg || {});
+      if (cfg.scenario === 'daily') cfg.difficulty = 'normal';
       if (cfg.seed == null) cfg.seed = Date.now() % 2147483647;
       this.cfg = cfg;
       this.seed = cfg.seed;
@@ -115,7 +118,7 @@
       this._startMonth(1);
     }
     static emptyStats() {
-      return { deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, onTimeByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, broken: 0, claims: 0, customerL3: 0, storageDone: 0, premiumPaid: 0, wetDelivered: 0, snowDelivered: 0,
+      return { deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, onTimeByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, broken: 0, claims: 0, customerL3: 0, storageDone: 0, premiumPaid: 0, wetDelivered: 0, snowDelivered: 0, noClaim2: false, customersAdded: 0,
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
         overdueDelivered: 0, returned: 0, stolen: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
@@ -125,11 +128,12 @@
       const c = this.cfg;
       const sc = M.SCENARIOS[c.scenario] || M.SCENARIOS.standard;
       const co = M.COMPANIES[c.company] || M.COMPANIES.local;
-      const mods = [{ months: sc.months }, sc.mods, co.mods];
+      const df = M.DIFFICULTIES[c.difficulty] || M.DIFFICULTIES.normal;
+      const mods = [{ months: sc.months }, sc.mods, df.mods, co.mods];
       for (const p of c.perks) if (M.PERKS[p]) mods.push(M.PERKS[p].mods);
       for (const v of c.variants || []) if (M.DAILY_VARIANTS[v]) mods.push(M.DAILY_VARIANTS[v].mods);
       this.rules = mergeMods(mods);
-      this.scenario = sc; this.company = co;
+      this.scenario = sc; this.company = co; this.difficulty = df;
     }
     _initCompany() {
       const R = this.rules, co = this.company;
@@ -167,7 +171,17 @@
         c.slots++; c.xp = Math.max(c.xp, M.CUSTOMER_LEVELS[lv] || 0);
       }
       for (const id in this.customers) this._applyCustomerPerks(id);
+      // 대형 계약: 고객 1명이 물량 60%
+      if (R.bigCustomer) { const cands = Object.keys(this.customers).filter(id => id !== 'anon' && !M.CUSTOMERS[id].storage); this.bigCustomer = cands.length ? this.rng.pick(cands) : null; if (this.bigCustomer) this.say(`대형 계약: ${M.CUSTOMERS[this.bigCustomer].name}이(가) 물량 60%를 보냅니다`); }
     }
+    // 마켓 신규 고객 계약
+    addCustomer(id) {
+      if (!M.CUSTOMERS[id] || this.customers[id]) return false;
+      this.customers[id] = { id, xp: 0, slots: 1, suspended: false, streak: 0, perkApplied: {}, month: this._emptyCustMonth(), total: { delivered: 0, revenue: 0, claims: 0, discarded: 0 } };
+      this._applyCustomerPerks(id); this.stats.customersAdded++;
+      return true;
+    }
+    customerCount() { return Object.keys(this.customers).filter(id => id !== 'anon').length; }
     _emptyCustMonth() { return { delivered: 0, revenue: 0, claims: 0, discarded: 0, lvStart: 0 }; }
     customerLevel(id) { const c = this.customers && this.customers[id]; if (!c || c.suspended) return 0; let lv = 0; for (let i = 1; i < M.CUSTOMER_LEVELS.length; i++) if (c.xp >= M.CUSTOMER_LEVELS[i]) lv = i; return lv; }
     customerNext(id) { const lv = this.customerLevel(id); const c = this.customers[id]; return lv >= 3 ? null : { need: M.CUSTOMER_LEVELS[lv + 1], have: Math.max(0, c.xp) }; }
@@ -190,7 +204,7 @@
     // 폐기 시 손해배상 (부패·반송·도난·파손 공통)
     _claim(p, why, kind) {
       const R = this.rules, id = p.customer || 'anon', cust = M.CUSTOMERS[id] || M.CUSTOMERS.anon, c = this.customers && this.customers[id];
-      const full = Math.round((25 + p.baseSize * 15) * cust.claimMult * R.claimMult);
+      const full = Math.round((25 + p.baseSize * 15) * cust.claimMult * R.claimMult * (R.customerClaimMult[id] || 1));
       const covered = Math.round(full * this.coverRate(kind || 'discard', p));
       const amount = full - covered;
       if (covered > 0) { this.monthStats.insClaims++; this.monthStats.covered += covered; }
@@ -224,6 +238,7 @@
     _customerWeightsFor(m) {
       const R = this.rules, w = {};
       for (const id in this.customers) { const c = this.customers[id]; if (c.suspended) continue; const vol = id === 'anon' ? 1 : M.CUSTOMER_VOLUME[this.customerLevel(id)]; w[id] = c.slots * vol * (R.customerWeights[id] || 1); if (this.insurer === 'none' && M.CUSTOMERS[id].claimMult >= 2) w[id] *= 0.5; if (M.CUSTOMERS[id].storage) delete w[id]; }
+      if (this.bigCustomer && w[this.bigCustomer] != null) { const rest = Object.keys(w).filter(k => k !== this.bigCustomer).reduce((s, k) => s + w[k], 0); w[this.bigCustomer] = rest > 0 ? rest * 1.5 : 1; }
       if (!Object.keys(w).length) w.anon = 1;
       return w;
     }
@@ -260,7 +275,7 @@
       const prem = this.premium();
       this.cash -= prem; ms.premium = prem; this.run.spent += prem; this.stats.premiumPaid += prem;
       const n = ms.insClaims;
-      if (n === 0) { this.noClaimMonths++; this.premMult = this.noClaimMonths >= 2 ? 0.7 : 0.8; this.coverHalf = false; if (this.noClaimMonths >= 2) { for (const id in this.customers) this._custXp(id, 1, '무사고'); ms.noClaimBonus = true; } }
+      if (n === 0) { this.noClaimMonths++; this.premMult = this.noClaimMonths >= 2 ? 0.7 : 0.8; this.coverHalf = false; if (this.noClaimMonths >= 2) { for (const id in this.customers) this._custXp(id, 1, '무사고'); ms.noClaimBonus = true; this.stats.noClaim2 = true; } }
       else { this.noClaimMonths = 0; for (const [max, mult] of M.PREMIUM_STEPS) if (n <= max) { this.premMult = mult; break; } this.coverHalf = n >= 5; }
       return prem;
     }
@@ -268,12 +283,12 @@
     // ----- 보관 계약 (3장) -----
     storageVol(s) { const d = M.CUSTOMERS[s.customer] && this.customerPerk(s.customer, 'storageVolDelta') || 0; return Math.max(1, s.vol + d); }
     storageVolume() { return this.storage.reduce((v, s) => v + this.storageVol(s), 0); }
-    _maybeOffer() {
+    _maybeOffer(force) {
       const R = this.rules;
       if (this.offer || this.storage.length >= R.storageMax) return;
       const custs = Object.keys(this.customers).filter(id => M.CUSTOMERS[id].storage && !this.customers[id].suspended);
       if (!custs.length && !R.storageAnon) return;
-      if (this.rng.next() >= R.storageOfferProb) return;
+      if (!force && this.rng.next() >= R.storageOfferProb) return;
       const customer = custs.length ? this.rng.pick(custs) : 'anon';
       const w = {}; for (const k in M.STORAGE_KINDS) { const K = M.STORAGE_KINDS[k]; const wt = R.eventGoods && K.peakWeight ? K.peakWeight : K.weight; if (wt > 0) w[k] = wt; }
       const kind = this.rng.weighted(w), K = M.STORAGE_KINDS[kind];
@@ -569,7 +584,7 @@
       const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
       for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
       this.burstTurns = [];
-      if (R.burstTurns) { const bt = this.rng.shuffle([...Array(turns - 2).keys()].map(i => i + 2)).slice(0, R.burstTurns); for (const t of bt) { sched[t].push(gen()); this.burstTurns.push(t + 1); } }
+      if (R.burstTurns) { const bt = this.rng.shuffle([...Array(turns - 2).keys()].map(i => i + 2)).slice(0, R.burstTurns); for (const t of bt) { sched[t].push(gen()); this.burstTurns.push(t + 1); if (R.burstDeadlineDelta) for (const sp of sched[t]) sp.burst = true; } }
       // 태풍 턴: 입고 없음, 다음 턴에 몰림
       for (let t = 0; t < turns - 1; t++) if (this.weather[t] === 'storm' && sched[t].length) { sched[t + 1].push(...sched[t]); sched[t] = []; }
       return sched;
@@ -584,8 +599,9 @@
       else {
         const base = D.TYPE_RATIO[Math.min(6, m || this.month)], w = {};
         for (const k in cust.items) { const t = M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k; const f = base[t] > 0 ? (ratio[t] || 0) / base[t] : 1; w[k] = Math.max(0.05, cust.items[k] * Math.max(0.25, Math.min(3, f))); }
+        if (R.dualAttrBonus && (m || this.month) >= 2) { w.intlfragile = (w.intlfragile || 0) + R.dualAttrBonus; if (cust.items.fresh) w.intlfresh = (w.intlfresh || 0) + R.dualAttrBonus; }
         const k = this.rng.weighted(w);
-        if (M.CUSTOMER_ITEMS[k]) { type = M.CUSTOMER_ITEMS[k].type; attrs = M.CUSTOMER_ITEMS[k].attrs; sizes = M.CUSTOMER_ITEMS[k].sizes; } else type = k;
+        if (M.CUSTOMER_ITEMS[k]) { type = M.CUSTOMER_ITEMS[k].type; attrs = R.noDualAttrs ? null : M.CUSTOMER_ITEMS[k].attrs; sizes = M.CUSTOMER_ITEMS[k].sizes; } else type = k;
       }
       let allowed = sizes || D.PARCEL_TYPES[type].sizes;
       if (type === 'fresh' && R.freshSizes && !sizes) allowed = R.freshSizes;
@@ -602,8 +618,9 @@
       const attrs = (spec.attrs || t.attrs).slice(), customer = spec.customer || 'anon';
       const cust = M.CUSTOMERS[customer] || M.CUSTOMERS.anon;
       const bsd = this.customerPerk(customer, 'bigSizeDelta'); if (bsd && spec.size >= 4) size = Math.max(1, size + bsd);
+      const burstD = spec.burst ? R.burstDeadlineDelta : 0;
       const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward: 25 + spec.size * 15, attrs, customer,
-        deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1 };
+        deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + burstD), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1 };
       if (attrs.includes('customs')) { p.customs = R.customsWait; if (this.rng.next() < R.customsDelayProb && this.items.customsBond !== this.month) { p.customs += 1; p.customsDelayed = true; } if (cust.rule && cust.rule.kind === 'customsFast') p.customs += cust.rule.delta; const cd = this.customerPerk(customer, 'customsDelta'); if (cd) p.customs += cd; p.customs = Math.max(0, p.customs); p.coldDuringCustoms = true; }
       return p;
     }
@@ -626,7 +643,7 @@
       this._assignCold();
       const xl = this.parcels.filter(p => p.baseSize >= 7).length; this.stats.maxXlSimul = Math.max(this.stats.maxXlSimul, xl);
       if (this.offer && this.offer.expires < this.totalTurn) { this.say('보관 제안 만료'); this.offer = null; }
-      this._maybeOffer();
+      if (this.rules.storageOfferEvery && !this.offer && this.storage.length < this.rules.storageMax && (this.turn - 1) % this.rules.storageOfferEvery === 0) this._maybeOffer(true); else this._maybeOffer();
       let note = '';
       const wx = this.weatherNow(); if (wx !== 'sunny') note = ` ${M.WEATHER[wx].icon}${M.WEATHER[wx].name}`;
       if (this.heatTurns.includes(this.turn)) note = ' 🌡폭염 경보!';
@@ -861,7 +878,7 @@
         this.say(`페널티 +${pen}: ${reasons.join(', ')} (스트레스 ${this.stress})`);
         this.emit('penalty', { amount: pen, reasons });
       } else if (reasons.length) this.say(reasons.join(', '));
-      if (this.stress >= D.GAMEOVER_STRESS) return this._gameOver('운영 스트레스가 한계에 도달했습니다');
+      if (this.stress >= this.rules.gameoverStress) return this._gameOver('운영 스트레스가 한계에 도달했습니다');
       if (this.turn >= D.TURNS_PER_MONTH) return this._endMonth();
       this._startTurn();
     }
@@ -902,6 +919,8 @@
       if (R.winMaxDiscard != null && this.run.discarded > R.winMaxDiscard) return this._gameOver(`부패 폐기 초과: ${this.run.discarded}개 (허용 ${R.winMaxDiscard})`), true;
       if (R.winCash && this.cash < R.winCash) return this._gameOver(`자금 부족: ${this.cash}/${R.winCash}c`), true;
       if (R.winMaxOverdue != null && this.stats.overdueDelivered > R.winMaxOverdue) return this._gameOver(`기한 초과 처리 초과: ${this.stats.overdueDelivered}개 (허용 ${R.winMaxOverdue})`), true;
+      if (R.winStorage && this.stats.storageDone < R.winStorage) return this._gameOver(`보관 계약 부족: ${this.stats.storageDone}/${R.winStorage}건`), true;
+      if (R.winBigCustomer && this.bigCustomer && this.customerLevel(this.bigCustomer) < 3) return this._gameOver(`${M.CUSTOMERS[this.bigCustomer].name} 신뢰 ${this.customerLevel(this.bigCustomer)}단계 (3단계 필요)`), true;
       return this._win();
     }
     _gameOver(reason) {
@@ -921,7 +940,7 @@
       this.stats.distinctCarriersAtEnd = new Set(this.contracts.filter(Boolean).map(c => c.carrier)).size;
       const score = Math.round(Math.max(0, this.run.revenue + Math.max(0, this.cash) + monthsDone * (this.rules.endless ? 300 : 200) - this.stress * 10) * this.rules.scoreMult);
       return { win, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, stress: this.stress, seed: this.seed,
-        scenario: this.cfg.scenario, company: this.cfg.company, perks: this.perks.slice(), variants: (this.cfg.variants || []).slice(), date: this.cfg.date || null, ...this.run };
+        scenario: this.cfg.scenario, company: this.cfg.company, difficulty: this.cfg.difficulty || 'normal', perks: this.perks.slice(), variants: (this.cfg.variants || []).slice(), date: this.cfg.date || null, ...this.run };
     }
 
     // ----- market -----
@@ -985,6 +1004,7 @@
         for (const id in this.customers || {}) { const fp = this.customerPerk(id, 'facilityPrice'); if (fp && fp[f]) price *= fp[f]; }
         items.push({ kind: 'fac', fac: f, price: Math.round(price), name: D.FACILITIES[f].name, sold: false });
       } else items.push({ kind: 'fac', fac: null, price: 0, name: '시설 매진', sold: true });
+      if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3) { const cands = Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !this.customers[k]); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: `신규 고객: ${M.CUSTOMERS[k].name}`, sold: false }); } }
       if (this.rng.next() < 0.6) { const k = this.rng.pick(Object.keys(M.INS_ITEMS)); items.push({ kind: 'item', item: k, price: Math.round(M.INS_ITEMS[k].price * mult), name: M.INS_ITEMS[k].name, sold: false }); }
       return items;
     }
@@ -1045,6 +1065,11 @@
         }
         this._updateTrustStats();
         this.say(`강화 적용: ${e.name} → ${this.contractName(c)} (-${price}c)`);
+      } else if (it.kind === 'customer') {
+        if (this.cash < price) return { ok: false, msg: '자금이 부족합니다' };
+        if (this.customerCount() >= M.CUSTOMER_SLOTS) return { ok: false, msg: `고객은 ${M.CUSTOMER_SLOTS}명까지` };
+        if (!this.addCustomer(it.customer)) return { ok: false, msg: '이미 거래 중인 고객' };
+        this.say(`신규 고객 계약: ${M.CUSTOMERS[it.customer].name} (-${price}c)`);
       } else if (it.kind === 'item') {
         if (this.cash < price) return { ok: false, msg: '자금이 부족합니다' };
         if (it.item === 'transitCert') this.items.transitCert++; else this.items[it.item] = this.month + 1;
@@ -1073,7 +1098,7 @@
 
     // ----- save / load -----
     toJSON() {
-      const { rng, rules, scenario, company, ...rest } = this;
+      const { rng, rules, scenario, company, difficulty, ...rest } = this;
       return { ...rest, rngCalls: rng.calls, seed: this.seed };
     }
     static fromJSON(obj) {
@@ -1097,6 +1122,7 @@
       if (!g.customers) { g._initCustomers(); for (const p of g.parcels) if (!p.customer) p.customer = 'anon'; }
       for (const id in g.customers) { const c = g.customers[id]; if (!c.total) c.total = { delivered: 0, revenue: 0, claims: 0, discarded: 0 }; if (!c.month) c.month = g._emptyCustMonth(); }
       if (g.monthStats && g.monthStats.claims == null) g.monthStats.claims = 0;
+      if (g.bigCustomer === undefined) g.bigCustomer = null;
       if (!g.storage) { g.storage = []; g.offer = null; g.outdoorPref = []; g.insurer = 'none'; g.premMult = 1; g.noClaimMonths = 0; g.coverHalf = false; g.items = { transitCert: 0, yardIns: 0, customsBond: 0 }; }
       if (!g.weather || !g.weather.length) g.weather = Array(D.TURNS_PER_MONTH).fill('sunny').map((w, i) => g.heatTurns && g.heatTurns.includes(i + 1) ? 'heat' : w);
       if (g.monthStats) for (const k of ['insClaims', 'covered', 'premium', 'storageIncome']) if (g.monthStats[k] == null) g.monthStats[k] = 0;

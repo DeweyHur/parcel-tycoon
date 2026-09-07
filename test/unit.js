@@ -65,7 +65,7 @@ t('지연 입금: 철도는 다음 턴에 입금', () => {
 t('월말 정산 → 마켓 → 다음 달', () => {
   const g = NG(9);
   while (g.phase === 'play') g.wait();
-  assert.equal(g.phase, 'summary'); g.closeSummary(); assert.equal(g.phase, 'market'); assert.ok(g.market.items.length >= 5 && g.market.items.length <= 6);
+  assert.equal(g.phase, 'summary'); g.closeSummary(); assert.equal(g.phase, 'market'); assert.ok(g.market.items.length >= 5 && g.market.items.length <= 7);
   const before = g.cash; const fac = g.market.items.findIndex(i => i.kind === 'fac' && i.fac); if (fac >= 0) { const r = g.buy(fac, null); assert.ok(r.ok); assert.ok(g.cash < before); }
   g.closeMarket(); assert.equal(g.month, 2); assert.equal(g.turn, 1);
 });
@@ -248,5 +248,24 @@ t('적재: 기본은 덜 급한 것부터 야외, 프리셋·지정', () => {
   assert.deepEqual(g.presetOutdoor('reward'), [3]); // 보상 같으면 급한 순 → 3이 뒤? (모두 55) → 정렬 안정: id 뒤가 밖
   g.setOutdoor([1]); assert.deepEqual(g.parcels.map(p => !!p.outdoor), [true, false, false]);
   g.wait(); assert.ok(g.outdoorPref.length <= 1);
+});
+t('난이도: 베테랑은 배상 ×1.5·한계 18, 수습은 예정 3턴·복합 속성 없음', () => {
+  const v = new Game({ seed: 3, difficulty: 'veteran' }); assert.equal(v.rules.claimMult, 1.5); assert.equal(v.rules.gameoverStress, 18); assert.equal(v.rules.theftMult, 1.3);
+  const r = new Game({ seed: 3, difficulty: 'rookie' }); assert.equal(r.rules.upcomingTurns, 3); assert.equal(r.rules.gameoverStress, 24);
+  const f = new Game({ seed: 3, company: 'fresh', difficulty: 'rookie' }); assert.ok(f.schedule.flat().every(sp => !sp.attrs));
+  const d = new Game({ seed: 3, scenario: 'daily', difficulty: 'veteran' }); assert.equal(d.cfg.difficulty, 'normal');
+});
+t('성수기: 폭주 턴 입고분 기한 -2', () => {
+  const g = new Game({ seed: 5, scenario: 'peak' }); const bt = g.burstTurns[0]; const sp = g.schedule[bt - 1].find(x => x.burst); assert.ok(sp);
+  while (g.turn < bt) g.wait(); const p = g.parcels.filter(x => x.arrivalTurn === g.totalTurn); assert.ok(p.length >= 1);
+});
+t('대형 계약·이사철: 승리 조건과 강제 고객', () => {
+  const b = new Game({ seed: 4, scenario: 'bigdeal' }); assert.ok(b.bigCustomer); const w = b._customerWeightsFor(1); const tot = Object.values(w).reduce((a, c) => a + c, 0); assert.ok(w[b.bigCustomer] / tot > 0.55);
+  const m = new Game({ seed: 4, scenario: 'moving' }); assert.ok(m.customers.mover); assert.ok(m.offer, '첫 턴 보관 제안 보장');
+});
+t('마켓 신규 고객 카드: 구매하면 고객 추가', () => {
+  const g = NG(3); while (g.phase === 'play') g.wait(); g.closeSummary();
+  g.market.items.push({ kind: 'customer', customer: 'ice', price: 100, name: 'x', sold: false }); g.cash = 1000;
+  const r = g.buy(g.market.items.length - 1, null); assert.ok(r.ok, r.msg); assert.ok(g.customers.ice); assert.equal(g.customerCount(), 4);
 });
 console.log(`\n${n} tests passed`);

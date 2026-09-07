@@ -62,9 +62,11 @@ window.Profile = (function () {
   function evaluate(game, result) {
     const got = [];
     const s = game ? game.stats : null, p = P.stats;
+    const rookie = game && game.cfg && game.cfg.difficulty === 'rookie';
     for (const id in M.ACHIEVEMENTS) {
       const a = M.ACHIEVEMENTS[id];
       if (P.achievements[id]) continue;
+      if (rookie && a.rewardType !== 'none') continue; // 수습 난이도에서는 해금 도전과제 인정 안 함
       let ok = false;
       try {
         if (a.kind === 'run' && s) ok = !!a.check(s, p, result, P);
@@ -84,11 +86,13 @@ window.Profile = (function () {
   // 런 종료: 누적 통계 반영 → 도전과제 판정 → 기록
   function recordRun(game, result) {
     const s = game.stats, p = P.stats;
+    const rookie = result.difficulty === 'rookie';
     p.runs++;
+    p.storageDone = (p.storageDone || 0) + (s.storageDone || 0);
     for (const t in s.deliveredByType) p.deliveredByType[t] = (p.deliveredByType[t] || 0) + s.deliveredByType[t];
     p.waits += s.waits; p.calls += s.calls; p.contractsBought += s.contractsBought; p.discarded += s.discarded; p.tidyMonths += s.tidyMonths; p.bigDelivered = (p.bigDelivered || 0) + (s.bigDelivered || 0);
     p.bestScore = Math.max(p.bestScore, result.score);
-    if (result.win) {
+    if (result.win && !rookie) {
       p.clears++;
       p.clearsByCompany[result.company] = (p.clearsByCompany[result.company] || 0) + 1;
       p.clearsByScenario[result.scenario] = (p.clearsByScenario[result.scenario] || 0) + 1;
@@ -107,7 +111,7 @@ window.Profile = (function () {
       // 오래된 데일리 기록 정리
       const keys = Object.keys(p.dailyDone).sort(); while (keys.length > 60) delete p.dailyDone[keys.shift()];
     }
-    P.recentRuns.unshift({ date: new Date().toISOString().slice(0, 10), score: result.score, win: result.win, month: result.month, turn: result.turn, cash: result.cash, scenario: result.scenario, company: result.company, perks: result.perks, reason: result.reason });
+    P.recentRuns.unshift({ date: new Date().toISOString().slice(0, 10), score: result.score, win: result.win, month: result.month, turn: result.turn, cash: result.cash, scenario: result.scenario, company: result.company, difficulty: result.difficulty, perks: result.perks, reason: result.reason });
     P.recentRuns = P.recentRuns.slice(0, 20);
     const got = evaluate(game, result);
     save();

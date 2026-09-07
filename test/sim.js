@@ -100,6 +100,7 @@ const N = +process.argv[2] || 200;
 const mode = process.argv[3] || 'strats';
 if (mode === 'companies') { for (const id of Object.keys(require('../www/js/meta.js').COMPANIES)) report(id, N, 'balanced', { company: id }); }
 else if (mode === 'scenarios') { const M = require('../www/js/meta.js'); for (const id of Object.keys(M.SCENARIOS)) { if (id === 'endless') continue; report(id, N, 'balanced', { scenario: id, company: id === 'daily' ? 'local' : 'local', variants: id === 'daily' ? ['fog', 'trustboom'] : [] }); } }
+else if (mode === 'difficulty') { for (const d of ['rookie', 'normal', 'veteran']) for (const sc of ['standard', 'peak', 'port']) report(`${d}/${sc}`, N, 'balanced', { scenario: sc, difficulty: d }); }
 else for (const strat of Object.keys(STRATS)) {
   let wins = 0, m2 = 0, m3 = 0, cash = 0, calls = 0, waits = 0, stress = 0, rev = 0;
   for (let s = 1; s <= N; s++) {

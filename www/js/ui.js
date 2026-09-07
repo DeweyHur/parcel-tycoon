@@ -74,7 +74,7 @@
   // ---------- 런 준비: 시나리오 → 회사 → 퍽 ----------
   function unlockText(achId) { const a = M.ACHIEVEMENTS[achId]; if (!a) return '🔒'; let pr = ''; try { if (a.prog) { const P = Profile.get(); const [h, n] = a.prog(P.stats, P); pr = ` (${Math.min(h, n)}/${n})`; } } catch (e) { } return `🔒 ${a.name}: ${a.desc}${pr}`; }
   const TIER_NAMES = ['시작', '1단계 · 기본', '2단계 · 특화 누적', '3단계 · 도전'];
-  const prep = { scenario: 'standard', company: 'local', perks: [], insurer: 'sturdy' };
+  const prep = { scenario: 'standard', company: 'local', perks: [], insurer: 'sturdy', difficulty: 'normal' };
   function showScenarioSelect() {
     const P = Profile.get(), dc = Game.dailyConfig ? null : null;
     const daily = window.dailyConfig(today());
@@ -86,8 +86,12 @@
       return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">${s.months >= 99 ? '∞' : s.months + '개월'}</small></span><span class="price">${best ? best + '점' : ''}</span></div>
         <div class="d">${esc(s.desc)}<br>승리: ${esc(s.win)} · 추천: ${esc(s.recommend)}</div>${un ? extra : `<div class="d">${esc(unlockText(s.unlock))}</div>`}</div>`;
     }).join('');
-    const m = modal('시나리오 선택', `<div class="perk-count">1/3 단계 — 런의 길이와 규칙을 고릅니다</div>${cards}`, [{ label: '타이틀', onClick: showTitle }, { label: '다음: 회사', cls: 'primary', onClick: () => { if (prep.scenario === 'daily') { prep.company = daily.company; showPerkSelect(daily); } else showCompanySelect(); } }]);
+    const diffUn = id => !M.DIFFICULTIES[id].unlock || P.achievements[M.DIFFICULTIES[id].unlock];
+    if (!diffUn(prep.difficulty)) prep.difficulty = 'normal';
+    const diffRow = `<div class="diffrow">${Object.keys(M.DIFFICULTIES).map(id => { const d = M.DIFFICULTIES[id], un = diffUn(id); return `<button class="btn small ${prep.difficulty === id ? 'on' : ''} ${un ? '' : 'dis'}" data-diff="${id}" title="${esc(d.desc)}">${d.icon} ${d.name}</button>`; }).join('')}</div><div class="d" style="font-size:11px;color:var(--dim);margin-bottom:6px">${esc(M.DIFFICULTIES[prep.difficulty].desc)}${prep.scenario === 'daily' ? ' · 데일리는 정규 고정' : ''}</div>`;
+    const m = modal('시나리오 선택', `<div class="perk-count">1/3 단계 — 런의 길이와 규칙을 고릅니다</div>${diffRow}${cards}`, [{ label: '타이틀', onClick: showTitle }, { label: '다음: 회사', cls: 'primary', onClick: () => { if (prep.scenario === 'daily') { prep.company = daily.company; showPerkSelect(daily); } else showCompanySelect(); } }]);
     m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (!P.unlocked.scenarios.includes(id)) { toast(unlockText(M.SCENARIOS[id].unlock), 2500); return; } SFX.select(); prep.scenario = id; showScenarioSelect(); });
+    m.querySelectorAll('[data-diff]').forEach(el => el.onclick = () => { const id = el.dataset.diff; if (!diffUn(id)) { toast(unlockText(M.DIFFICULTIES[id].unlock), 2500); return; } SFX.select(); prep.difficulty = id; showScenarioSelect(); });
   }
   function companyInfo(co, id) {
     const wh = co.warehouse ? `용량 ${co.warehouse.cap} · 냉장 ${co.warehouse.cold} · 초대형 ${co.warehouse.xl}` : '창고 무작위';
@@ -134,7 +138,7 @@
     });
   }
   function startRun(daily) {
-    const cfg = { scenario: prep.scenario, company: prep.company, perks: prep.perks.slice(), variants: [], insurer: prep.insurer };
+    const cfg = { scenario: prep.scenario, company: prep.company, perks: prep.perks.slice(), variants: [], insurer: prep.insurer, difficulty: prep.difficulty };
     if (daily) { cfg.seed = daily.seed; cfg.variants = daily.variants; cfg.date = daily.date; cfg.company = daily.company; }
     game = new Game(cfg);
     closeModal(); startPlay();
@@ -161,11 +165,11 @@
     $('#hud-month').textContent = `${g.month}개월차`;
     $('#hud-turn').textContent = `${g.turn}/${D.TURNS_PER_MONTH}턴`;
     $('#hud-cash').textContent = g.cash;
-    $('#stress-num').textContent = `${g.stress}/${D.GAMEOVER_STRESS}`;
+    $('#stress-num').textContent = `${g.stress}/${R.gameoverStress}`;
     $('#stress-label').textContent = g.stressState();
-    const gauge = $('#stress-gauge'); gauge.querySelector('i').style.width = Math.min(100, g.stress / D.GAMEOVER_STRESS * 100) + '%';
+    const gauge = $('#stress-gauge'); gauge.querySelector('i').style.width = Math.min(100, g.stress / R.gameoverStress * 100) + '%';
     gauge.className = 'gauge ' + (g.stress >= 16 ? 'crisis' : g.stress >= 11 ? 'danger' : g.stress >= 6 ? 'warn' : '');
-    $('#hud-perks').textContent = [g.company.icon + ' ' + g.company.name, ...g.perks.map(p => M.PERKS[p].name), g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + M.INSURERS[g.insurer].name : '무보험'].join(' · ') + (g.strikeCarrier ? ` · ✊${D.CARRIERS[g.strikeCarrier].short} 파업` : '');
+    $('#hud-perks').textContent = [(g.difficulty && g.difficulty.name !== '정규' ? g.difficulty.icon + g.difficulty.name + ' · ' : '') + g.company.icon + ' ' + g.company.name, ...g.perks.map(p => M.PERKS[p].name), g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + M.INSURERS[g.insurer].name : '무보험'].join(' · ') + (g.strikeCarrier ? ` · ✊${D.CARRIERS[g.strikeCarrier].short} 파업` : '');
     const used = g.usedVolume(), cap = g.warehouse.cap, pct = used / cap * 100;
     const bu = $('#bar-usage'); bu.querySelector('i').style.width = Math.min(100, pct) + '%'; $('#usage-txt').textContent = `${used}/${cap} (${Math.round(pct)}%)`;
     bu.className = 'bar usage ' + (pct > 100 ? 'over' : pct > 90 ? 'danger' : pct > 75 ? 'caution' : pct > 60 ? 'eff' : '');
@@ -410,9 +414,11 @@
       <span>부패 폐기</span><span class="v ${s.discarded ? 'bad' : ''}">${s.discarded}개${R.winMaxDiscard != null ? ` (런 누적 ${game.run.discarded}/${R.winMaxDiscard})` : ''}</span>
       <hr style="grid-column:1/-1">
       <span>현재 자금</span><span class="v">${s.cash}c${R.winCash ? ` (목표 ${R.winCash})` : ''}</span>
-      <span>스트레스</span><span class="v ${s.stress >= 11 ? 'bad' : ''}">${s.stress}/${D.GAMEOVER_STRESS} (${game.stressState()})</span>
+      <span>스트레스</span><span class="v ${s.stress >= 11 ? 'bad' : ''}">${s.stress}/${game.rules.gameoverStress} (${game.stressState()})</span>
       <span>창고 사용률</span><span class="v">${s.usage}% (${s.left}개 보관 중)</span>
-      ${R.winDelivered ? `<span>처리 목표</span><span class="v">${game.run.delivered}/${R.winDelivered}개</span>` : ''}</div>
+      ${R.winDelivered ? `<span>처리 목표</span><span class="v">${game.run.delivered}/${R.winDelivered}개</span>` : ''}
+      ${R.winStorage ? `<span>보관 계약 완수</span><span class="v">${game.stats.storageDone}/${R.winStorage}건</span>` : ''}
+      ${R.winBigCustomer && game.bigCustomer ? `<span>대형 계약 고객</span><span class="v">${M.CUSTOMERS[game.bigCustomer].icon} ${esc(M.CUSTOMERS[game.bigCustomer].name)} 신뢰 ${game.customerLevel(game.bigCustomer)}/3</span>` : ''}</div>
       ${s.customers ? `<hr><div style="font-size:12px;color:var(--dim);margin-bottom:4px">고객</div>` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${c.month.delivered}개 · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">배상 -${c.month.claims}c</span>` : ''}${c.id !== 'anon' ? ` · 신뢰 ${c.month.lvStart}→${c.level}${c.suspended ? ' (중단)' : ''}` : ''}</div>`).join('') : ''}`;
     const last = !R.endless && game.month >= R.months;
     modal(`${s.month}개월차 정산`, body, [{ label: last ? '최종 결과' : '마켓으로', cls: 'primary', onClick: () => { closeModal(); game.closeSummary(); saveGame(); checkPhase(); } }]);
@@ -428,8 +434,9 @@
         if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], g = D.GRADES[it.grade]; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${car.desc}<br>${car.badge || ''} 능력 ${car.caps.length ? attrIcons(car.caps) : '없음'} · 크기 ${car.sizeMin}~${car.sizeMax}${car.delay ? ` · ⏱ 입금 ${car.delay}턴 뒤` : ''}<br>회당 ${car.cap + g.cap + (R.carrierCapDelta[it.carrier] || 0)}개 · 최대 ${Math.max(1, car.calls + g.calls + R.callsDelta)}회 · ${trustBar(game, it.carrier)}${trustTrack(it.carrier, game.trustXp(it.carrier))}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' (1회성)';
+        else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · 배상 ×${cu.claimMult}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>신뢰 0단계로 거래 시작 (고객 ${game.customerCount()}/${M.CUSTOMER_SLOTS})`; }
         else if (it.kind === 'fac') { const F = it.fac && D.FACILITIES[it.fac]; let prev = ''; if (F) { if (F.cap) prev = `창고 ${game.warehouse.cap} → ${game.warehouse.cap + Math.round(F.cap * R.facilityCapMult)}`; else if (F.cold) prev = `냉장 ${game.warehouse.cold} → ${Math.min(R.coldCapMax == null ? 99 : R.coldCapMax, game.warehouse.cold + F.cold)}`; else if (F.xl) prev = `초대형 ${game.warehouse.xl} → ${game.warehouse.xl + F.xl}`; else if (F.frozen) prev = `냉동 ${game.warehouse.frozen || 0} → ${(game.warehouse.frozen || 0) + F.frozen}`; } desc = F ? F.desc + (prev ? `<br><span style="color:var(--green)">구매 후 ${prev}</span>` : '') : '이미 모든 시설을 구매했습니다'; }
-        const kindLbl = { contract: '계약', enh: '강화', fac: '시설', item: '보험' }[it.kind];
+        const kindLbl = { contract: '계약', enh: '강화', fac: '시설', item: '보험', customer: '고객' }[it.kind];
         return `<div class="card ${it.sold ? 'sold' : ''}" data-i="${i}"><div class="t"><span>[${kindLbl}] ${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? '판매됨' : price + 'c'}</span></div><div class="d">${desc}</div></div>`;
       }).join('');
       const contracts = `<hr><div style="font-size:12px;color:var(--dim);margin-bottom:4px">현재 계약 (교체 시 잔여 호출·강화 소멸${R.keepCalls ? `, 잔여 ${R.keepCalls}회 보존` : ''}. 업체 신뢰도는 유지)</div>` + game.contracts.map(c => c ? `<div style="font-size:12px">· ${esc(game.contractName(c))} — 잔여 ${c.calls}/${c.maxCalls}회, 회당 ${game.baseCapacity(c)}개 ${trustBar(game, c.carrier)}</div>` : '<div style="font-size:12px">· (빈 슬롯)</div>').join('');
@@ -449,7 +456,7 @@
         if (mk.bought >= R.marketMaxBuy) return toast(`한 달에 ${R.marketMaxBuy}개까지만 구매할 수 있습니다`);
         const price = it.kind === 'contract' ? game.contractPrice(it) : it.price;
         if (game.cash < price) return toast('자금이 부족합니다');
-        if (it.kind === 'fac' || it.kind === 'item') { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
+        if (it.kind === 'fac' || it.kind === 'item' || it.kind === 'customer') { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
         chooseSlot(it, +el.dataset.i, render);
       });
     };
@@ -483,8 +490,8 @@
     const rec = (P.records[r.scenario] || {})[r.company];
     const got = (r.got || []).map(a => `<div class="card" style="cursor:default"><div class="t">🏆 ${esc(a.name)}</div>${a.unlocks.map(u => `<div class="d" style="color:var(--green)">🔓 ${esc(u.name)} 해금</div>`).join('')}</div>`).join('');
     const body = `<p style="text-align:center">${esc(r.reason)}</p><div class="big-num">${r.score}점${rec && r.score >= rec.bestScore && r.score > 0 ? ' ★ 최고 기록' : ''}</div>${got}
-      <div class="kv"><span>시나리오 / 회사</span><span class="v">${esc(M.SCENARIOS[r.scenario].name)} / ${esc(M.COMPANIES[r.company].name)}</span><span>도달</span><span class="v">${r.month}개월차 ${r.turn}턴</span><span>총 배송 수익</span><span class="v">${r.revenue}c</span><span>총 지출</span><span class="v">${r.spent}c</span><span>최종 자금</span><span class="v">${r.cash}c</span><span>스트레스</span><span class="v">${r.stress}</span><span>호출 / 대기</span><span class="v">${r.calls} / ${r.waits}</span><span>처리 택배 / 폐기</span><span class="v">${r.delivered} / ${r.discarded}</span><span>퍽</span><span class="v">${r.perks.map(p => M.PERKS[p].name).join(', ') || '없음'}</span>${r.variants.length ? `<span>변형</span><span class="v">${r.variants.map(v => M.DAILY_VARIANTS[v].name).join(', ')}</span>` : ''}<span>시드</span><span class="v">${r.seed}</span></div>`;
-    const again = r.scenario === 'daily' ? { label: '타이틀로', cls: 'primary', onClick: () => { closeModal(); game = null; showTitle(); } } : { label: '같은 조건으로 다시', cls: 'primary', onClick: () => { closeModal(); const cfg = game.cfg; game = new Game({ scenario: cfg.scenario, company: cfg.company, perks: cfg.perks, insurer: cfg.insurer }); startPlay(); } };
+      <div class="kv"><span>시나리오 / 회사</span><span class="v">${esc(M.SCENARIOS[r.scenario].name)}${r.difficulty && r.difficulty !== 'normal' ? ` (${esc(M.DIFFICULTIES[r.difficulty].name)})` : ''} / ${esc(M.COMPANIES[r.company].name)}</span><span>도달</span><span class="v">${r.month}개월차 ${r.turn}턴</span><span>총 배송 수익</span><span class="v">${r.revenue}c</span><span>총 지출</span><span class="v">${r.spent}c</span><span>최종 자금</span><span class="v">${r.cash}c</span><span>스트레스</span><span class="v">${r.stress}</span><span>호출 / 대기</span><span class="v">${r.calls} / ${r.waits}</span><span>처리 택배 / 폐기</span><span class="v">${r.delivered} / ${r.discarded}</span><span>퍽</span><span class="v">${r.perks.map(p => M.PERKS[p].name).join(', ') || '없음'}</span>${r.variants.length ? `<span>변형</span><span class="v">${r.variants.map(v => M.DAILY_VARIANTS[v].name).join(', ')}</span>` : ''}<span>시드</span><span class="v">${r.seed}</span></div>`;
+    const again = r.scenario === 'daily' ? { label: '타이틀로', cls: 'primary', onClick: () => { closeModal(); game = null; showTitle(); } } : { label: '같은 조건으로 다시', cls: 'primary', onClick: () => { closeModal(); const cfg = game.cfg; game = new Game({ scenario: cfg.scenario, company: cfg.company, perks: cfg.perks, insurer: cfg.insurer, difficulty: cfg.difficulty }); startPlay(); } };
     modal(r.win ? '런 성공!' : '게임오버', body, [{ label: '타이틀로', onClick: () => { closeModal(); game = null; showTitle(); } }, again]);
   }
   function showRecords(back) {
@@ -568,6 +575,7 @@
       <tr><td>🛃 통관</td><td>입고 후 <b>2턴 통관 대기</b>(20% 지연 +1). 대기 중엔 자리만 차지, 기한은 그 뒤 시작</td><td>대기 후 아무 업체. 대기 중엔 통관 대행·항공·해상·긴급만</td></tr>
       <tr><td>❆ 냉동</td><td>냉동 구역 밖이면 <b>즉시 폐기</b>. 기한 8턴. 4개월차부터</td><td>냉동 물류·냉동 컨테이너 특약만</td></tr>
       <tr><td>대형(4~7)</td><td>크기 범위가 맞는 업체만</td><td>용달·대형 화물·철도·해상·통관 대행</td></tr></table>
+      <h3>난이도</h3><p>시나리오 화면 위에서 <b>수습·정규·베테랑</b>을 고릅니다. 수습은 입고·가격·배상이 줄고 예정이 3턴까지 보이지만 해금 도전과제가 인정되지 않습니다. 베테랑(첫 클리어 후)은 입고 +10%, 배상 ×1.5, 도난·파손 ×1.3, 스트레스 한계 18, 점수 ×1.4.</p>
       <h3>날씨 · 적재 · 보관 · 보험</h3><p>턴마다 날씨가 있고 2턴 앞까지 예보됩니다. <b>🌧 비</b>는 야외 일반·⚠ 택배를 적셔 보상 -20%, <b>🔥 폭염</b>은 냉장 밖 ❄❆ 즉시 폐기, <b>❄️ 폭설</b>은 야외가 냉장고가 되고(❄ 부패 없음, 도난 절반, ❄ 처리 +10), <b>🌀 태풍</b>은 도난 2배에 그 턴 입고가 다음 턴으로 몰립니다.</p><p>창고가 넘칠 때 <b>대기</b>를 누르면 <b>적재 정리</b>가 열립니다. 무엇을 야외에 둘지 직접 고르거나 프리셋(급한 것·고보상·고배상·고객 우선)을 씁니다. 호출 턴에는 열리지 않습니다 — 대기의 보상입니다.</p><p>이사센터 같은 고객이 <b>보관 계약</b>을 제안합니다. 수락하면 선불 보관료를 받고 그 부피가 기간 동안 창고를 차지합니다(호출·정리 대상 아님). 무사히 끝나면 신뢰 +2, 조기 반환은 남은 기간 환불 + 위약금 30c. 야외로 내보내 도난당하면 배상 ×2.</p><p><b>보험</b>은 런 시작 때 고르고 마켓에서 갈아탈 수 있습니다. 배상액의 일부를 보험이 대신 내고, 월 보험료는 정산에서 빠집니다. 청구 0건이면 다음 달 -20%(연속 2개월 -30% + 고객 신뢰 +1), 많으면 인상. 무보험이면 배상 ×2 고객(유리공방·이사센터)의 물량이 절반. 마켓의 1회성 보험(운송 보험증·야적 보험·통관 보증)도 있습니다.</p>
       <h3>고객</h3><p>택배마다 보낸 <b>고객</b>이 있습니다(행 왼쪽 아이콘). 기한 내 처리 +1xp, 고객 특수 규칙 충족 +1xp, 폐기 -3xp. 신뢰 1~3단계에서 물량과 개당 보상이 오르고 2·3단계에 고객 혜택이 열립니다. 폐기(부패·반송·도난·파손)가 나면 고객이 <b>손해배상</b>(기본 보상 × 배상 배율)을 청구해 자금에서 바로 빠지고, xp가 0 밑으로 떨어지면 다음 달까지 거래가 끊깁니다. 하단 <b>고객</b> 버튼에서 확인하세요.</p>
       <p>업체 카드의 <b>능력</b> 아이콘이 그 업체가 안전하게 다루는 속성입니다. 강화 슬롯의 <b>특약</b>으로 계약에 속성 하나를 붙일 수 있습니다(계약당 1개). ✈🚆🚢는 운송 수단 표시일 뿐 매칭과 무관하고, 철도·해상은 보상이 1~2턴 뒤에 입금됩니다.</p>
