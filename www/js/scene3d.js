@@ -3,6 +3,14 @@ window.Scene3D = (function () {
   const CELL = 0.6;
   const MAIN = { x0: -1.2, cells: 8, depth: 7 };   // 일반 구역 (오른쪽)
   const COLD = { x0: -4.6, cells: 4, depth: 7 };   // 냉장 구역 (왼쪽)
+  const YARD = { x0: -2.4, cells: 11, depth: 2, z0: 3.15 };   // 야외 적재 (창고 앞, 지붕 밖)
+  const WX = {
+    sunny: { hemi: 0xdfefff, hemiI: 0.9, sunI: 1.1, clear: [0x000000, 0], rain: 0, snow: 0 },
+    rain:  { hemi: 0x9fb0c8, hemiI: 0.7, sunI: 0.45, clear: [0x5d6b80, 0.5], rain: 420, snow: 0 },
+    heat:  { hemi: 0xffd0a0, hemiI: 1.0, sunI: 1.5, clear: [0xff9a3c, 0.22], rain: 0, snow: 0 },
+    snow:  { hemi: 0xe8f0ff, hemiI: 0.95, sunI: 0.7, clear: [0xdfe8f0, 0.45], rain: 0, snow: 320 },
+    storm: { hemi: 0x6a7090, hemiI: 0.55, sunI: 0.3, clear: [0x2e3348, 0.7], rain: 700, snow: 0 },
+  };
   const FOOT = { 1: [1, 1, 0.5], 2: [2, 1, 0.6], 4: [2, 2, 0.95], 7: [3, 2, 1.5] }; // [w, d, h]
   const TRUCK_PARK = 12, TRUCK_DOCK = 6.7, TRUCK_GONE = 17;
 
@@ -24,6 +32,8 @@ window.Scene3D = (function () {
       this.tweens = []; this.boxes = new Map(); this.clock = new THREE.Clock(); this.time = 0;
       this.busy = 0;
       this._buildWorld();
+      this._buildWeather();
+      this.weather = 'sunny';
       this.resize();
       window.addEventListener('resize', () => this.resize());
       this._loop();
@@ -45,8 +55,8 @@ window.Scene3D = (function () {
     }
     _buildWorld() {
       const s = this.scene;
-      s.add(new THREE.HemisphereLight(0xdfefff, 0x6b8f4e, 0.9));
-      const sun = new THREE.DirectionalLight(0xfff2d0, 1.1); sun.position.set(6, 12, 5); sun.castShadow = true;
+      this.hemi = new THREE.HemisphereLight(0xdfefff, 0x6b8f4e, 0.9); s.add(this.hemi);
+      const sun = new THREE.DirectionalLight(0xfff2d0, 1.1); this.sun = sun; sun.position.set(6, 12, 5); sun.castShadow = true;
       sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -9; sun.shadow.camera.right = 9; sun.shadow.camera.top = 9; sun.shadow.camera.bottom = -9;
       s.add(sun);
       // 바닥 (콘크리트) + 잔디
@@ -66,12 +76,34 @@ window.Scene3D = (function () {
       const lamp = this._box(0.3, 0.3, 0.3, 0x5ee0d8, { emissive: 0x2a8f8a }); lamp.position.set(COLD.x0 + 0.4, 2.9, -1.5); s.add(lamp);
       // 도크 라인 (오른쪽)
       const dock = this._box(0.4, 0.05, 3.0, 0xf0d060); dock.position.set(4.9, 0.08, 1.8); s.add(dock);
+      // 앞마당 (야외 적재장)
+      const yard = this._box(YARD.cells * CELL + 0.3, 0.05, YARD.depth * CELL + 0.3, 0x86836f); yard.position.set(YARD.x0 + YARD.cells * CELL / 2 - 0.15, 0.09, YARD.z0 + YARD.depth * CELL / 2 - 0.05); s.add(yard);
       // 트럭
       this.truck = this._makeTruck(); this.truck.position.set(TRUCK_PARK, 0, 1.8); s.add(this.truck);
       // 도로
       const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 3.4), this._mat(0x4a4a52)); road.rotation.x = -Math.PI / 2; road.position.set(14, -0.02, 1.8); road.receiveShadow = true; s.add(road);
       // 나무 몇 그루 (장식)
       [[-7.5, -3], [8.5, -3.5], [-8, 3.5]].forEach(([x, z]) => { const t = new THREE.Group(); const trunk = this._box(0.3, 0.8, 0.3, 0x8a5a3a); trunk.position.y = 0.4; const leaf = this._box(1.2, 1.2, 1.2, 0x4f9a4a); leaf.position.y = 1.4; t.add(trunk, leaf); t.position.set(x, 0, z); s.add(t); });
+    }
+    _buildWeather() {
+      const mk = (n, size, color) => { const geo = new THREE.BufferGeometry(); const arr = new Float32Array(n * 3); for (let i = 0; i < n; i++) { arr[i * 3] = -9 + Math.random() * 18; arr[i * 3 + 1] = Math.random() * 9; arr[i * 3 + 2] = -5 + Math.random() * 13; } geo.setAttribute('position', new THREE.BufferAttribute(arr, 3)); const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size, transparent: true, opacity: 0.8, depthWrite: false })); pts.visible = false; pts.frustumCulled = false; this.scene.add(pts); return pts; };
+      this.snowPts = mk(320, 0.14, 0xffffff);
+      // 비: 짧은 선분 (물방울 700개 × 2점)
+      const n = 700, geo = new THREE.BufferGeometry(), arr = new Float32Array(n * 6);
+      for (let i = 0; i < n; i++) { const x = -9 + Math.random() * 18, y = Math.random() * 9, z = -5 + Math.random() * 13; arr.set([x, y, z, x, y - 0.35, z], i * 6); }
+      geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+      this.rainPts = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.55 })); this.rainPts.visible = false; this.rainPts.frustumCulled = false; this.scene.add(this.rainPts);
+    }
+    setWeather(kind) {
+      const w = WX[kind] || WX.sunny; this.weather = kind;
+      this.hemi.color.setHex(w.hemi); this.hemi.intensity = w.hemiI; this.sun.intensity = w.sunI;
+      this.renderer.setClearColor(w.clear[0], w.clear[1]);
+      this.rainPts.visible = w.rain > 0; this.rainN = w.rain; this.rainPts.geometry.setDrawRange(0, w.rain * 2);
+      this.snowPts.visible = w.snow > 0; this.snowPts.geometry.setDrawRange(0, w.snow);
+    }
+    _tickWeather(dt) {
+      if (this.rainPts.visible) { const a = this.rainPts.geometry.attributes.position, sp = this.weather === 'storm' ? 16 : 11, drift = this.weather === 'storm' ? -5 : -0.5, len = this.weather === 'storm' ? 0.6 : 0.35, dx = this.weather === 'storm' ? 0.2 : 0.02; for (let i = 0; i < this.rainN; i++) { const o = i * 6; let y = a.array[o + 1] - sp * dt, x = a.array[o] + drift * dt; if (y < 0) { y = 9; x = -9 + Math.random() * 18; } a.array[o] = x; a.array[o + 1] = y; a.array[o + 3] = x - dx; a.array[o + 4] = y - len; a.array[o + 5] = a.array[o + 2]; } a.needsUpdate = true; }
+      if (this.snowPts.visible) { const a = this.snowPts.geometry.attributes.position; for (let i = 0; i < 320; i++) { a.array[i * 3 + 1] -= 1.4 * dt; a.array[i * 3] += Math.sin(this.time * 1.5 + i) * 0.4 * dt; if (a.array[i * 3 + 1] < 0) { a.array[i * 3 + 1] = 9; a.array[i * 3] = -9 + Math.random() * 18; } } a.needsUpdate = true; }
     }
     _makeTruck() {
       const g = new THREE.Group();
@@ -91,7 +123,7 @@ window.Scene3D = (function () {
       for (const p of parcels) {
         const [w, d] = FOOT[p.baseSizeVis];
         if (x + w > zone.cells) { x = 0; z += rowD; rowD = 0; }
-        out.set(p.id, { cx: zone.x0 + (x + w / 2) * CELL, cz: -1.3 + (z + d / 2) * CELL, over: z + d > zone.depth });
+        out.set(p.id, { cx: zone.x0 + (x + w / 2) * CELL, cz: (zone.z0 != null ? zone.z0 : -1.3) + (z + d / 2) * CELL, over: z + d > zone.depth });
         x += w; rowD = Math.max(rowD, d);
       }
       return out;
@@ -99,16 +131,20 @@ window.Scene3D = (function () {
     _visSize(p) { return p.size >= 7 ? 7 : p.size >= 4 ? 4 : p.size >= 2 ? 2 : 1; }
     sync(game, opts = {}) {
       const D = window.DATA;
-      const cold = [], main = [];
-      for (const p of game.parcels) { p.baseSizeVis = this._visSize(p); (p.type === 'fresh' && p.inCold ? cold : main).push(p); }
-      const pos = new Map([...this._pack(cold, COLD), ...this._pack(main, MAIN)]);
+      if (game.weatherNow) this.setWeather(game.weatherNow());
+      const cold = [], main = [], yard = [];
+      const items = [];
+      for (const s of game.storage || []) items.push({ id: 's' + s.id, type: 'storage', size: s.vol, baseSize: s.vol, baseSizeVis: s.vol >= 7 ? 7 : s.vol >= 4 ? 4 : 2, outdoor: s.outdoor, storage: true });
+      for (const p of game.parcels) items.push(p);
+      for (const p of items) { if (!p.storage) p.baseSizeVis = this._visSize(p); (p.outdoor ? yard : (p.type === 'fresh' && p.inCold ? cold : main)).push(p); }
+      const pos = new Map([...this._pack(cold, COLD), ...this._pack(main, MAIN), ...this._pack(yard, YARD)]);
       const seen = new Set();
-      for (const p of game.parcels) {
+      for (const p of items) {
         seen.add(p.id);
         let b = this.boxes.get(p.id);
         const [w, d, h] = FOOT[p.baseSizeVis];
         if (!b) {
-          b = this._box(w * CELL - 0.08, h, d * CELL - 0.08, D.PARCEL_TYPES[p.type].color);
+          b = this._box(w * CELL - 0.08, h, d * CELL - 0.08, p.storage ? 0xa8845a : D.PARCEL_TYPES[p.type].color);
           // 테이프
           const tape = this._box(w * CELL - 0.06, h * 0.18, 0.12, 0xf7e9c5); tape.position.y = h * 0.42; b.add(tape);
           if (p.type === 'fragile') { const mark = this._box(0.12, h * 0.5, 0.05, 0xb8453b); mark.position.set(0, 0, d * CELL / 2 - 0.02); b.add(mark); }
@@ -125,8 +161,8 @@ window.Scene3D = (function () {
         }
         // 상태 색상
         const m = b.material;
-        const base = new THREE.Color(D.PARCEL_TYPES[p.type].color);
-        if (p.type === 'fresh' && p.fresh <= 0) base.multiplyScalar(0.55);
+        const base = new THREE.Color(p.storage ? 0xa8845a : D.PARCEL_TYPES[p.type].color);
+        if (p.wet) base.multiplyScalar(0.7);
         m.color.copy(base);
         b.userData.overdue = p.overdue || (p.type === 'fresh' && p.fresh <= 1) || false;
         b.userData.warm = p.type === 'fresh' && !p.inCold;
@@ -184,9 +220,11 @@ window.Scene3D = (function () {
         if (b.userData.overdue) m.emissive.setRGB(0.5 * pulse, 0.05, 0.05); else m.emissive.setRGB(0, 0, 0);
         if (b.userData.warm && !b.userData.locked) b.rotation.y = Math.sin(this.time * 6 + b.userData.id) * 0.06; else b.rotation.y = 0;
       }
+      this._tickWeather(dt);
       // 트럭 바퀴 흔들림
       if (this.truck.position.x < TRUCK_PARK - 0.1 && this.truck.position.x > TRUCK_DOCK + 0.1) this.truck.position.y = Math.abs(Math.sin(this.time * 30)) * 0.03; else this.truck.position.y = 0;
       if (this.shakeT > 0) { this.shakeT -= dt; this.camera.position.x = 2.6 + (Math.random() - 0.5) * this.shakeA; this.camera.position.y = 7.8 + (Math.random() - 0.5) * this.shakeA; }
+      else if (this.weather === 'storm') { this.camera.position.x = 2.6 + Math.sin(this.time * 9) * 0.05; this.camera.position.y = 7.8 + Math.sin(this.time * 7) * 0.04; }
       else { this.camera.position.x = 2.6; this.camera.position.y = 7.8; }
       this.renderer.render(this.scene, this.camera);
     }

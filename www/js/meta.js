@@ -29,6 +29,44 @@
     seafood: { name: '해외수산', icon: '🐟', items: { intlfresh: 60, fresh: 40 }, sizeBias: null, claimMult: 1.6,
       rule: { kind: 'coldCustoms', bonus: 20, text: '선도 유지: 통관 대기 중 냉장 구역에 있었으면 +20' },
       perks: { 2: { marketWeight: { sea: 2 }, text: '해상 운송 마켓 등장 ×2' }, 3: { customsDelta: -1, text: '이 고객 통관 대기 -1' } } },
+    mover:   { name: '이사센터', icon: '🚚', items: null, storage: true, sizeBias: null, claimMult: 2.0, rule: null, desc: '보관 계약만 제안한다',
+      perks: { 2: { storageFee: 0.2, text: '보관료 +20%' }, 3: { storageVolDelta: -2, text: '이삿짐 점유 -2' } } },
+  };
+  // 보관 계약 종류 (docs/CUSTOMER_DESIGN.md 3장)
+  const STORAGE_KINDS = {
+    move:   { name: '이삿짐', icon: '🏠', vol: [6, 10], turns: [3, 6], perVolTurn: 5, weight: 70 },
+    season: { name: '계절 재고', icon: '📦', vol: [4, 4], turns: [12, 15], perTurn: 10, weight: 20 },
+    event:  { name: '행사 물품', icon: '🎪', vol: [2, 2], turns: [2, 2], fee: 60, weight: 0, peakWeight: 40 },
+  };
+  // 보험사 (5장). cover: all | attrs+other | kinds+other. fans: 선호 고객(가입 중 월초 xp +1)
+  const INSURERS = {
+    none:      { name: '무보험', icon: '—', fee: 0, cover: null, fans: [], desc: '보장 없음. 배상 배율 ×2 고객은 물량 절반' },
+    sturdy:    { name: '든든화재', icon: '🛡', fee: 60, cover: { all: 0.5 }, fans: ['mart'], desc: '모든 폐기 배상 50%' },
+    coldguard: { name: '콜드가드', icon: '❄', fee: 50, cover: { attrs: { cold: 0.8, frozen: 0.8 }, other: 0.2 }, fans: ['dawn', 'ice', 'seafood'], desc: '❄❆ 부패 배상 80%, 그 외 20%' },
+    safebox:   { name: '세이프박스', icon: '📦', fee: 50, cover: { kinds: { broken: 0.8, stolen: 0.8 }, other: 0.2 }, fans: ['glass', 'import'], desc: '⚠ 파손·도난 배상 80%, 그 외 20%' },
+    premier:   { name: '프리미어', icon: '👑', fee: 110, cover: { all: 0.9 }, noReturnStress: true, fans: ['factory', 'mover'], desc: '모든 배상 90% + 반송 스트레스 면제' },
+  };
+  // 이번 달 청구 건수 → 다음 달 보험료 배율
+  const PREMIUM_STEPS = [[0, 0.8], [2, 1.0], [4, 1.3], [Infinity, 1.7]];
+  // 특수 보험 (마켓 1회성)
+  const INS_ITEMS = {
+    transitCert: { name: '운송 보험증', icon: '📜', price: 40, desc: '다음 호출 1회의 파손 확률 0' },
+    yardIns:     { name: '야적 보험', icon: '⛺', price: 70, desc: '다음 달 도난 배상 100%' },
+    customsBond: { name: '통관 보증', icon: '🛃', price: 50, desc: '다음 달 통관 지연 무효' },
+  };
+  // 날씨 (4.4장). 계절별 기본 가중치
+  const WEATHER = {
+    sunny: { name: '맑음', icon: '☀', desc: '' },
+    rain:  { name: '비', icon: '🌧', desc: '야외 일반·⚠ 택배 젖음 (보상 -20%)' },
+    heat:  { name: '폭염', icon: '🔥', desc: '냉장 밖 ❄❆ 즉시 폐기' },
+    snow:  { name: '폭설', icon: '❄️', desc: '야외 ❄ 부패 없음·❆ 1턴 유예, 도난 절반, ❄ 기한 정지, ❄ 처리 +10' },
+    storm: { name: '태풍', icon: '🌀', desc: '도난 2배, 젖음, 이 턴 입고 없음(다음 턴에 몰림)' },
+  };
+  const WEATHER_BY_SEASON = {
+    spring: { sunny: 60, rain: 25, storm: 5 },
+    summer: { sunny: 50, rain: 20, heat: 15, storm: 5 },
+    autumn: { sunny: 60, rain: 25, storm: 5 },
+    winter: { sunny: 55, rain: 15, snow: 20, storm: 3 },
   };
   // 복합 품목: 종류 + 추가 속성
   const CUSTOMER_ITEMS = { intlfresh: { type: 'intl', attrs: ['customs', 'cold'], sizes: [2, 4] } };
@@ -52,7 +90,7 @@
       unlock: 'fresh30', tier: 2,
     },
     steel: {
-      customers: [['factory', 2], ['import', 1], ['mart', 0], ['anon', 0]],
+      customers: [['factory', 2], ['mover', 1], ['import', 0], ['anon', 0]],
       name: '강철 창고', tag: '대형화물 · 공간', icon: '🏗️',
       warehouse: { cap: 34, cold: 0, xl: 3 }, cash: 400,
       contracts: [{ carrier: 'large', calls: 2 }, { carrier: 'bulk', calls: 2 }, { carrier: 'target', calls: 4 }],
@@ -88,12 +126,12 @@
       unlock: 'fragile30', tier: 2,
     },
     thrifty: {
-      customers: [['mart', 2], ['factory', 0], ['anon', 0], ['anon', 0]],
+      customers: [['mart', 2], ['mover', 1], ['anon', 0], ['anon', 0]],
       name: '짠돌이 운송', tag: '절약형의 극단', icon: '🪙',
       warehouse: { cap: 30, cold: 6, xl: 1 }, cash: 700,
       contracts: [{ carrier: 'bulk', calls: 2 }, { carrier: 'cold', calls: 2 }, { carrier: 'target', calls: 2 }],
       passive: '알뜰 계약: 모든 마켓 가격 -20%. 대기한 턴마다 다음 호출 처리량 +1 (최대 +3)', weakness: '인력 부족: 모든 계약 최대 호출 -1. 월말 운영비 +40',
-      mods: { priceMult: 0.8, waitStack: 3, callsDelta: -1, opCostDelta: 40, marketWeight: { cap1: 1.5, limit1: 0.7, limit2: 0.7 } },
+      mods: { premiumMult: 0.8, priceMult: 0.8, waitStack: 3, callsDelta: -1, opCostDelta: 40, marketWeight: { cap1: 1.5, limit1: 0.7, limit2: 0.7 } },
       unlock: 'two_clears', tier: 1,
     },
     startup: {
@@ -101,7 +139,7 @@
       name: '스타트업 딜리버리', tag: '무작위 · 고위험', icon: '🚀',
       warehouse: null, cash: 300, contracts: null,
       passive: '피벗: 매월 마켓 새로고침 1회 무료. 마켓 계약 슬롯 3개. 신뢰 이상 등급 확률 +15%p', weakness: '불안정: 월말마다 시작 계약 하나의 잔여 호출 -1. 3개월차부터 운영비 +30',
-      mods: { randomStart: true, freeRefresh: 1, marketContractSlots: 3, gradeShift: 0.15, erosion: true, lateOpCost: { from: 3, delta: 30 } },
+      mods: { noInsurance: true, randomStart: true, freeRefresh: 1, marketContractSlots: 3, gradeShift: 0.15, erosion: true, lateOpCost: { from: 3, delta: 30 } },
       unlock: 'three_companies', tier: 3,
     },
     postal: {
@@ -110,7 +148,7 @@
       warehouse: { cap: 28, cold: 6, xl: 1 }, cash: 550,
       contracts: [{ carrier: 'bulk', grade: 'trusted', calls: 3 }, { carrier: 'cold', calls: 2 }, { carrier: 'target', calls: 2 }],
       passive: '공공 서비스: 운영비 80 고정. 자체 배송 +1칸. 스트레스 10 이상이면 월초 -2. 계약 교체 시 잔여 호출 1회 보존', weakness: '느린 결재: 마켓 매월 2개까지. 전문·마스터는 5개월차부터. 특수 보너스 -5',
-      mods: { opCostFixed: 80, selfCapDelta: 1, stressRelief: { min: 10, amount: 2 }, keepCalls: 1, marketMaxBuy: 2, expertFrom: 5, bonusDelta: -5, marketWeight: { trusted: 1.3, expert: 0.5, master: 0.5 } },
+      mods: { premiumDelta: { premier: -30 }, opCostFixed: 80, selfCapDelta: 1, stressRelief: { min: 10, amount: 2 }, keepCalls: 1, marketMaxBuy: 2, expertFrom: 5, bonusDelta: -5, marketWeight: { trusted: 1.3, expert: 0.5, master: 0.5 } },
       unlock: 'first_clear', tier: 1,
     },
   };
@@ -133,6 +171,7 @@
     // 운영 계열
     skip:      { name: '스킵 보너스', family: 'ops', desc: '대기 후 다음 호출의 처리량 +1', mods: { skipBonus: 1 }, unlock: null },
     insure:    { name: '폐기 보험', family: 'ops', desc: '런당 첫 폐기 택배의 페널티 무효', mods: { insurance: true }, unlock: null },
+    tent:      { name: '천막', family: 'warehouse', desc: '비·태풍에도 야외 택배가 젖지 않음', mods: { tent: true }, unlock: null },
     breath:    { name: '심호흡', family: 'ops', desc: '월초에 스트레스 -1', mods: { monthlyStress: -1 }, unlock: 'survivor' },
     overtime:  { name: '연장 근무', family: 'ops', desc: '기한 초과 택배의 보상 감소 25% → 10%', mods: { overdueMult: 0.9 }, unlock: 'late_but_done' },
     foresight: { name: '예지', family: 'ops', desc: '입고 예정을 4턴까지 표시', mods: { upcomingTurns: 4 }, unlock: 'waiter' },
@@ -162,13 +201,13 @@
   const SCENARIOS = {
     standard: { name: '표준 3개월', icon: '📦', months: 3, desc: '기본 규칙. 3개월 생존', win: '3개월 생존', mods: {}, unlock: null, recommend: '동네 택배' },
     half:     { name: '반기 결산', icon: '📅', months: 6, desc: '6개월 풀런. 전문·마스터 등급, 대형화물 등장', win: '6개월 생존 (점수 ×1.5)', mods: { scoreMult: 1.5 }, unlock: 'first_clear', recommend: '국영 우편' },
-    peak:     { name: '성수기', icon: '🎄', months: 2, desc: '입고 ×1.8, 폭주 턴 4회. 보상 +10, 가격 ×1.3, 시작 호출 +2', win: '2개월 생존 + 38개 처리', mods: { returnGrace: 2, arrivalsMult: 1.8, burstTurns: 4, rewardAll: 10, itemPriceMult: 1.3, startCallsDelta: 2, winDelivered: 38 }, unlock: 'busy_month', recommend: '도심 퀵 · 강철 창고' },
-    heatwave: { name: '폭염', icon: '🌡️', months: 3, desc: '신선 비율 +20%p, 상온 부패 3배, 폭염 경보 턴(월 3회), 입고 +10%', win: '3개월 생존 + 폐기 3개 이하', mods: { customerWeights: { dawn: 2, ice: 2 }, typeShift: { fresh: 20, normal: -20 }, freshSizes: [2, 4, 7], warmMult: 3, heatAlerts: 3, arrivalsMult: 1.1, facilityPriceMult: { cold1: 0.7, cold2: 0.7 }, marketWeight: { cold: 1.5 }, winMaxDiscard: 3 }, unlock: 'fresh20', recommend: '프레시 로지스틱스' },
+    peak:     { name: '성수기', icon: '🎄', months: 2, desc: '입고 ×1.8, 폭주 턴 4회. 보상 +10, 가격 ×1.3, 시작 호출 +2', win: '2개월 생존 + 38개 처리', mods: { eventGoods: true, returnGrace: 2, arrivalsMult: 1.8, burstTurns: 4, rewardAll: 10, itemPriceMult: 1.3, startCallsDelta: 2, winDelivered: 38 }, unlock: 'busy_month', recommend: '도심 퀵 · 강철 창고' },
+    heatwave: { name: '폭염', icon: '🌡️', months: 3, desc: '신선 비율 +20%p, 상온 부패 3배, 폭염 경보 턴(월 3회), 입고 +10%', win: '3개월 생존 + 폐기 3개 이하', mods: { season: 'summer', customerWeights: { dawn: 2, ice: 2 }, typeShift: { fresh: 20, normal: -20 }, freshSizes: [2, 4, 7], warmMult: 3, heatAlerts: 3, arrivalsMult: 1.1, facilityPriceMult: { cold1: 0.7, cold2: 0.7 }, marketWeight: { cold: 1.5 }, winMaxDiscard: 3 }, unlock: 'fresh20', recommend: '프레시 로지스틱스' },
     strike:   { name: '파업', icon: '✊', months: 3, desc: '매월 운송 업체 1종 호출 불가 (월초 공지). 입고 +20%, 운영비 +30. 긴급 특송 상시 등장', win: '3개월 생존', mods: { strike: true, guaranteeCarrier: 'urgent', arrivalsMult: 1.2, opCostDelta: 30 }, unlock: 'four_carriers', recommend: '스타트업' },
     port:     { name: '항만 계약', icon: '🚢', months: 4, desc: '통관 20%·대형 12%, 초대형 7%, 입고 +10%. 통관·대형 보상 +20, 일반 -5', win: '4개월 생존', mods: { forceCustomers: ['import', 'seafood', 'factory'], noAnon: true, typeOverride: { normal: 40, fresh: 15, fragile: 13, intl: 20, large: 12 }, xlWeight: 7, arrivalsMult: 1.1, rewardDelta: { intl: 20, large: 20, normal: -5 }, xlDelta: 1, guaranteeCarriers: ['intl', 'large'] }, unlock: 'intl15', recommend: '글로벌 · 강철 창고' },
     cashcrunch:{ name: '자금난', icon: '💸', months: 3, desc: '시작 자금 -50%, 운영비 240, 새로고침 불가, 마켓 가격 +10%. 수익 +10%, 신뢰도 ×2', win: '3개월 생존 + 자금 600 이상', mods: { cashMult: 0.5, opCostFixed: 240, noRefresh: true, itemPriceMult: 1.1, revenueMult: 1.1, trustXpMult: 2, winCash: 600 }, unlock: 'rich_clear', recommend: '짠돌이 · 국영 우편' },
     blackfriday:{ name: '블랙 프라이데이', icon: '🛒', months: 1, desc: '한 달 지옥. 입고 ×2.3, 폭주 턴 4회, 가격 ×1.4. 보상 +15, 시작 호출 +3', win: '1개월 생존 + 24개 처리', mods: { arrivalsMult: 2.3, burstTurns: 4, itemPriceMult: 1.4, rewardAll: 15, startCallsDelta: 3, winDelivered: 24 }, unlock: 'peak_clear', recommend: '도심 퀵 · 짠돌이' },
-    audit:    { name: '감사', icon: '📋', months: 3, desc: '모든 기한 -1턴, 기한 초과 보상 -50%, 월초 스트레스 +1, 운영비 +30', win: '3개월 생존 + 기한 초과 처리 4개 이하', mods: { claimMult: 1.5, deadlineAll: -1, overdueMult: 0.5, monthlyStress: 1, opCostDelta: 30, winMaxOverdue: 4 }, unlock: 'perfect_month', recommend: '국영 우편 · 유리방' },
+    audit:    { name: '감사', icon: '📋', months: 3, desc: '모든 기한 -1턴, 기한 초과 보상 -50%, 월초 스트레스 +1, 운영비 +30', win: '3개월 생존 + 기한 초과 처리 4개 이하', mods: { premiumMult: 1.5, claimMult: 1.5, deadlineAll: -1, overdueMult: 0.5, monthlyStress: 1, opCostDelta: 30, winMaxOverdue: 4 }, unlock: 'perfect_month', recommend: '국영 우편 · 유리방' },
     endless:  { name: '무한 운영', icon: '♾️', months: 99, desc: '게임오버까지. 7개월차부터 매월 입고 +1, 12개월차부터 운영비 +10/월', win: '없음 — 점수 경쟁', mods: { endless: true }, unlock: 'half_clear', recommend: '—' },
     daily:    { name: '데일리 배송', icon: '📆', months: 3, desc: '날짜 시드 고정 + 변형 규칙 2개. 회사는 그날 지정', win: '3개월 생존 (하루 1회 기록)', mods: { daily: true }, unlock: 'three_unlocked', recommend: '그날 지정' },
   };
@@ -234,6 +273,6 @@
     daily7:       { name: '데일리 7일', desc: '데일리 7일 연속 클리어', kind: 'meta', rewardType: 'none', check: (s, p) => p.dailyStreak >= 7 },
   };
 
-  const META = { CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, DAILY_VARIANTS, DAILY_CONFLICTS, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['standard'], perkSlots: 1 } };
+  const META = { CUSTOMERS, CUSTOMER_ITEMS, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, DAILY_VARIANTS, DAILY_CONFLICTS, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['standard'], perkSlots: 1 } };
   if (typeof module !== 'undefined') module.exports = META; else root.META = META;
 })(typeof window !== 'undefined' ? window : globalThis);

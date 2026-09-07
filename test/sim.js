@@ -67,10 +67,12 @@ function marketBot(g) {
 }
 
 function runOne(seed, strat, cfg) {
-  const g = new Game(Object.assign({ seed, perks: ['skip', 'insure'] }, cfg || {}));
+  const g = new Game(Object.assign({ seed, perks: ['skip', 'insure'], insurer: 'sturdy' }, cfg || {}));
   let guard = 0;
   while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 500) {
     if (g.phase === 'play') {
+      // 보관 제안: 다음 턴 입고까지 넣어도 창고가 남으면 수락
+      if (g.offer) { if (g.usedVolume() + g.offer.vol + nextVolume(g) <= g.warehouse.cap) g.acceptOffer(); else g.declineOffer(); }
       // 긴급 특송: 부패 직전·기한 임박 택배가 있으면 즉시 사용
       const ui = g.contracts.findIndex(c => c && D.CARRIERS[c.carrier].instant && g.canCall(c));
       if (ui >= 0) { const p = g.parcels.find(p => (p.type === 'fresh' && p.fresh <= 1) || p.deadline <= 1); if (p) { g.callCarrier(ui, [p.id]); continue; } }

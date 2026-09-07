@@ -154,3 +154,11 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .attr.cold { color: var(--cyan); } .attr.fragile { color: var(--orange); } .attr.customs { color: var(--blue); } .attr.frozen { color: #9ad7ff; }
 .parcel.risk:not(.dis) { border-color: var(--orange); }
 .parcel .cust { margin-right: 3px; font-size: 12px; }
+
+.chip.wx { border-color: var(--line); } .chip.wx.rain { border-color: #5fa8d8; } .chip.wx.heat { border-color: var(--red); color: var(--orange); } .chip.wx.snow { border-color: #cfe8ff; } .chip.wx.storm { border-color: #7a6ad8; color: #c9bfff; }
+.offer { display: flex; gap: 6px; align-items: center; background: #2a2f22; border: 2px solid var(--gold); padding: 5px 7px; font-size: 12px; margin-bottom: 4px; }
+.offer > div:first-child { flex: 1; } .offer .ob { display: flex; flex-direction: column; gap: 4px; }
+.parcel.storage { background: #33291f; }
+.presets { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 12px; margin: 6px 0; } .presets span { color: var(--dim); }
+.zone-h { font-size: 12px; color: var(--gold); margin: 6px 0 3px; } .zone { display: flex; flex-direction: column; gap: 3px; min-height: 24px; } .zone.out { border: 2px dashed var(--red); padding: 3px; }
+.wxline { font-size: 11px; color: var(--orange); padding: 1px 2px 3px; } .wxline.snow { color: #cfe8ff; } .wxline.rain { color: #9fc8ff; } .wxline.storm { color: #c9bfff; }

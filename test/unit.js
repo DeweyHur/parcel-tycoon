@@ -65,7 +65,7 @@ t('지연 입금: 철도는 다음 턴에 입금', () => {
 t('월말 정산 → 마켓 → 다음 달', () => {
   const g = NG(9);
   while (g.phase === 'play') g.wait();
-  assert.equal(g.phase, 'summary'); g.closeSummary(); assert.equal(g.phase, 'market'); assert.equal(g.market.items.length, 5);
+  assert.equal(g.phase, 'summary'); g.closeSummary(); assert.equal(g.phase, 'market'); assert.ok(g.market.items.length >= 5 && g.market.items.length <= 6);
   const before = g.cash; const fac = g.market.items.findIndex(i => i.kind === 'fac' && i.fac); if (fac >= 0) { const r = g.buy(fac, null); assert.ok(r.ok); assert.ok(g.cash < before); }
   g.closeMarket(); assert.equal(g.month, 2); assert.equal(g.turn, 1);
 });
@@ -188,5 +188,65 @@ t('고객 규칙: 새벽배송(입고 당 턴 처리 +20)', () => {
   const g = NG(3); g.warehouse.cap = 99; g.schedule = g.schedule.map(() => []);
   g.parcels = [{ id: 7, type: 'normal', size: 1, baseSize: 1, reward: 40, deadline: 6, overdue: false, attrs: [], age: 0, warm: 0, customs: 0, customer: 'dawn', arrivalTurn: g.totalTurn }];
   const t = g.contracts.findIndex(c => c && c.carrier === 'target'); const r = g.callCarrier(t, [7]); assert.equal(r.revenue, 40 + 20); assert.equal(g.customers.dawn.xp, 2);
+});
+const P = (id, type, size, extra) => Object.assign({ id, type, size, baseSize: size, reward: 25 + size * 15, deadline: 6, overdue: false, attrs: D.PARCEL_TYPES[type].attrs.slice(), age: 0, warm: 0, customs: 0, customer: 'anon', arrivalTurn: 1, inCold: false, inFrozen: false }, extra);
+t('날씨: 월별 10턴 생성, 태풍 턴 입고는 다음 턴으로', () => {
+  let found = false;
+  for (let seed = 1; seed < 60 && !found; seed++) { const g = new Game({ seed, scenario: 'half' }); assert.equal(g.weather.length, 10); const t = g.weather.indexOf('storm'); if (t > 0) { found = true; assert.equal(g.schedule[t].length, 0); assert.ok(g.schedule[t + 1].length >= 2); } }
+  assert.ok(found, 'storm never rolled');
+});
+t('날씨: 비에 야외 일반 택배 젖음(보상 -20%), 천막 퍽이면 무효', () => {
+  for (const tent of [false, true]) {
+    const g = NG(5, { perks: tent ? ['tent'] : ['skip'] }); g.schedule = g.schedule.map(() => []); g.weather = Array(10).fill('rain');
+    g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2)]; g.warehouse.cap = 2; g._assignCold();
+    assert.equal(g.outdoorParcels().length, 1);
+    g.wait();
+    const wetN = g.parcels.filter(p => p.wet).length; assert.equal(wetN, tent ? 0 : 1);
+    if (!tent) { g.warehouse.cap = 99; const wet = g.parcels.find(p => p.wet); const t = g.contracts.findIndex(c => c && c.carrier === 'target'); const r = g.callCarrier(t, [wet.id]); assert.equal(r.revenue, Math.round(55 * 0.8)); }
+  }
+});
+t('날씨: 폭설이면 야외 신선 안 썩고 냉장 기한 정지, 도난 절반', () => {
+  const g = NG(5); g.schedule = g.schedule.map(() => []); g.weather = Array(10).fill('snow');
+  g.parcels = [P(1, 'fresh', 2, { deadline: 3 }), P(2, 'fresh', 2, { deadline: 3 })]; g.warehouse.cap = 2; g.warehouse.cold = 2; g._assignCold();
+  const out = g.outdoorParcels(); assert.equal(out.length, 1);
+  assert.equal(g.theftProb(), 0.15 * 0.5);
+  g.wait();
+  assert.ok(g.parcels.length >= 1); // 도난만 가능, 부패 없음
+  for (const p of g.parcels) assert.equal(p.deadline, 3);
+});
+t('보험: 든든화재 50% 보장, 무사고 할인, 청구 많으면 인상', () => {
+  const g = NG(3, { insurer: 'sturdy', perks: ['skip', 'longdeal'] }); assert.equal(g.insurer, 'sturdy'); assert.equal(g.premium(), 60);
+  g.schedule = g.schedule.map(() => []); g.warehouse.cap = 99;
+  g.parcels = [P(6, 'fragile', 2, { deadline: 1, customer: 'glass' })];
+  const cash = g.cash; g.wait(); g.wait(); g.wait(); g.wait();
+  assert.equal(cash - g.cash, 55); // 110 × 50%
+  assert.equal(g.monthStats.insClaims, 1);
+  while (g.phase === 'play') g.wait();
+  assert.equal(g.summary.premium, 60); assert.equal(g.summary.nextPremium, 60); // 1건 → ×1.0
+  const g2 = NG(3, { insurer: 'sturdy' }); g2.schedule = g2.schedule.map(() => []); g2.parcels = []; while (g2.phase === 'play') g2.wait();
+  assert.equal(g2.summary.nextPremium, 48); // 0건 → ×0.8
+});
+t('보험: 프리미어는 반송 스트레스 면제, 마켓에서 갈아타기', () => {
+  const g = NG(3, { insurer: 'premier', perks: ['skip', 'longdeal'] }); g.schedule = g.schedule.map(() => []); g.warehouse.cap = 99;
+  g.parcels = [P(6, 'normal', 1, { deadline: 1 })]; g.wait(); g.wait(); g.wait(); g.wait(); g.wait();
+  assert.equal(g.stats.returned, 1); assert.equal(g.stress, 1); // 기한 초과 +1만
+  while (g.phase === 'play') g.wait(); g.closeSummary();
+  const cash = g.cash; assert.ok(g.setInsurer('coldguard').ok); assert.equal(cash - g.cash, 50); assert.equal(g.insurer, 'coldguard');
+});
+t('보관 계약: 수락 → 점유 → 회수 xp +2, 조기 반환 위약금', () => {
+  const g = new Game({ seed: 7, company: 'thrifty', perks: [] }); g.schedule = g.schedule.map(() => []); g.parcels = [];
+  g.offer = { id: 500, kind: 'move', vol: 8, turns: 2, fee: 80, perTurn: 0, customer: 'mover', expires: 99 };
+  const cash = g.cash; assert.ok(g.acceptOffer().ok); assert.equal(g.cash, cash + 80); assert.equal(g.usedVolume(), 8);
+  const xp = g.customers.mover.xp; g.wait(); assert.equal(g.storage[0].left, 1); g.wait(); assert.equal(g.storage.length, 0); assert.equal(g.customers.mover.xp, xp + 2);
+  g.offer = { id: 501, kind: 'move', vol: 6, turns: 4, fee: 120, perTurn: 0, customer: 'mover', expires: 99 }; g.acceptOffer(); g.wait();
+  const c2 = g.cash; assert.ok(g.returnStorage(501).ok); assert.equal(c2 - g.cash, 90 + 30); assert.equal(g.storage.length, 0);
+});
+t('적재: 기본은 덜 급한 것부터 야외, 프리셋·지정', () => {
+  const g = NG(4); g.schedule = g.schedule.map(() => []); g.warehouse.cap = 4;
+  g.parcels = [P(1, 'normal', 2, { deadline: 1 }), P(2, 'normal', 2, { deadline: 5 }), P(3, 'normal', 2, { deadline: 3 })]; g._assignCold();
+  assert.deepEqual(g.parcels.map(p => !!p.outdoor), [false, true, false]);
+  assert.deepEqual(g.presetOutdoor('reward'), [3]); // 보상 같으면 급한 순 → 3이 뒤? (모두 55) → 정렬 안정: id 뒤가 밖
+  g.setOutdoor([1]); assert.deepEqual(g.parcels.map(p => !!p.outdoor), [true, false, false]);
+  g.wait(); assert.ok(g.outdoorPref.length <= 1);
 });
 console.log(`\n${n} tests passed`);
