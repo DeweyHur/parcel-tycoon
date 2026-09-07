@@ -67,7 +67,7 @@ function marketBot(g) {
 }
 
 function runOne(seed, strat, cfg) {
-  const g = new Game(Object.assign({ seed, perks: ['skip', 'insure'], insurer: 'sturdy' }, cfg || {}));
+  const g = new Game(Object.assign({ seed, perks: ['skip', 'insure'], insurer: 'sturdy', prep: true }, cfg || {}));
   let guard = 0;
   while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 500) {
     if (g.phase === 'play') {

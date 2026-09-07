@@ -570,6 +570,13 @@
         if (R.monthlyStress) this.stress = Math.max(0, this.stress + R.monthlyStress);
         if (R.stressRelief && this.stress >= R.stressRelief.min) this.stress = Math.max(0, this.stress - R.stressRelief.amount);
       }
+      // 준비 마켓: 1개월차 첫 턴 전에 시작 자금으로 계약·시설·보험을 갖출 수 있다 (입고 예정이 보인다)
+      if (m === 1 && this.cfg.prep && !this.prepDone) {
+        this.prepDone = true; this.phase = 'market';
+        this.market = { items: this._genMarketItems(), bought: 0, refreshes: 0, month: 0, prep: true, freeRefresh: this.rules.freeRefresh + 1 };
+        this.say('준비 마켓: 1개월차 시작 전 구매 (새로고침 1회 무료)');
+        return;
+      }
       this.phase = 'play';
       this.say(`── ${m}개월차 시작 ──`);
       this._startTurn();
@@ -1091,7 +1098,9 @@
     }
     closeMarket() {
       if (this.phase !== 'market') return false;
+      const prep = this.market.prep;
       this.market = null;
+      if (prep) { this.phase = 'play'; this.say('── 1개월차 시작 ──'); this._startTurn(); return true; }
       this._startMonth(this.month + 1);
       return true;
     }

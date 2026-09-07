@@ -268,4 +268,9 @@ t('마켓 신규 고객 카드: 구매하면 고객 추가', () => {
   g.market.items.push({ kind: 'customer', customer: 'ice', price: 100, name: 'x', sold: false }); g.cash = 1000;
   const r = g.buy(g.market.items.length - 1, null); assert.ok(r.ok, r.msg); assert.ok(g.customers.ice); assert.equal(g.customerCount(), 4);
 });
+t('준비 마켓: 첫 턴 전에 마켓, 닫으면 1개월차 1턴', () => {
+  const g = new Game({ seed: 3, prep: true }); assert.equal(g.phase, 'market'); assert.ok(g.market.prep); assert.equal(g.turn, 0); assert.ok(g.upcoming()[0].specs);
+  assert.ok(g.market.items.length >= 5); g.closeMarket(); assert.equal(g.phase, 'play'); assert.equal(g.turn, 1); assert.equal(g.month, 1);
+  while (g.phase === 'play') g.wait(); g.closeSummary(); assert.ok(!g.market.prep); g.closeMarket(); assert.equal(g.month, 2);
+});
 console.log(`\n${n} tests passed`);
