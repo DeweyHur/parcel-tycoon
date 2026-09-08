@@ -9,7 +9,7 @@
     MARKET_MAX_BUY: 3,
     REFRESH_COSTS: [40, 80, 140, 220],
 
-    WAREHOUSE: { cap: 24, cold: 6, frozen: 2, xl: 1 },
+    WAREHOUSE: { cap: 24, cold: 6, frozen: 4, xl: 1 },
 
     // 월별 추가 입고 수 (기본 10 + 추가). 7개월차 이후는 무한 모드에서 확장
     EXTRA_ARRIVALS: { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7 },
@@ -17,22 +17,25 @@
     // 월별 택배 종류 비율 (large = 대형화물, 4개월차부터)
     // intl = 🛃 통관 (구 국제운송), frozen = ❆ 냉동 (4개월차부터)
     TYPE_RATIO: {
-      1: { normal: 60, fresh: 20, fragile: 15, intl: 5, large: 0, frozen: 0 },
-      2: { normal: 50, fresh: 20, fragile: 20, intl: 10, large: 0, frozen: 0 },
-      3: { normal: 45, fresh: 20, fragile: 20, intl: 15, large: 0, frozen: 0 },
-      4: { normal: 35, fresh: 19, fragile: 23, intl: 15, large: 5, frozen: 3 },
-      5: { normal: 30, fresh: 21, fragile: 25, intl: 15, large: 5, frozen: 4 },
-      6: { normal: 25, fresh: 20, fragile: 25, intl: 20, large: 5, frozen: 5 },
+      1: { normal: 62, fresh: 12, produce: 8, fragile: 12, intl: 6, large: 0, frozen: 0 },
+      2: { normal: 55, fresh: 13, produce: 9, fragile: 13, intl: 10, large: 0, frozen: 0 },
+      3: { normal: 50, fresh: 13, produce: 9, fragile: 15, intl: 13, large: 0, frozen: 0 },
+      4: { normal: 42, fresh: 13, produce: 9, fragile: 16, intl: 12, large: 5, frozen: 3 },
+      5: { normal: 38, fresh: 13, produce: 10, fragile: 17, intl: 13, large: 5, frozen: 4 },
+      6: { normal: 33, fresh: 13, produce: 10, fragile: 18, intl: 16, large: 5, frozen: 5 },
     },
 
     // 크기 등장 비율 (1 소형, 2 중형, 4 대형, 7 초대형)
     SIZE_WEIGHT: { 1: 50, 2: 35, 4: 12, 7: 3 },
 
     // 속성(attrs): 창고에서 벌어지는 일. cold=❄ 냉장 구역 밖이면 다음 턴 폐기 / fragile=⚠ 능력 없는 업체면 파손 확률 / customs=🛃 통관 대기 중 처리 불가 / frozen=❆ 냉동 구역 밖이면 즉시 폐기
-    ATTRS: { cold: { icon: '❄', name: '냉장' }, fragile: { icon: '⚠', name: '파손' }, customs: { icon: '🛃', name: '통관' }, frozen: { icon: '❆', name: '냉동' } },
+    ATTRS: { cold: { icon: '❄', name: '냉장' }, fragile: { icon: '⚠', name: '파손' }, customs: { icon: '🛃', name: '통관' }, frozen: { icon: '❆', name: '냉동' }, produce: { icon: '🌾', name: '농산물' } },
+    // 업체 매칭에 관여하는 속성 (🌾 농산물은 날씨 속성이라 아무 업체나 처리)
+    GATING_ATTRS: ['cold', 'fragile', 'customs', 'frozen'],
     PARCEL_TYPES: {
       normal:  { name: '일반',     short: '일반', attrs: [],          sizes: [1, 2],  deadline: 6, bonus: 0,  color: 0xc9a06c, css: '#c9a06c' },
       fresh:   { name: '신선식품', short: '신선', attrs: ['cold'],    sizes: [2, 4],  deadline: 3, bonus: 10, color: 0x5ee0d8, css: '#5ee0d8' },
+      produce: { name: '농산물',   short: '농산', attrs: ['produce'], sizes: [2, 4],  deadline: 5, bonus: 10, color: 0x9acd5a, css: '#9acd5a' },
       fragile: { name: '파손주의', short: '파손', attrs: ['fragile'], sizes: [2, 4],  deadline: 7, bonus: 15, color: 0xf0a04b, css: '#f0a04b' },
       intl:    { name: '통관 화물', short: '통관', attrs: ['customs'], sizes: [4, 7],  deadline: 8, bonus: 20, color: 0x6c8cff, css: '#6c8cff' },
       large:   { name: '대형화물', short: '대형', attrs: [],          sizes: [4, 7],  deadline: 8, bonus: 25, color: 0xb08bd8, css: '#b08bd8' },
@@ -55,21 +58,21 @@
     // specialist = 이 종류를 처리하면 특수 운송 보너스. delay = 보상이 N턴 뒤 입금. badge = 운송 수단(매칭 무관)
     CARRIERS: {
       target:  { name: '용달',        short: '용달', badge: '🚚', desc: '원하는 택배 1개를 골라 차를 불러 보냄 (특수 보너스 없음, ⚠ 파손 위험)', cap: 1, calls: 4, price: 200, caps: [], sizeMin: 1, sizeMax: 7 },
-      cold:    { name: '냉장 물류',   short: '냉장', badge: '🚚', desc: '신선식품 전문. 신선 보너스', cap: 3, calls: 3, price: 210, caps: ['cold'], need: ['cold'], sizeMin: 1, sizeMax: 4, specialist: 'fresh' },
+      cold:    { name: '냉장 물류',   short: '냉장', badge: '🚚', desc: '신선·농산물 전문. 신선·농산물 보너스', cap: 4, calls: 3, price: 210, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'] },
       bulk:    { name: '대량 분류',   short: '대량', badge: '🚚', desc: '일반 택배를 골라 한 번에 처리', cap: 4, calls: 2, price: 160, caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2 },
       fragile: { name: '프래자일 전문', short: '프래', badge: '🚚', desc: '파손주의 전문. 파손 없음, 파손 보너스', cap: 3, calls: 3, price: 210, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile', marketOnly: true },
       intl:    { name: '통관 대행',   short: '통관', badge: '🚚', desc: '통관 대기 중인 화물을 즉시 통관·발송. 통관 보너스', cap: 2, calls: 3, price: 240, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
       large:   { name: '대형 화물',   short: '대형', badge: '🚚', desc: '크기 4 이상 택배를 처리 (파손 안전). 대형 보너스', cap: 2, calls: 2, price: 220, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true },
-      frozen:  { name: '냉동 물류',   short: '냉동', badge: '🚚', desc: '냉동·신선 전문. 냉동 보너스', cap: 2, calls: 3, price: 230, caps: ['frozen', 'cold'], need: ['frozen', 'cold'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true },
+      frozen:  { name: '냉동 물류',   short: '냉동', badge: '🚚', desc: '냉동 전용. 냉동 보너스', cap: 3, calls: 3, price: 230, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true },
       urgent:  { name: '긴급 특송',   short: '긴급', badge: '⚡', desc: '⚡턴을 쓰지 않고 즉시 1개 처리. 통관 대기 중·파손도 안전, 보너스 없음', cap: 1, calls: 2, price: 300, caps: ['fragile', 'customs'], sizeMin: 1, sizeMax: 7, marketOnly: true, instant: true },
       // 원형(운송 수단) 업체: 속성이 겹치고 트레이드오프가 다르다
       air:     { name: '항공 특송',   short: '항공', badge: '✈', desc: '소형(1~2)만. 통관 대기 중 처리·파손 안전. 비싸지만 빠름', cap: 2, calls: 3, price: 260, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
       rail:    { name: '철도 수송',   short: '철도', badge: '🚆', desc: '파손 안전, 한 번에 많이. 보상은 다음 턴 입금', cap: 5, calls: 2, price: 190, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true },
-      sea:     { name: '해상 운송',   short: '해상', badge: '🚢', desc: '통관·냉장 컨테이너, 크기 2 이상. 보상은 2턴 뒤 입금', cap: 4, calls: 2, price: 230, caps: ['customs', 'cold'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
+      sea:     { name: '해상 운송',   short: '해상', badge: '🚢', desc: '통관 컨테이너, 크기 2 이상, 파손 안전. 보상은 2턴 뒤 입금', cap: 4, calls: 2, price: 230, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
     },
     CARRIER_L3: {
       target: '신뢰 3단계: 특수 택배 처리 시 특수 운송 보너스 적용',
-      cold: '신뢰 3단계: 호출 턴에 신선식품 기한 정지',
+      cold: '신뢰 3단계: 호출 턴에 신선·농산물 기한 정지',
       bulk: '신뢰 3단계: 일반 택배 1개 추가 처리',
       fragile: '신뢰 3단계: 파손주의 처리 시 보상 +15',
       intl: '신뢰 3단계: 통관 화물 1개 추가 처리',
@@ -81,8 +84,8 @@
       sea: '신뢰 3단계: 입금 지연 1턴',
     },
 
-    // 자체 배송: 계약과 무관한 상설 행동. 대기열 앞의 일반 택배를 처리, 무제한·무료, 턴 소모
-    SELF_DELIVERY: { name: '자체 배송', cap: 2, rewardMult: 0.7 }, // cap은 부피(칸). 직접 배송은 마진이 낮다
+    // 자체 배송: 계약과 무관한 상설 행동. 대기열 앞의 일반(속성 없는)·농산물 택배를 처리, 무제한·무료, 턴 소모. 차량 시설로 확장
+    SELF_DELIVERY: { name: '자체 배송', cap: 2, sizeMax: 2, rewardMult: 0.7 }, // cap은 부피(칸). 직접 배송은 마진이 낮다
 
     GRADES: {
       normal:  { name: '일반', cap: 0, calls: 0, price: 1.0 },
@@ -127,6 +130,11 @@
       cold2:   { name: '냉장고 증설 2', desc: '냉장 용량 +6', price: 240, cold: 6, requires: 'cold1' },
       yard:    { name: '대형 적재장', desc: '초대형 보관 +1', price: 180, xl: 1 },
       freezer1: { name: '냉동고 증설', desc: '냉동 용량 +4', price: 200, frozen: 4 },
+      vent:    { name: '환기 시설', desc: '창고 안 🌾 농산물이 폭염에 상하지 않음', price: 150, vent: true },
+      // 차량: 자체 배송 확장 (마켓 차량 슬롯)
+      coldvan: { name: '냉동 탑차', desc: '자체 배송으로 ❄ 신선·❆ 냉동 처리', price: 240, vehicle: true },
+      padvan:  { name: '완충 포장차', desc: '자체 배송으로 ⚠ 파손을 안전하게 처리', price: 170, vehicle: true },
+      bigvan:  { name: '대형 트럭', desc: '자체 배송 부피 +2, 크기 4까지', price: 220, vehicle: true },
     },
     PRICE_MULT: { 1: 1.0, 2: 1.1, 3: 1.2, 4: 1.35, 5: 1.5, 6: 1.7 },
 

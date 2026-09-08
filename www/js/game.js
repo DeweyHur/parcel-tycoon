@@ -118,7 +118,7 @@
       this._startMonth(1);
     }
     static emptyStats() {
-      return { deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, onTimeByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, broken: 0, claims: 0, customerL3: 0, storageDone: 0, premiumPaid: 0, wetDelivered: 0, snowDelivered: 0, noClaim2: false, customersAdded: 0,
+      return { deliveredByType: { normal: 0, fresh: 0, produce: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, onTimeByType: { normal: 0, fresh: 0, produce: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, broken: 0, claims: 0, customerL3: 0, storageDone: 0, premiumPaid: 0, wetDelivered: 0, snowDelivered: 0, noClaim2: false, customersAdded: 0,
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
         overdueDelivered: 0, returned: 0, stolen: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
@@ -228,6 +228,8 @@
         else if (rule.kind === 'frozenSafe' && p.type === 'frozen') { bonus += rule.bonus; ruleHit = true; }
         else if (rule.kind === 'coldCustoms' && this._attrs(p).includes('customs') && p.coldDuringCustoms) { bonus += rule.bonus; ruleHit = true; }
         else if (rule.kind === 'customsFast') { ruleHit = true; }
+        else if (rule.kind === 'secure' && this._attrs(p).includes('customs') && !p.outdoorDuringCustoms) { bonus += rule.bonus; ruleHit = true; }
+        else if (rule.kind === 'harvest' && p.age <= 1) { bonus += rule.bonus; ruleHit = true; }
       }
       if (ruleHit) xp += 1;
       if (c) { c.month.delivered++; c.total.delivered++; }
@@ -262,7 +264,7 @@
       if (this.phase !== 'market') return { ok: false, msg: '마켓에서만 바꿀 수 있습니다' };
       if (!M.INSURERS[id]) return { ok: false, msg: '없는 보험사' };
       if (id === this.insurer) return { ok: false, msg: '이미 가입 중' };
-      if (this.rules.noInsurance && this.month < 2) return { ok: false, msg: '첫 달은 무보험' };
+      if (this.rules.noInsurance && this.month < 2) return { ok: false, msg: '스타트업은 첫 달 무보험 (2개월차 마켓부터 가입)' };
       const cost = this.premiumBase(id);
       if (this.cash < cost) return { ok: false, msg: '자금이 부족합니다' };
       this.cash -= cost; this.run.spent += cost;
@@ -399,22 +401,31 @@
       xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       return { xp, parts };
     }
-    selfCapacity() { return Math.max(1, D.SELF_DELIVERY.cap + this.rules.selfCapDelta); }
+    selfCapacity() { return Math.max(1, D.SELF_DELIVERY.cap + this.rules.selfCapDelta + (this.warehouse.bigvan ? 2 : 0)); }
+    selfSizeMax() { return this.warehouse.bigvan ? 4 : D.SELF_DELIVERY.sizeMax; }
+    // 자체 배송 가능: 크기 범위 안이고 속성마다 차량이 있어야 (❄❆ 냉동 탑차, ⚠ 완충 포장차, 🛃 통관 끝난 뒤)
+    selfCan(p) {
+      if (p.size > this.selfSizeMax()) return false;
+      for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return false; if (a === 'fragile' && !this.warehouse.padvan) return false; if (a === 'customs' && (p.customs || 0) > 0) return false; }
+      return true;
+    }
+    selfBlockReason(p) { if (p.size > this.selfSizeMax()) return '대형 트럭 필요'; for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return '냉동 탑차 필요'; if (a === 'fragile' && !this.warehouse.padvan) return '완충 포장차 필요'; if (a === 'customs' && (p.customs || 0) > 0) return '통관 대기 중'; } return null; }
     // 자체 배송 대상: 대기열 앞의 일반 택배를 부피 한도(칸)까지
-    selfEligible() { const cap = this.selfCapacity(); const out = []; let v = 0; for (const p of this.parcels) { if (p.type !== 'normal') continue; if (v + p.size > cap) { if (out.length) break; else continue; } out.push(p); v += p.size; } return out; }
+    selfEligible() { const cap = this.selfCapacity(); const out = []; let v = 0; for (const p of this.parcels) { if (!this.selfCan(p)) continue; if (v + p.size > cap) { if (out.length) break; else continue; } out.push(p); v += p.size; } return out; }
     canSelfDeliver() { return this.phase === 'play' && this.selfEligible().length > 0; }
     // 대기했을 때 다음 턴 예상: 창고 사용량, 기한 초과·부패 예정
     forecast() {
       const R = this.rules, nxt = this.schedule[this.turn] || [];
       let incoming = 0; for (const s of nxt) { let sz = s.size + R.sizeDelta; if (s.size >= 4) sz += R.bigSizeDelta; incoming += Math.max(1, sz); }
-      let overdue = 0, spoil = 0;
+      let overdue = 0, spoil = 0, frozenOver = 0;
       const heat = this.isHeatTurn();
+      { let free = (this.warehouse.frozen || 0) - this.frozenUsed(); for (const s of nxt) if (s.type === 'frozen') { if (s.size > free) frozenOver++; else free -= s.size; } }
       for (const p of this.parcels) {
         if (!p.overdue && p.deadline - 1 <= 0) overdue++;
         if (p.type === 'fresh' && !p.inCold && (heat || (p.warm || 0) + 1 >= R.warmLimit)) spoil++;
         if (this._attrs(p).includes('frozen') && !p.inFrozen) spoil++;
       }
-      return { used: this.usedVolume() + incoming, cap: this.warehouse.cap, incoming, count: nxt.length, overdue, spoil, monthEnd: this.turn >= D.TURNS_PER_MONTH };
+      return { used: this.usedVolume() + incoming, cap: this.warehouse.cap, incoming, count: nxt.length, overdue, spoil, frozenOver, monthEnd: this.turn >= D.TURNS_PER_MONTH };
     }
     contractName(c) { return D.CARRIERS[c.carrier].name + (c.grade !== 'normal' ? ` (${D.GRADES[c.grade].name})` : ''); }
     isStruck(c) { return this.rules.strike && this.strikeCarrier === c.carrier; }
@@ -457,14 +468,15 @@
     // car: 업체 데이터, p: 택배(또는 {type,size,attrs,customs} 의사 택배), caps: 계약 단위 능력, sizeMax: 계약 단위 최대 크기
     _carrierAccepts(car, p, caps, sizeMax) {
       caps = caps || car.caps; sizeMax = sizeMax == null ? car.sizeMax : sizeMax;
-      const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs;
+      const attrs = (p.attrs || D.PARCEL_TYPES[p.type].attrs).filter(a => D.GATING_ATTRS.includes(a) || (car.need || []).includes(a));
       if (p.size < car.sizeMin || p.size > sizeMax) return false;
-      if (car.onlyPlain && attrs.length) return false;
+      if (car.onlyPlain && attrs.filter(a => D.GATING_ATTRS.includes(a)).length) return false;
       if (car.need && !car.need.some(a => attrs.includes(a))) return false;
       if (attrs.includes('frozen') && !caps.includes('frozen')) return false;
       if (attrs.includes('customs') && (p.customs || 0) > 0 && !caps.includes('customs')) return false;
       return true;
     }
+    isSpecialist(car, type) { return Array.isArray(car.specialist) ? car.specialist.includes(type) : car.specialist === type; }
     canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c)); }
     // ⚠ 파손 확률: 능력에 fragile이 없으면
     breakProb(c, p) { const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs; if (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile')) return 0; return Math.min(0.95, D.BREAK_PROB * this.rules.breakMult * (this.customerPerk(p.customer, 'breakMult') || 1)); }
@@ -489,6 +501,8 @@
         if (!this._attrs(p).includes('cold')) continue;
         if (p.size <= left) { p.inCold = true; left -= p.size; } else p.inCold = false;
       }
+      // 🌾 농산물은 남는 냉장 자리에 들어가면 폭염을 피한다
+      for (const p of this.parcels) { if (!this._attrs(p).includes('produce')) continue; if (p.size <= left) { p.inCold = true; left -= p.size; } else p.inCold = false; }
       this._assignOutdoor();
     }
     _attrs(p) { return p.attrs || D.PARCEL_TYPES[p.type].attrs; }
@@ -606,13 +620,15 @@
       else {
         const base = D.TYPE_RATIO[Math.min(6, m || this.month)], w = {};
         for (const k in cust.items) { const t = M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k; const f = base[t] > 0 ? (ratio[t] || 0) / base[t] : 1; w[k] = Math.max(0.05, cust.items[k] * Math.max(0.25, Math.min(3, f))); }
-        if (R.dualAttrBonus && (m || this.month) >= 2) { w.intlfragile = (w.intlfragile || 0) + R.dualAttrBonus; if (cust.items.fresh) w.intlfresh = (w.intlfresh || 0) + R.dualAttrBonus; }
+        if (R.dualAttrBonus && (m || this.month) >= 2 && (cust.items.intl || cust.items.fragile)) w.intlfragile = (w.intlfragile || 0) + R.dualAttrBonus;
         const k = this.rng.weighted(w);
         if (M.CUSTOMER_ITEMS[k]) { type = M.CUSTOMER_ITEMS[k].type; attrs = R.noDualAttrs ? null : M.CUSTOMER_ITEMS[k].attrs; sizes = M.CUSTOMER_ITEMS[k].sizes; } else type = k;
       }
       let allowed = sizes || D.PARCEL_TYPES[type].sizes;
       if (type === 'fresh' && R.freshSizes && !sizes) allowed = R.freshSizes;
       const w = {}; for (const s of allowed) { let wt = D.SIZE_WEIGHT[s]; if (s === 7 && R.xlWeight != null) wt = R.xlWeight; if (s >= 4) wt *= R.bigWeight; if (cust.sizeBias === 'small' && s >= 2) wt *= s >= 4 ? 0.2 : 0.6; if (cust.sizeBias === 'big' && s < 4) wt *= 0.3; if (cust.sizeBias === 'mid' && s !== 2) wt *= 0.5; w[s] = wt; }
+      // 냉동: 냉동 구역보다 큰 택배는 오지 않는다 (구역이 0이면 신선으로)
+      if (type === 'frozen') { const fz = this.warehouse.frozen || 0; const ok = {}; for (const s in w) if (+s <= fz) ok[s] = w[s]; if (!Object.keys(ok).length) { type = 'fresh'; } else { for (const s in w) delete w[s]; Object.assign(w, ok); } }
       const spec = { type, size: +this.rng.weighted(w), customer };
       if (attrs) spec.attrs = attrs;
       return spec;
@@ -710,7 +726,7 @@
           continue;
         }
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
-        const isSpec = specialistAll || car.specialist === p.type;
+        const isSpec = specialistAll || this.isSpecialist(car, p.type);
         if (isSpec && t.bonus) { r += t.bonus + R.bonusDelta + (this.customerPerk(p.customer, 'bonusDelta') || 0); special = true; if (c.carrier === 'fragile' && lv >= 3) r += 15; if (!this.stats.specialistTypes.includes(p.type)) this.stats.specialistTypes.push(p.type); }
         r = Math.round(r * (R.rewardMult[p.type] || 1));
         if (p.wet) { r = Math.round(r * 0.8); this.stats.wetDelivered++; }
@@ -775,17 +791,17 @@
     selfDeliver() {
       if (this.phase !== 'play') return { ok: false, msg: '지금은 배송할 수 없습니다' };
       const R = this.rules, chosen = this.selfEligible();
-      if (!chosen.length) return { ok: false, msg: '처리할 일반 택배가 없습니다' };
+      if (!chosen.length) return { ok: false, msg: '자체 배송으로 처리할 택배가 없습니다' };
       let revenue = 0;
       for (const p of chosen) {
-        let r = p.reward + (R.rewardDelta.normal || 0) + R.rewardAll;
-        r = Math.round(r * (R.rewardMult.normal || 1) * D.SELF_DELIVERY.rewardMult);
+        let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
+        r = Math.round(r * (R.rewardMult[p.type] || 1) * D.SELF_DELIVERY.rewardMult);
         if (p.wet) r = Math.round(r * 0.8);
-        if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else this.stats.onTimeByType.normal++;
+        if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else this.stats.onTimeByType[p.type]++;
         r += this._custDeliver(p, r, !p.overdue, chosen.filter(q => q.customer === p.customer));
         r = Math.max(0, r); this._custRevenue(p, r);
         revenue += r;
-        this.stats.deliveredByType.normal++;
+        this.stats.deliveredByType[p.type]++;
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.emit('deliver', { parcel: p, reward: r });
       }
@@ -797,7 +813,7 @@
       this.stats.maxCash = Math.max(this.stats.maxCash, this.cash);
       this.waitStack = 0;
       this._assignCold();
-      this.say(`자체 배송: 일반 ${chosen.length}개 처리, +${revenue}c`);
+      this.say(`자체 배송: ${chosen.length}개 처리, +${revenue}c`);
       this.emit('call', { contract: null, self: true, count: chosen.length, revenue });
       this._endTurn(false, false);
       return { ok: true, revenue, count: chosen.length };
@@ -832,6 +848,9 @@
         p.age++;
         const isCold = this._attrs(p).includes('cold'), isFrozen = this._attrs(p).includes('frozen');
         if (p.outdoor && wet && !isCold && !isFrozen && !p.wet) { p.wet = true; reasons.push(`젖음 ${D.PARCEL_TYPES[p.type].short}${p.size}`); }
+        if (p.customs > 0 && p.outdoor) p.outdoorDuringCustoms = true;
+        // 🌾 농산물: 폭염이면 창고 안이라도 상한다 (냉장 구역·환기 시설이면 무사). 야외면 즉시 폐기
+        if (this._attrs(p).includes('produce') && heat && !p.inCold) { if (p.outdoor) { discard.push([p, '폭염 부패']); continue; } if (!this.warehouse.vent && !p.overdue) { p.deadline -= 2; reasons.push(`폭염에 농산물 상함 ${D.PARCEL_TYPES[p.type].short}${p.size} 기한 -2`); } }
         if (p.outdoor && snow) { if (isFrozen) continue; if (isCold) { p.warm = 0; if (!p.overdue) continue; } }
         // 통관 대기: 기한은 통관 뒤 시작
         if (p.customs > 0) { if (isCold && !p.inCold) p.coldDuringCustoms = false; p.customs--; continue; }
@@ -1003,14 +1022,15 @@
       const enhW = {}; for (const k of Object.keys(D.ENHANCEMENTS)) enhW[k] = R.marketWeight[k] || 1;
       const picked = []; for (let i = 0; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }
       for (const e of picked) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });
-      const facW = {};
-      for (const f of Object.keys(D.FACILITIES)) { const F = D.FACILITIES[f]; if (this.warehouse[f]) continue; if (F.requires && !this.warehouse[F.requires]) continue; if (F.cold && R.coldCapMax != null && this.warehouse.cold >= R.coldCapMax) continue; if (F.frozen && R.frozenCapMax != null && (this.warehouse.frozen || 0) >= R.frozenCapMax) continue; facW[f] = R.marketWeight[f] || 1; }
+      const facW = {}, vehW = {};
+      for (const f of Object.keys(D.FACILITIES)) { const F = D.FACILITIES[f]; if (this.warehouse[f]) continue; if (F.vehicle) { vehW[f] = R.marketWeight[f] || 1; continue; } if (F.requires && !this.warehouse[F.requires]) continue; if (F.cold && R.coldCapMax != null && this.warehouse.cold >= R.coldCapMax) continue; if (F.frozen && R.frozenCapMax != null && (this.warehouse.frozen || 0) >= R.frozenCapMax) continue; facW[f] = R.marketWeight[f] || 1; }
       if (Object.keys(facW).length) {
         const f = this.rng.weighted(facW);
         let price = D.FACILITIES[f].price * mult * R.facilityPriceMult; if (R.facilityPriceMap && R.facilityPriceMap[f]) price *= R.facilityPriceMap[f];
         for (const id in this.customers || {}) { const fp = this.customerPerk(id, 'facilityPrice'); if (fp && fp[f]) price *= fp[f]; }
         items.push({ kind: 'fac', fac: f, price: Math.round(price), name: D.FACILITIES[f].name, sold: false });
       } else items.push({ kind: 'fac', fac: null, price: 0, name: '시설 매진', sold: true });
+      if (Object.keys(vehW).length && this.rng.next() < 0.5) { const f = this.rng.weighted(vehW); items.push({ kind: 'fac', fac: f, price: Math.round(D.FACILITIES[f].price * mult * R.facilityPriceMult), name: D.FACILITIES[f].name, sold: false }); }
       if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3) { const cands = Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !this.customers[k]); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: `신규 고객: ${M.CUSTOMERS[k].name}`, sold: false }); } }
       if (this.rng.next() < 0.6) { const k = this.rng.pick(Object.keys(M.INS_ITEMS)); items.push({ kind: 'item', item: k, price: Math.round(M.INS_ITEMS[k].price * mult), name: M.INS_ITEMS[k].name, sold: false }); }
       return items;

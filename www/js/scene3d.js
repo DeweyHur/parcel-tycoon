@@ -105,6 +105,45 @@ window.Scene3D = (function () {
       if (this.rainPts.visible) { const a = this.rainPts.geometry.attributes.position, sp = this.weather === 'storm' ? 16 : 11, drift = this.weather === 'storm' ? -5 : -0.5, len = this.weather === 'storm' ? 0.6 : 0.35, dx = this.weather === 'storm' ? 0.2 : 0.02; for (let i = 0; i < this.rainN; i++) { const o = i * 6; let y = a.array[o + 1] - sp * dt, x = a.array[o] + drift * dt; if (y < 0) { y = 9; x = -9 + Math.random() * 18; } a.array[o] = x; a.array[o + 1] = y; a.array[o + 3] = x - dx; a.array[o + 4] = y - len; a.array[o + 5] = a.array[o + 2]; } a.needsUpdate = true; }
       if (this.snowPts.visible) { const a = this.snowPts.geometry.attributes.position; for (let i = 0; i < 320; i++) { a.array[i * 3 + 1] -= 1.4 * dt; a.array[i * 3] += Math.sin(this.time * 1.5 + i) * 0.4 * dt; if (a.array[i * 3 + 1] < 0) { a.array[i * 3 + 1] = 9; a.array[i * 3] = -9 + Math.random() * 18; } } a.needsUpdate = true; }
     }
+    // 용량 타일: 창고 안 바닥에 용량만큼 타일을 깔아 남은 자리를 눈으로 보게 한다 (택배 1칸 ≈ 타일 1개)
+    _buildTiles(cap, cold, frozen) {
+      if (this.tiles) this.scene.remove(this.tiles);
+      const g = new THREE.Group(); this.tiles = g; this.tileCaps = [cap, cold, frozen];
+      const tile = (zone, i, color) => { const x = i % zone.cells, z = Math.floor(i / zone.cells); const m = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 0.08, CELL - 0.08), new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.55 })); m.rotation.x = -Math.PI / 2; m.position.set(zone.x0 + (x + 0.5) * CELL, zone === COLD ? 0.145 : 0.075, -1.3 + (z + 0.5) * CELL); m.receiveShadow = true; g.add(m); };
+      for (let i = 0; i < Math.min(cap, MAIN.cells * MAIN.depth); i++) tile(MAIN, i, 0xb9b9c6);
+      for (let i = 0; i < Math.min(cold, COLD.cells * COLD.depth); i++) tile(COLD, i, 0xaee6f0);
+      for (let i = cold; i < Math.min(cold + frozen, COLD.cells * COLD.depth); i++) tile(COLD, i, 0xd8ecff);
+      this.scene.add(g);
+    }
+    // 고객 마크: 이모지를 캔버스에 그려 상자 위에 붙인다
+    _iconTexture(icon) {
+      this.iconCache = this.iconCache || {};
+      if (this.iconCache[icon]) return this.iconCache[icon];
+      const c = document.createElement('canvas'); c.width = c.height = 64; const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2); ctx.fill();
+      ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(icon, 32, 36);
+      const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; this.iconCache[icon] = tex; return tex;
+    }
+    _iconMark(icon, w, h, d) {
+      const size = Math.min(0.42, Math.max(0.26, w * CELL * 0.45));
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: this._iconTexture(icon), transparent: true, depthWrite: false }));
+      m.rotation.x = -Math.PI / 2; m.position.set(-(w * CELL) / 4, h / 2 + 0.035, d * CELL / 6); return m;
+    }
+    // 다음 턴 입고 예정: 도로 위 트럭 뒤에 반투명 상자로
+    _syncGhosts(specs, D) {
+      if (!this.ghosts) { this.ghosts = new THREE.Group(); this.scene.add(this.ghosts); }
+      const key = specs.map(s => s.type + s.size).join(',');
+      if (key === this.ghostKey) return; this.ghostKey = key;
+      while (this.ghosts.children.length) this.ghosts.remove(this.ghosts.children[0]);
+      let z = 0.4; // 도크(노란 선) 위에 세로로
+      for (const s of specs) {
+        const vis = s.size >= 7 ? 7 : s.size >= 4 ? 4 : s.size >= 2 ? 2 : 1; const [w, d, h] = FOOT[vis];
+        const m = new THREE.Mesh(new THREE.BoxGeometry(d * CELL - 0.08, h, w * CELL - 0.08), new THREE.MeshLambertMaterial({ color: D.PARCEL_TYPES[s.type].color, transparent: true, opacity: 0.5 }));
+        m.position.set(5.05, h / 2 + 0.1, z + w * CELL / 2); this.ghosts.add(m);
+        const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })); m.add(e);
+        z += w * CELL + 0.12;
+      }
+    }
     _makeTruck() {
       const g = new THREE.Group();
       const cargo = this._box(2.2, 1.3, 1.3, 0xf2ecd8); cargo.position.set(0.4, 0.95, 0); g.add(cargo);
@@ -132,11 +171,13 @@ window.Scene3D = (function () {
     sync(game, opts = {}) {
       const D = window.DATA;
       if (game.weatherNow) this.setWeather(game.weatherNow());
+      { const wh = game.warehouse, caps = [wh.cap, wh.cold, wh.frozen || 0]; if (!this.tiles || caps.some((v, i) => v !== this.tileCaps[i])) this._buildTiles(...caps); }
+      if (game.upcoming) { const u = game.upcoming()[0]; this._syncGhosts(u && u.specs ? u.specs : [], D); }
       const cold = [], main = [], yard = [];
       const items = [];
       for (const s of game.storage || []) items.push({ id: 's' + s.id, type: 'storage', size: s.vol, baseSize: s.vol, baseSizeVis: s.vol >= 7 ? 7 : s.vol >= 4 ? 4 : 2, outdoor: s.outdoor, storage: true });
       for (const p of game.parcels) items.push(p);
-      for (const p of items) { if (!p.storage) p.baseSizeVis = this._visSize(p); (p.outdoor ? yard : (p.type === 'fresh' && p.inCold ? cold : main)).push(p); }
+      for (const p of items) { if (!p.storage) p.baseSizeVis = this._visSize(p); (p.outdoor ? yard : ((p.inCold || p.inFrozen) ? cold : main)).push(p); }
       const pos = new Map([...this._pack(cold, COLD), ...this._pack(main, MAIN), ...this._pack(yard, YARD)]);
       const seen = new Set();
       for (const p of items) {
@@ -151,6 +192,7 @@ window.Scene3D = (function () {
           if (p.type === 'intl') { const mark = this._box(w * CELL * 0.4, 0.05, 0.16, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
           if (p.type === 'fresh') { const mark = this._box(w * CELL * 0.5, 0.04, d * CELL * 0.5, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
           b.userData = { h, id: p.id };
+          if (!p.storage) { const cu = (window.META && window.META.CUSTOMERS[p.customer || 'anon']); if (cu) b.add(this._iconMark(cu.icon, w, h, d)); }
           this.scene.add(b); this.boxes.set(p.id, b);
           const t = pos.get(p.id);
           if (opts.animate && t) { b.position.set(t.cx, h / 2 + 4, t.cz); this._tween(b.position, { y: h / 2 }, 0.55, bounce, 0.05 * (this.tweens.length % 6)); }

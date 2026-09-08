@@ -143,7 +143,7 @@ t('마켓 막힌 속성 보장: 처리 못 하는 특수 택배가 있으면 슬
     const b = blocked[0]; assert.ok(g._carrierAccepts(D.CARRIERS[it.carrier], { type: b.type, size: b.maxSize }), `seed ${s}: ${it.carrier} vs ${b.type}`); assert.ok(it.hint && !['target', 'urgent'].includes(it.carrier)); checked++; }
   assert.ok(checked > 5);
 });
-t('신뢰도 단계 문구는 한 곳에서 나온다', () => { assert.equal(D.trustEffectText('cold', 1), '회당 처리량 +1'); assert.equal(D.trustEffectText('cold', 3), '호출 턴에 신선식품 기한 정지'); });
+t('신뢰도 단계 문구는 한 곳에서 나온다', () => { assert.equal(D.trustEffectText('cold', 1), '회당 처리량 +1'); assert.equal(D.trustEffectText('cold', 3), '호출 턴에 신선·농산물 기한 정지'); });
 t('반송: 기한 초과 후 유예 3턴 지나면 폐기 + 스트레스 +2', () => {
   const g = NG(4, { perks: ['skip', 'longdeal'] });
   g.parcels = []; g.schedule = g.schedule.map(() => []); g.warehouse.cap = 99;
@@ -172,7 +172,7 @@ t('세이브 마이그레이션: v0.3 형식(enh.capDelta·attrs 없음)에서 N
   const h = Game.fromJSON(j);
   for (const c of h.contracts) if (c) { assert.ok(Number.isFinite(h.callCapacity(c)), 'cap'); assert.ok(Number.isFinite(c.calls) && Number.isFinite(c.maxCalls)); }
   for (const p of h.parcels) assert.ok(Array.isArray(p.attrs));
-  assert.equal(h.warehouse.frozen, 2); h.wait(); assert.ok(Number.isFinite(h.stress));
+  assert.equal(h.warehouse.frozen, 4); h.wait(); assert.ok(Number.isFinite(h.stress));
 });
 t('고객: 입고 배정·신뢰 xp·손해배상·거래 중단', () => {
   const g = NG(3, { perks: ['skip', 'longdeal'] }); assert.ok(g.customers.mart && g.customerLevel('mart') === 1);
@@ -272,5 +272,20 @@ t('준비 마켓: 첫 턴 전에 마켓, 닫으면 1개월차 1턴', () => {
   const g = new Game({ seed: 3, prep: true }); assert.equal(g.phase, 'market'); assert.ok(g.market.prep); assert.equal(g.turn, 0); assert.ok(g.upcoming()[0].specs);
   assert.ok(g.market.items.length >= 5); g.closeMarket(); assert.equal(g.phase, 'play'); assert.equal(g.turn, 1); assert.equal(g.month, 1);
   while (g.phase === 'play') g.wait(); g.closeSummary(); assert.ok(!g.market.prep); g.closeMarket(); assert.equal(g.month, 2);
+});
+t('냉동 택배는 냉동 구역보다 크게 오지 않음, 자체 배송 차량', () => {
+  const g = new Game({ seed: 3, company: 'fresh' }); for (let m = 0; m < 3; m++) { for (const sp of g.schedule.flat()) if (sp.type === 'frozen') assert.ok(sp.size <= g.warehouse.frozen); }
+  const h = NG(4); h.schedule = h.schedule.map(() => []);
+  h.parcels = [P(1, 'fresh', 2), P(2, 'fragile', 2), P(3, 'normal', 4), P(4, 'produce', 2)]; h._assignCold();
+  assert.deepEqual(h.selfEligible().map(p => p.id), [4]);
+  h.warehouse.coldvan = true; h.warehouse.padvan = true; h.warehouse.bigvan = true;
+  assert.equal(h.selfCapacity(), 4); assert.deepEqual(h.selfEligible().map(p => p.id), [1, 2]);
+  const r = h.selfDeliver(); assert.ok(r.ok); assert.equal(h.stats.deliveredByType.fresh, 1);
+});
+t('농산물: 폭염이면 창고 안이라도 기한 -2, 환기 시설·냉장 구역이면 무사', () => {
+  const g = NG(4); g.schedule = g.schedule.map(() => []); g.weather = Array(10).fill('heat'); g.warehouse.cold = 0;
+  g.parcels = [P(1, 'produce', 2, { deadline: 5 })]; g._assignCold(); g.wait(); assert.equal(g.parcels[0].deadline, 2);
+  g.warehouse.vent = true; g.wait(); assert.equal(g.parcels[0].deadline, 1);
+  const h = NG(4); h.schedule = h.schedule.map(() => []); h.weather = Array(10).fill('heat'); h.parcels = [P(1, 'produce', 2, { deadline: 5 })]; h._assignCold(); assert.ok(h.parcels[0].inCold); h.wait(); assert.equal(h.parcels[0].deadline, 4);
 });
 console.log(`\n${n} tests passed`);

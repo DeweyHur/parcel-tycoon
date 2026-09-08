@@ -184,6 +184,7 @@
     if (g.outdoorVolume() > 0) $('#upcoming').innerHTML += `<span class="chip heat">🌧 야외 ${g.outdoorVolume()}칸 (${g.outdoorParcels().length}개${g.storage.some(s => s.outdoor) ? '+보관' : ''}) · 이번 턴 도난 ${Math.round(g.theftProb() * 100)}%</span>`;
     renderOffer();
     renderParcels($('#parcels'), g.parcels, null);
+    $('#parcels').querySelectorAll('.parcel[data-id]').forEach(el => el.onclick = () => { if (busy) return; SFX.click(); showParcelDetail(+el.dataset.id); });
     if (g.storage.length) $('#parcels').insertAdjacentHTML('afterbegin', g.storage.map(s => { const K = M.STORAGE_KINDS[s.kind], cu = M.CUSTOMERS[s.customer]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#a8845a"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${g.storageVol(s)}칸 · ${cu.icon}${esc(cu.name)}${s.perTurn ? ` · 턴당 ${s.perTurn}c 후불` : ''}</div><div class="st">${s.outdoor ? '🌧 야외 · ' : ''}회수까지 ${s.left}턴</div></div>`; }).join(''));
     $('#parcels').querySelectorAll('.parcel.storage').forEach(el => el.onclick = () => showStorage(+el.dataset.sid));
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) {
@@ -200,13 +201,29 @@
     }
     const sb = $('#self-btn'), se = g.selfEligible();
     sb.disabled = busy || !g.canSelfDeliver();
-    sb.innerHTML = `🚚 자체 배송<small>일반 ${se.length}개 (${g.selfCapacity()}칸) · 보상 ${Math.round(D.SELF_DELIVERY.rewardMult * 100)}%</small>`;
+    const vans = ['coldvan', 'padvan', 'bigvan'].filter(v => g.warehouse[v]).map(v => ({ coldvan: '❄❆', padvan: '⚠', bigvan: '🚛' })[v]).join('');
+    sb.innerHTML = `🚚 자체 배송${vans ? `<small style="display:inline"> ${vans}</small>` : ''}<small>대상 ${se.length}개 (${g.selfCapacity()}칸·크기≤${g.selfSizeMax()}) · 보상 ${Math.round(D.SELF_DELIVERY.rewardMult * 100)}%</small>`;
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
     const f = g.forecast();
     const warn = [];
-    if (f.overdue) warn.push(`⏳초과 ${f.overdue}`); if (f.spoil) warn.push(`🥀부패 ${f.spoil}`);
-    wb.className = 'btn primary' + (f.used > f.cap || f.spoil ? ' danger' : '');
+    if (f.overdue) warn.push(`⏳초과 ${f.overdue}`); if (f.spoil) warn.push(`🥀부패 ${f.spoil}`); if (f.frozenOver) warn.push(`❆냉동 자리 없음 ${f.frozenOver}`);
+    wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
     wb.innerHTML = `⏭ 대기<small>${f.monthEnd ? '월말 정산' : `다음 턴 창고 ${f.used}/${f.cap}${f.used > f.cap ? ' 초과!' : ''}`}${warn.length ? ' · ' + warn.join(' ') : ''}</small>`;
+  }
+  // ---------- 택배 상세 ----------
+  function showParcelDetail(id) {
+    const g = game, p = g.parcels.find(x => x.id === id); if (!p) return;
+    const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], lv = g.customerLevel(p.customer || 'anon');
+    const claim = Math.round((25 + p.baseSize * 15) * cu.claimMult * g.rules.claimMult * (g.rules.customerClaimMult[p.customer] || 1));
+    const attrRows = a.map(k => `<div class="d">${D.ATTRS[k].icon} <b>${D.ATTRS[k].name}</b> — ${{ cold: '냉장 구역 밖이면 다음 턴 폐기', fragile: '⚠ 능력 없는 업체로 보내면 파손 확률', customs: '통관 대기 중엔 처리 불가 (통관 대행 제외)', frozen: '냉동 구역 밖이면 즉시 폐기', produce: '폭염이면 창고 안이라도 상함 (냉장 구역·환기 시설이면 무사)' }[k]}</div>`).join('');
+    const rows = g.contracts.map(c => { if (!c) return ''; const car = D.CARRIERS[c.carrier]; const ok = g.canHandle(c, p), bp = ok ? g.breakProb(c, p) : 0, can = g.canCall(c); const why = !ok ? (p.size > g.contractSizeMax(c) || p.size < car.sizeMin ? '크기 범위 밖' : car.onlyPlain ? '속성 없는 택배만' : car.need ? '전문 대상 아님' : a.includes('frozen') ? '❆ 능력 없음' : p.customs > 0 ? '통관 대기 중' : '불가') : ''; const spec = ok && (g.isSpecialist(car, p.type) || (c.carrier === 'target' && g.trustLevel(c) >= 3)) && t.bonus; return `<div class="ttrow ${ok ? 'on' : ''}"><span class="lv">${car.badge || '🚚'}</span><span class="ef">${esc(car.short)}${gradeBadge(c.grade)} ${ok ? `${spec ? `<span style="color:var(--gold)">특수 보너스 +${t.bonus}</span> ` : ''}${bp ? `<span style="color:var(--orange)">⚠ 파손 ${Math.round(bp * 100)}%</span>` : ''}${!can ? '<span style="color:var(--dim)">(호출 불가)</span>' : ''}` : `<span style="color:var(--dim)">${why}</span>`}</span><span class="st">${ok ? (c.calls > 0 ? `${c.calls}회` : '0회') : '—'}</span></div>`; }).join('');
+    const selfOk = g.selfCan(p), selfWhy = g.selfBlockReason(p);
+    const body = `<div class="parcel" style="margin-bottom:6px"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cu.icon}</span><span class="nm">${esc(t.name)}</span>${attrIcons(a)} ${p.size}칸 · 기본 ${p.reward}c</div><div class="st">${parcelStatus(p)}</div></div>
+      <div class="d">고객 <b>${cu.icon} ${esc(cu.name)}</b>${p.customer !== 'anon' ? ` · 신뢰 ${lv}단계 (개당 +${M.CUSTOMER_BONUS[lv]})` : ''}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}</div>
+      <div class="d">폐기 시 손해배상 <b style="color:var(--red)">${claim}c</b>${p.arrivalTurn ? ` · 입고 ${p.age}턴 전` : ''}${p.wet ? ' · 젖음 (보상 -20%)' : ''}${p.outdoor ? ' · 🌧 야외 적재 중' : ''}</div>
+      ${attrRows}
+      <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">처리할 수 있는 계약</div><div class="ttrack">${rows || '<div class="d">계약 없음</div>'}<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">자체 배송 ${selfOk ? `(보상 ${Math.round(D.SELF_DELIVERY.rewardMult * 100)}%)` : `<span style="color:var(--dim)">${esc(selfWhy || '불가')}</span>`}</span><span class="st">${selfOk ? '가능' : '—'}</span></div></div>`;
+    modal(`${t.name} ${p.size}칸`, body, [{ label: '닫기', onClick: closeModal }]);
   }
   function renderOffer() {
     const g = game, o = g.offer, el = $('#offer');
@@ -273,6 +290,7 @@
     const parts = [], a = attrsOf(p);
     if (a.includes('cold')) { if (!p.inCold) parts.push('<b style="color:var(--red)">🔥 상온 · 다음 턴 폐기</b>'); else parts.push('❄ 냉장'); }
     if (a.includes('frozen')) { if (!p.inFrozen) parts.push('<b style="color:var(--red)">🔥 냉동 구역 밖</b>'); else parts.push('❆ 냉동'); }
+    if (a.includes('produce')) { if (p.inCold) parts.push('❄ 냉장'); else if (game && game.isHeatTurn() && !game.warehouse.vent) parts.push('<b style="color:var(--orange)">🔥 폭염에 상함</b>'); }
     if (p.customs > 0) { parts.push(`<b style="color:var(--blue)">🛃 통관 ${p.customs}턴${p.customsDelayed ? ' (지연)' : ''}</b>`); parts.push(`⏳ ${p.deadline}턴`); if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">🌧 야외</b>`); return parts.join(' · '); }
     if (p.overdue) { const ri = game ? game.returnIn(p) : null; parts.push(`<b style="color:var(--red)">⏳ 초과${ri != null ? ` · 반송 ${ri}턴` : ''}</b>`); } else parts.push(`⏳ <b>${p.deadline}</b>턴`);
     if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">🌧 야외</b>`);
@@ -516,9 +534,9 @@
   function showInsurance(back) {
     const g = game;
     const cards = Object.keys(M.INSURERS).map(id => { const I = M.INSURERS[id], cur = id === g.insurer; const fee = cur ? g.premium() : g.premiumBase(id); return `<div class="card ${cur ? 'sel' : ''}" data-ins="${id}"><div class="t"><span>${I.icon} ${esc(I.name)}${cur ? ' <small style="color:var(--green)">가입 중</small>' : ''}</span><span class="price">${cur ? `다음 달 ${fee}c` : fee ? `가입비 ${fee}c · 월 ${fee}c` : '0c'}</span></div><div class="d">${esc(I.desc)}${I.fans.length ? `<br><span style="color:var(--green)">선호 고객: ${I.fans.filter(f => g.customers[f]).map(f => M.CUSTOMERS[f].icon + M.CUSTOMERS[f].name).join(' ') || '(이 회사에 없음)'}</span>` : ''}</div></div>`; }).join('');
-    const info = `<div class="perk-count">보험료는 월말에 차감. 청구 0건이면 다음 달 ×0.8(연속 2개월 ×0.7 + 고객 전원 신뢰 +1), 3~4건 ×1.3, 5건↑ ×1.7·보장 절반. 갈아타면 새 보험사 기본 보험료를 가입비로 냅니다.${g.coverHalf ? '<br><span style="color:var(--red)">이번 달 보장 절반 (지난달 청구 5건 이상)</span>' : ''}</div>`;
+    const info = `${g.rules.noInsurance && g.month < 2 ? '<div class="perk-count" style="color:var(--orange)">스타트업은 첫 달 무보험. 2개월차 마켓부터 가입할 수 있습니다</div>' : ''}<div class="perk-count">보험료는 월말에 차감. 청구 0건이면 다음 달 ×0.8(연속 2개월 ×0.7 + 고객 전원 신뢰 +1), 3~4건 ×1.3, 5건↑ ×1.7·보장 절반. 갈아타면 새 보험사 기본 보험료를 가입비로 냅니다.${g.coverHalf ? '<br><span style="color:var(--red)">이번 달 보장 절반 (지난달 청구 5건 이상)</span>' : ''}</div>`;
     const m = modal('보험', info + cards, [{ label: '닫기', onClick: back }]);
-    m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.ins; if (id === g.insurer) return; askConfirm(`${M.INSURERS[id].name}(으)로 바꿀까요? 가입비 ${g.premiumBase(id)}c`, () => { const r = g.setInsurer(id); if (!r.ok) return toast(r.msg); SFX.buy(); saveGame(); showInsurance(back); }, '가입'); });
+    m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.ins; if (id === g.insurer) return; if (g.rules.noInsurance && g.month < 2) { toast('스타트업은 첫 달 무보험 — 2개월차 마켓부터 가입', 2500); return; } askConfirm(`${M.INSURERS[id].name}(으)로 바꿀까요? 가입비 ${g.premiumBase(id)}c`, () => { const r = g.setInsurer(id); if (!r.ok) toast(r.msg); else { SFX.buy(); saveGame(); } showInsurance(back); }, '가입'); });
   }
   function showCustomers(back) {
     const list = game.customerSummary();
@@ -575,8 +593,10 @@
       <tr><td>❄ 신선</td><td>냉장 구역 밖이면 <b>다음 턴 폐기</b>. 기한 3턴</td><td>아무 업체 (보너스는 냉장 물류만)</td></tr>
       <tr><td>⚠ 파손</td><td>⚠ 능력 없는 업체로 보내면 <b>25% 파손</b>(폐기 +2)</td><td>아무 업체. 안전: 프래자일·대형·철도·항공·긴급·완충 특약</td></tr>
       <tr><td>🛃 통관</td><td>입고 후 <b>2턴 통관 대기</b>(20% 지연 +1). 대기 중엔 자리만 차지, 기한은 그 뒤 시작</td><td>대기 후 아무 업체. 대기 중엔 통관 대행·항공·해상·긴급만</td></tr>
-      <tr><td>❆ 냉동</td><td>냉동 구역 밖이면 <b>즉시 폐기</b>. 기한 8턴. 4개월차부터</td><td>냉동 물류·냉동 컨테이너 특약만</td></tr>
+      <tr><td>❆ 냉동</td><td>냉동 구역 밖이면 <b>즉시 폐기</b>. 기한 8턴. 4개월차부터. 냉동 구역보다 큰 택배는 오지 않음</td><td>냉동 물류·냉동 컨테이너 특약만</td></tr>
+      <tr><td>🌾 농산물</td><td>창고 안에 있어도 <b>폭염이면 기한 -2</b>(야외면 폐기). 남는 냉장 자리에 들어가거나 환기 시설이 있으면 무사. 기한 5턴</td><td>아무 업체 (보너스는 냉장 물류). 자체 배송 가능</td></tr>
       <tr><td>대형(4~7)</td><td>크기 범위가 맞는 업체만</td><td>용달·대형 화물·철도·해상·통관 대행</td></tr></table>
+      <h3>자체 배송 · 차량</h3><p>자체 배송은 속성 없는 일반·농산물을 크기 2, 부피 2칸까지 처리합니다(보상 70%). 마켓의 <b>차량</b>으로 넓힙니다: 냉동 탑차(❄❆), 완충 포장차(⚠ 안전), 대형 트럭(부피 +2, 크기 4). 택배 행을 탭하면 어떤 계약·자체 배송으로 처리할 수 있는지 보입니다.</p>
       <h3>준비 마켓</h3><p>런은 <b>준비 마켓</b>으로 시작합니다. 1개월차 첫 턴 전에 시작 자금으로 계약·강화·시설·보험을 갖출 수 있고, 1~2턴 입고 예정과 날씨가 보입니다. 새로고침 1회 무료. 한 달짜리 시나리오도 여기서 대비합니다.</p>
       <h3>난이도</h3><p>시나리오 화면 위에서 <b>수습·정규·베테랑</b>을 고릅니다. 수습은 입고·가격·배상이 줄고 예정이 3턴까지 보이지만 해금 도전과제가 인정되지 않습니다. 베테랑(첫 클리어 후)은 입고 +10%, 배상 ×1.5, 도난·파손 ×1.3, 스트레스 한계 18, 점수 ×1.4.</p>
       <h3>날씨 · 적재 · 보관 · 보험</h3><p>턴마다 날씨가 있고 2턴 앞까지 예보됩니다. <b>🌧 비</b>는 야외 일반·⚠ 택배를 적셔 보상 -20%, <b>🔥 폭염</b>은 냉장 밖 ❄❆ 즉시 폐기, <b>❄️ 폭설</b>은 야외가 냉장고가 되고(❄ 부패 없음, 도난 절반, ❄ 처리 +10), <b>🌀 태풍</b>은 도난 2배에 그 턴 입고가 다음 턴으로 몰립니다.</p><p>창고가 넘칠 때 <b>대기</b>를 누르면 <b>적재 정리</b>가 열립니다. 무엇을 야외에 둘지 직접 고르거나 프리셋(급한 것·고보상·고배상·고객 우선)을 씁니다. 호출 턴에는 열리지 않습니다 — 대기의 보상입니다.</p><p>이사센터 같은 고객이 <b>보관 계약</b>을 제안합니다. 수락하면 선불 보관료를 받고 그 부피가 기간 동안 창고를 차지합니다(호출·정리 대상 아님). 무사히 끝나면 신뢰 +2, 조기 반환은 남은 기간 환불 + 위약금 30c. 야외로 내보내 도난당하면 배상 ×2.</p><p><b>보험</b>은 런 시작 때 고르고 마켓에서 갈아탈 수 있습니다. 배상액의 일부를 보험이 대신 내고, 월 보험료는 정산에서 빠집니다. 청구 0건이면 다음 달 -20%(연속 2개월 -30% + 고객 신뢰 +1), 많으면 인상. 무보험이면 배상 ×2 고객(유리공방·이사센터)의 물량이 절반. 마켓의 1회성 보험(운송 보험증·야적 보험·통관 보증)도 있습니다.</p>
