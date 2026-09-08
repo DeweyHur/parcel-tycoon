@@ -45,8 +45,9 @@ window.Scene3D = (function () {
       const a = w / h;
       this.camera.fov = a < 0.9 ? 46 : 38;
       // 넓은 화면(가로형)이면 카메라를 왼쪽으로 옮겨 냉장 구역이 잘리지 않게
-      this.camX = a > 1.25 ? 0.6 : a > 1.0 ? 1.6 : 2.6;
-      this.camera.position.set(this.camX, 7.8, 9.8); this.camera.lookAt(this.camX - 1.3, 0.3, 0.3);
+      // 장면 가로 범위는 x -5.2(냉장 벽)~5.6(도크). 가로형은 가운데(0.3)를 보고, 세로형은 창고 중앙(2.6) 기준
+      this.camX = a >= 1.4 ? 0.3 : a > 1.0 ? 1.4 : 2.6;
+      this.camera.position.set(this.camX, 7.8, 9.8); this.camera.lookAt(this.camX - (a >= 1.4 ? 0.2 : 1.3), 0.3, 0.3);
       this.camera.updateProjectionMatrix();
     }
     _mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, flatShading: true, ...opts }); }
@@ -116,7 +117,9 @@ window.Scene3D = (function () {
       const tile = (zone, i, color) => { const x = i % zone.cells, z = Math.floor(i / zone.cells); const m = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 0.08, CELL - 0.08), new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.55 })); m.rotation.x = -Math.PI / 2; m.position.set(zone.x0 + (x + 0.5) * CELL, zone === COLD ? 0.145 : 0.075, -1.3 + (z + 0.5) * CELL); m.receiveShadow = true; g.add(m); };
       for (let i = 0; i < Math.min(cap, MAIN.cells * MAIN.depth); i++) tile(MAIN, i, 0xb9b9c6);
       for (let i = 0; i < Math.min(cold, COLD.cells * COLD.depth); i++) tile(COLD, i, 0xaee6f0);
-      for (let i = cold; i < Math.min(cold + frozen, COLD.cells * COLD.depth); i++) tile(COLD, i, 0xd8ecff);
+      for (let i = cold; i < Math.min(cold + frozen, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x4f7fe0);
+      // 냉장/냉동 경계선
+      if (frozen > 0 && cold > 0) { const row = Math.floor(cold / COLD.cells), col = cold % COLD.cells; const z = -1.3 + row * CELL; const mk = (x0, x1, zz) => { const w = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); w.position.set((x0 + x1) / 2, 0.2, zz); g.add(w); }; if (col > 0) { mk(COLD.x0 + col * CELL, COLD.x0 + COLD.cells * CELL, z); mk(COLD.x0, COLD.x0 + col * CELL, z + CELL); const v = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, CELL), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); v.position.set(COLD.x0 + col * CELL, 0.2, z + CELL / 2); g.add(v); } else mk(COLD.x0, COLD.x0 + COLD.cells * CELL, z); }
       this.scene.add(g);
     }
     // 고객 마크: 이모지를 캔버스에 그려 상자 위에 붙인다
