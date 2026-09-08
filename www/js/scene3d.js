@@ -47,7 +47,7 @@ window.Scene3D = (function () {
       // 넓은 화면(가로형)이면 카메라를 왼쪽으로 옮겨 냉장 구역이 잘리지 않게
       // 장면 가로 범위는 x -5.2(냉장 벽)~5.7(도크). 세로형(a<0.9)은 창고 중앙(2.6) 기준, 그 외는 가운데(0.3)를 보되 다 들어올 때까지 카메라를 뒤로
       if (a < 0.9) { this.camX = 2.6; this.camY = 7.8; this.camZ = 9.8; this.camera.position.set(2.6, 7.8, 9.8); this.camera.lookAt(1.3, 0.3, 0.3); }
-      else { const need = 5.9 / (Math.tan(this.camera.fov / 2 * Math.PI / 180) * a); const k = Math.max(1, need / 12.1); this.camX = 0.3; this.camY = 0.3 + 7.5 * k; this.camZ = 0.3 + 9.5 * k; this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(0.1, 0.3, 0.3); }
+      else { const need = 6.4 / (Math.tan(this.camera.fov / 2 * Math.PI / 180) * a); const k = Math.max(1, need / 12.1); this.camX = 0.3; this.camY = 0.3 + 7.5 * k; this.camZ = 0.3 + 9.5 * k; this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(0.1, 0.3, 0.3); }
       this.camera.updateProjectionMatrix();
     }
     _mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, flatShading: true, ...opts }); }
@@ -121,10 +121,10 @@ window.Scene3D = (function () {
       // 냉장/냉동 경계선
       if (frozen > 0 && cold > 0) { const row = Math.floor(cold / COLD.cells), col = cold % COLD.cells; const z = -1.3 + row * CELL; const mk = (x0, x1, zz) => { const w = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); w.position.set((x0 + x1) / 2, 0.2, zz); g.add(w); }; if (col > 0) { mk(COLD.x0 + col * CELL, COLD.x0 + COLD.cells * CELL, z); mk(COLD.x0, COLD.x0 + col * CELL, z + CELL); const v = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, CELL), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); v.position.set(COLD.x0 + col * CELL, 0.2, z + CELL / 2); g.add(v); } else mk(COLD.x0, COLD.x0 + COLD.cells * CELL, z); }
       // 구역 표지: ❄ 냉장, ❆ 냉동, 🌧 야외 (카메라를 보는 스프라이트)
-      const sign = (icon, x, z, sc) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._iconTexture(icon), transparent: true, depthTest: false })); sp.scale.set(sc, sc, 1); sp.position.set(x, 0.75, z); g.add(sp); };
-      if (cold > 0) sign('❄', COLD.x0 + 0.35, -1.0, 0.8);
-      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('❆', COLD.x0 + (i % COLD.cells + 0.5) * CELL, -1.3 + (Math.floor(i / COLD.cells) + 0.5) * CELL, 0.8); }
-      sign('🌧', YARD.x0 + 0.3, YARD.z0 + 0.6, 0.7);
+      const sign = (icon, label, bg, x, z, y) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._signTexture(icon, label, bg), transparent: true, depthTest: false })); sp.scale.set(1.5, 0.75, 1); sp.position.set(x, y || 0.9, z); g.add(sp); };
+      if (cold > 0) sign('❄', '냉장', '#1f8fb0', COLD.x0 + 0.9, -1.2, 1.7);
+      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('❆', '냉동', '#2b4ab8', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, -1.3 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
+      sign('🌧', '야외', '#7a5a2a', YARD.x0 + 0.9, YARD.z0 + 0.6);
       this.scene.add(g);
     }
     // 고객 마크: 이모지를 캔버스에 그려 상자 위에 붙인다
@@ -135,6 +135,18 @@ window.Scene3D = (function () {
       ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2); ctx.fill();
       ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(icon, 32, 36);
       const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; this.iconCache[icon] = tex; return tex;
+    }
+    // 구역 표지: 색 배경 + 아이콘 + 한글 라벨 (시인성)
+    _signTexture(icon, label, bg) {
+      this.signCache = this.signCache || {}; const key = icon + label;
+      if (this.signCache[key]) return this.signCache[key];
+      const c = document.createElement('canvas'); c.width = 256; c.height = 128; const ctx = c.getContext('2d');
+      ctx.fillStyle = bg; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(8, 8, 240, 112, 22) : ctx.rect(8, 8, 240, 112); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '64px sans-serif'; ctx.fillText(icon, 62, 66);
+      ctx.font = 'bold 60px sans-serif'; ctx.fillText(label, 170, 66);
+      const tex = new THREE.CanvasTexture(c); this.signCache[key] = tex; return tex;
     }
     _iconMark(icon, w, h, d) {
       const size = Math.min(0.42, Math.max(0.26, w * CELL * 0.45));
