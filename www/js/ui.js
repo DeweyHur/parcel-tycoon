@@ -169,16 +169,20 @@
     $('#stress-label').textContent = g.stressState();
     const gauge = $('#stress-gauge'); gauge.querySelector('i').style.width = Math.min(100, g.stress / R.gameoverStress * 100) + '%';
     gauge.className = 'gauge ' + (g.stress >= 16 ? 'crisis' : g.stress >= 11 ? 'danger' : g.stress >= 6 ? 'warn' : '');
-    $('#hud-perks').textContent = [(g.difficulty && g.difficulty.name !== '정규' ? g.difficulty.icon + g.difficulty.name + ' · ' : '') + g.company.icon + ' ' + g.company.name, ...g.perks.map(p => M.PERKS[p].name), g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + M.INSURERS[g.insurer].name : '무보험'].join(' · ') + (g.strikeCarrier ? ` · ✊${D.CARRIERS[g.strikeCarrier].short} 파업` : '');
+    $('#hud-perks').innerHTML = [`<a class="hl" data-pop="company">${g.difficulty && g.difficulty.name !== '정규' ? g.difficulty.icon + esc(g.difficulty.name) + ' · ' : ''}${g.company.icon} ${esc(g.company.name)}</a>`, ...g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}">${esc(M.PERKS[p].name)}</a>`), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : '무보험'}</a>`].join(' · ') + (g.strikeCarrier ? ` · ✊${D.CARRIERS[g.strikeCarrier].short} 파업` : '');
+    $('#hud-perks').querySelectorAll('[data-pop]').forEach(el => el.onclick = () => { SFX.click(); if (el.dataset.pop === 'company') showCompanyInfo(); else if (el.dataset.pop === 'insurer') showInsurance(closeModal); else { const pk = M.PERKS[el.dataset.id]; modal(pk.name, `<p>${esc(pk.desc)}</p><p style="color:var(--dim);font-size:12px">${esc(M.PERK_FAMILIES[pk.family])} 계열 퍽</p>`, [{ label: '닫기', onClick: closeModal }]); } });
     const used = g.usedVolume(), cap = g.warehouse.cap, pct = used / cap * 100;
     const bu = $('#bar-usage'); bu.querySelector('i').style.width = Math.min(100, pct) + '%'; $('#usage-txt').textContent = `${used}/${cap} (${Math.round(pct)}%)`;
     bu.className = 'bar usage ' + (pct > 100 ? 'over' : pct > 90 ? 'danger' : pct > 75 ? 'caution' : pct > 60 ? 'eff' : '');
     const cu = g.coldUsed(), cc = g.warehouse.cold; const bc = $('#bar-cold'); bc.querySelector('i').style.width = cc ? Math.min(100, cu / cc * 100) + '%' : '100%'; const fz = g.warehouse.frozen || 0, fu = g.frozenUsed(); $('#cold-txt').textContent = (cc ? `${cu}/${cc}` : '없음') + (fz || fu ? ` · ❆ ${fu}/${fz}` : ''); bc.className = 'bar cold ' + (cu > cc || fu > fz ? 'over' : '');
     const up = g.upcoming();
-    $('#upcoming').innerHTML = '<span>입고 예정</span>' + up.map(u => u.specs ? `<span class="chip ${u.heat ? 'heat' : ''}">${u.turn}턴${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}</span>` : `<span class="chip none">${u.turn > D.TURNS_PER_MONTH ? '월말 정산' : '-'}</span>`).join('');
+    $('#upcoming').innerHTML = '<span>입고 예정</span>' + up.map(u => u.specs ? `<span class="chip up ${u.heat ? 'heat' : ''}" data-turn="${u.turn}">${u.turn}턴${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}</span>` : `<span class="chip none">${u.turn > D.TURNS_PER_MONTH ? '월말 정산' : '-'}</span>`).join('');
     const wxNow = g.weatherNow(), W = M.WEATHER[wxNow];
     const fc = up.filter(u => u.weather && u.turn > g.turn).map(u => `${u.turn}턴 ${M.WEATHER[u.weather].icon}`).join(' · ');
     $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.desc)}">${W.icon} ${W.name}${fc ? ` <small style="color:var(--dim)">→ ${fc}</small>` : ''}</span>` + $('#upcoming').innerHTML;
+    $('#upcoming').querySelectorAll('.chip.wx').forEach(el => el.onclick = () => { SFX.click(); showWeatherInfo(); });
+    $('#upcoming').querySelectorAll('.chip.up').forEach(el => el.onclick = () => { SFX.click(); showUpcomingInfo(+el.dataset.turn); });
+    $('#wxline').onclick = () => { SFX.click(); showWeatherInfo(); };
     $('#wxline').className = 'wxline ' + wxNow; $('#wxline').innerHTML = wxNow !== 'sunny' ? `${W.icon} ${esc(W.desc)}` : ''; $('#wxline').hidden = wxNow === 'sunny';
     if (g.items.transitCert || g.items.yardIns === g.month || g.items.customsBond === g.month) $('#upcoming').innerHTML += `<span class="chip">${[g.items.transitCert ? `📜 운송 보험증 ${g.items.transitCert}` : '', g.items.yardIns === g.month ? '⛺ 야적 보험' : '', g.items.customsBond === g.month ? '🛃 통관 보증' : ''].filter(Boolean).join(' · ')}</span>`;
     if (g.outdoorVolume() > 0) $('#upcoming').innerHTML += `<span class="chip heat">🌧 야외 ${g.outdoorVolume()}칸 (${g.outdoorParcels().length}개${g.storage.some(s => s.outdoor) ? '+보관' : ''}) · 이번 턴 도난 ${Math.round(g.theftProb() * 100)}%</span>`;
@@ -209,6 +213,37 @@
     if (f.overdue) warn.push(`⏳초과 ${f.overdue}`); if (f.spoil) warn.push(`🥀부패 ${f.spoil}`); if (f.frozenOver) warn.push(`❆냉동 자리 없음 ${f.frozenOver}`);
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
     wb.innerHTML = `⏭ 대기<small>${f.monthEnd ? '월말 정산' : `다음 턴 창고 ${f.used}/${f.cap}${f.used > f.cap ? ' 초과!' : ''}`}${warn.length ? ' · ' + warn.join(' ') : ''}</small>`;
+  }
+  // ---------- HUD 팝업: 회사 · 날씨 · 입고 예정 ----------
+  function showCompanyInfo() {
+    const g = game, co = g.company;
+    const custs = g.customerSummary().map(c => `<div class="d">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)}${c.id !== 'anon' ? ` — 신뢰 ${c.level}단계${c.suspended ? ' (중단)' : ''}` : ''}</div>`).join('');
+    const body = `<div class="d">${esc(co.tag)}</div>${companyInfo(co, g.cfg.company)}
+      <div class="d" style="margin-top:6px">난이도: ${g.difficulty.icon} ${esc(g.difficulty.name)} — ${esc(g.difficulty.desc)}</div>
+      <div class="d" style="margin-top:6px">창고 ${g.warehouse.cap} · 냉장 ${g.warehouse.cold} · 냉동 ${g.warehouse.frozen || 0} · 초대형 ${g.warehouse.xl}${['coldvan', 'padvan', 'bigvan', 'vent'].filter(k => g.warehouse[k]).length ? ' · 시설: ' + ['coldvan', 'padvan', 'bigvan', 'vent'].filter(k => g.warehouse[k]).map(k => D.FACILITIES[k].name).join(', ') : ''}</div>
+      <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">고객</div>${custs}
+      ${g.perks.length ? `<div style="font-size:12px;color:var(--gold);margin:8px 0 3px">퍽</div>${g.perks.map(p => `<div class="d">${esc(M.PERKS[p].name)} — ${esc(M.PERKS[p].desc)}</div>`).join('')}` : ''}`;
+    modal(`${co.icon} ${co.name}`, body, [{ label: '고객 상세', onClick: () => showCustomers(closeModal) }, { label: '닫기', cls: 'primary', onClick: closeModal }]);
+  }
+  function showWeatherInfo() {
+    const g = game, now = g.weatherNow();
+    const known = []; for (let t = 1; t <= D.TURNS_PER_MONTH; t++) { const k = t <= g.turn ? 'past' : t <= g.turn + g.rules.forecastTurns ? 'known' : 'unknown'; known.push(`<span class="chip wx ${k === 'unknown' ? '' : g.weatherAt(t)} ${t === g.turn ? 'now' : ''}" style="${k === 'past' ? 'opacity:.5' : ''}">${t}턴 ${k === 'unknown' ? '?' : M.WEATHER[g.weatherAt(t)].icon}</span>`); }
+    const rows = Object.keys(M.WEATHER).map(k => { const W = M.WEATHER[k]; return `<div class="ttrow ${k === now ? 'on' : ''}"><span class="lv">${W.icon}</span><span class="ef"><b>${esc(W.name)}</b>${W.desc ? ' — ' + esc(W.desc) : ' — 영향 없음'}</span></div>`; }).join('');
+    const season = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' }[g.season()];
+    modal('날씨', `<div class="d">이번 달 계절: <b>${season}</b> · 예보는 ${g.rules.forecastTurns}턴 앞까지 (예보는 확정)${g.rules.tent ? ' · 천막: 젖음 무효' : ''}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">${known.join('')}</div><div class="ttrack">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">야외 적재 택배가 날씨의 영향을 가장 크게 받습니다. 폭염은 창고 안 🌾 농산물도 상하게 합니다(냉장 구역·환기 시설이면 무사).</div>`, [{ label: '닫기', onClick: closeModal }]);
+  }
+  function showUpcomingInfo(turn) {
+    const g = game, u = g.upcoming().find(x => x.turn === turn); if (!u || !u.specs) return;
+    const wx = u.weather ? M.WEATHER[u.weather] : null;
+    let coldFree = g.warehouse.cold - g.coldUsed(), fzFree = (g.warehouse.frozen || 0) - g.frozenUsed();
+    const rows = u.specs.map(s => { const t = D.PARCEL_TYPES[s.type], a = s.attrs || t.attrs, cu = M.CUSTOMERS[s.customer || 'anon']; let note = '';
+      if (a.includes('frozen')) { if (s.size <= fzFree) { fzFree -= s.size; note = '❆ 냉동 구역 OK'; } else note = '<b style="color:var(--red)">❆ 냉동 자리 없음 → 즉시 폐기</b>'; }
+      else if (a.includes('cold')) { if (s.size <= coldFree) { coldFree -= s.size; note = '❄ 냉장 구역 OK'; } else note = '<b style="color:var(--orange)">❄ 냉장 자리 부족 → 상온</b>'; }
+      if (a.includes('customs')) note += (note ? ' · ' : '') + `🛃 통관 대기 ${g.rules.customsWait}턴`;
+      if (s.burst) note += (note ? ' · ' : '') + '<b style="color:var(--orange)">⚡ 폭주 입고 (기한 -2)</b>';
+      return `<div class="parcel"><div class="sw" style="background:${t.css}"></div><div><span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${s.size}칸 · ${25 + s.size * 15}c · ${esc(cu.name)}</div><div class="st">${note}</div></div>`; }).join('');
+    const vol = u.specs.reduce((v, s) => v + s.size, 0), used = g.usedVolume();
+    modal(`${turn}턴 입고 예정`, `<div class="pickinfo"><span>부피 <b>${vol}</b>칸</span><span>창고 ${used} → <b class="${used + vol > g.warehouse.cap ? 'bad' : ''}">${used + vol}</b>/${g.warehouse.cap}</span>${wx ? `<span>${wx.icon} ${wx.name}</span>` : ''}</div>${u.heat ? '<div class="d" style="color:var(--orange)">🌡 폭염 경보 턴: 냉장 밖 신선·냉동 즉시 폐기</div>' : ''}<div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">입고 순서는 예정대로이며, 통관 대기·냉장 배정은 입고 시점 상태로 정해집니다.</div>`, [{ label: '닫기', onClick: closeModal }]);
   }
   // ---------- 택배 상세 ----------
   function showParcelDetail(id) {
@@ -536,7 +571,7 @@
     const cards = Object.keys(M.INSURERS).map(id => { const I = M.INSURERS[id], cur = id === g.insurer; const fee = cur ? g.premium() : g.premiumBase(id); return `<div class="card ${cur ? 'sel' : ''}" data-ins="${id}"><div class="t"><span>${I.icon} ${esc(I.name)}${cur ? ' <small style="color:var(--green)">가입 중</small>' : ''}</span><span class="price">${cur ? `다음 달 ${fee}c` : fee ? `가입비 ${fee}c · 월 ${fee}c` : '0c'}</span></div><div class="d">${esc(I.desc)}${I.fans.length ? `<br><span style="color:var(--green)">선호 고객: ${I.fans.filter(f => g.customers[f]).map(f => M.CUSTOMERS[f].icon + M.CUSTOMERS[f].name).join(' ') || '(이 회사에 없음)'}</span>` : ''}</div></div>`; }).join('');
     const info = `${g.rules.noInsurance && g.month < 2 ? '<div class="perk-count" style="color:var(--orange)">스타트업은 첫 달 무보험. 2개월차 마켓부터 가입할 수 있습니다</div>' : ''}<div class="perk-count">보험료는 월말에 차감. 청구 0건이면 다음 달 ×0.8(연속 2개월 ×0.7 + 고객 전원 신뢰 +1), 3~4건 ×1.3, 5건↑ ×1.7·보장 절반. 갈아타면 새 보험사 기본 보험료를 가입비로 냅니다.${g.coverHalf ? '<br><span style="color:var(--red)">이번 달 보장 절반 (지난달 청구 5건 이상)</span>' : ''}</div>`;
     const m = modal('보험', info + cards, [{ label: '닫기', onClick: back }]);
-    m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.ins; if (id === g.insurer) return; if (g.rules.noInsurance && g.month < 2) { toast('스타트업은 첫 달 무보험 — 2개월차 마켓부터 가입', 2500); return; } askConfirm(`${M.INSURERS[id].name}(으)로 바꿀까요? 가입비 ${g.premiumBase(id)}c`, () => { const r = g.setInsurer(id); if (!r.ok) toast(r.msg); else { SFX.buy(); saveGame(); } showInsurance(back); }, '가입'); });
+    m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.ins; if (id === g.insurer) return; if (g.phase !== 'market') { toast('보험은 마켓에서 갈아탈 수 있습니다'); return; } if (g.rules.noInsurance && g.month < 2) { toast('스타트업은 첫 달 무보험 — 2개월차 마켓부터 가입', 2500); return; } askConfirm(`${M.INSURERS[id].name}(으)로 바꿀까요? 가입비 ${g.premiumBase(id)}c`, () => { const r = g.setInsurer(id); if (!r.ok) toast(r.msg); else { SFX.buy(); saveGame(); } showInsurance(back); }, '가입'); });
   }
   function showCustomers(back) {
     const list = game.customerSummary();

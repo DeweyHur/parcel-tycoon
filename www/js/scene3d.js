@@ -27,7 +27,7 @@ window.Scene3D = (function () {
       container.appendChild(this.renderer.domElement);
       this.scene = new THREE.Scene();
       this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-      this.camera.position.set(2.6, 7.8, 9.8);
+      this.camX = 2.6; this.camera.position.set(2.6, 7.8, 9.8);
       this.camera.lookAt(1.3, 0.3, 0.3);
       this.tweens = []; this.boxes = new Map(); this.clock = new THREE.Clock(); this.time = 0;
       this.busy = 0;
@@ -42,7 +42,11 @@ window.Scene3D = (function () {
       const w = this.container.clientWidth || 360, h = this.container.clientHeight || 220;
       this.renderer.setSize(w, h, false);
       this.camera.aspect = w / h;
-      this.camera.fov = w / h < 0.9 ? 46 : 38;
+      const a = w / h;
+      this.camera.fov = a < 0.9 ? 46 : 38;
+      // 넓은 화면(가로형)이면 카메라를 왼쪽으로 옮겨 냉장 구역이 잘리지 않게
+      this.camX = a > 1.25 ? 0.6 : a > 1.0 ? 1.6 : 2.6;
+      this.camera.position.set(this.camX, 7.8, 9.8); this.camera.lookAt(this.camX - 1.3, 0.3, 0.3);
       this.camera.updateProjectionMatrix();
     }
     _mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, flatShading: true, ...opts }); }
@@ -265,9 +269,9 @@ window.Scene3D = (function () {
       this._tickWeather(dt);
       // 트럭 바퀴 흔들림
       if (this.truck.position.x < TRUCK_PARK - 0.1 && this.truck.position.x > TRUCK_DOCK + 0.1) this.truck.position.y = Math.abs(Math.sin(this.time * 30)) * 0.03; else this.truck.position.y = 0;
-      if (this.shakeT > 0) { this.shakeT -= dt; this.camera.position.x = 2.6 + (Math.random() - 0.5) * this.shakeA; this.camera.position.y = 7.8 + (Math.random() - 0.5) * this.shakeA; }
-      else if (this.weather === 'storm') { this.camera.position.x = 2.6 + Math.sin(this.time * 9) * 0.05; this.camera.position.y = 7.8 + Math.sin(this.time * 7) * 0.04; }
-      else { this.camera.position.x = 2.6; this.camera.position.y = 7.8; }
+      if (this.shakeT > 0) { this.shakeT -= dt; this.camera.position.x = this.camX + (Math.random() - 0.5) * this.shakeA; this.camera.position.y = 7.8 + (Math.random() - 0.5) * this.shakeA; }
+      else if (this.weather === 'storm') { this.camera.position.x = this.camX + Math.sin(this.time * 9) * 0.05; this.camera.position.y = 7.8 + Math.sin(this.time * 7) * 0.04; }
+      else { this.camera.position.x = this.camX; this.camera.position.y = 7.8; }
       this.renderer.render(this.scene, this.camera);
     }
   }

@@ -164,3 +164,5 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .wxline { font-size: 11px; color: var(--orange); padding: 1px 2px 3px; } .wxline.snow { color: #cfe8ff; } .wxline.rain { color: #9fc8ff; } .wxline.storm { color: #c9bfff; }
 .diffrow { display: flex; gap: 4px; margin-bottom: 4px; } .diffrow .btn { flex: 1; } .diffrow .btn.dis { opacity: 0.45; }
 .diffrow .btn.on { border-color: var(--gold); color: var(--gold); background: #3a3320; }
+#hud-perks .hl { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; } #hud-perks .hl:active { color: var(--gold); }
+.chip.up, .chip.wx, .wxline { cursor: pointer; } .chip.wx.now { border-color: var(--gold); }

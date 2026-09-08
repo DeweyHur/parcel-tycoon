@@ -1014,7 +1014,9 @@
         // 보호 규칙: 계약 슬롯 중 하나는 현재 보유 등급보다 높게
         if (i === 1 && items[0].grade === 'normal' && grade === 'normal' && this.contracts.every(c => !c || c.grade === 'normal')) grade = 'trusted';
         const f = forced[i];
-        const carrier = f ? f.carrier : this.rng.weighted(weights);
+        let carrier = f ? f.carrier : this.rng.weighted(weights);
+        // 같은 업체 중복 방지 (다른 후보가 있으면)
+        if (!f && items.some(it => it.carrier === carrier)) { const alt = {}; for (const k in weights) if (!items.some(it => it.carrier === k)) alt[k] = weights[k]; if (Object.keys(alt).length) carrier = this.rng.weighted(alt); }
         let price = Math.round(D.CARRIERS[carrier].price * D.GRADES[grade].price * R.priceMult);
         if (carrier === 'urgent') price = Math.round(price * R.urgentDiscount);
         items.push({ kind: 'contract', carrier, grade, price, name: D.CARRIERS[carrier].name + (grade !== 'normal' ? ` (${D.GRADES[grade].name})` : ''), sold: false, hint: f && f.hint || null });
