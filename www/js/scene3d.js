@@ -45,9 +45,9 @@ window.Scene3D = (function () {
       const a = w / h;
       this.camera.fov = a < 0.9 ? 46 : 38;
       // 넓은 화면(가로형)이면 카메라를 왼쪽으로 옮겨 냉장 구역이 잘리지 않게
-      // 장면 가로 범위는 x -5.2(냉장 벽)~5.6(도크). 가로형은 가운데(0.3)를 보고, 세로형은 창고 중앙(2.6) 기준
-      this.camX = a >= 1.4 ? 0.3 : a > 1.0 ? 1.4 : 2.6;
-      this.camera.position.set(this.camX, 7.8, 9.8); this.camera.lookAt(this.camX - (a >= 1.4 ? 0.2 : 1.3), 0.3, 0.3);
+      // 장면 가로 범위는 x -5.2(냉장 벽)~5.7(도크). 세로형(a<0.9)은 창고 중앙(2.6) 기준, 그 외는 가운데(0.3)를 보되 다 들어올 때까지 카메라를 뒤로
+      if (a < 0.9) { this.camX = 2.6; this.camY = 7.8; this.camZ = 9.8; this.camera.position.set(2.6, 7.8, 9.8); this.camera.lookAt(1.3, 0.3, 0.3); }
+      else { const need = 5.9 / (Math.tan(this.camera.fov / 2 * Math.PI / 180) * a); const k = Math.max(1, need / 12.1); this.camX = 0.3; this.camY = 0.3 + 7.5 * k; this.camZ = 0.3 + 9.5 * k; this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(0.1, 0.3, 0.3); }
       this.camera.updateProjectionMatrix();
     }
     _mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, flatShading: true, ...opts }); }
@@ -120,6 +120,11 @@ window.Scene3D = (function () {
       for (let i = cold; i < Math.min(cold + frozen, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x4f7fe0);
       // 냉장/냉동 경계선
       if (frozen > 0 && cold > 0) { const row = Math.floor(cold / COLD.cells), col = cold % COLD.cells; const z = -1.3 + row * CELL; const mk = (x0, x1, zz) => { const w = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); w.position.set((x0 + x1) / 2, 0.2, zz); g.add(w); }; if (col > 0) { mk(COLD.x0 + col * CELL, COLD.x0 + COLD.cells * CELL, z); mk(COLD.x0, COLD.x0 + col * CELL, z + CELL); const v = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, CELL), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); v.position.set(COLD.x0 + col * CELL, 0.2, z + CELL / 2); g.add(v); } else mk(COLD.x0, COLD.x0 + COLD.cells * CELL, z); }
+      // 구역 표지: ❄ 냉장, ❆ 냉동, 🌧 야외 (카메라를 보는 스프라이트)
+      const sign = (icon, x, z, sc) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._iconTexture(icon), transparent: true, depthTest: false })); sp.scale.set(sc, sc, 1); sp.position.set(x, 0.75, z); g.add(sp); };
+      if (cold > 0) sign('❄', COLD.x0 + 0.35, -1.0, 0.8);
+      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('❆', COLD.x0 + (i % COLD.cells + 0.5) * CELL, -1.3 + (Math.floor(i / COLD.cells) + 0.5) * CELL, 0.8); }
+      sign('🌧', YARD.x0 + 0.3, YARD.z0 + 0.6, 0.7);
       this.scene.add(g);
     }
     // 고객 마크: 이모지를 캔버스에 그려 상자 위에 붙인다
@@ -272,9 +277,10 @@ window.Scene3D = (function () {
       this._tickWeather(dt);
       // 트럭 바퀴 흔들림
       if (this.truck.position.x < TRUCK_PARK - 0.1 && this.truck.position.x > TRUCK_DOCK + 0.1) this.truck.position.y = Math.abs(Math.sin(this.time * 30)) * 0.03; else this.truck.position.y = 0;
-      if (this.shakeT > 0) { this.shakeT -= dt; this.camera.position.x = this.camX + (Math.random() - 0.5) * this.shakeA; this.camera.position.y = 7.8 + (Math.random() - 0.5) * this.shakeA; }
-      else if (this.weather === 'storm') { this.camera.position.x = this.camX + Math.sin(this.time * 9) * 0.05; this.camera.position.y = 7.8 + Math.sin(this.time * 7) * 0.04; }
-      else { this.camera.position.x = this.camX; this.camera.position.y = 7.8; }
+      const cy = this.camY || 7.8;
+      if (this.shakeT > 0) { this.shakeT -= dt; this.camera.position.x = this.camX + (Math.random() - 0.5) * this.shakeA; this.camera.position.y = cy + (Math.random() - 0.5) * this.shakeA; }
+      else if (this.weather === 'storm') { this.camera.position.x = this.camX + Math.sin(this.time * 9) * 0.05; this.camera.position.y = cy + Math.sin(this.time * 7) * 0.04; }
+      else { this.camera.position.x = this.camX; this.camera.position.y = cy; }
       this.renderer.render(this.scene, this.camera);
     }
   }
