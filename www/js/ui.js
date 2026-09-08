@@ -203,16 +203,12 @@
       btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${caps.length ? ` <small>${attrIcons(caps)}</small>` : ''}</span><span class="calls ${c.calls === 0 ? 'zero' : ''}">${struck ? '파업' : spare ? '예비' : `${c.calls}/${c.maxCalls}`}</span></div>
         <div class="sub"><b>${cp}</b>개 · 대상 <b>${elig}</b>${car.instant ? ' · 턴 미소모' : ''}${car.delay ? ` · ⏱${car.delay}` : ''}${c.enh.regular ? ' · 정기' : ''}${c.enh.express ? ' · 고속' : ''} ${trustBar(g, c.carrier)}</div>`;
     }
-    const sb = $('#self-btn'), se = g.selfEligible();
-    sb.disabled = busy || !g.canSelfDeliver();
-    const vans = ['coldvan', 'padvan', 'bigvan'].filter(v => g.warehouse[v]).map(v => ({ coldvan: '❄❆', padvan: '⚠', bigvan: '🚛' })[v]).join('');
-    sb.innerHTML = `🚚 자체 배송${vans ? `<small style="display:inline"> ${vans}</small>` : ''}<small>대상 ${se.length}개 (${g.selfCapacity()}칸·크기≤${g.selfSizeMax()}) · 보상 ${Math.round(D.SELF_DELIVERY.rewardMult * 100)}%</small>`;
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
     const f = g.forecast();
     const warn = [];
     if (f.overdue) warn.push(`⏳초과 ${f.overdue}`); if (f.spoil) warn.push(`🥀부패 ${f.spoil}`); if (f.frozenOver) warn.push(`❆냉동 자리 없음 ${f.frozenOver}`);
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
-    wb.innerHTML = `⏭ 대기<small>${f.monthEnd ? '월말 정산' : `다음 턴 창고 ${f.used}/${f.cap}${f.used > f.cap ? ' 초과!' : ''}`}${warn.length ? ' · ' + warn.join(' ') : ''}</small>`;
+    wb.innerHTML = `⏭ 대기 · 직접 배송<small>${f.monthEnd ? '월말 정산' : `다음 턴 창고 ${f.used}/${f.cap}${f.used > f.cap ? ' 초과!' : ''}`}${warn.length ? ' · ' + warn.join(' ') : ''}</small>`;
   }
   // ---------- HUD 팝업: 회사 · 날씨 · 입고 예정 ----------
   function showCompanyInfo() {
@@ -257,7 +253,7 @@
       <div class="d">고객 <b>${cu.icon} ${esc(cu.name)}</b>${p.customer !== 'anon' ? ` · 신뢰 ${lv}단계 (개당 +${M.CUSTOMER_BONUS[lv]})` : ''}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}</div>
       <div class="d">폐기 시 손해배상 <b style="color:var(--red)">${claim}c</b>${p.arrivalTurn ? ` · 입고 ${p.age}턴 전` : ''}${p.wet ? ' · 젖음 (보상 -20%)' : ''}${p.outdoor ? ' · 🌧 야외 적재 중' : ''}</div>
       ${attrRows}
-      <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">처리할 수 있는 계약</div><div class="ttrack">${rows || '<div class="d">계약 없음</div>'}<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">자체 배송 ${selfOk ? `(보상 ${Math.round(D.SELF_DELIVERY.rewardMult * 100)}%)` : `<span style="color:var(--dim)">${esc(selfWhy || '불가')}</span>`}</span><span class="st">${selfOk ? '가능' : '—'}</span></div></div>`;
+      <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">처리할 수 있는 계약</div><div class="ttrack">${rows || '<div class="d">계약 없음</div>'}<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">직접 배송 (대기 턴) ${selfOk ? `배송비 ${g.selfCost(p)}c, 보상 그대로` : `<span style="color:var(--dim)">${esc(selfWhy || '불가')}</span>`}</span><span class="st">${selfOk ? '가능' : '—'}</span></div></div>`;
     modal(`${t.name} ${p.size}칸`, body, [{ label: '닫기', onClick: closeModal }]);
   }
   function renderOffer() {
@@ -291,7 +287,7 @@
         <div class="presets"><span>프리셋</span><button class="btn small" data-pre="urgent">급한 것 우선</button><button class="btn small" data-pre="reward">고보상 우선</button><button class="btn small" data-pre="claim">고배상 우선</button>${Object.keys(g.customers).filter(id => id !== 'anon' && !M.CUSTOMERS[id].storage && g.parcels.some(p => p.customer === id)).map(id => `<button class="btn small" data-pre="customer" data-cust="${id}">${M.CUSTOMERS[id].icon} 우선</button>`).join('')}</div>
         <div class="zone-h">🏠 창고 안 — 탭하면 야외로</div><div class="zone">${g.storage.filter(s => !s.outdoor).map(srow).join('')}${inside.map(p => row(p, false)).join('') || '<div id="empty">비어 있음</div>'}</div>
         <div class="zone-h">🌧 야외 — 탭하면 창고 안으로</div><div class="zone out">${g.storage.filter(s => s.outdoor).map(srow).join('')}${outside.map(p => row(p, true)).join('') || '<div id="empty">없음</div>'}</div>`;
-      const m = modal('적재 정리', body, [{ label: '취소', onClick: () => { g.setOutdoor(saved); closeModal(); renderAll(); } }, { label: '이대로 대기', cls: 'primary', onClick: () => { closeModal(); saveGame(); onDone(); } }], '대기 턴에만 정리할 수 있습니다. 창고 안이 용량을 넘으면 덜 급한 것부터 자동으로 밀려납니다');
+      const m = modal('적재 정리', body, [{ label: '취소', onClick: () => { g.setOutdoor(saved); closeModal(); renderAll(); } }, { label: '적용', cls: 'primary', onClick: () => { closeModal(); saveGame(); onDone(); } }], '창고 안이 용량을 넘으면 덜 급한 것부터 자동으로 밀려납니다');
       m.querySelectorAll('.parcel[data-id]').forEach(el => el.onclick = () => { const id = +el.dataset.id; SFX.click(); if (pref.includes(id)) pref = pref.filter(x => x !== id); else pref.push(id); render(); });
       m.querySelectorAll('.parcel[data-sid]').forEach(el => el.onclick = () => { const id = 's' + el.dataset.sid; SFX.click(); if (pref.includes(id)) pref = pref.filter(x => x !== id); else pref.push(id); render(); });
       m.querySelectorAll('[data-pre]').forEach(el => el.onclick = () => { SFX.select(); pref = g.presetOutdoor(el.dataset.pre, el.dataset.cust); render(); });
@@ -400,29 +396,40 @@
   }
   function announceCustomers(events) { let claim = 0; for (const e of events) { if (e.type === 'claim') claim += e.amount; if (e.type === 'custLevel') toastLater(`${M.CUSTOMERS[e.customer].icon} ${M.CUSTOMERS[e.customer].name} 신뢰 ${e.level}단계!`, 2200); if (e.type === 'custSuspend') toastLater(`${M.CUSTOMERS[e.customer].icon} ${M.CUSTOMERS[e.customer].name} 거래 중단 — 다음 달 재개`, 2600); } if (claim) setTimeout(() => floatText(`손해배상 -${claim}c`, true, 50), 350); }
   function announceTrust(events) { for (const e of events) if (e.type === 'trustup') toastLater(`⭐ ${D.CARRIERS[e.carrier].name} 신뢰 ${e.level}단계: ${D.TRUST_EFFECTS[e.level]}`, 2400); }
-  function doSelf() {
-    if (busy || !game.canSelfDeliver()) return;
-    SFX.resume(); SFX.click();
-    const r = game.selfDeliver();
-    if (!r.ok) { toast(r.msg); return; }
-    busy = true; renderAll();
-    const events = game.takeEvents();
-    const delivered = events.filter(e => e.type === 'deliver').map(e => e.parcel.id);
-    SFX.truck();
-    scene.deliver(delivered, () => { SFX.coin(delivered.length); floatText(`+${r.revenue}c`, false, 70); afterTurn(events); });
-    saveGame();
-  }
-  function doWait(skipReorder) {
+  function doWait(selfIds) {
     if (busy || game.phase !== 'play') return;
     SFX.resume();
-    const f = game.forecast();
-    if (!skipReorder && !f.monthEnd && game.outdoorVolume() > 0) { SFX.click(); showReorder(() => doWait(true)); return; }
-    SFX.wait();
-    game.wait();
+    if (!selfIds) { SFX.click(); showWaitModal(); return; }
+    const r = game.wait(selfIds);
+    if (r && r.ok === false) { toast(r.msg); return; }
     busy = true; renderAll();
     const events = game.takeEvents();
     saveGame();
-    setTimeout(() => afterTurn(events), 250);
+    if (selfIds.length && r && r.ids) { SFX.truck(); const rev = r.revenue, cost = r.cost; scene.deliver(r.ids, () => { SFX.coin(r.ids.length); floatText(`직접 배송 +${rev}c (배송비 -${cost}c)`, false, 70); afterTurn(events); }); }
+    else { SFX.wait(); setTimeout(() => afterTurn(events), 250); }
+  }
+  // ---------- 대기 화면: 직접 배송 선택 + 적재 정리 + 다음 턴 예보 ----------
+  function showWaitModal() {
+    const g = game, f = g.forecast(), n = g.selfCount(), nextWx = f.monthEnd ? null : g.weatherAt(g.turn + 1);
+    let picked = [];
+    const render = () => {
+      const elig = sortByUrgency(g.selfEligible());
+      const cost = picked.reduce((s, id) => { const p = g.parcels.find(x => x.id === id); return s + (p ? g.selfCost(p) : 0); }, 0);
+      const vans = ['coldvan', 'padvan', 'bigvan'].filter(v => g.warehouse[v]).map(v => D.FACILITIES[v].name).join(', ');
+      const rows = elig.map(p => { const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], on = picked.includes(p.id); return `<div class="parcel ${on ? 'sel' : ''} ${p.overdue ? 'overdue' : ''}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${p.size}칸 · 보상 <b>${p.reward}</b>c · 배송비 <b style="color:var(--orange)">${g.selfCost(p)}</b>c</div><div class="st">${parcelStatus(p)}</div></div>`; }).join('');
+      const blocked = g.parcels.filter(p => !g.selfCan(p)).length;
+      const warn = []; if (f.overdue) warn.push(`⏳ 기한 초과 ${f.overdue}개`); if (f.spoil) warn.push(`🥀 부패 ${f.spoil}개`); if (f.frozenOver) warn.push(`❆ 냉동 자리 없음 ${f.frozenOver}개`);
+      const body = `<div class="pickinfo"><span>자금 <b>${g.cash}</b>c</span><span>다음 턴 창고 <b class="${f.used > f.cap ? 'bad' : ''}">${f.used}/${f.cap}</b></span>${nextWx ? `<span>${M.WEATHER[nextWx].icon} ${M.WEATHER[nextWx].name}</span>` : '<span>월말 정산</span>'}</div>
+        ${warn.length ? `<div class="d" style="color:var(--red);margin-bottom:4px">대기하면: ${warn.join(' · ')}</div>` : ''}
+        ${g.outdoorVolume() > 0 ? `<div class="d" style="margin-bottom:4px">🌧 야외 ${g.outdoorVolume()}칸 · 이번 턴 도난 ${Math.round(g.theftProb() * 100)}% <button class="btn small" id="wm-reorder">적재 정리</button></div>` : ''}
+        <div style="font-size:12px;color:var(--gold);margin:6px 0 3px">🚚 직접 배송 — 이 턴에 <b>${n}개</b>까지 (크기 ≤ ${g.selfSizeMax()}) · 보상은 그대로, 배송비 ${D.SELF_DELIVERY.costBase}c + 크기×${D.SELF_DELIVERY.costPerSize}c</div>
+        <div class="d" style="color:var(--dim);margin-bottom:4px">${vans ? `차량: ${esc(vans)}` : '차량 없음 — 속성 없는 택배·농산물만'}${blocked ? ` · 직접 배송 불가 ${blocked}개 (택배 상세에서 사유 확인)` : ''}</div>
+        <div class="zone">${rows || '<div id="empty">직접 배송할 수 있는 택배가 없습니다</div>'}</div>`;
+      const m = modal('대기', body, [{ label: '취소', onClick: closeModal }, { label: picked.length ? `직접 배송 ${picked.length}개 후 대기 (-${cost}c)` : '그냥 대기', cls: 'primary', onClick: () => { if (picked.length && g.cash < cost) return toast(`배송비 ${cost}c가 부족합니다`); closeModal(); doWait(picked.slice()); } }], '호출 없이 턴을 넘깁니다');
+      m.querySelectorAll('.parcel[data-id]').forEach(el => el.onclick = () => { const id = +el.dataset.id; SFX.click(); if (picked.includes(id)) picked = picked.filter(x => x !== id); else { if (picked.length >= n) { toast(`한 턴에 ${n}개까지`); return; } picked.push(id); } render(); });
+      const rb = m.querySelector('#wm-reorder'); if (rb) rb.onclick = () => { SFX.click(); showReorder(() => { render(); }); };
+    };
+    render();
   }
   function afterTurn(events) {
     for (const e of events) if (e.type === 'discard') { scene.discard(e.parcel.id); SFX.discard(); floatText(`폐기! ${e.why || ''}`, true, 30); }
@@ -461,7 +468,8 @@
       <span>이번 달 페널티</span><span class="v ${s.penalty ? 'bad' : ''}">+${s.penalty}</span>
       <span>반송 / 도난 / 파손</span><span class="v ${s.returned || s.stolen || s.broken ? 'bad' : ''}">${s.returned || 0} / ${s.stolen || 0} / ${s.broken || 0}</span>
       <span>손해배상</span><span class="v ${s.claims ? 'bad' : ''}">-${s.claims || 0}${s.covered ? ` <small style="color:var(--green)">(보험 ${s.covered} 보장)</small>` : ''}</span>
-      ${game.insurer !== 'none' ? `<span>보험료 (${esc(M.INSURERS[game.insurer].name)})</span><span class="v ${s.premium ? 'bad' : ''}">-${s.premium || 0} <small style="color:var(--dim)">청구 ${s.insClaims || 0}건 → 다음 달 ${s.nextPremium}c${s.noClaimBonus ? ' · 무사고 2개월 고객 신뢰 +1' : ''}</small></span>` : ''}
+      ${game.insurer !== 'none' ? `<span>보험료 (${esc(M.INSURERS[game.insurer].name)})</span><span class="v ${s.premium ? 'bad' : ''}">-${s.premium || 0}</span><span class="sub" style="grid-column:1/-1;white-space:normal">청구 ${s.insClaims || 0}건 → 다음 달 보험료 ${s.nextPremium}c${s.noClaimBonus ? ' · 무사고 2개월: 고객 전원 신뢰 +1' : ''}</span>` : ''}
+      ${s.selfCost ? `<span>직접 배송비</span><span class="v bad">-${s.selfCost}</span>` : ''}
       ${s.storageIncome ? `<span>보관료</span><span class="v">+${s.storageIncome}</span>` : ''}
       <span>기한 초과 보관 중</span><span class="v ${s.overdueVol ? 'bad' : ''}">${s.overdueVol}칸</span>
       <span>부패 폐기</span><span class="v ${s.discarded ? 'bad' : ''}">${s.discarded}개${R.winMaxDiscard != null ? ` (런 누적 ${game.run.discarded}/${R.winMaxDiscard})` : ''}</span>
@@ -631,13 +639,13 @@
       <tr><td>❆ 냉동</td><td>냉동 구역 밖이면 <b>즉시 폐기</b>. 기한 8턴. 4개월차부터. 냉동 구역보다 큰 택배는 오지 않음</td><td>냉동 물류·냉동 컨테이너 특약만</td></tr>
       <tr><td>🌾 농산물</td><td>창고 안에 있어도 <b>폭염이면 기한 -2</b>(야외면 폐기). 남는 냉장 자리에 들어가거나 환기 시설이 있으면 무사. 기한 5턴</td><td>아무 업체 (보너스는 냉장 물류). 자체 배송 가능</td></tr>
       <tr><td>대형(4~7)</td><td>크기 범위가 맞는 업체만</td><td>용달·대형 화물·철도·해상·통관 대행</td></tr></table>
-      <h3>자체 배송 · 차량</h3><p>자체 배송은 속성 없는 일반·농산물을 크기 2, 부피 2칸까지 처리합니다(보상 70%). 마켓의 <b>차량</b>으로 넓힙니다: 냉동 탑차(❄❆), 완충 포장차(⚠ 안전), 대형 트럭(부피 +2, 크기 4). 택배 행을 탭하면 어떤 계약·자체 배송으로 처리할 수 있는지 보입니다.</p>
+      <h3>대기 · 직접 배송 · 차량</h3><p><b>대기</b>를 누르면 턴 넘기기 화면이 열립니다. 여기서 택배를 골라 <b>직접 배송</b>할 수 있습니다 — 한 턴에 1개(대형 트럭 +1, 도심 퀵·국영 +1), 속성 없는 택배·농산물, 크기 2까지. 보상은 그대로 받고 대신 <b>배송비</b>(15c + 크기×5c)를 냅니다. 마켓의 <b>차량</b>으로 넓힙니다: 냉동 탑차(❄❆), 완충 포장차(⚠ 안전), 대형 트럭(크기 4, +1개). 야외 적재가 있으면 같은 화면에서 적재 정리로 들어갑니다. 택배 행을 탭하면 어떤 계약·직접 배송으로 처리할 수 있는지 보입니다.</p>
       <h3>준비 마켓</h3><p>런은 <b>준비 마켓</b>으로 시작합니다. 1개월차 첫 턴 전에 시작 자금으로 계약·강화·시설·보험을 갖출 수 있고, 1~2턴 입고 예정과 날씨가 보입니다. 새로고침 1회 무료. 한 달짜리 시나리오도 여기서 대비합니다.</p>
       <h3>난이도</h3><p>시나리오 화면 위에서 <b>수습·정규·베테랑</b>을 고릅니다. 수습은 입고·가격·배상이 줄고 예정이 3턴까지 보이지만 해금 도전과제가 인정되지 않습니다. 베테랑(첫 클리어 후)은 입고 +10%, 배상 ×1.5, 도난·파손 ×1.3, 스트레스 한계 18, 점수 ×1.4.</p>
       <h3>날씨 · 적재 · 보관 · 보험</h3><p>턴마다 날씨가 있고 2턴 앞까지 예보됩니다. <b>🌧 비</b>는 야외 일반·⚠ 택배를 적셔 보상 -20%, <b>🔥 폭염</b>은 냉장 밖 ❄❆ 즉시 폐기, <b>❄️ 폭설</b>은 야외가 냉장고가 되고(❄ 부패 없음, 도난 절반, ❄ 처리 +10), <b>🌀 태풍</b>은 도난 2배에 그 턴 입고가 다음 턴으로 몰립니다.</p><p>창고가 넘칠 때 <b>대기</b>를 누르면 <b>적재 정리</b>가 열립니다. 무엇을 야외에 둘지 직접 고르거나 프리셋(급한 것·고보상·고배상·고객 우선)을 씁니다. 호출 턴에는 열리지 않습니다 — 대기의 보상입니다.</p><p>이사센터 같은 고객이 <b>보관 계약</b>을 제안합니다. 수락하면 선불 보관료를 받고 그 부피가 기간 동안 창고를 차지합니다(호출·정리 대상 아님). 무사히 끝나면 신뢰 +2, 조기 반환은 남은 기간 환불 + 위약금 30c. 야외로 내보내 도난당하면 배상 ×2.</p><p><b>보험</b>은 런 시작 때 고르고 마켓에서 갈아탈 수 있습니다. 배상액의 일부를 보험이 대신 내고, 월 보험료는 정산에서 빠집니다. 청구 0건이면 다음 달 -20%(연속 2개월 -30% + 고객 신뢰 +1), 많으면 인상. 무보험이면 배상 ×2 고객(유리공방·이사센터)의 물량이 절반. 마켓의 1회성 보험(운송 보험증·야적 보험·통관 보증)도 있습니다.</p>
       <h3>고객</h3><p>택배마다 보낸 <b>고객</b>이 있습니다(행 왼쪽 아이콘). 기한 내 처리 +1xp, 고객 특수 규칙 충족 +1xp, 폐기 -3xp. 신뢰 1~3단계에서 물량과 개당 보상이 오르고 2·3단계에 고객 혜택이 열립니다. 폐기(부패·반송·도난·파손)가 나면 고객이 <b>손해배상</b>(기본 보상 × 배상 배율)을 청구해 자금에서 바로 빠지고, xp가 0 밑으로 떨어지면 다음 달까지 거래가 끊깁니다. 하단 <b>고객</b> 버튼에서 확인하세요.</p>
       <p>업체 카드의 <b>능력</b> 아이콘이 그 업체가 안전하게 다루는 속성입니다. 강화 슬롯의 <b>특약</b>으로 계약에 속성 하나를 붙일 수 있습니다(계약당 1개). ✈🚆🚢는 운송 수단 표시일 뿐 매칭과 무관하고, 철도·해상은 보상이 1~2턴 뒤에 입금됩니다.</p>
-      <h3>세 가지 배송 수단</h3><p><b>자체 배송</b>: 계약 없이 언제나. 오래된 순 일반 택배를 2칸까지(크기 1은 2개, 크기 2는 1개), 턴 소모, 보상 70%. <b>업체 호출</b>: 계약의 잔여 호출을 1회 쓰고 턴 소모. 전문 업체는 보너스. <b>⚡긴급 특송</b>: 턴을 쓰지 않고 즉시 1개 처리 — 대기 전략의 안전장치.</p>
+      <h3>세 가지 배송 수단</h3><p><b>직접 배송</b>: 대기 턴에 택배 1개를 골라 배송비를 내고 처리(보상 그대로). <b>업체 호출</b>: 계약의 잔여 호출을 1회 쓰고 턴 소모. 전문 업체는 보너스. <b>⚡긴급 특송</b>: 턴을 쓰지 않고 즉시 1개 처리 — 대기 전략의 안전장치.</p>
       <p>용달은 어떤 택배든 1개(보너스 없음, ⚠ 파손 위험). 기한을 넘기면 보상 -25%와 스트레스 +1, 3턴 더 지나면 <b>반송</b>(스트레스 +2)됩니다. 창고를 넘긴 만큼 최근 입고분이 <b>야외 적재</b>되어 매 턴 도난 판정(초과 1~2: 15%, 3~5: 30%, 6+: 50%)을 받습니다. 신선식품은 3턴이 지나면 보상 50%, 그 다음 턴에 폐기(+3). 상온(❄ 아님)의 신선식품은 2배 빨리 상합니다.</p>
       <h3>창고</h3><p>용량 초과 1~2: +1, 3 이상: +2 스트레스 — 진짜 위험은 야외 적재분의 도난입니다. 스트레스 ${D.GAMEOVER_STRESS}이면 게임오버. 월말에는 운영비가 정산됩니다.</p>
       <h3>계약과 마켓</h3><p>계약마다 잔여 호출 횟수가 있고 월중에는 새 계약을 살 수 없습니다. 월말 마켓에서 계약 교체·강화·시설을 구매하세요. 계약을 교체하면 잔여 호출·신뢰도·강화가 사라집니다. 등급: 일반 &lt; 신뢰 &lt; 전문 &lt; 마스터.</p>
@@ -662,8 +670,7 @@
   function init() {
     scene = new Scene3D($('#scene'));
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) $('#c' + i).onclick = () => onContractTap(i);
-    $('#wait-btn').onclick = () => doWait(false);
-    $('#self-btn').onclick = doSelf;
+    $('#wait-btn').onclick = () => doWait(null);
     $('#log-btn').onclick = () => { if (game) { SFX.click(); showLog(closeModal); } };
     $('#cust-btn').onclick = () => { if (game) { SFX.click(); showCustomers(closeModal); } };
     $('#help-btn').onclick = () => { SFX.click(); showHelp(closeModal); };

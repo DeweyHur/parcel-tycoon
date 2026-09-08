@@ -84,8 +84,8 @@
       sea: '신뢰 3단계: 입금 지연 1턴',
     },
 
-    // 자체 배송: 계약과 무관한 상설 행동. 대기열 앞의 일반(속성 없는)·농산물 택배를 처리, 무제한·무료, 턴 소모. 차량 시설로 확장
-    SELF_DELIVERY: { name: '자체 배송', cap: 2, sizeMax: 2, rewardMult: 0.7 }, // cap은 부피(칸). 직접 배송은 마진이 낮다
+    // 직접 배송: 대기 턴의 부가 행동. 택배 count개까지 골라 직접 배송 — 보상은 그대로, 대신 배송비(costBase + costPerSize×크기)를 낸다. 차량 시설로 확장
+    SELF_DELIVERY: { name: '직접 배송', count: 1, sizeMax: 2, costBase: 15, costPerSize: 5 },
 
     GRADES: {
       normal:  { name: '일반', cap: 0, calls: 0, price: 1.0 },
@@ -132,9 +132,9 @@
       freezer1: { name: '냉동고 증설', desc: '냉동 용량 +4', price: 200, frozen: 4 },
       vent:    { name: '환기 시설', desc: '창고 안 🌾 농산물이 폭염에 상하지 않음', price: 150, vent: true },
       // 차량: 자체 배송 확장 (마켓 차량 슬롯)
-      coldvan: { name: '냉동 탑차', desc: '자체 배송으로 ❄ 신선·❆ 냉동 처리', price: 240, vehicle: true },
-      padvan:  { name: '완충 포장차', desc: '자체 배송으로 ⚠ 파손을 안전하게 처리', price: 170, vehicle: true },
-      bigvan:  { name: '대형 트럭', desc: '자체 배송 부피 +2, 크기 4까지', price: 220, vehicle: true },
+      coldvan: { name: '냉동 탑차', desc: '직접 배송으로 ❄ 신선·❆ 냉동 처리', price: 240, vehicle: true },
+      padvan:  { name: '완충 포장차', desc: '직접 배송으로 ⚠ 파손을 안전하게 처리', price: 170, vehicle: true },
+      bigvan:  { name: '대형 트럭', desc: '직접 배송 +1개, 크기 4까지', price: 220, vehicle: true },
     },
     PRICE_MULT: { 1: 1.0, 2: 1.1, 3: 1.2, 4: 1.35, 5: 1.5, 6: 1.7 },
 

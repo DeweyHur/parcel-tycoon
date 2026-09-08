@@ -401,7 +401,9 @@
       xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       return { xp, parts };
     }
-    selfCapacity() { return Math.max(1, D.SELF_DELIVERY.cap + this.rules.selfCapDelta + (this.warehouse.bigvan ? 2 : 0)); }
+    selfCount() { return Math.max(1, D.SELF_DELIVERY.count + this.rules.selfCapDelta + (this.warehouse.bigvan ? 1 : 0)); }
+    selfCost(p) { return D.SELF_DELIVERY.costBase + D.SELF_DELIVERY.costPerSize * p.size; }
+    selfCapacity() { return this.selfCount(); }
     selfSizeMax() { return this.warehouse.bigvan ? 4 : D.SELF_DELIVERY.sizeMax; }
     // 자체 배송 가능: 크기 범위 안이고 속성마다 차량이 있어야 (❄❆ 냉동 탑차, ⚠ 완충 포장차, 🛃 통관 끝난 뒤)
     selfCan(p) {
@@ -411,7 +413,7 @@
     }
     selfBlockReason(p) { if (p.size > this.selfSizeMax()) return '대형 트럭 필요'; for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return '냉동 탑차 필요'; if (a === 'fragile' && !this.warehouse.padvan) return '완충 포장차 필요'; if (a === 'customs' && (p.customs || 0) > 0) return '통관 대기 중'; } return null; }
     // 자체 배송 대상: 대기열 앞의 일반 택배를 부피 한도(칸)까지
-    selfEligible() { const cap = this.selfCapacity(); const out = []; let v = 0; for (const p of this.parcels) { if (!this.selfCan(p)) continue; if (v + p.size > cap) { if (out.length) break; else continue; } out.push(p); v += p.size; } return out; }
+    selfEligible() { return this.parcels.filter(p => this.selfCan(p)); }
     canSelfDeliver() { return this.phase === 'play' && this.selfEligible().length > 0; }
     // 대기했을 때 다음 턴 예상: 창고 사용량, 기한 초과·부패 예정
     forecast() {
@@ -682,15 +684,18 @@
       return out;
     }
 
-    wait() {
+    // 대기: 턴을 넘긴다. selfIds를 주면 그 택배를 직접 배송(배송비 지불, 보상 그대로)하고 넘긴다
+    wait(selfIds) {
       if (this.phase !== 'play') return false;
+      let self = null;
+      if (selfIds && selfIds.length) { self = this.selfDeliver(selfIds); if (!self.ok) return self; }
       this.monthStats.waits++; this.run.waits++; this.stats.waits++;
-      this.stats.callStreak = 0;
+      if (self) { this.stats.callStreak++; this.stats.maxCallStreak = Math.max(this.stats.maxCallStreak, this.stats.callStreak); } else this.stats.callStreak = 0;
       this.waitStack++;
-      this.say('대기: 호출 없이 1턴 진행');
-      this.emit('wait', {});
+      this.say(self ? `대기 + 직접 배송 ${self.count}개 (+${self.revenue}c, 배송비 -${self.cost}c)` : '대기: 호출 없이 1턴 진행');
+      this.emit('wait', { self });
       this._endTurn(true);
-      return true;
+      return self ? Object.assign({ ok: true }, self) : true;
     }
 
     callCarrier(slotIdx, pickIds) {
@@ -787,15 +792,20 @@
       this._endTurn(false, freezeFresh);
       return { ok: true, revenue, count: chosen.length, broken, delay };
     }
-    // 자체 배송: 대기열 앞 일반 택배를 무료로 처리. 턴 소모, 계약·신뢰도 무관
-    selfDeliver() {
+    // 직접 배송(대기 턴의 부가 행동): 고른 택배를 배송비를 내고 처리. 보상 그대로. wait()에서 호출
+    selfDeliver(ids) {
       if (this.phase !== 'play') return { ok: false, msg: '지금은 배송할 수 없습니다' };
-      const R = this.rules, chosen = this.selfEligible();
-      if (!chosen.length) return { ok: false, msg: '자체 배송으로 처리할 택배가 없습니다' };
+      const R = this.rules;
+      const chosen = (ids || []).map(id => this.parcels.find(p => p.id === id)).filter(p => p && this.selfCan(p));
+      if (!chosen.length) return { ok: false, msg: '직접 배송할 수 있는 택배가 없습니다' };
+      if (chosen.length > this.selfCount()) return { ok: false, msg: `직접 배송은 한 턴에 ${this.selfCount()}개까지` };
+      const cost = chosen.reduce((s, p) => s + this.selfCost(p), 0);
+      if (this.cash < cost) return { ok: false, msg: `배송비 ${cost}c가 부족합니다` };
+      this.cash -= cost; this.monthStats.spent += cost; this.run.spent += cost; this.monthStats.selfCost = (this.monthStats.selfCost || 0) + cost;
       let revenue = 0;
       for (const p of chosen) {
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
-        r = Math.round(r * (R.rewardMult[p.type] || 1) * D.SELF_DELIVERY.rewardMult);
+        r = Math.round(r * (R.rewardMult[p.type] || 1));
         if (p.wet) r = Math.round(r * 0.8);
         if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else this.stats.onTimeByType[p.type]++;
         r += this._custDeliver(p, r, !p.overdue, chosen.filter(q => q.customer === p.customer));
@@ -809,14 +819,11 @@
       this.cash += revenue;
       this.monthStats.revenue += revenue; this.monthStats.delivered += chosen.length;
       this.run.revenue += revenue; this.run.delivered += chosen.length;
-      this.stats.selfCalls++; this.stats.callStreak++; this.stats.maxCallStreak = Math.max(this.stats.maxCallStreak, this.stats.callStreak);
+      this.stats.selfCalls++;
       this.stats.maxCash = Math.max(this.stats.maxCash, this.cash);
-      this.waitStack = 0;
       this._assignCold();
-      this.say(`자체 배송: ${chosen.length}개 처리, +${revenue}c`);
-      this.emit('call', { contract: null, self: true, count: chosen.length, revenue });
-      this._endTurn(false, false);
-      return { ok: true, revenue, count: chosen.length };
+      this.emit('call', { contract: null, self: true, count: chosen.length, revenue, cost });
+      return { ok: true, revenue, cost, count: chosen.length, ids: chosen.map(p => p.id) };
     }
     _updateTrustStats() {
       const seen = new Set(this.contracts.filter(Boolean).map(c => c.carrier));
@@ -927,7 +934,7 @@
       if (this.contracts.filter(Boolean).length >= 4 && this.contracts.every(c => c && c.calls === 0)) this.stats.zeroCallsMonthEnd = true;
       if (this.cash >= 0 && this.cash <= 100) this.stats.brokeMonthEnd = true;
       this.summary = { month: this.month, revenue: ms.revenue, opCost, calls: ms.calls, waits: ms.waits,
-        delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, customers: this.customerSummary(),
+        delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, selfCost: ms.selfCost || 0, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, customers: this.customerSummary(),
         cash: this.cash, stress: this.stress, usage: Math.round(this.usage() * 100), left: this.parcels.length };
       this.say(`${this.month}월 정산: 수익 ${ms.revenue}, 운영비 ${opCost}${closing ? `, 월말 결산 +${closing}` : ''}`);
       if (this.cash < 0) return this._gameOver('운영비를 지불하지 못해 파산했습니다');

@@ -92,7 +92,7 @@ t('저장/불러오기 후 결정적 진행', () => {
 t('스트레스 20 → 게임오버', () => { const g = NG(1); g.stress = 19; g.warehouse.cap = 1; g.wait(); assert.equal(g.phase, 'over'); assert.ok(g.result && !g.result.win); });
 t('회사별 시작 상태', () => {
   for (const id of Object.keys(M.COMPANIES)) { const g = new Game({ seed: 2, company: id }); assert.ok(g.cash > 0, id); assert.ok(g.warehouse.cap >= 16, id); assert.ok(g.contracts.filter(Boolean).length >= 3, id); }
-  const q = new Game({ seed: 2, company: 'quick' }); assert.equal(q.contracts[0].maxCalls, 6); assert.equal(q.selfCapacity(), 3);
+  const q = new Game({ seed: 2, company: 'quick' }); assert.equal(q.contracts[0].maxCalls, 6); assert.equal(q.selfCount(), 2);
   const st = new Game({ seed: 2, company: 'steel' }); assert.equal(st.warehouse.cold, 0);
   const th = new Game({ seed: 2, company: 'thrifty' }); th.wait(); th.wait(); assert.equal(th.callCapacity(th.contracts[0]), 4 + 2 + 1); // 큰마트 2단계: 대량 +1
 });
@@ -107,11 +107,12 @@ t('시나리오 규칙', () => {
 });
 t('데일리 설정은 날짜에 결정적', () => { const a = dailyConfig('2026-09-05'), b = dailyConfig('2026-09-05'); assert.deepEqual(a, b); assert.equal(a.variants.length, 2); assert.notEqual(a.variants[0], a.variants[1]); });
 t('통계 추적', () => { const g = NG(4); let n = 0; while (g.phase === 'play' && n < 8) { g.wait(); n++; } assert.equal(g.stats.waits, n); assert.equal(g.stats.maxCallStreak, 0); });
-t('자체 배송: 일반 2개 무료 처리, 턴 소모', () => {
+t('직접 배송: 대기 턴에 1개, 보상 그대로 + 배송비 20c', () => {
   const g = NG(8); g.parcels = []; g.schedule = g.schedule.map(() => []);
-  for (let i = 0; i < 3; i++) g.parcels.push({ id: 900 + i, type: 'normal', size: 1, baseSize: 1, reward: 40, deadline: 6, overdue: false, inCold: false, age: 0 });
-  const turn = g.turn, cash = g.cash; const r = g.selfDeliver();
-  assert.ok(r.ok); assert.equal(r.count, 2); assert.equal(g.turn, turn + 1); assert.equal(g.cash, cash + 56); assert.equal(g.parcels.length, 1); assert.equal(g.stats.selfCalls, 1);
+  for (let i = 0; i < 3; i++) g.parcels.push({ id: 900 + i, type: 'normal', size: 1, baseSize: 1, reward: 40, deadline: 6, overdue: false, inCold: false, age: 0, attrs: [], customer: 'anon' });
+  assert.equal(g.selfCount(), 1); assert.ok(!g.wait([900, 901]).ok);
+  const turn = g.turn, cash = g.cash; const r = g.wait([900]);
+  assert.ok(r.ok); assert.equal(r.count, 1); assert.equal(g.turn, turn + 1); assert.equal(g.cash, cash + 40 - 20); assert.equal(g.parcels.length, 2); assert.equal(g.stats.selfCalls, 1); assert.equal(g.stats.waits, 1);
 });
 t('긴급 특송: 턴 미소모', () => {
   const g = NG(8); g.contracts[3] = g._makeContract('urgent', 'normal');
@@ -279,8 +280,8 @@ t('냉동 택배는 냉동 구역보다 크게 오지 않음, 자체 배송 차�
   h.parcels = [P(1, 'fresh', 2), P(2, 'fragile', 2), P(3, 'normal', 4), P(4, 'produce', 2)]; h._assignCold();
   assert.deepEqual(h.selfEligible().map(p => p.id), [4]);
   h.warehouse.coldvan = true; h.warehouse.padvan = true; h.warehouse.bigvan = true;
-  assert.equal(h.selfCapacity(), 4); assert.deepEqual(h.selfEligible().map(p => p.id), [1, 2]);
-  const r = h.selfDeliver(); assert.ok(r.ok); assert.equal(h.stats.deliveredByType.fresh, 1);
+  assert.equal(h.selfCount(), 2); assert.deepEqual(h.selfEligible().map(p => p.id), [1, 2, 3, 4]);
+  const r = h.wait([1, 2]); assert.ok(r.ok); assert.equal(h.stats.deliveredByType.fresh, 1); assert.equal(r.cost, 25 + 25);
 });
 t('농산물: 폭염이면 창고 안이라도 기한 -2, 환기 시설·냉장 구역이면 무사', () => {
   const g = NG(4); g.schedule = g.schedule.map(() => []); g.weather = Array(10).fill('heat'); g.warehouse.cold = 0;

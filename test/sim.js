@@ -12,8 +12,6 @@ function nextVolume(g) { const u = g.upcoming()[0]; return u.specs ? u.specs.red
 function pickBest(g, threshold) {
   // 각 계약별 처리 가능 수 계산, 가장 많이 처리하는 계약 선택 (급한 것 우선). 자체 배송도 후보(i = -1)
   let best = null;
-  const selfE = g.selfEligible();
-  if (selfE.length) { const urgent = selfE.some(p => p.deadline <= 1 || p.overdue); const fill = selfE.length / g.selfCapacity(); const score = (urgent ? 100 : 0) + selfE.length * 10 + fill * 5 + 4; best = { i: -1, ids: selfE.map(p => p.id), score, urgent, fill }; }
   g.contracts.forEach((c, i) => {
     if (!g.canCall(c) || D.CARRIERS[c.carrier].instant) return;
     const cap = g.callCapacity(c);
@@ -77,7 +75,7 @@ function runOne(seed, strat, cfg) {
       const ui = g.contracts.findIndex(c => c && D.CARRIERS[c.carrier].instant && g.canCall(c));
       if (ui >= 0) { const p = g.parcels.find(p => (p.type === 'fresh' && p.fresh <= 1) || p.deadline <= 1); if (p) { g.callCarrier(ui, [p.id]); continue; } }
       const b = STRATS[strat](g);
-      if (!b) g.wait(); else if (b.i === -1) g.selfDeliver(); else g.callCarrier(b.i, b.ids);
+      if (!b) { const se = g.selfEligible().sort((a, b) => a.deadline - b.deadline).slice(0, g.selfCount()); g.wait(g.cash > 150 ? se.map(p => p.id) : []); } else g.callCarrier(b.i, b.ids);
     } else if (g.phase === 'summary') g.closeSummary();
     else if (g.phase === 'market') { marketBot(g); g.closeMarket(); }
   }

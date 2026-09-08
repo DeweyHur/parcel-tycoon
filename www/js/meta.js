@@ -113,7 +113,7 @@
       name: '도심 퀵', tag: '좁은 창고 · 잦은 호출', icon: '🛵',
       warehouse: { cap: 16, cold: 4, xl: 0 }, cash: 500,
       contracts: [{ carrier: 'target', calls: 5 }, { carrier: 'cold', calls: 2 }, { carrier: 'bulk', calls: 2 }],
-      passive: '빠른 배차: 모든 계약의 최대·잔여 호출 +2. 자체 배송 +1칸', weakness: '협소: 창고 확장 효과 절반. 초대형은 항상 임시 공간 +3',
+      passive: '빠른 배차: 모든 계약의 최대·잔여 호출 +2. 직접 배송 +1개', weakness: '협소: 창고 확장 효과 절반. 초대형은 항상 임시 공간 +3',
       mods: { callsDelta: 2, selfCapDelta: 1, facilityCapMult: 0.5, marketWeight: { limit1: 2, limit2: 2, expand1: 0.5, expand2: 0.5, expand3: 0.5 } },
       unlock: 'rookie', tier: 1,
     },
@@ -157,7 +157,7 @@
       name: '국영 우편', tag: '안정형 · 장기전', icon: '📮',
       warehouse: { cap: 28, cold: 6, xl: 1 }, cash: 550,
       contracts: [{ carrier: 'bulk', grade: 'trusted', calls: 3 }, { carrier: 'cold', calls: 2 }, { carrier: 'target', calls: 2 }],
-      passive: '공공 서비스: 운영비 80 고정. 자체 배송 +1칸. 스트레스 10 이상이면 월초 -2. 계약 교체 시 잔여 호출 1회 보존', weakness: '느린 결재: 마켓 매월 2개까지. 전문·마스터는 5개월차부터. 특수 보너스 -5',
+      passive: '공공 서비스: 운영비 80 고정. 직접 배송 +1개. 스트레스 10 이상이면 월초 -2. 계약 교체 시 잔여 호출 1회 보존', weakness: '느린 결재: 마켓 매월 2개까지. 전문·마스터는 5개월차부터. 특수 보너스 -5',
       mods: { premiumDelta: { premier: -30 }, opCostFixed: 80, selfCapDelta: 1, stressRelief: { min: 10, amount: 2 }, keepCalls: 1, marketMaxBuy: 2, expertFrom: 5, bonusDelta: -5, marketWeight: { trusted: 1.3, expert: 0.5, master: 0.5 } },
       unlock: 'first_clear', tier: 1,
     },
@@ -238,7 +238,7 @@
     // 기록용 (예전 회사 해금 조건)
     fresh_king:   { name: '신선 배송왕', desc: '한 런에서 신선식품 15개를 부패 없이 처리', kind: 'run', rewardType: 'none', check: s => s.deliveredByType.fresh >= 15 && s.discarded === 0 },
     giant:        { name: '거인의 어깨', desc: '한 런에서 초대형(7) 택배 5개를 기한 내 처리', kind: 'run', rewardType: 'none', check: s => s.xlOnTime >= 5 },
-    nonstop:      { name: '무정차', desc: '대기 없이 30턴 연속 배송(자체 배송 포함)', kind: 'run', rewardType: 'none', check: s => s.maxCallStreak >= 30 },
+    nonstop:      { name: '무정차', desc: '대기 없이 30턴 연속 배송(직접 배송한 대기 턴 포함)', kind: 'run', rewardType: 'none', check: s => s.maxCallStreak >= 30 },
     unbreakable:  { name: '깨지지 않는', desc: '한 런에서 파손주의 12개를 기한 내 처리', kind: 'run', rewardType: 'none', check: s => s.onTimeByType.fragile >= 12 },
     patience:     { name: '기다림의 미학', desc: '월평균 호출 4회 이하로 런 클리어', kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => s.calls / Math.max(1, r.monthsDone) <= 4 },
     // 시나리오·슬롯 해금
