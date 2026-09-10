@@ -289,4 +289,26 @@ t('농산물: 폭염이면 창고 안이라도 기한 -2, 환기 시설·냉장 
   g.warehouse.vent = true; g.wait(); assert.equal(g.parcels[0].deadline, 1);
   const h = NG(4); h.schedule = h.schedule.map(() => []); h.weather = Array(10).fill('heat'); h.parcels = [P(1, 'produce', 2, { deadline: 5 })]; h._assignCold(); assert.ok(h.parcels[0].inCold); h.wait(); assert.equal(h.parcels[0].deadline, 4);
 });
+// ----- i18n -----
+const I18n = require('../www/js/i18n.js');
+const KO = require('../www/locales/ko.js'), EN = require('../www/locales/en.js');
+t('i18n: ko/en UI 키와 자리표시자가 일치', () => {
+  const ph = s => new Set((s.match(/\{(\w+)/g) || []).map(x => x.slice(1)));
+  for (const k in KO.ui) { assert.ok(k in EN.ui, 'en 누락: ' + k); for (const x of ph(KO.ui[k])) assert.ok(ph(EN.ui[k]).has(x), `en ${k} 자리표시자 {${x}} 누락`); }
+  for (const k in EN.ui) assert.ok(k in KO.ui, 'ko 누락: ' + k);
+});
+t('i18n: ko/en data·meta 텍스트 필드 모양이 일치', () => {
+  const walk = (a, b, p) => { for (const k in a) { assert.ok(k in b, 'en 누락: ' + p + '.' + k); if (a[k] && typeof a[k] === 'object' && !Array.isArray(a[k])) walk(a[k], b[k], p + '.' + k); } for (const k in b) assert.ok(k in a, 'ko 누락: ' + p + '.' + k); };
+  walk(KO.data, EN.data, 'data'); walk(KO.meta, EN.meta, 'meta');
+});
+t('i18n: 자리표시자·복수형·메시지 객체 렌더링', () => {
+  assert.equal(I18n.lang, 'ko');
+  assert.equal(I18n.t('log.monthStart', { m: 2 }), '── 2개월차 시작 ──');
+  assert.equal(I18n.text({ k: 'log.penalty', p: { pen: 2, reasons: [{ k: 'r.overdue', p: { short: '일반' } }, { k: 'r.stolenInsured' }], stress: 5 } }), '페널티 +2: 기한 초과 일반, 도난 (보험 적용) (스트레스 5)');
+  assert.equal(I18n.text('옛 세이브 문자열'), '옛 세이브 문자열');
+  assert.ok(I18n.setLang('en'));
+  assert.equal(I18n.t('fmt.calls', { n: 1 }), '1 call'); assert.equal(I18n.t('fmt.calls', { n: 3 }), '3 calls');
+  assert.equal(D.PARCEL_TYPES.fresh.name, 'Fresh Food'); assert.equal(M.COMPANIES.local.name, 'Local Parcel'); assert.equal(D.trustEffectText('cold', 3), 'Fresh/produce deadlines freeze on call turns');
+  assert.ok(I18n.setLang('ko')); assert.equal(D.PARCEL_TYPES.fresh.name, '신선식품');
+});
 console.log(`\n${n} tests passed`);

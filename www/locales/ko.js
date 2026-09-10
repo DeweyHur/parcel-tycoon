@@ -206,6 +206,7 @@
     'fmt.perMonth': '월 {n}c',
     'fmt.count': '{n}개',
     'fmt.turns': '{n}턴',
+    'fmt.turnN': '{n}턴',
     'fmt.level': '{n}단계',
     'fmt.cells': '{n}칸',
     'prep.family': '{family} 계열',
