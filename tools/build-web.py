@@ -18,12 +18,12 @@ css = css.replace("url('../fonts/Galmuri11-Bold.woff2')", f"url(data:font/woff2;
 audio = {n: b64(WWW / 'audio' / f'{n}.mp3') for n in ['title', 'warehouse', 'overflow', 'market', 'gameover', 'fanfare']}
 audio_js = 'window.__AUDIO_B64__ = ' + '{' + ','.join(f'{k}:"{v}"' for k, v in audio.items()) + '};'
 
-scripts = re.findall(r'<script src="js/([^"]+)"></script>', html)
+scripts = re.findall(r'<script src="([^"]+)"></script>', html)  # js/*.js + locales/*.js (index.html 순서대로)
 js_inline = '<script>' + audio_js + '</script>\n' + '\n'.join(
-    '<script>\n' + (WWW / 'js' / s).read_text(encoding='utf-8').replace('</script>', '<\\/script>') + '\n</script>' for s in scripts)
+    '<script>\n' + (WWW / s).read_text(encoding='utf-8').replace('</script>', '<\\/script>') + '\n</script>' for s in scripts)
 
 body = html.split('<body>')[1].split('</body>')[0]
-body = re.sub(r'\s*<script src="js/[^"]+"></script>', '', body)
+body = re.sub(r'\s*<script src="[^"]+"></script>', '', body)
 wide_css = '\n/* 웹(넓은 화면): 폰 비율 컬럼으로 가운데 정렬 */\n@media (min-width: 640px) { #app { left: 50%; right: auto; width: 480px; transform: translateX(-50%); box-shadow: 0 0 0 4px var(--line), 0 0 60px #000; } #modal-root { left: 50%; right: auto; width: 480px; transform: translateX(-50%); } }\n'
 head_extra = f'<title>택배 타이쿤</title>\n<style>\n{css}{wide_css}\n</style>'
 

@@ -122,11 +122,13 @@ window.Scene3D = (function () {
       if (frozen > 0 && cold > 0) { const row = Math.floor(cold / COLD.cells), col = cold % COLD.cells; const z = -1.3 + row * CELL; const mk = (x0, x1, zz) => { const w = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); w.position.set((x0 + x1) / 2, 0.2, zz); g.add(w); }; if (col > 0) { mk(COLD.x0 + col * CELL, COLD.x0 + COLD.cells * CELL, z); mk(COLD.x0, COLD.x0 + col * CELL, z + CELL); const v = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, CELL), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); v.position.set(COLD.x0 + col * CELL, 0.2, z + CELL / 2); g.add(v); } else mk(COLD.x0, COLD.x0 + COLD.cells * CELL, z); }
       // 구역 표지: ❄ 냉장, ❆ 냉동, 🌧 야외 (카메라를 보는 스프라이트)
       const sign = (icon, label, bg, x, z, y) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._signTexture(icon, label, bg), transparent: true, depthTest: false })); sp.scale.set(1.5, 0.75, 1); sp.position.set(x, y || 0.9, z); g.add(sp); };
-      if (cold > 0) sign('❄', '냉장', '#1f8fb0', COLD.x0 + 0.9, -1.2, 1.7);
-      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('❆', '냉동', '#2b4ab8', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, -1.3 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
-      sign('🌧', '야외', '#7a5a2a', YARD.x0 + 0.9, YARD.z0 + 0.6);
+      const A = window.DATA.ATTRS, OUT = window.I18n ? window.I18n.t('hud.outdoorLabel') : '';
+      if (cold > 0) sign(A.cold.icon, A.cold.name, '#1f8fb0', COLD.x0 + 0.9, -1.2, 1.7);
+      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign(A.frozen.icon, A.frozen.name, '#2b4ab8', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, -1.3 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
+      sign('🌧', OUT, '#7a5a2a', YARD.x0 + 0.9, YARD.z0 + 0.6);
       this.scene.add(g);
     }
+    relabel() { if (this.tileCaps) this._buildTiles(...this.tileCaps); }
     // 고객 마크: 이모지를 캔버스에 그려 상자 위에 붙인다
     _iconTexture(icon) {
       this.iconCache = this.iconCache || {};

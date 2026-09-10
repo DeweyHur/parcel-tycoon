@@ -1,4 +1,5 @@
 // 밸런스 데이터 (기획서 v0.2 전체 범위 + 메타 기획서 v0.1)
+// 이름·설명 등 텍스트 필드는 locales/<lang>.js 의 data 섹션에 있고, i18n.js 가 같은 모양으로 덮어쓴다
 (function (root) {
   const DATA = {
     TURNS_PER_MONTH: 10,
@@ -29,17 +30,17 @@
     SIZE_WEIGHT: { 1: 50, 2: 35, 4: 12, 7: 3 },
 
     // 속성(attrs): 창고에서 벌어지는 일. cold=❄ 냉장 구역 밖이면 다음 턴 폐기 / fragile=⚠ 능력 없는 업체면 파손 확률 / customs=🛃 통관 대기 중 처리 불가 / frozen=❆ 냉동 구역 밖이면 즉시 폐기
-    ATTRS: { cold: { icon: '❄', name: '냉장' }, fragile: { icon: '⚠', name: '파손' }, customs: { icon: '🛃', name: '통관' }, frozen: { icon: '❆', name: '냉동' }, produce: { icon: '🌾', name: '농산물' } },
+    ATTRS: { cold: { icon: '❄' }, fragile: { icon: '⚠' }, customs: { icon: '🛃' }, frozen: { icon: '❆' }, produce: { icon: '🌾' } },
     // 업체 매칭에 관여하는 속성 (🌾 농산물은 날씨 속성이라 아무 업체나 처리)
     GATING_ATTRS: ['cold', 'fragile', 'customs', 'frozen'],
     PARCEL_TYPES: {
-      normal:  { name: '일반',     short: '일반', attrs: [],          sizes: [1, 2],  deadline: 6, bonus: 0,  color: 0xc9a06c, css: '#c9a06c' },
-      fresh:   { name: '신선식품', short: '신선', attrs: ['cold'],    sizes: [2, 4],  deadline: 3, bonus: 10, color: 0x5ee0d8, css: '#5ee0d8' },
-      produce: { name: '농산물',   short: '농산', attrs: ['produce'], sizes: [2, 4],  deadline: 5, bonus: 10, color: 0x9acd5a, css: '#9acd5a' },
-      fragile: { name: '파손주의', short: '파손', attrs: ['fragile'], sizes: [2, 4],  deadline: 7, bonus: 15, color: 0xf0a04b, css: '#f0a04b' },
-      intl:    { name: '통관 화물', short: '통관', attrs: ['customs'], sizes: [4, 7],  deadline: 8, bonus: 20, color: 0x6c8cff, css: '#6c8cff' },
-      large:   { name: '대형화물', short: '대형', attrs: [],          sizes: [4, 7],  deadline: 8, bonus: 25, color: 0xb08bd8, css: '#b08bd8' },
-      frozen:  { name: '냉동식품', short: '냉동', attrs: ['frozen'],  sizes: [2, 4],  deadline: 8, bonus: 20, color: 0x9ad7ff, css: '#9ad7ff' },
+      normal:  { attrs: [],          sizes: [1, 2],  deadline: 6, bonus: 0,  color: 0xc9a06c, css: '#c9a06c' },
+      fresh:   { attrs: ['cold'],    sizes: [2, 4],  deadline: 3, bonus: 10, color: 0x5ee0d8, css: '#5ee0d8' },
+      produce: { attrs: ['produce'], sizes: [2, 4],  deadline: 5, bonus: 10, color: 0x9acd5a, css: '#9acd5a' },
+      fragile: { attrs: ['fragile'], sizes: [2, 4],  deadline: 7, bonus: 15, color: 0xf0a04b, css: '#f0a04b' },
+      intl:    { attrs: ['customs'], sizes: [4, 7],  deadline: 8, bonus: 20, color: 0x6c8cff, css: '#6c8cff' },
+      large:   { attrs: [],          sizes: [4, 7],  deadline: 8, bonus: 25, color: 0xb08bd8, css: '#b08bd8' },
+      frozen:  { attrs: ['frozen'],  sizes: [2, 4],  deadline: 8, bonus: 20, color: 0x9ad7ff, css: '#9ad7ff' },
     },
     FRESH_TURNS: 3,
     // 신선: 냉장 구역 밖에서 WARM_LIMIT턴 지나면 폐기 (폭염 경보 턴은 즉시). 냉동: 냉동 구역 밖이면 즉시
@@ -57,41 +58,30 @@
     // 매칭: 크기 범위 && need && (❆는 caps 필수) && (🛃 대기 중이면 caps 필수). ❄·⚠는 caps 없어도 받되 ⚠는 파손 확률.
     // specialist = 이 종류를 처리하면 특수 운송 보너스. delay = 보상이 N턴 뒤 입금. badge = 운송 수단(매칭 무관)
     CARRIERS: {
-      target:  { name: '용달',        short: '용달', badge: '🚚', desc: '원하는 택배 1개를 골라 차를 불러 보냄 (특수 보너스 없음, ⚠ 파손 위험)', cap: 1, calls: 4, price: 200, caps: [], sizeMin: 1, sizeMax: 7 },
-      cold:    { name: '냉장 물류',   short: '냉장', badge: '🚚', desc: '신선·농산물 전문. 신선·농산물 보너스', cap: 4, calls: 3, price: 210, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'] },
-      bulk:    { name: '대량 분류',   short: '대량', badge: '🚚', desc: '일반 택배를 골라 한 번에 처리', cap: 4, calls: 2, price: 160, caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2 },
-      fragile: { name: '프래자일 전문', short: '프래', badge: '🚚', desc: '파손주의 전문. 파손 없음, 파손 보너스', cap: 3, calls: 3, price: 210, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile', marketOnly: true },
-      intl:    { name: '통관 대행',   short: '통관', badge: '🚚', desc: '통관 대기 중인 화물을 즉시 통관·발송. 통관 보너스', cap: 2, calls: 3, price: 240, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
-      large:   { name: '대형 화물',   short: '대형', badge: '🚚', desc: '크기 4 이상 택배를 처리 (파손 안전). 대형 보너스', cap: 2, calls: 2, price: 220, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true },
-      frozen:  { name: '냉동 물류',   short: '냉동', badge: '🚚', desc: '냉동 전용. 냉동 보너스', cap: 3, calls: 3, price: 230, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true },
-      urgent:  { name: '긴급 특송',   short: '긴급', badge: '⚡', desc: '⚡턴을 쓰지 않고 즉시 1개 처리. 통관 대기 중·파손도 안전, 보너스 없음', cap: 1, calls: 2, price: 300, caps: ['fragile', 'customs'], sizeMin: 1, sizeMax: 7, marketOnly: true, instant: true },
+      target:  { badge: '🚚', cap: 1, calls: 4, price: 200, caps: [], sizeMin: 1, sizeMax: 7 },
+      cold:    { badge: '🚚', cap: 4, calls: 3, price: 210, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'] },
+      bulk:    { badge: '🚚', cap: 4, calls: 2, price: 160, caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2 },
+      fragile: { badge: '🚚', cap: 3, calls: 3, price: 210, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile', marketOnly: true },
+      intl:    { badge: '🚚', cap: 2, calls: 3, price: 240, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
+      large:   { badge: '🚚', cap: 2, calls: 2, price: 220, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true },
+      frozen:  { badge: '🚚', cap: 3, calls: 3, price: 230, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true },
+      urgent:  { badge: '⚡', cap: 1, calls: 2, price: 300, caps: ['fragile', 'customs'], sizeMin: 1, sizeMax: 7, marketOnly: true, instant: true },
       // 원형(운송 수단) 업체: 속성이 겹치고 트레이드오프가 다르다
-      air:     { name: '항공 특송',   short: '항공', badge: '✈', desc: '소형(1~2)만. 통관 대기 중 처리·파손 안전. 비싸지만 빠름', cap: 2, calls: 3, price: 260, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
-      rail:    { name: '철도 수송',   short: '철도', badge: '🚆', desc: '파손 안전, 한 번에 많이. 보상은 다음 턴 입금', cap: 5, calls: 2, price: 190, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true },
-      sea:     { name: '해상 운송',   short: '해상', badge: '🚢', desc: '통관 컨테이너, 크기 2 이상, 파손 안전. 보상은 2턴 뒤 입금', cap: 4, calls: 2, price: 230, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
+      air:     { badge: '✈', cap: 2, calls: 3, price: 260, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
+      rail:    { badge: '🚆', cap: 5, calls: 2, price: 190, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true },
+      sea:     { badge: '🚢', cap: 4, calls: 2, price: 230, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
     },
-    CARRIER_L3: {
-      target: '신뢰 3단계: 특수 택배 처리 시 특수 운송 보너스 적용',
-      cold: '신뢰 3단계: 호출 턴에 신선·농산물 기한 정지',
-      bulk: '신뢰 3단계: 일반 택배 1개 추가 처리',
-      fragile: '신뢰 3단계: 파손주의 처리 시 보상 +15',
-      intl: '신뢰 3단계: 통관 화물 1개 추가 처리',
-      large: '신뢰 3단계: 초대형 화물 2개를 한 번에 처리 (처리량 +1)',
-      frozen: '신뢰 3단계: 냉동 1개 추가 처리',
-      urgent: '신뢰 3단계: 한 번에 2개 처리',
-      air: '신뢰 3단계: 크기 4까지 처리',
-      rail: '신뢰 3단계: 입금 지연 없음',
-      sea: '신뢰 3단계: 입금 지연 1턴',
-    },
+    // 신뢰 3단계 전용 능력 문구 — 텍스트는 locales/<lang>.js data.CARRIER_L3 (업체 id → 문구)
+    CARRIER_L3: {},
 
     // 직접 배송: 대기 턴의 부가 행동. 택배 count개까지 골라 직접 배송 — 보상은 그대로, 대신 배송비(costBase + costPerSize×크기)를 낸다. 차량 시설로 확장
-    SELF_DELIVERY: { name: '직접 배송', count: 1, sizeMax: 2, costBase: 15, costPerSize: 5 },
+    SELF_DELIVERY: { count: 1, sizeMax: 2, costBase: 15, costPerSize: 5 },
 
     GRADES: {
-      normal:  { name: '일반', cap: 0, calls: 0, price: 1.0 },
-      trusted: { name: '신뢰', cap: 1, calls: 1, price: 1.35 },
-      expert:  { name: '전문', cap: 2, calls: 1, price: 1.7 },
-      master:  { name: '마스터', cap: 2, calls: 2, price: 2.1, special: true },
+      normal:  { cap: 0, calls: 0, price: 1.0 },
+      trusted: { cap: 1, calls: 1, price: 1.35 },
+      expert:  { cap: 2, calls: 1, price: 1.7 },
+      master:  { cap: 2, calls: 2, price: 2.1, special: true },
     },
     GRADE_PROB: {
       1: { normal: 70, trusted: 30, expert: 0, master: 0 },
@@ -104,41 +94,43 @@
 
     // 업체 신뢰도 (런 내, 업체별 누적 — 계약을 바꿔도 유지)
     TRUST_LEVELS: [0, 3, 8, 15],
-    TRUST_EFFECTS: ['기본', '회당 처리량 +1', '4번째 호출마다 +1개', '전용 능력'],
+    TRUST_EFFECTS: [], // 단계 0~3 문구 — locales/<lang>.js data.TRUST_EFFECTS
     // 단계별 효과 문구 (마켓 카드·호출 모달·도감이 같은 문자열을 읽는다)
-    trustEffectText(carrier, lv) { if (lv >= 3 && DATA.CARRIER_L3[carrier]) return DATA.CARRIER_L3[carrier].replace('신뢰 3단계: ', ''); return DATA.TRUST_EFFECTS[lv]; },
+    trustEffectText(carrier, lv) { if (lv >= 3 && DATA.CARRIER_L3[carrier]) return DATA.CARRIER_L3[carrier]; return DATA.TRUST_EFFECTS[lv]; },
 
     ENHANCEMENTS: {
-      limit1:  { name: '호출 한도 +1', desc: '계약 최대/잔여 호출 횟수 +1 (계약당 2회)', price: 90, kind: 'limit', value: 1 },
-      limit2:  { name: '호출 한도 +2', desc: '계약 최대/잔여 호출 횟수 +2 (계약당 2회)', price: 160, kind: 'limit', value: 2 },
-      cap1:    { name: '처리 용량 강화 I', desc: '회당 처리량 +1 (계약당 3회)', price: 160, kind: 'cap', value: 1 },
-      regular: { name: '정기 배차', desc: '해당 계약의 4번째 성공 호출마다 추가 1개 처리', price: 180, kind: 'regular' },
-      express: { name: '고속 배차', desc: '해당 계약의 3번째 성공 호출마다 추가 1개 처리', price: 300, kind: 'express' },
-      seal:    { name: '신뢰도 인장', desc: '선택한 계약의 신뢰도 경험치 +3', price: 90, kind: 'trust', value: 3 },
-      record:  { name: '장기 거래 기록', desc: '선택한 계약의 신뢰도 경험치 +6', price: 170, kind: 'trust', value: 6 },
+      limit1:  { price: 90, kind: 'limit', value: 1 },
+      limit2:  { price: 160, kind: 'limit', value: 2 },
+      cap1:    { price: 160, kind: 'cap', value: 1 },
+      regular: { price: 180, kind: 'regular' },
+      express: { price: 300, kind: 'express' },
+      seal:    { price: 90, kind: 'trust', value: 3 },
+      record:  { price: 170, kind: 'trust', value: 6 },
       // 속성 특약: 계약 하나에 속성 하나 추가 (계약당 1개, 교체 시 소멸, 특약 처리는 보너스 없음)
-      optFragile: { name: '완충 포장 특약', desc: '이 계약이 ⚠ 파손을 안전하게 처리 (계약당 특약 1개)', price: 150, kind: 'opt', attr: 'fragile' },
-      optCold:    { name: '보냉 특약', desc: '이 계약이 ❄ 신선을 처리(보너스 없음), 회당 처리량 -1', price: 170, kind: 'opt', attr: 'cold', capDelta: -1 },
-      optCustoms: { name: '통관 대행 특약', desc: '이 계약이 🛃 통관 대기 중 화물을 처리, 계약 최대 호출 -1', price: 190, kind: 'opt', attr: 'customs', callsDelta: -1 },
-      optFrozen:  { name: '냉동 컨테이너 특약', desc: '이 계약이 ❆ 냉동을 처리, 회당 -1 (크기 최대 4 이하 계약만)', price: 220, kind: 'opt', attr: 'frozen', capDelta: -1, maxSizeMax: 4 },
+      optFragile: { price: 150, kind: 'opt', attr: 'fragile' },
+      optCold:    { price: 170, kind: 'opt', attr: 'cold', capDelta: -1 },
+      optCustoms: { price: 190, kind: 'opt', attr: 'customs', callsDelta: -1 },
+      optFrozen:  { price: 220, kind: 'opt', attr: 'frozen', capDelta: -1, maxSizeMax: 4 },
     },
     FACILITIES: {
-      expand1: { name: '창고 확장 1단계', desc: '전체 용량 +8', price: 160, cap: 8 },
-      expand2: { name: '창고 확장 2단계', desc: '전체 용량 +10', price: 260, cap: 10, requires: 'expand1' },
-      expand3: { name: '창고 확장 3단계', desc: '전체 용량 +12', price: 400, cap: 12, requires: 'expand2' },
-      cold1:   { name: '냉장고 증설', desc: '냉장 용량 +4', price: 140, cold: 4 },
-      cold2:   { name: '냉장고 증설 2', desc: '냉장 용량 +6', price: 240, cold: 6, requires: 'cold1' },
-      yard:    { name: '대형 적재장', desc: '초대형 보관 +1', price: 180, xl: 1 },
-      freezer1: { name: '냉동고 증설', desc: '냉동 용량 +4', price: 200, frozen: 4 },
-      vent:    { name: '환기 시설', desc: '창고 안 🌾 농산물이 폭염에 상하지 않음', price: 150, vent: true },
+      expand1: { price: 160, cap: 8 },
+      expand2: { price: 260, cap: 10, requires: 'expand1' },
+      expand3: { price: 400, cap: 12, requires: 'expand2' },
+      cold1:   { price: 140, cold: 4 },
+      cold2:   { price: 240, cold: 6, requires: 'cold1' },
+      yard:    { price: 180, xl: 1 },
+      freezer1: { price: 200, frozen: 4 },
+      vent:    { price: 150, vent: true },
       // 차량: 자체 배송 확장 (마켓 차량 슬롯)
-      coldvan: { name: '냉동 탑차', desc: '직접 배송으로 ❄ 신선·❆ 냉동 처리', price: 240, vehicle: true },
-      padvan:  { name: '완충 포장차', desc: '직접 배송으로 ⚠ 파손을 안전하게 처리', price: 170, vehicle: true },
-      bigvan:  { name: '대형 트럭', desc: '직접 배송 +1개, 크기 4까지', price: 220, vehicle: true },
+      coldvan: { price: 240, vehicle: true },
+      padvan:  { price: 170, vehicle: true },
+      bigvan:  { price: 220, vehicle: true },
     },
     PRICE_MULT: { 1: 1.0, 2: 1.1, 3: 1.2, 4: 1.35, 5: 1.5, 6: 1.7 },
 
-    STRESS_STATES: [[5, '안정'], [10, '주의'], [15, '위험'], [19, '위기'], [20, '게임오버']],
+    // 스트레스 구간 → 상태 id. 표시 문구는 locales/<lang>.js data.STRESS_NAMES[id]
+    STRESS_STATES: [[5, 'stable'], [10, 'caution'], [15, 'danger'], [19, 'crisis'], [20, 'gameover']],
+    STRESS_NAMES: {},
   };
   if (typeof module !== 'undefined') module.exports = DATA; else root.DATA = DATA;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -3,6 +3,8 @@
 (function (root) {
   const D = typeof module !== 'undefined' ? require('./data.js') : root.DATA;
   const M = typeof module !== 'undefined' ? require('./meta.js') : root.META;
+  const I18n = typeof module !== 'undefined' ? require('./i18n.js').init(D, M) : root.I18n;
+  const T = I18n.t, MSG = I18n.msg; // T: 즉시 문자열, MSG: 로그용 메시지 객체 {k, p} (표시 시점에 번역)
 
   // ---------- RNG ----------
   function mulberry32(a) {
@@ -172,7 +174,7 @@
       }
       for (const id in this.customers) this._applyCustomerPerks(id);
       // 대형 계약: 고객 1명이 물량 60%
-      if (R.bigCustomer) { const cands = Object.keys(this.customers).filter(id => id !== 'anon' && !M.CUSTOMERS[id].storage); this.bigCustomer = cands.length ? this.rng.pick(cands) : null; if (this.bigCustomer) this.say(`대형 계약: ${M.CUSTOMERS[this.bigCustomer].name}이(가) 물량 60%를 보냅니다`); }
+      if (R.bigCustomer) { const cands = Object.keys(this.customers).filter(id => id !== 'anon' && !M.CUSTOMERS[id].storage); this.bigCustomer = cands.length ? this.rng.pick(cands) : null; if (this.bigCustomer) this.say('log.bigCustomer', { name: M.CUSTOMERS[this.bigCustomer].name }); }
     }
     // 마켓 신규 고객 계약
     addCustomer(id) {
@@ -197,9 +199,9 @@
       const c = this.customers && this.customers[id]; if (!c || id === 'anon') return;
       const before = this.customerLevel(id);
       c.xp += delta;
-      if (c.xp < 0) { c.xp = 0; if (!c.suspended) { c.suspended = true; this.say(`${M.CUSTOMERS[id].name} 거래 중단 (${why}) — 다음 달 재개`); this.emit('custSuspend', { customer: id }); } }
+      if (c.xp < 0) { c.xp = 0; if (!c.suspended) { c.suspended = true; this.say('log.custSuspend', { name: M.CUSTOMERS[id].name, why }); this.emit('custSuspend', { customer: id }); } }
       const after = this.customerLevel(id);
-      if (after !== before) { this._applyCustomerPerks(id); this._assignCold(); if (after > before) { this.say(`${M.CUSTOMERS[id].name} 신뢰 ${after}단계!`); this.emit('custLevel', { customer: id, level: after }); if (after >= 3) this.stats.customerL3++; } }
+      if (after !== before) { this._applyCustomerPerks(id); this._assignCold(); if (after > before) { this.say('log.custLevel', { name: M.CUSTOMERS[id].name, level: after }); this.emit('custLevel', { customer: id, level: after }); if (after >= 3) this.stats.customerL3++; } }
     }
     // 폐기 시 손해배상 (부패·반송·도난·파손 공통)
     _claim(p, why, kind) {
@@ -210,7 +212,7 @@
       if (covered > 0) { this.monthStats.insClaims++; this.monthStats.covered += covered; }
       this.cash -= amount; this.monthStats.claims += amount; this.run.spent += amount; this.stats.claims += amount;
       if (c) { c.month.claims += amount; c.month.discarded++; c.total.claims += amount; c.total.discarded++; }
-      this.say(`손해배상 -${amount}c (${cust.name}, ${why}${covered ? `, 보험 ${covered}c 보장` : ''})`);
+      this.say('log.claim', { amount, name: cust.name, why, covered: covered ? MSG('log.claimCovered', { covered }) : '' });
       this.emit('claim', { parcel: p, amount, covered, customer: id, why });
       this._custXp(id, -3, why);
     }
@@ -233,7 +235,7 @@
       }
       if (ruleHit) xp += 1;
       if (c) { c.month.delivered++; c.total.delivered++; }
-      if (xp) this._custXp(id, xp, '처리');
+      if (xp) this._custXp(id, xp, MSG('why.delivered'));
       return bonus;
     }
     _custRevenue(p, amount) { const c = this.customers && this.customers[p.customer || 'anon']; if (c) { c.month.revenue += amount; c.total.revenue += amount; } }
@@ -261,15 +263,15 @@
     premium(id) { return id && id !== this.insurer ? this.premiumBase(id) : Math.round(this.premiumBase() * this.premMult); }
     // 마켓에서 갈아타기: 새 보험사의 기본 보험료를 가입비로 낸다
     setInsurer(id) {
-      if (this.phase !== 'market') return { ok: false, msg: '마켓에서만 바꿀 수 있습니다' };
-      if (!M.INSURERS[id]) return { ok: false, msg: '없는 보험사' };
-      if (id === this.insurer) return { ok: false, msg: '이미 가입 중' };
-      if (this.rules.noInsurance && this.month < 2) return { ok: false, msg: '스타트업은 첫 달 무보험 (2개월차 마켓부터 가입)' };
+      if (this.phase !== 'market') return { ok: false, msg: T('err.marketOnly') };
+      if (!M.INSURERS[id]) return { ok: false, msg: T('err.noInsurer') };
+      if (id === this.insurer) return { ok: false, msg: T('err.alreadyInsured') };
+      if (this.rules.noInsurance && this.month < 2) return { ok: false, msg: T('err.startupNoInsurance') };
       const cost = this.premiumBase(id);
-      if (this.cash < cost) return { ok: false, msg: '자금이 부족합니다' };
+      if (this.cash < cost) return { ok: false, msg: T('err.noCash') };
       this.cash -= cost; this.run.spent += cost;
       this.insurer = id; this.premMult = 1; this.noClaimMonths = 0; this.coverHalf = false;
-      this.say(`보험 변경: ${M.INSURERS[id].name}${cost ? ` (가입비 -${cost}c)` : ''}`);
+      this.say('log.insurerChange', { name: M.INSURERS[id].name, fee: cost ? MSG('log.insurerFee', { cost }) : '' });
       return { ok: true };
     }
     _settlePremium() {
@@ -277,7 +279,7 @@
       const prem = this.premium();
       this.cash -= prem; ms.premium = prem; this.run.spent += prem; this.stats.premiumPaid += prem;
       const n = ms.insClaims;
-      if (n === 0) { this.noClaimMonths++; this.premMult = this.noClaimMonths >= 2 ? 0.7 : 0.8; this.coverHalf = false; if (this.noClaimMonths >= 2) { for (const id in this.customers) this._custXp(id, 1, '무사고'); ms.noClaimBonus = true; this.stats.noClaim2 = true; } }
+      if (n === 0) { this.noClaimMonths++; this.premMult = this.noClaimMonths >= 2 ? 0.7 : 0.8; this.coverHalf = false; if (this.noClaimMonths >= 2) { for (const id in this.customers) this._custXp(id, 1, MSG('why.noClaim')); ms.noClaimBonus = true; this.stats.noClaim2 = true; } }
       else { this.noClaimMonths = 0; for (const [max, mult] of M.PREMIUM_STEPS) if (n <= max) { this.premMult = mult; break; } this.coverHalf = n >= 5; }
       return prem;
     }
@@ -301,30 +303,30 @@
       else if (K.perTurn) perTurn = Math.round(K.perTurn * feeMult);
       else fee = Math.round(K.fee * feeMult);
       this.offer = { id: this.nextId++, kind, vol, turns, fee, perTurn, customer, expires: this.totalTurn + 1 };
-      this.say(`보관 제안: ${M.CUSTOMERS[customer].name} ${K.name} ${vol}칸 · ${turns}턴 · ${fee ? `선불 ${fee}c` : `턴당 ${perTurn}c 후불`}`);
+      this.say('log.storageOffer', { name: M.CUSTOMERS[customer].name, kind: K.name, vol, turns, pay: fee ? MSG('log.storagePrepaid', { fee }) : MSG('log.storagePerTurn', { perTurn }) });
       this.emit('offer', { offer: this.offer });
     }
     acceptOffer() {
-      if (this.phase !== 'play' || !this.offer) return { ok: false, msg: '제안이 없습니다' };
+      if (this.phase !== 'play' || !this.offer) return { ok: false, msg: T('err.noOffer') };
       const o = this.offer;
-      if (o.vol > this.warehouse.cap) return { ok: false, msg: '창고보다 큽니다' };
+      if (o.vol > this.warehouse.cap) return { ok: false, msg: T('err.offerTooBig') };
       this.storage.push({ id: o.id, kind: o.kind, vol: o.vol, turns: o.turns, left: o.turns, fee: o.fee, perTurn: o.perTurn, customer: o.customer, outdoor: false });
       this.cash += o.fee; this.monthStats.storageIncome += o.fee; this.run.revenue += o.fee;
       this.offer = null; this._assignCold();
-      this.say(`보관 수락: ${M.STORAGE_KINDS[o.kind].name} ${o.vol}칸 (+${o.fee}c)`);
+      this.say('log.storageAccept', { kind: M.STORAGE_KINDS[o.kind].name, vol: o.vol, fee: o.fee });
       this.emit('storageStart', { storage: this.storage[this.storage.length - 1] });
       return { ok: true, fee: o.fee };
     }
-    declineOffer() { if (!this.offer) return false; this.say('보관 제안 거절'); this.offer = null; return true; }
+    declineOffer() { if (!this.offer) return false; this.say('log.storageDecline'); this.offer = null; return true; }
     returnStorage(id) {
-      const s = this.storage.find(x => x.id === id); if (!s) return { ok: false, msg: '없는 보관 계약' };
+      const s = this.storage.find(x => x.id === id); if (!s) return { ok: false, msg: T('err.noStorage') };
       const refund = Math.round(s.fee * s.left / s.turns), pen = 30, cost = refund + pen;
-      if (this.cash < cost) return { ok: false, msg: `환불+위약금 ${cost}c가 필요합니다` };
+      if (this.cash < cost) return { ok: false, msg: T('err.needRefundPenalty', { cost }) };
       this.cash -= cost; this.run.spent += cost; this.monthStats.storageIncome -= refund;
       this.storage.splice(this.storage.indexOf(s), 1);
       this.outdoorPref = this.outdoorPref.filter(x => x !== 's' + s.id);
-      this._custXp(s.customer, -1, '조기 반환'); this._assignCold();
-      this.say(`보관 조기 반환: 환불 ${refund}c + 위약금 ${pen}c`);
+      this._custXp(s.customer, -1, MSG('why.earlyReturn')); this._assignCold();
+      this.say('log.storageEarlyReturn', { refund, pen });
       return { ok: true, cost };
     }
     _tickStorage(reasons) {
@@ -333,8 +335,8 @@
         if (s.left <= 0) {
           this.storage.splice(this.storage.indexOf(s), 1);
           let pay = 0; if (s.perTurn) { pay = s.perTurn * s.turns; this.cash += pay; this.monthStats.storageIncome += pay; this.run.revenue += pay; }
-          this._custXp(s.customer, 2, '보관 완료'); this.stats.storageDone++;
-          this.say(`보관 회수: ${M.STORAGE_KINDS[s.kind].name}${pay ? ` (+${pay}c 후불)` : ''}`);
+          this._custXp(s.customer, 2, MSG('why.storageDone')); this.stats.storageDone++;
+          this.say('log.storageCollect', { kind: M.STORAGE_KINDS[s.kind].name, pay: pay ? MSG('log.storagePostpaid', { pay }) : '' });
           this.emit('storageEnd', { storage: s, pay });
         }
       }
@@ -384,7 +386,9 @@
         enh: { limit: 0, cap: 0, regular: false, express: false, opt: null, capDelta: 0 }, successCalls: 0, totalCalls: 0, delivered: 0 };
     }
     hasPerk(p) { return this.perks.includes(p); }
-    say(msg) { this.log.unshift(msg); if (this.log.length > 60) this.log.pop(); }
+    // 로그는 {k, p} 메시지 객체로 저장하고 표시할 때 I18n.text() 로 렌더링한다 (옛 세이브의 문자열 항목도 그대로 표시됨)
+    say(k, p) { this.log.unshift(p === undefined ? { k } : { k, p }); if (this.log.length > 60) this.log.pop(); }
+    static logText(entry) { return I18n.text(entry); }
     emit(type, data) { this.events.push({ type, ...data }); }
     takeEvents() { const e = this.events; this.events = []; return e; }
 
@@ -394,10 +398,10 @@
     // 이 호출로 얻을 신뢰도 경험치 예상 (정상 처리 +1, 처리량 80% 이상 +1, 특수 택배 전문 처리 +1)
     trustGainPreview(c, count) {
       const R = this.rules, cap = this.callCapacity(c);
-      let xp = 1; const parts = ['정상 처리 +1'];
-      if (count >= Math.ceil(cap * 0.8)) { xp++; parts.push('처리량 80%↑ +1'); }
-      if (D.CARRIERS[c.carrier].specialist || (c.carrier === 'target' && this.trustLevel(c) >= 3)) { xp++; parts.push('전문 처리 +1'); }
-      if (c.carrier === 'cold' && R.coldTrustBonus) { xp += R.coldTrustBonus; parts.push('콜드체인 +1'); }
+      let xp = 1; const parts = [T('xp.base')];
+      if (count >= Math.ceil(cap * 0.8)) { xp++; parts.push(T('xp.cap80')); }
+      if (D.CARRIERS[c.carrier].specialist || (c.carrier === 'target' && this.trustLevel(c) >= 3)) { xp++; parts.push(T('xp.specialist')); }
+      if (c.carrier === 'cold' && R.coldTrustBonus) { xp += R.coldTrustBonus; parts.push(T('xp.coldChain')); }
       xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       return { xp, parts };
     }
@@ -411,7 +415,7 @@
       for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return false; if (a === 'fragile' && !this.warehouse.padvan) return false; if (a === 'customs' && (p.customs || 0) > 0) return false; }
       return true;
     }
-    selfBlockReason(p) { if (p.size > this.selfSizeMax()) return '대형 트럭 필요'; for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return '냉동 탑차 필요'; if (a === 'fragile' && !this.warehouse.padvan) return '완충 포장차 필요'; if (a === 'customs' && (p.customs || 0) > 0) return '통관 대기 중'; } return null; }
+    selfBlockReason(p) { if (p.size > this.selfSizeMax()) return T('self.needBigVan'); for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return T('self.needColdVan'); if (a === 'fragile' && !this.warehouse.padvan) return T('self.needPadVan'); if (a === 'customs' && (p.customs || 0) > 0) return T('self.customsWait'); } return null; }
     // 자체 배송 대상: 대기열 앞의 일반 택배를 부피 한도(칸)까지
     selfEligible() { return this.parcels.filter(p => this.selfCan(p)); }
     canSelfDeliver() { return this.phase === 'play' && this.selfEligible().length > 0; }
@@ -456,12 +460,12 @@
     capacityBonusNote(c) {
       const R = this.rules, notes = [];
       const nth = c.successCalls + 1;
-      if (c.enh.regular && nth % 4 === 0) notes.push('정기 배차 +1');
-      if (c.enh.express && nth % 3 === 0) notes.push('고속 배차 +1');
-      if (this.trustLevel(c) >= 2 && nth % 4 === 0) notes.push('신뢰 2단계 +1');
-      if (R.skipBonus && this.waitedLastTurn) notes.push('스킵 보너스 +1');
-      if (R.waitStack && this.waitStack) notes.push(`대기 누적 +${Math.min(R.waitStack, this.waitStack)}`);
-      if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) notes.push('동네 단골 +1');
+      if (c.enh.regular && nth % 4 === 0) notes.push(T('note.regular'));
+      if (c.enh.express && nth % 3 === 0) notes.push(T('note.express'));
+      if (this.trustLevel(c) >= 2 && nth % 4 === 0) notes.push(T('note.trust2'));
+      if (R.skipBonus && this.waitedLastTurn) notes.push(T('note.skip'));
+      if (R.waitStack && this.waitStack) notes.push(T('note.waitStack', { n: Math.min(R.waitStack, this.waitStack) }));
+      if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) notes.push(T('note.firstCall'));
       return notes;
     }
     // ----- 능력 매칭 (CARRIER_CAPABILITY_DESIGN v0.2) -----
@@ -532,7 +536,7 @@
       return 0;
     }
     returnIn(p) { return p.overdue ? Math.max(0, this.rules.returnGrace - (p.overdueTurns || 0)) : null; }
-    stressState() { for (const [max, name] of D.STRESS_STATES) if (this.stress <= max) return name; return '게임오버'; }
+    stressState() { for (const [max, id] of D.STRESS_STATES) if (this.stress <= max) return D.STRESS_NAMES[id]; return D.STRESS_NAMES.gameover; }
     monthsTotal() { return this.rules.endless ? Infinity : this.rules.months; }
 
     // ----- 월별 테이블 (무한 모드 확장 포함) -----
@@ -568,19 +572,19 @@
     _startMonth(m) {
       const R = this.rules;
       this.month = m; this.turn = 0;
-      if (this.customers) for (const id in this.customers) { const c = this.customers[id]; if (c.suspended && m > 1) { c.suspended = false; c.xp = 0; this.say(`${M.CUSTOMERS[id].name} 거래 재개`); } c.month = this._emptyCustMonth(); c.month.lvStart = this.customerLevel(id); }
+      if (this.customers) for (const id in this.customers) { const c = this.customers[id]; if (c.suspended && m > 1) { c.suspended = false; c.xp = 0; this.say('log.custResume', { name: M.CUSTOMERS[id].name }); } c.month = this._emptyCustMonth(); c.month.lvStart = this.customerLevel(id); }
       this.monthStats = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false };
       for (const c of this.contracts) if (c) c.successCalls = 0;
       this.monthStats.insClaims = 0; this.monthStats.covered = 0; this.monthStats.premium = 0; this.monthStats.storageIncome = 0;
       this.heatTurns = R.heatAlerts ? this.rng.shuffle([...Array(D.TURNS_PER_MONTH).keys()].map(i => i + 1)).slice(0, R.heatAlerts).sort((a, b) => a - b) : [];
       this.weather = this._genWeather(m);
       this.schedule = this._makeSchedule(m);
-      if (m > 1 && this.insurer !== 'none') for (const id of M.INSURERS[this.insurer].fans) if (this.customers[id]) this._custXp(id, 1, '선호 보험');
+      if (m > 1 && this.insurer !== 'none') for (const id of M.INSURERS[this.insurer].fans) if (this.customers[id]) this._custXp(id, 1, MSG('why.fanInsurer'));
       if (R.strike) {
         const owned = [...new Set(this.contracts.filter(Boolean).map(c => c.carrier))];
         const pool = (owned.length ? owned : Object.keys(D.CARRIERS)).filter(k => k !== 'urgent' && k !== this.strikeCarrier);
         this.strikeCarrier = pool.length ? this.rng.pick(pool) : null;
-        if (this.strikeCarrier) this.say(`⚠ 이번 달 ${D.CARRIERS[this.strikeCarrier].name} 파업: 호출 불가`);
+        if (this.strikeCarrier) this.say('log.strike', { name: D.CARRIERS[this.strikeCarrier].name });
       }
       if (m > 1) {
         if (R.monthlyStress) this.stress = Math.max(0, this.stress + R.monthlyStress);
@@ -590,11 +594,11 @@
       if (m === 1 && this.cfg.prep && !this.prepDone) {
         this.prepDone = true; this.phase = 'market';
         this.market = { items: this._genMarketItems(), bought: 0, refreshes: 0, month: 0, prep: true, freeRefresh: this.rules.freeRefresh + 1 };
-        this.say('준비 마켓: 1개월차 시작 전 구매 (새로고침 1회 무료)');
+        this.say('log.prepMarket');
         return;
       }
       this.phase = 'play';
-      this.say(`── ${m}개월차 시작 ──`);
+      this.say('log.monthStart', { m });
       this._startTurn();
     }
     _makeSchedule(m) {
@@ -660,19 +664,19 @@
       // 지연 입금 (철도·해상)
       if (this.pendingRevenue && this.pendingRevenue.length) {
         const due = this.pendingRevenue.filter(x => x.turn <= this.totalTurn); this.pendingRevenue = this.pendingRevenue.filter(x => x.turn > this.totalTurn);
-        for (const x of due) { this.cash += x.amount; this.monthStats.revenue += x.amount; this.run.revenue += x.amount; this.say(`${x.name} 입금 +${x.amount}c (${x.count}개)`); this.emit('paid', x); }
+        for (const x of due) { this.cash += x.amount; this.monthStats.revenue += x.amount; this.run.revenue += x.amount; this.say('log.paid', { name: x.name, amount: x.amount, count: x.count }); this.emit('paid', x); }
         this.stats.maxCash = Math.max(this.stats.maxCash, this.cash);
       }
       // 냉동: 냉동 구역에 못 들어가면 즉시 폐기
-      for (const p of arrived) if (this._attrs(p).includes('frozen') && !p.inFrozen) this._discardParcel(p, '냉동 구역 없음', 2, 'discard');
+      for (const p of arrived) if (this._attrs(p).includes('frozen') && !p.inFrozen) this._discardParcel(p, MSG('why.noFrozenZone'), 2, 'discard');
       this._assignCold();
       const xl = this.parcels.filter(p => p.baseSize >= 7).length; this.stats.maxXlSimul = Math.max(this.stats.maxXlSimul, xl);
-      if (this.offer && this.offer.expires < this.totalTurn) { this.say('보관 제안 만료'); this.offer = null; }
+      if (this.offer && this.offer.expires < this.totalTurn) { this.say('log.offerExpired'); this.offer = null; }
       if (this.rules.storageOfferEvery && !this.offer && this.storage.length < this.rules.storageMax && (this.turn - 1) % this.rules.storageOfferEvery === 0) this._maybeOffer(true); else this._maybeOffer();
       let note = '';
       const wx = this.weatherNow(); if (wx !== 'sunny') note = ` ${M.WEATHER[wx].icon}${M.WEATHER[wx].name}`;
-      if (this.heatTurns.includes(this.turn)) note = ' 🌡폭염 경보!';
-      this.say(`${this.month}월 ${this.turn}턴: ${arrived.map(p => D.PARCEL_TYPES[p.type].short + p.size).join(', ')} 입고 (사용률 ${Math.round(this.usage() * 100)}%)${note}`);
+      if (this.heatTurns.includes(this.turn)) note = MSG('log.heatAlert');
+      this.say('log.arrive', { month: this.month, turn: this.turn, list: arrived.map(p => D.PARCEL_TYPES[p.type].short + p.size).join(', '), usage: Math.round(this.usage() * 100), note });
     }
     upcoming() {
       const out = [];
@@ -692,19 +696,19 @@
       this.monthStats.waits++; this.run.waits++; this.stats.waits++;
       if (self) { this.stats.callStreak++; this.stats.maxCallStreak = Math.max(this.stats.maxCallStreak, this.stats.callStreak); } else this.stats.callStreak = 0;
       this.waitStack++;
-      this.say(self ? `대기 + 직접 배송 ${self.count}개 (+${self.revenue}c, 배송비 -${self.cost}c)` : '대기: 호출 없이 1턴 진행');
+      if (self) this.say('log.waitSelf', { count: self.count, revenue: self.revenue, cost: self.cost }); else this.say('log.wait');
       this.emit('wait', { self });
       this._endTurn(true);
       return self ? Object.assign({ ok: true }, self) : true;
     }
 
     callCarrier(slotIdx, pickIds) {
-      if (this.phase !== 'play') return { ok: false, msg: '지금은 호출할 수 없습니다' };
+      if (this.phase !== 'play') return { ok: false, msg: T('err.cannotCallNow') };
       const c = this.contracts[slotIdx], R = this.rules;
-      if (!c) return { ok: false, msg: '빈 슬롯' };
-      if (this.isStruck(c)) return { ok: false, msg: '파업 중인 업체입니다' };
+      if (!c) return { ok: false, msg: T('err.emptySlot') };
+      if (this.isStruck(c)) return { ok: false, msg: T('err.struck') };
       const useSpare = c.calls <= 0;
-      if (useSpare && !(R.spareCall && !this.monthStats.spareUsed)) return { ok: false, msg: '잔여 호출 횟수가 없습니다' };
+      if (useSpare && !(R.spareCall && !this.monthStats.spareUsed)) return { ok: false, msg: T('err.noCalls') };
       const car = D.CARRIERS[c.carrier];
       const cap = this.callCapacity(c);
       let chosen;
@@ -712,22 +716,22 @@
       else {
         const elig = this.eligibleParcels(c);
         chosen = (pickIds || []).map(id => elig.find(p => p.id === id)).filter(Boolean);
-        if (chosen.length > cap) return { ok: false, msg: `최대 ${cap}개까지 처리할 수 있습니다` };
+        if (chosen.length > cap) return { ok: false, msg: T('err.overCap', { cap }) };
       }
-      if (chosen.length === 0) return { ok: false, msg: '처리할 택배가 없습니다' };
+      if (chosen.length === 0) return { ok: false, msg: T('err.nothingToShip') };
 
       const lv = this.trustLevel(c);
       const specialistAll = c.carrier === 'target' && lv >= 3;
       let revenue = 0, xp = 1, special = false, onTime = 0, broken = 0, delivered = [];
       let cert = false;
-      if (this.items.transitCert > 0 && chosen.some(p => this.breakProb(c, p) > 0)) { this.items.transitCert--; cert = true; this.say('운송 보험증 사용: 이번 호출 파손 없음'); }
+      if (this.items.transitCert > 0 && chosen.some(p => this.breakProb(c, p) > 0)) { this.items.transitCert--; cert = true; this.say('log.transitCert'); }
       const snow = this.weatherNow() === 'snow';
       for (const p of chosen) {
         const t = D.PARCEL_TYPES[p.type];
         // ⚠ 파손 판정 (능력 없는 업체)
         if (!cert && this.breakProb(c, p) > 0 && this.rng.next() < this.breakProb(c, p)) {
           broken++; this.monthStats.broken++; this.stats.broken++;
-          this._discardParcel(p, `${this.contractName(c)} 운송 중 파손`, 2, 'broken');
+          this._discardParcel(p, MSG('why.brokenInTransit', { name: this.contractName(c) }), 2, 'broken');
           continue;
         }
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
@@ -751,7 +755,7 @@
         if (!useSpare) c.calls--; c.totalCalls++;
         this.monthStats.calls++; this.run.calls++; this.stats.calls++;
         this.waitStack = 0; this._assignCold();
-        this.say(`${this.contractName(c)} 호출: ${broken}개 전부 파손!`);
+        this.say('log.callAllBroken', { name: this.contractName(c), broken });
         this.emit('call', { contract: c, count: 0, revenue: 0, broken, instant: !!car.instant });
         if (car.instant) return { ok: true, revenue: 0, count: 0, broken, instant: true };
         this._endTurn(false, false); return { ok: true, revenue: 0, count: 0, broken };
@@ -767,10 +771,10 @@
       if (xp > 0) xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       const beforeLv = lv;
       this.trust[c.carrier] = (this.trust[c.carrier] || 0) + xp;
-      if (this.trustLevel(c) > beforeLv) { this.say(`${car.name} 신뢰도 ${this.trustLevel(c)}단계 달성! (${D.TRUST_EFFECTS[this.trustLevel(c)]})`); this.emit('trustup', { carrier: c.carrier, level: this.trustLevel(c) }); if (this.trustLevel(c) >= 3) this.stats.trustL3++; }
+      if (this.trustLevel(c) > beforeLv) { this.say('log.trustUp', { name: car.name, level: this.trustLevel(c), effect: D.TRUST_EFFECTS[this.trustLevel(c)] }); this.emit('trustup', { carrier: c.carrier, level: this.trustLevel(c) }); if (this.trustLevel(c) >= 3) this.stats.trustL3++; }
       // 호출 횟수 소모
       let refunded = false;
-      if (useSpare) { this.monthStats.spareUsed = true; this.say('예비 기사 투입 (잔여 호출 없이 호출)'); }
+      if (useSpare) { this.monthStats.spareUsed = true; this.say('log.spareCall'); }
       else if (R.bundleRefund && chosen.length >= R.bundleRefund && !this.monthStats.bundleUsed) { this.monthStats.bundleUsed = true; refunded = true; }
       else c.calls--;
       c.successCalls++; c.totalCalls++; c.delivered += chosen.length;
@@ -785,7 +789,7 @@
       this.waitStack = 0;
       this._assignCold();
       const freezeFresh = c.carrier === 'cold' && lv >= 3;
-      this.say(`${this.contractName(c)} 호출: ${chosen.length}개 처리, +${revenue}c${delay ? ` (${delay}턴 뒤 입금)` : ''}${broken ? `, 파손 ${broken}개` : ''}${refunded ? ' (묶음 할인: 호출 미소모)' : ''} (잔여 ${c.calls}회)${car.instant ? ' ⚡즉시' : ''}`);
+      this.say('log.call', { name: this.contractName(c), count: chosen.length, revenue, delay: delay ? MSG('log.callDelay', { delay }) : '', broken: broken ? MSG('log.callBroken', { broken }) : '', refund: refunded ? MSG('log.callRefund') : '', calls: c.calls, instant: car.instant ? MSG('log.callInstant') : '' });
       this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, instant: !!car.instant });
       this._updateTrustStats();
       if (car.instant) { this.stats.urgentCalls++; this.stats.maxCash = Math.max(this.stats.maxCash, this.cash); return { ok: true, revenue, count: chosen.length, broken, delay, instant: true }; }
@@ -794,13 +798,13 @@
     }
     // 직접 배송(대기 턴의 부가 행동): 고른 택배를 배송비를 내고 처리. 보상 그대로. wait()에서 호출
     selfDeliver(ids) {
-      if (this.phase !== 'play') return { ok: false, msg: '지금은 배송할 수 없습니다' };
+      if (this.phase !== 'play') return { ok: false, msg: T('err.cannotShipNow') };
       const R = this.rules;
       const chosen = (ids || []).map(id => this.parcels.find(p => p.id === id)).filter(p => p && this.selfCan(p));
-      if (!chosen.length) return { ok: false, msg: '직접 배송할 수 있는 택배가 없습니다' };
-      if (chosen.length > this.selfCount()) return { ok: false, msg: `직접 배송은 한 턴에 ${this.selfCount()}개까지` };
+      if (!chosen.length) return { ok: false, msg: T('err.nothingSelf') };
+      if (chosen.length > this.selfCount()) return { ok: false, msg: T('err.selfLimit', { n: this.selfCount() }) };
       const cost = chosen.reduce((s, p) => s + this.selfCost(p), 0);
-      if (this.cash < cost) return { ok: false, msg: `배송비 ${cost}c가 부족합니다` };
+      if (this.cash < cost) return { ok: false, msg: T('err.selfCost', { cost }) };
       this.cash -= cost; this.monthStats.spent += cost; this.run.spent += cost; this.monthStats.selfCost = (this.monthStats.selfCost || 0) + cost;
       let revenue = 0;
       for (const p of chosen) {
@@ -837,9 +841,9 @@
       this.parcels.splice(i, 1);
       this.monthStats.discarded++; this.run.discarded++; this.stats.discarded++;
       let pen = stress, insured = false;
-      if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; pen = 0; insured = true; why += ' (보험 적용)'; }
+      if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; pen = 0; insured = true; why = MSG('why.insured', { why }); }
       if (pen) { this.stress += pen; this.monthStats.penalty += pen; }
-      this.say(`폐기: ${D.PARCEL_TYPES[p.type].short}${p.size} — ${why}${pen ? ` +${pen}` : ''}`);
+      this.say('log.discard', { short: D.PARCEL_TYPES[p.type].short, size: p.size, why, pen: pen ? ` +${pen}` : '' });
       this.emit(evt || 'discard', { parcel: p, why });
       if (!insured) this._claim(p, why, evt === 'broken' ? 'broken' : 'discard');
       if (evt === 'broken') { const cc = this.customers && this.customers[p.customer]; if (cc) cc.streak = 0; }
@@ -854,28 +858,28 @@
       for (const p of this.parcels) {
         p.age++;
         const isCold = this._attrs(p).includes('cold'), isFrozen = this._attrs(p).includes('frozen');
-        if (p.outdoor && wet && !isCold && !isFrozen && !p.wet) { p.wet = true; reasons.push(`젖음 ${D.PARCEL_TYPES[p.type].short}${p.size}`); }
+        if (p.outdoor && wet && !isCold && !isFrozen && !p.wet) { p.wet = true; reasons.push(MSG('r.wet', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); }
         if (p.customs > 0 && p.outdoor) p.outdoorDuringCustoms = true;
         // 🌾 농산물: 폭염이면 창고 안이라도 상한다 (냉장 구역·환기 시설이면 무사). 야외면 즉시 폐기
-        if (this._attrs(p).includes('produce') && heat && !p.inCold) { if (p.outdoor) { discard.push([p, '폭염 부패']); continue; } if (!this.warehouse.vent && !p.overdue) { p.deadline -= 2; reasons.push(`폭염에 농산물 상함 ${D.PARCEL_TYPES[p.type].short}${p.size} 기한 -2`); } }
+        if (this._attrs(p).includes('produce') && heat && !p.inCold) { if (p.outdoor) { discard.push([p, MSG('why.heatSpoil')]); continue; } if (!this.warehouse.vent && !p.overdue) { p.deadline -= 2; reasons.push(MSG('r.heatProduce', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); } }
         if (p.outdoor && snow) { if (isFrozen) continue; if (isCold) { p.warm = 0; if (!p.overdue) continue; } }
         // 통관 대기: 기한은 통관 뒤 시작
         if (p.customs > 0) { if (isCold && !p.inCold) p.coldDuringCustoms = false; p.customs--; continue; }
         // 신선: 냉장 구역 밖이면 폭염 즉시 / warmLimit턴 뒤 폐기. 안이면 기한만 진행(냉동고 퍽·냉장 L3는 기한 정지)
-        if (isCold && !p.inCold) { p.warm = (p.warm || 0) + 1; if (heat || p.warm >= R.warmLimit) { discard.push([p, heat ? '폭염 부패' : '상온 부패']); continue; } }
+        if (isCold && !p.inCold) { p.warm = (p.warm || 0) + 1; if (heat || p.warm >= R.warmLimit) { discard.push([p, MSG(heat ? 'why.heatSpoil' : 'why.warmSpoil')]); continue; } }
         else if (isCold) p.warm = 0;
-        if (isFrozen && !p.inFrozen) { discard.push([p, '냉동 구역 밖']); continue; }
+        if (isFrozen && !p.inFrozen) { discard.push([p, MSG('why.outsideFrozen')]); continue; }
         const freeze = isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer));
         const grace = isCold ? R.returnGraceFresh : R.returnGrace;
-        if (!p.overdue) { if (!freeze) p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; pen += 1; reasons.push(`기한 초과 ${D.PARCEL_TYPES[p.type].short}`); this.monthStats.overdue++; } }
-        else { p.overdueTurns = (p.overdueTurns || 0) + 1; if (p.overdueTurns >= grace) returned.push(p); else if (R.overdueTurnStress) { pen += R.overdueTurnStress; reasons.push(`초과 지속 ${D.PARCEL_TYPES[p.type].short}`); } }
+        if (!p.overdue) { if (!freeze) p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; pen += 1; reasons.push(MSG('r.overdue', { short: D.PARCEL_TYPES[p.type].short })); this.monthStats.overdue++; } }
+        else { p.overdueTurns = (p.overdueTurns || 0) + 1; if (p.overdueTurns >= grace) returned.push(p); else if (R.overdueTurnStress) { pen += R.overdueTurnStress; reasons.push(MSG('r.overdueCont', { short: D.PARCEL_TYPES[p.type].short })); } }
       }
-      for (const [p, why] of discard) { this._discardParcel(p, why, 2, 'discard'); reasons.push(`${why} 폐기 ${D.PARCEL_TYPES[p.type].short}`); }
+      for (const [p, why] of discard) { this._discardParcel(p, why, 2, 'discard'); reasons.push(MSG('r.discard', { why, short: D.PARCEL_TYPES[p.type].short })); }
       for (const p of returned) {
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.monthStats.returned++; this.stats.returned++;
-        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push('반송 (보험 적용)'); this.emit('returned', { parcel: p }); }
-        else { const ns = M.INSURERS[this.insurer].noReturnStress; if (!ns) pen += 2; reasons.push(`반송 ${D.PARCEL_TYPES[p.type].short}${ns ? '' : ' +2'}`); this.emit('returned', { parcel: p }); this._claim(p, '반송', 'returned'); }
+        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push(MSG('r.returnedInsured')); this.emit('returned', { parcel: p }); }
+        else { const ns = M.INSURERS[this.insurer].noReturnStress; if (!ns) pen += 2; reasons.push(MSG('r.returned', { short: D.PARCEL_TYPES[p.type].short, pen: ns ? '' : ' +2' })); this.emit('returned', { parcel: p }); this._claim(p, MSG('why.returned'), 'returned'); }
       }
       this._assignCold();
       // 도난: 야외 적재 택배는 각각 판정
@@ -884,8 +888,8 @@
         if (this.rng.next() >= tp) continue;
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.monthStats.stolen++; this.stats.stolen++;
-        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push('도난 (보험 적용)'); this.emit('stolen', { parcel: p }); }
-        else { pen += 2; reasons.push(`도난 ${D.PARCEL_TYPES[p.type].short}${p.size} +2`); this.emit('stolen', { parcel: p }); this._claim(p, '도난', 'stolen'); }
+        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push(MSG('r.stolenInsured')); this.emit('stolen', { parcel: p }); }
+        else { pen += 2; reasons.push(MSG('r.stolen', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); this.emit('stolen', { parcel: p }); this._claim(p, MSG('why.stolen'), 'stolen'); }
       }
       // 야외 보관 물품 도난: 배상 ×2
       if (tp > 0) for (const s of this.storage.slice()) {
@@ -893,8 +897,8 @@
         this.storage.splice(this.storage.indexOf(s), 1);
         const full = Math.round((s.fee || s.perTurn * s.turns) * 2), covered = Math.round(full * this.coverRate('stolen', { attrs: [] })), amount = full - covered;
         if (covered) this.monthStats.insClaims++;
-        this.cash -= amount; this.monthStats.claims += amount; this.stats.claims += amount; pen += 2; reasons.push(`보관 물품 도난 +2 (배상 ${amount}c)`);
-        this._custXp(s.customer, -3, '보관 도난'); this.emit('storageStolen', { storage: s, amount });
+        this.cash -= amount; this.monthStats.claims += amount; this.stats.claims += amount; pen += 2; reasons.push(MSG('r.storageStolen', { amount }));
+        this._custXp(s.customer, -3, MSG('why.storageStolen')); this.emit('storageStolen', { storage: s, amount });
       }
       this._tickStorage(reasons);
       this.outdoorPref = this.outdoorPref.filter(id => typeof id === 'string' ? this.storage.some(s => 's' + s.id === id) : this.parcels.some(p => p.id === id));
@@ -902,16 +906,16 @@
       const over = this.outdoorVolume();
       if (over > 0) { this.stats.overflowTurns++; this.stats.maxOverflowTurns = Math.max(this.stats.maxOverflowTurns, this.stats.overflowTurns); } else this.stats.overflowTurns = 0;
       const effOver = over > R.overflowGrace ? over : 0;
-      if (effOver >= 3) { let p2 = 2; if (R.endless && this.month >= 10 && effOver >= 6) p2 += Math.floor((effOver - 6) / 3); pen += p2; reasons.push(`창고 초과 ${over} (+${p2})`); }
-      else if (effOver >= 1) { pen += 1; reasons.push(`창고 초과 ${over} (+1)`); }
-      else if (over > 0) reasons.push(`창고 초과 ${over} (임시 적재장)`);
+      if (effOver >= 3) { let p2 = 2; if (R.endless && this.month >= 10 && effOver >= 6) p2 += Math.floor((effOver - 6) / 3); pen += p2; reasons.push(MSG('r.overflow', { over, pen: p2 })); }
+      else if (effOver >= 1) { pen += 1; reasons.push(MSG('r.overflow', { over, pen: 1 })); }
+      else if (over > 0) reasons.push(MSG('r.overflowGrace', { over }));
       if (usageBefore >= 1 && pen === 0) this.stats.fullNoPenalty = true;
       if (pen > 0) {
         this.stress += pen; this.monthStats.penalty += pen;
-        this.say(`페널티 +${pen}: ${reasons.join(', ')} (스트레스 ${this.stress})`);
+        this.say('log.penalty', { pen, reasons, stress: this.stress });
         this.emit('penalty', { amount: pen, reasons });
       } else if (reasons.length) this.say(reasons.join(', '));
-      if (this.stress >= this.rules.gameoverStress) return this._gameOver('운영 스트레스가 한계에 도달했습니다');
+      if (this.stress >= this.rules.gameoverStress) return this._gameOver(MSG('over.stress'));
       if (this.turn >= D.TURNS_PER_MONTH) return this._endMonth();
       this._startTurn();
     }
@@ -925,7 +929,7 @@
       const premium = this._settlePremium();
       let closing = 0;
       if (R.closingBonus && this.usage() <= R.closingBonus.usage) { closing = R.closingBonus.amount; this.cash += closing; }
-      if (R.erosion) { const cands = this.contracts.filter(c => c && this.startContractIds.includes(c.id) && c.calls > 0); if (cands.length) { const c = this.rng.pick(cands); c.calls--; this.say(`불안정: ${this.contractName(c)} 잔여 호출 -1`); } }
+      if (R.erosion) { const cands = this.contracts.filter(c => c && this.startContractIds.includes(c.id) && c.calls > 0); if (cands.length) { const c = this.rng.pick(cands); c.calls--; this.say('log.erosion', { name: this.contractName(c) }); } }
       // 통계
       this.stats.monthsDone = this.month;
       this.stats.maxMonthDelivered = Math.max(this.stats.maxMonthDelivered, ms.delivered);
@@ -936,8 +940,8 @@
       this.summary = { month: this.month, revenue: ms.revenue, opCost, calls: ms.calls, waits: ms.waits,
         delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, selfCost: ms.selfCost || 0, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, customers: this.customerSummary(),
         cash: this.cash, stress: this.stress, usage: Math.round(this.usage() * 100), left: this.parcels.length };
-      this.say(`${this.month}월 정산: 수익 ${ms.revenue}, 운영비 ${opCost}${closing ? `, 월말 결산 +${closing}` : ''}`);
-      if (this.cash < 0) return this._gameOver('운영비를 지불하지 못해 파산했습니다');
+      this.say('log.settle', { month: this.month, revenue: ms.revenue, opCost, closing: closing ? MSG('log.settleClosing', { closing }) : '' });
+      if (this.cash < 0) return this._gameOver(MSG('over.bankrupt'));
       this.phase = 'summary';
     }
     closeSummary() {
@@ -948,22 +952,22 @@
     }
     _finish() {
       const R = this.rules;
-      if (R.winDelivered && this.run.delivered < R.winDelivered) return this._gameOver(`처리량 부족: ${this.run.delivered}/${R.winDelivered}개`), true;
-      if (R.winMaxDiscard != null && this.run.discarded > R.winMaxDiscard) return this._gameOver(`부패 폐기 초과: ${this.run.discarded}개 (허용 ${R.winMaxDiscard})`), true;
-      if (R.winCash && this.cash < R.winCash) return this._gameOver(`자금 부족: ${this.cash}/${R.winCash}c`), true;
-      if (R.winMaxOverdue != null && this.stats.overdueDelivered > R.winMaxOverdue) return this._gameOver(`기한 초과 처리 초과: ${this.stats.overdueDelivered}개 (허용 ${R.winMaxOverdue})`), true;
-      if (R.winStorage && this.stats.storageDone < R.winStorage) return this._gameOver(`보관 계약 부족: ${this.stats.storageDone}/${R.winStorage}건`), true;
-      if (R.winBigCustomer && this.bigCustomer && this.customerLevel(this.bigCustomer) < 3) return this._gameOver(`${M.CUSTOMERS[this.bigCustomer].name} 신뢰 ${this.customerLevel(this.bigCustomer)}단계 (3단계 필요)`), true;
+      if (R.winDelivered && this.run.delivered < R.winDelivered) return this._gameOver(MSG('over.delivered', { n: this.run.delivered, need: R.winDelivered })), true;
+      if (R.winMaxDiscard != null && this.run.discarded > R.winMaxDiscard) return this._gameOver(MSG('over.discard', { n: this.run.discarded, max: R.winMaxDiscard })), true;
+      if (R.winCash && this.cash < R.winCash) return this._gameOver(MSG('over.cash', { cash: this.cash, need: R.winCash })), true;
+      if (R.winMaxOverdue != null && this.stats.overdueDelivered > R.winMaxOverdue) return this._gameOver(MSG('over.overdue', { n: this.stats.overdueDelivered, max: R.winMaxOverdue })), true;
+      if (R.winStorage && this.stats.storageDone < R.winStorage) return this._gameOver(MSG('over.storage', { n: this.stats.storageDone, need: R.winStorage })), true;
+      if (R.winBigCustomer && this.bigCustomer && this.customerLevel(this.bigCustomer) < 3) return this._gameOver(MSG('over.bigCustomer', { name: M.CUSTOMERS[this.bigCustomer].name, level: this.customerLevel(this.bigCustomer) })), true;
       return this._win();
     }
     _gameOver(reason) {
       this.phase = 'over';
       this.result = this._makeResult(false, reason);
-      this.say(`게임오버: ${reason}`);
+      this.say('log.gameOver', { reason });
     }
     _win() {
       this.phase = 'win';
-      this.result = this._makeResult(true, `${this.rules.months}개월 생존 성공!`);
+      this.result = this._makeResult(true, MSG('over.win', { months: this.rules.months }));
       this.say(this.result.reason);
       return true;
     }
@@ -980,7 +984,7 @@
     _openMarket() {
       this.phase = 'market';
       this.market = { items: this._genMarketItems(), bought: 0, refreshes: 0, month: this.month, freeRefresh: this.rules.freeRefresh };
-      this.say(`${this.month}월 마켓 오픈 (최대 ${this.rules.marketMaxBuy}개 구매)`);
+      this.say('log.marketOpen', { month: this.month, max: this.rules.marketMaxBuy });
     }
     _carrierWeights() {
       const R = this.rules, w = {};
@@ -1012,7 +1016,7 @@
           if (forced.some(f => safe(f.carrier))) break;
           const cand = {}; for (const k of Object.keys(weights)) if (!['target', 'urgent'].includes(k) && safe(k)) cand[k] = weights[k];
           if (!Object.keys(cand).length) continue;
-          forced.unshift({ carrier: this.rng.weighted(cand), hint: `창고의 ${D.PARCEL_TYPES[b.type].short} ${b.count}개 처리 가능` });
+          forced.unshift({ carrier: this.rng.weighted(cand), hint: T('market.hint', { short: D.PARCEL_TYPES[b.type].short, count: b.count }) });
           break;
         }
       }
@@ -1038,21 +1042,21 @@
         let price = D.FACILITIES[f].price * mult * R.facilityPriceMult; if (R.facilityPriceMap && R.facilityPriceMap[f]) price *= R.facilityPriceMap[f];
         for (const id in this.customers || {}) { const fp = this.customerPerk(id, 'facilityPrice'); if (fp && fp[f]) price *= fp[f]; }
         items.push({ kind: 'fac', fac: f, price: Math.round(price), name: D.FACILITIES[f].name, sold: false });
-      } else items.push({ kind: 'fac', fac: null, price: 0, name: '시설 매진', sold: true });
+      } else items.push({ kind: 'fac', fac: null, price: 0, name: T('market.facSoldOut'), sold: true });
       if (Object.keys(vehW).length && this.rng.next() < 0.5) { const f = this.rng.weighted(vehW); items.push({ kind: 'fac', fac: f, price: Math.round(D.FACILITIES[f].price * mult * R.facilityPriceMult), name: D.FACILITIES[f].name, sold: false }); }
-      if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3) { const cands = Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !this.customers[k]); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: `신규 고객: ${M.CUSTOMERS[k].name}`, sold: false }); } }
+      if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3) { const cands = Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !this.customers[k]); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: T('market.newCustomer', { name: M.CUSTOMERS[k].name }), sold: false }); } }
       if (this.rng.next() < 0.6) { const k = this.rng.pick(Object.keys(M.INS_ITEMS)); items.push({ kind: 'item', item: k, price: Math.round(M.INS_ITEMS[k].price * mult), name: M.INS_ITEMS[k].name, sold: false }); }
       return items;
     }
     refreshCost() { const mk = this.market; if (mk.refreshes < mk.freeRefresh) return 0; const r = mk.refreshes - mk.freeRefresh; return Math.round(D.REFRESH_COSTS[Math.min(r, D.REFRESH_COSTS.length - 1)] * this.rules.priceMult); }
     refreshMarket() {
       if (this.phase !== 'market') return { ok: false };
-      if (this.rules.noRefresh) return { ok: false, msg: '이 시나리오에서는 새로고침할 수 없습니다' };
+      if (this.rules.noRefresh) return { ok: false, msg: T('err.noRefresh') };
       const cost = this.refreshCost();
-      if (this.cash < cost) return { ok: false, msg: '자금이 부족합니다' };
+      if (this.cash < cost) return { ok: false, msg: T('err.noCash') };
       this.cash -= cost; this.run.spent += cost; this.market.refreshes++;
       this.market.items = this._genMarketItems();
-      this.say(cost ? `마켓 새로고침 (-${cost}c)` : '마켓 새로고침 (무료)');
+      if (cost) this.say('log.refresh', { cost }); else this.say('log.refreshFree');
       return { ok: true };
     }
     contractPrice(item) {
@@ -1062,15 +1066,15 @@
       return p;
     }
     buy(itemIdx, target) {
-      if (this.phase !== 'market') return { ok: false, msg: '마켓이 아닙니다' };
+      if (this.phase !== 'market') return { ok: false, msg: T('err.notMarket') };
       const R = this.rules, it = this.market.items[itemIdx];
-      if (!it || it.sold) return { ok: false, msg: '이미 판매된 상품' };
-      if (this.market.bought >= R.marketMaxBuy) return { ok: false, msg: `한 달에 ${R.marketMaxBuy}개까지만 구매할 수 있습니다` };
+      if (!it || it.sold) return { ok: false, msg: T('err.sold') };
+      if (this.market.bought >= R.marketMaxBuy) return { ok: false, msg: T('err.marketMax', { n: R.marketMaxBuy }) };
       let price = it.price;
       if (it.kind === 'contract') {
         price = this.contractPrice(it);
-        if (this.cash < price) return { ok: false, msg: '자금이 부족합니다' };
-        if (target == null || target < 0 || target >= D.CONTRACT_SLOTS) return { ok: false, msg: '교체할 슬롯을 선택하세요' };
+        if (this.cash < price) return { ok: false, msg: T('err.noCash') };
+        if (target == null || target < 0 || target >= D.CONTRACT_SLOTS) return { ok: false, msg: T('err.pickSlot') };
         const old = this.contracts[target];
         const nc = this._makeContract(it.carrier, it.grade);
         if (old) {
@@ -1079,40 +1083,40 @@
         }
         this.contracts[target] = nc;
         this.monthStats.firstContractBought = true; this.stats.contractsBought++;
-        this.say(`계약 구매: ${it.name} (-${price}c)` + (old ? `, ${this.contractName(old)} 폐기 (잔여 ${old.calls}회 소멸)` : ''));
+        this.say('log.buyContract', { name: it.name, price, old: old ? MSG('log.buyContractOld', { name: this.contractName(old), calls: old.calls }) : '' });
       } else if (it.kind === 'enh') {
-        if (this.cash < price) return { ok: false, msg: '자금이 부족합니다' };
+        if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         const c = this.contracts[target];
-        if (!c) return { ok: false, msg: '적용할 계약을 선택하세요' };
+        if (!c) return { ok: false, msg: T('err.pickContract') };
         const e = D.ENHANCEMENTS[it.enh];
-        if (e.kind === 'limit') { if (c.enh.limit >= 2) return { ok: false, msg: '호출 한도 강화는 계약당 2회까지' }; c.enh.limit++; c.maxCalls += e.value; c.calls += e.value; }
-        else if (e.kind === 'cap') { if (c.enh.cap >= 3) return { ok: false, msg: '처리 용량 강화는 계약당 3단계까지' }; c.enh.cap++; }
-        else if (e.kind === 'regular') { if (c.enh.regular) return { ok: false, msg: '이미 정기 배차가 적용된 계약' }; c.enh.regular = true; }
-        else if (e.kind === 'express') { if (c.enh.express) return { ok: false, msg: '이미 고속 배차가 적용된 계약' }; c.enh.express = true; }
+        if (e.kind === 'limit') { if (c.enh.limit >= 2) return { ok: false, msg: T('err.limitMax') }; c.enh.limit++; c.maxCalls += e.value; c.calls += e.value; }
+        else if (e.kind === 'cap') { if (c.enh.cap >= 3) return { ok: false, msg: T('err.capMax') }; c.enh.cap++; }
+        else if (e.kind === 'regular') { if (c.enh.regular) return { ok: false, msg: T('err.hasRegular') }; c.enh.regular = true; }
+        else if (e.kind === 'express') { if (c.enh.express) return { ok: false, msg: T('err.hasExpress') }; c.enh.express = true; }
         else if (e.kind === 'trust') { const b = this.trustLevel(c); this.trust[c.carrier] = (this.trust[c.carrier] || 0) + e.value; if (this.trustLevel(c) > b && this.trustLevel(c) >= 3) this.stats.trustL3++; }
         else if (e.kind === 'opt') {
           const car = D.CARRIERS[c.carrier];
-          if (c.enh.opt) return { ok: false, msg: '특약은 계약당 1개' };
-          if (car.caps.includes(e.attr)) return { ok: false, msg: '이미 그 속성을 다루는 업체' };
-          if (car.instant) return { ok: false, msg: '긴급 특송에는 특약을 붙일 수 없음' };
-          if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return { ok: false, msg: `크기 최대 ${e.maxSizeMax} 이하 계약만` };
-          if (car.onlyPlain) return { ok: false, msg: '속성 없는 택배 전용 업체에는 붙일 수 없음' };
+          if (c.enh.opt) return { ok: false, msg: T('err.optOne') };
+          if (car.caps.includes(e.attr)) return { ok: false, msg: T('err.optHasAttr') };
+          if (car.instant) return { ok: false, msg: T('err.optUrgent') };
+          if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return { ok: false, msg: T('err.optSize', { max: e.maxSizeMax }) };
+          if (car.onlyPlain) return { ok: false, msg: T('err.optPlain') };
           c.enh.opt = it.enh; if (e.capDelta) c.enh.capDelta += e.capDelta; if (e.callsDelta) { c.maxCalls = Math.max(1, c.maxCalls + e.callsDelta); c.calls = Math.max(0, Math.min(c.calls, c.maxCalls)); }
         }
         this._updateTrustStats();
-        this.say(`강화 적용: ${e.name} → ${this.contractName(c)} (-${price}c)`);
+        this.say('log.enhance', { name: e.name, contract: this.contractName(c), price });
       } else if (it.kind === 'customer') {
-        if (this.cash < price) return { ok: false, msg: '자금이 부족합니다' };
-        if (this.customerCount() >= M.CUSTOMER_SLOTS) return { ok: false, msg: `고객은 ${M.CUSTOMER_SLOTS}명까지` };
-        if (!this.addCustomer(it.customer)) return { ok: false, msg: '이미 거래 중인 고객' };
-        this.say(`신규 고객 계약: ${M.CUSTOMERS[it.customer].name} (-${price}c)`);
+        if (this.cash < price) return { ok: false, msg: T('err.noCash') };
+        if (this.customerCount() >= M.CUSTOMER_SLOTS) return { ok: false, msg: T('err.customerMax', { n: M.CUSTOMER_SLOTS }) };
+        if (!this.addCustomer(it.customer)) return { ok: false, msg: T('err.customerDup') };
+        this.say('log.buyCustomer', { name: M.CUSTOMERS[it.customer].name, price });
       } else if (it.kind === 'item') {
-        if (this.cash < price) return { ok: false, msg: '자금이 부족합니다' };
+        if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         if (it.item === 'transitCert') this.items.transitCert++; else this.items[it.item] = this.month + 1;
-        this.say(`구매: ${it.name} (-${price}c)`);
+        this.say('log.buyItem', { name: it.name, price });
       } else if (it.kind === 'fac') {
-        if (!it.fac) return { ok: false, msg: '매진' };
-        if (this.cash < price) return { ok: false, msg: '자금이 부족합니다' };
+        if (!it.fac) return { ok: false, msg: T('err.soldOut') };
+        if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         const f = D.FACILITIES[it.fac];
         if (f.cap) { this.warehouse.cap += Math.round(f.cap * R.facilityCapMult); this.stats.expansions++; }
         if (f.cold) { this.warehouse.cold += f.cold; if (R.coldCapMax != null) this.warehouse.cold = Math.min(this.warehouse.cold, R.coldCapMax); this.stats.coldUpgrades++; }
@@ -1120,7 +1124,7 @@
         if (f.frozen) { this.warehouse.frozen = (this.warehouse.frozen || 0) + f.frozen; if (R.frozenCapMax != null) this.warehouse.frozen = Math.min(this.warehouse.frozen, R.frozenCapMax); }
         this.warehouse[it.fac] = true;
         this._assignCold();
-        this.say(`시설 구매: ${f.name} (-${price}c)`);
+        this.say('log.buyFacility', { name: f.name, price });
       }
       this.cash -= price; this.run.spent += price; this.market.bought++; it.sold = true;
       return { ok: true };
@@ -1129,7 +1133,7 @@
       if (this.phase !== 'market') return false;
       const prep = this.market.prep;
       this.market = null;
-      if (prep) { this.phase = 'play'; this.say('── 1개월차 시작 ──'); this._startTurn(); return true; }
+      if (prep) { this.phase = 'play'; this.say('log.monthStart', { m: 1 }); this._startTurn(); return true; }
       this._startMonth(this.month + 1);
       return true;
     }

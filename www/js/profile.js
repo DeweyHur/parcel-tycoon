@@ -53,7 +53,7 @@ window.Profile = (function () {
       if (type === 'company' && !P.unlocked.companies.includes(id)) { P.unlocked.companies.push(id); out.push({ type, id, name: M.COMPANIES[id].name }); }
       if (type === 'perk' && !P.unlocked.perks.includes(id)) { P.unlocked.perks.push(id); out.push({ type, id, name: M.PERKS[id].name }); }
       if (type === 'scenario' && !P.unlocked.scenarios.includes(id)) { P.unlocked.scenarios.push(id); out.push({ type, id, name: M.SCENARIOS[id].name }); }
-      if (type === 'slot' && (P.unlocked.perkSlots || 1) < +id) { P.unlocked.perkSlots = +id; out.push({ type, id, name: `퍽 슬롯 ${id}개` }); }
+      if (type === 'slot' && (P.unlocked.perkSlots || 1) < +id) { P.unlocked.perkSlots = +id; out.push({ type, id, name: window.I18n.t('codex.slotReward', { n: id }) }); }
     }
     return out;
   }

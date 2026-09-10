@@ -11,9 +11,9 @@
   <div id="app">
     <div id="scene">
       <div id="hud">
-        <div class="hud-box" id="hud-left"><b id="hud-month">1개월차</b> <span id="hud-turn">1/10턴</span><br>자금 <b id="hud-cash">600</b>c</div>
+        <div class="hud-box" id="hud-left"><b id="hud-month">1</b> <span id="hud-turn">1/10</span><br><span id="hud-cash-lbl">자금</span> <b id="hud-cash">600</b>c</div>
         <div class="hud-box" id="hud-right">
-          <div id="stress-wrap"><span id="stress-label">안정</span><div class="gauge" id="stress-gauge"><i style="width:0%"></i></div><span id="stress-num">0</span></div>
+          <div id="stress-wrap"><span id="stress-label"></span><div class="gauge" id="stress-gauge"><i style="width:0%"></i></div><span id="stress-num">0</span></div>
           <div id="hud-perks" style="color:var(--dim);font-size:11px"></div>
         </div>
       </div>
@@ -22,8 +22,8 @@
     </div>
     <div id="panel">
       <div class="bars">
-        <div class="bar usage" id="bar-usage"><div class="lbl"><span>창고</span><b id="usage-txt">0/24</b></div><div class="track"><i></i><span class="mark" style="left:75%"></span><span class="mark" style="left:90%"></span></div></div>
-        <div class="bar cold" id="bar-cold"><div class="lbl"><span>냉장</span><b id="cold-txt">0/6</b></div><div class="track"><i></i></div></div>
+        <div class="bar usage" id="bar-usage"><div class="lbl"><span id="usage-lbl">창고</span><b id="usage-txt">0/24</b></div><div class="track"><i></i><span class="mark" style="left:75%"></span><span class="mark" style="left:90%"></span></div></div>
+        <div class="bar cold" id="bar-cold"><div class="lbl"><span id="cold-lbl">냉장</span><b id="cold-txt">0/6</b></div><div class="track"><i></i></div></div>
       </div>
       <div id="upcoming"></div>
       <div id="wxline" hidden></div>
@@ -34,7 +34,7 @@
         <button class="btn contract" id="c1"></button>
         <button class="btn contract" id="c2"></button>
         <button class="btn contract" id="c3"></button>
-        <button class="btn primary" id="wait-btn" style="grid-column:1/-1">⏭ 대기 · 직접 배송<small>다음 턴 예상</small></button>
+        <button class="btn primary" id="wait-btn" style="grid-column:1/-1"></button>
         <div id="bottom-bar">
           <button class="btn small" id="cust-btn">고객</button>
           <button class="btn small" id="log-btn">기록</button>
@@ -49,6 +49,9 @@
   <script src="js/three.min.js"></script>
   <script src="js/data.js"></script>
   <script src="js/meta.js"></script>
+  <script src="locales/ko.js"></script>
+  <script src="locales/en.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/game.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/profile.js"></script>
