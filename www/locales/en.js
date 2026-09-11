@@ -346,6 +346,7 @@
     'trust.remain': '{n}xp to go',
     'ps.warm': '🔥 Room temp · discarded next turn',
     'ps.cold': '❄ Cold',
+    'ps.produceCold': '🌾 in spare cold space (heat-safe)',
     'ps.frozenOut': '🔥 Outside freezer',
     'ps.frozen': '❆ Frozen',
     'ps.heat': '🔥 Heat damage',

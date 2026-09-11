@@ -324,7 +324,7 @@
     const parts = [], a = attrsOf(p);
     if (a.includes('cold')) { if (!p.inCold) parts.push(`<b style="color:var(--red)">${T('ps.warm')}</b>`); else parts.push(T('ps.cold')); }
     if (a.includes('frozen')) { if (!p.inFrozen) parts.push(`<b style="color:var(--red)">${T('ps.frozenOut')}</b>`); else parts.push(T('ps.frozen')); }
-    if (a.includes('produce')) { if (p.inCold) parts.push(T('ps.cold')); else if (game && game.isHeatTurn() && !game.warehouse.vent) parts.push(`<b style="color:var(--orange)">${T('ps.heat')}</b>`); }
+    if (a.includes('produce')) { if (p.inCold) parts.push(T('ps.produceCold')); else if (game && game.isHeatTurn() && !game.warehouse.vent) parts.push(`<b style="color:var(--orange)">${T('ps.heat')}</b>`); }
     if (p.customs > 0) { parts.push(`<b style="color:var(--blue)">${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })}</b>`); parts.push(`⏳ ${T('fmt.turns', { n: p.deadline })}`); if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`); return parts.join(' · '); }
     if (p.overdue) { const ri = game ? game.returnIn(p) : null; parts.push(`<b style="color:var(--red)">${T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' })}</b>`); } else parts.push(T('ps.deadline', { n: p.deadline }));
     if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`);

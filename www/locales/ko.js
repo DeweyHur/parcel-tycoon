@@ -347,6 +347,7 @@
     'trust.remain': '{n}xp 남음',
     'ps.warm': '🔥 상온 · 다음 턴 폐기',
     'ps.cold': '❄ 냉장',
+    'ps.produceCold': '🌾 냉장 빈자리 대피(폭염 안전)',
     'ps.frozenOut': '🔥 냉동 구역 밖',
     'ps.frozen': '❆ 냉동',
     'ps.heat': '🔥 폭염에 상함',
