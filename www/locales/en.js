@@ -420,6 +420,7 @@
     'hud.cashLbl': "Month-end est.",
     'hud.cashNow': "cash {n}",
     'hud.pending': "incoming +{n}",
+    'hud.stock': 'stock +{n}',
     'hud.opCostDue': "op cost & premium −{n}",
     'hud.loanWarn': "⚠ shortfall becomes a loan (15% interest)",
     'hud.debt': "loan repay −{n}",

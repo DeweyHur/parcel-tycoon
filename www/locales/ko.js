@@ -421,6 +421,7 @@
     'hud.cashLbl': "월말 예상",
     'hud.cashNow': "현금 {n}",
     'hud.pending': "입금 예정 +{n}",
+    'hud.stock': '재고 +{n}',
     'hud.opCostDue': "운영비·보험 −{n}",
     'hud.loanWarn': "⚠ 부족분은 단기 차입(이자 15%)",
     'hud.debt': "차입 상환 −{n}",

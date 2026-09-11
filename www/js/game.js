@@ -623,7 +623,9 @@
       const op = this.opCostBreakdown(this.month).total;
       const prem = this.insurer === 'none' ? 0 : this.premium();
       const loan = this.debt > 0 ? this.debt + Math.ceil(this.debt * D.LOAN.interest) : 0;
-      return { cash: this.cash, pending, feesDue: this.feesDue, opCost: op, premium: prem, loan, total: this.cash + pending - this.feesDue - op - prem - loan };
+      // 재고 수입 예상: 창고 택배 보상 합(기한 초과분은 -25%) — 이번 달 안에 보낼 것으로 본다
+      const stock = this.parcels.reduce((s, p) => s + Math.round(p.reward * (p.overdue ? this.rules.overdueMult : 1)), 0);
+      return { cash: this.cash, pending, stock, feesDue: this.feesDue, opCost: op, premium: prem, loan, total: this.cash + pending + stock - this.feesDue - op - prem - loan };
     }
     // 운영비 내역: 임대(기본/회사 고정/난이도·시나리오 보정) + 계약 유지비 + 시설 유지비
     opCostBreakdown(m, rentRoll) {
