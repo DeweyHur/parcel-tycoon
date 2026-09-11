@@ -258,8 +258,13 @@
       return Object.keys(w).map(id => {
         const share = w[id] / sum, n = total * share, lv = this.customerLevel(id), cust = M.CUSTOMERS[id];
         const special = id === 'anon' || !cust.items ? Math.max(0, 1 - (ratio.normal || 0) / Object.values(ratio).reduce((a, b) => a + b, 0)) : (lv === 0 ? 0 : lv === 1 ? 0.3 : 1);
-        const types = cust.items ? Object.keys(cust.items).map(k => M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k).filter(t => t !== 'normal') : Object.keys(ratio).filter(t => t !== 'normal' && ratio[t] > 0);
-        return { id, level: lv, min: Math.max(0, Math.floor(n - 1)), max: Math.ceil(n + 1), special, types };
+        // 종류별 비중: 특수 전체 비중(special)을 고객 품목 가중치(또는 익명은 월별 비율)로 나눔
+        const tw = {};
+        if (cust.items) { for (const k of Object.keys(cust.items)) { const t = M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k; if (t !== 'normal') tw[t] = (tw[t] || 0) + cust.items[k]; } }
+        else for (const t of Object.keys(ratio)) if (t !== 'normal' && ratio[t] > 0) tw[t] = ratio[t];
+        const tsum = Object.values(tw).reduce((a, b) => a + b, 0) || 1;
+        const types = Object.keys(tw), pct = {}; for (const t of types) pct[t] = special * tw[t] / tsum;
+        return { id, level: lv, min: Math.max(0, Math.floor(n - 1)), max: Math.ceil(n + 1), special, types, pct };
       }).sort((a, b) => b.max - a.max);
     }
     customerSummary() { return Object.keys(this.customers || {}).map(id => ({ id, ...M.CUSTOMERS[id], level: this.customerLevel(id), xp: this.customers[id].xp, suspended: this.customers[id].suspended, month: this.customers[id].month, total: this.customers[id].total, next: this.customerNext(id), slots: this.customers[id].slots })); }
