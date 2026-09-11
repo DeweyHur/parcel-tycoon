@@ -7,6 +7,9 @@
     GAMEOVER_STRESS: 20,
     OPERATING_COST: 120,   // 월 기본 임대(창고·인건비). 여기에 계약 유지비 + 시설 유지비가 더해진다
     OPCOST_CONTRACT: 10,   // 보유 계약 슬롯당 월 유지비
+    // 배차비·배송비는 후불: 월중에 쌓였다가 월말 정산에서 빠진다. 정산 후 자금이 음수면 단기 차입으로 메우고
+    // 다음 정산에 원금+이자를 갚는다. 부채가 한도를 넘으면 부도.
+    LOAN: { limit: 400, interest: 0.15 },
     CONTRACT_SLOTS: 4,
     MARKET_MAX_BUY: 3,
     REFRESH_COSTS: [40, 80, 140, 220],

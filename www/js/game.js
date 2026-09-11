@@ -107,7 +107,7 @@
       this.waitedLastTurn = false; this.waitStack = 0;
       this.insuranceUsed = false;
       this.market = null;
-      this.storage = []; this.offer = null; this.outdoorPref = []; this.weather = []; this.pendingRevenue = []; this.bigCustomer = null;
+      this.storage = []; this.offer = null; this.outdoorPref = []; this.weather = []; this.pendingRevenue = []; this.bigCustomer = null; this.feesDue = 0; this.debt = 0;
       this.insurer = 'none'; this.premMult = 1; this.noClaimMonths = 0; this.coverHalf = false; this.items = { transitCert: 0, yardIns: 0, customsBond: 0 };
       this.monthStats = null;
       this.run = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, discarded: 0 };
@@ -122,7 +122,7 @@
       this._startMonth(1);
     }
     static emptyStats() {
-      return { deliveredByType: { normal: 0, fresh: 0, produce: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, onTimeByType: { normal: 0, fresh: 0, produce: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, broken: 0, claims: 0, customerL3: 0, storageDone: 0, premiumPaid: 0, wetDelivered: 0, snowDelivered: 0, noClaim2: false, customersAdded: 0,
+      return { deliveredByType: { normal: 0, fresh: 0, produce: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, onTimeByType: { normal: 0, fresh: 0, produce: 0, fragile: 0, intl: 0, large: 0, frozen: 0 }, broken: 0, claims: 0, customerL3: 0, storageDone: 0, premiumPaid: 0, loans: 0, interestPaid: 0, wetDelivered: 0, snowDelivered: 0, noClaim2: false, customersAdded: 0,
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
         overdueDelivered: 0, returned: 0, stolen: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
@@ -788,8 +788,8 @@
       const avail = c.calls + (useSpare ? 1 : 0);
       if (trucks > avail) return { ok: false, msg: T('err.noTrucks', { n: c.calls }) };
       const fee = this.callFee(c, trucks);
-      if (this.cash < fee) return { ok: false, msg: T('err.noCashFee', { fee }) };
-      this.cash -= fee; this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
+      // 후불: 배차비는 월말 정산에서 빠진다 (자금 부족으로 호출이 막히지 않는다)
+      this.feesDue += fee; this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
       if (c.enh.regular && !c.freeUsedMonth) c.freeUsedMonth = true;
       const fill = volume / (vcap * trucks);
       if (fill >= 0.8) this.stats.fullTrucks++;
@@ -874,8 +874,7 @@
       if (!chosen.length) return { ok: false, msg: T('err.nothingSelf') };
       if (chosen.length > this.selfCount()) return { ok: false, msg: T('err.selfLimit', { n: this.selfCount() }) };
       const cost = chosen.reduce((s, p) => s + this.selfCost(p), 0);
-      if (this.cash < cost) return { ok: false, msg: T('err.selfCost', { cost }) };
-      this.cash -= cost; this.monthStats.spent += cost; this.run.spent += cost; this.monthStats.selfCost = (this.monthStats.selfCost || 0) + cost;
+      this.feesDue += cost; this.monthStats.spent += cost; this.run.spent += cost; this.monthStats.selfCost = (this.monthStats.selfCost || 0) + cost;
       let revenue = 0;
       for (const p of chosen) {
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
@@ -996,6 +995,7 @@
       const unproc = 0; // v0.3.5: 월말 미처리 페널티는 반송이 대신한다
       const opCost = this._opCost(this.month);
       this.cash -= opCost; ms.spent += opCost; this.run.spent += opCost;
+      const feesDue = this.feesDue; this.cash -= feesDue; this.feesDue = 0; // 후불 배차비·배송비 정산
       const premium = this._settlePremium();
       let closing = 0;
       if (R.closingBonus && this.usage() <= R.closingBonus.usage) { closing = R.closingBonus.amount; this.cash += closing; }
@@ -1010,8 +1010,15 @@
       this.summary = { month: this.month, revenue: ms.revenue, opCost, opCostDetail: this._lastOpCost, calls: ms.calls, waits: ms.waits,
         delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, selfCost: ms.selfCost || 0, fees: ms.fees || 0, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, customers: this.customerSummary(),
         cash: this.cash, stress: this.stress, usage: Math.round(this.usage() * 100), left: this.parcels.length };
-      this.say('log.settle', { month: this.month, revenue: ms.revenue, opCost, closing: closing ? MSG('log.settleClosing', { closing }) : '' });
-      if (this.cash < 0) return this._gameOver(MSG('over.bankrupt'));
+      // 단기 금융: 지난달 차입 상환(원금+이자) → 그래도 음수면 새로 차입해 0으로 맞춤
+      const loan = { interest: 0, repaid: 0, borrowed: 0, debt: 0 };
+      if (this.debt > 0) { loan.interest = Math.ceil(this.debt * D.LOAN.interest); loan.repaid = this.debt; this.cash -= this.debt + loan.interest; this.run.spent += loan.interest; this.stats.interestPaid += loan.interest; this.debt = 0; }
+      if (this.cash < 0) { loan.borrowed = -this.cash; this.debt = loan.borrowed; this.cash = 0; this.stats.loans++; }
+      loan.debt = this.debt; this.summary.loan = loan; this.summary.cash = this.cash;
+      this.say('log.settle', { month: this.month, revenue: ms.revenue, opCost, fees: feesDue, closing: closing ? MSG('log.settleClosing', { closing }) : '' });
+      if (loan.repaid) this.say('log.loanRepaid', { n: loan.repaid, interest: loan.interest });
+      if (loan.borrowed) this.say('log.loan', { n: loan.borrowed, interest: Math.ceil(loan.borrowed * D.LOAN.interest) });
+      if (this.debt > D.LOAN.limit) return this._gameOver(MSG('over.bankrupt', { debt: this.debt, limit: D.LOAN.limit }));
       this.phase = 'summary';
     }
     closeSummary() {
@@ -1256,7 +1263,7 @@
       for (const p of g.parcels) { if (!p.attrs) p.attrs = D.PARCEL_TYPES[p.type].attrs.slice(); if (p.warm == null) p.warm = 0; if (p.customs == null) p.customs = 0; if (p.inFrozen == null) p.inFrozen = false; delete p.fresh; }
       if (g.warehouse && g.warehouse.frozen == null) g.warehouse.frozen = g.warehouse.cold > 0 ? D.WAREHOUSE.frozen : 0;
       if (g.monthStats) for (const k of ['returned', 'stolen', 'broken']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
-      if (!g.pendingRevenue) g.pendingRevenue = []; if (g.totalTurn == null) g.totalTurn = (g.month - 1) * D.TURNS_PER_MONTH + g.turn;
+      if (!g.pendingRevenue) g.pendingRevenue = []; if (g.feesDue == null) g.feesDue = 0; if (g.debt == null) g.debt = 0; if (g.totalTurn == null) g.totalTurn = (g.month - 1) * D.TURNS_PER_MONTH + g.turn;
       if (!g.customers) { g._initCustomers(); for (const p of g.parcels) if (!p.customer) p.customer = 'anon'; }
       for (const id in g.customers) { const c = g.customers[id]; if (!c.total) c.total = { delivered: 0, revenue: 0, claims: 0, discarded: 0 }; if (!c.month) c.month = g._emptyCustMonth(); }
       if (g.monthStats && g.monthStats.claims == null) g.monthStats.claims = 0;

@@ -24,7 +24,6 @@ function pickBest(g, threshold) {
       if (!pick.length) break;
       const urgent = pick.some(p => (p.type === 'fresh' && !p.inCold) || p.deadline <= 1 || p.overdue);
       const fill = vol / cap, income = pick.reduce((s, p) => s + p.reward, 0), cost = g.callFee(c, trucks);
-      if (g.cash < cost) break;
       const net = income - cost;
       if (net <= 0 && !urgent) continue;
       const score = (urgent ? 100 : 0) + net * 0.5 + fill * 20;

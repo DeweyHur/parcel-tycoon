@@ -167,6 +167,7 @@
     $('#hud-month').textContent = T('fmt.monthN', { n: g.month });
     $('#hud-turn').textContent = T('hud.turn', { t: g.turn, max: D.TURNS_PER_MONTH });
     $('#hud-cash').textContent = g.cash;
+    const due = $('#hud-due'); if (due) { const parts = []; if (g.feesDue) parts.push(T('hud.feesDue', { n: g.feesDue })); if (g.debt) parts.push(T('hud.debt', { n: g.debt })); due.textContent = parts.join(' · '); due.style.display = parts.length ? '' : 'none'; }
     $('#stress-num').textContent = `${g.stress}/${R.gameoverStress}`;
     $('#stress-label').textContent = g.stressState();
     const gauge = $('#stress-gauge'); gauge.querySelector('i').style.width = Math.min(100, g.stress / R.gameoverStress * 100) + '%';
@@ -365,7 +366,7 @@
       const after = `${T('fmt.trucks', { n: c.calls })} → ${T('fmt.trucks', { n: Math.max(0, c.calls - trucks) })}`;
       const body = `<p style="font-size:12px;color:var(--dim)">${esc(car.desc)} · ${T('fmt.vehicleCap', { vehicle: esc(car.vehicle || ''), cap: vcap })} · ${T('fmt.perTruck', { fee })}${notes.length ? `<br>${T('call.bonus')}: ${notes.join(', ')}` : ''}</p>${capsLine}${gauge}${money}<div class="pickinfo"><span>${T('call.selected', { n: sel.size, cap: elig.length })}</span><span>${T('call.remain')} <b>${after}</b></span></div>${riskLine}${trustInfo(vol, trucks)}<div id="pick-list" style="display:flex;flex-direction:column;gap:3px"></div>
         <div style="margin-top:8px;display:flex;gap:6px"><button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button></div>`;
-      const m = modal(game.contractName(c), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: `${T('call.btn')} (${T('fmt.count', { n: sel.size })} · ${T('fmt.trucks', { n: trucks })} · -${callFee}c)`, cls: 'primary', disabled: sel.size === 0 || game.cash < callFee, onClick: () => { closeModal(); doCall(i, [...sel], trucks); } }]);
+      const m = modal(game.contractName(c), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: `${T('call.btn')} (${T('fmt.count', { n: sel.size })} · ${T('fmt.trucks', { n: trucks })} · -${callFee}c)`, cls: 'primary', disabled: sel.size === 0, onClick: () => { closeModal(); doCall(i, [...sel], trucks); } }]);
       const ta = m.querySelector('#truck-add'); if (ta) ta.onclick = () => { extraTrucks = trucks; SFX.select(); render(); };
       const td = m.querySelector('#truck-del'); if (td) td.onclick = () => { extraTrucks = Math.max(0, trucks - 2); SFX.cancel(); render(); };
       const list = m.querySelector('#pick-list');
@@ -433,7 +434,7 @@
         <div style="font-size:12px;color:var(--gold);margin:6px 0 3px">${T('wm.selfHead', { n, size: g.selfSizeMax(), base: D.SELF_DELIVERY.costBase, per: D.SELF_DELIVERY.costPerSize })}</div>
         <div class="d" style="color:var(--dim);margin-bottom:4px">${vans ? `${T('wm.vans')}: ${esc(vans)}` : T('wm.noVans')}${blocked ? ` · ${T('wm.blocked', { n: blocked })}` : ''}</div>
         <div class="zone">${rows || `<div id="empty">${T('err.nothingSelf')}</div>`}</div>`;
-      const m = modal(T('wm.title'), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: picked.length ? T('wm.selfWait', { n: picked.length, cost }) : T('wm.justWait'), cls: 'primary', onClick: () => { if (picked.length && g.cash < cost) return toast(T('err.selfCost', { cost })); closeModal(); doWait(picked.slice()); } }], T('wm.sub'));
+      const m = modal(T('wm.title'), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: picked.length ? T('wm.selfWait', { n: picked.length, cost }) : T('wm.justWait'), cls: 'primary', onClick: () => { closeModal(); doWait(picked.slice()); } }], T('wm.sub'));
       m.querySelectorAll('.parcel[data-id]').forEach(el => el.onclick = () => { const id = +el.dataset.id; SFX.click(); if (picked.includes(id)) picked = picked.filter(x => x !== id); else { if (picked.length >= n) { toast(T('wm.limit', { n })); return; } picked.push(id); } render(); });
       const rb = m.querySelector('#wm-reorder'); if (rb) rb.onclick = () => { SFX.click(); showReorder(() => { render(); }); };
     };
@@ -472,6 +473,8 @@
       <span>${T('sum.opCost')}</span><span class="v bad">-${s.opCost}</span>
       ${s.opCostDetail ? `<span class="sub" style="grid-column:1/-1;font-size:11px;color:var(--dim);margin-top:-4px">${T('sum.opCostDetail', s.opCostDetail)}</span>` : ''}
       <span>${T('sum.fees')}</span><span class="v ${s.fees ? 'bad' : ''}">-${s.fees || 0}</span>
+      ${s.loan && s.loan.repaid ? `<span>${T('sum.loanRepaid')}</span><span class="v bad">-${s.loan.repaid + s.loan.interest} <small>${T('sum.loanInterest', { n: s.loan.interest })}</small></span>` : ''}
+      ${s.loan && s.loan.borrowed ? `<span>${T('sum.loan')}</span><span class="v" style="color:var(--orange)">+${s.loan.borrowed}</span><span class="sub" style="grid-column:1/-1;white-space:normal;color:var(--orange)">${T('sum.loanNote', { debt: s.loan.debt, interest: Math.ceil(s.loan.debt * D.LOAN.interest), limit: D.LOAN.limit })}</span>` : ''}
       ${s.closing ? `<span>${T('sum.closing')}</span><span class="v good">+${s.closing}</span>` : ''}
       <span>${T('sum.callsWaits')}</span><span class="v">${T('fmt.calls', { n: s.calls })} / ${T('fmt.calls', { n: s.waits })}</span>
       <span>${T('sum.delivered')}</span><span class="v">${T('fmt.count', { n: s.delivered })}</span>

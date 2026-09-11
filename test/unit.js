@@ -20,7 +20,7 @@ t('차량: 부피 합으로 대수 결정, 배차비 즉시 차감, 대수만큼
   g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2)];
   const cash = g.cash, trucks = c.calls, fee = g.truckFee(c); assert.equal(fee, 70);
   const r = g.callCarrier(i, [1, 2, 3]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 1); assert.equal(r.fee, 70); assert.equal(c.calls, trucks - 1);
-  assert.equal(g.cash, cash - 70 + r.revenue); assert.equal(r.revenue, 35 * 3); assert.ok(r.fill >= 0.8);
+  assert.equal(g.cash, cash + r.revenue); assert.equal(g.feesDue, 70); assert.equal(r.revenue, 35 * 3); assert.ok(r.fill >= 0.8);
 });
 t('차량: 용량을 넘기면 동시 대수 한도(기본 1)에서 거부, 신뢰 1단계 대량은 2대', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
@@ -29,10 +29,17 @@ t('차량: 용량을 넘기면 동시 대수 한도(기본 1)에서 거부, 신�
   g.trust.bulk = 3; assert.equal(g.simulMax(c), 2);
   r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 2); assert.equal(r.fee, 140);
 });
-t('차량: 배차비가 없으면 호출 불가, 남은 배차보다 많이 못 부름', () => {
+t('차량: 배차비는 후불이라 자금 0이어도 호출 가능, 남은 배차보다 많이 못 부름', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i]; g.parcels = [P(1, 'normal', 1)];
-  g.cash = 10; let r = g.callCarrier(i, [1]); assert.ok(!r.ok && /배차비/.test(r.msg));
-  g.cash = 500; c.calls = 0; r = g.callCarrier(i, [1]); assert.ok(!r.ok);
+  g.cash = 0; let r = g.callCarrier(i, [1]); assert.ok(r.ok); assert.equal(g.feesDue, 70);
+  g.parcels = [P(2, 'normal', 1)]; c.calls = 0; r = g.callCarrier(i, [2]); assert.ok(!r.ok);
+});
+t('단기 금융: 정산 후 음수면 차입해 0, 다음 정산에 원금+이자 15% 상환, 한도 400 넘으면 부도', () => {
+  const g = EMPTY(2, { perks: ['skip', 'longdeal'] }); g.turn = D.TURNS_PER_MONTH; g.cash = 50; g.feesDue = 200; g._endMonth();
+  assert.equal(g.phase, 'summary'); assert.equal(g.cash, 0); assert.ok(g.debt > 0); assert.equal(g.summary.loan.borrowed, g.debt); const debt = g.debt;
+  g.closeSummary(); g.closeMarket(); g.cash = 2000; g.feesDue = 0; g.turn = D.TURNS_PER_MONTH; g._endMonth();
+  assert.equal(g.debt, 0); assert.equal(g.summary.loan.repaid, debt); assert.equal(g.summary.loan.interest, Math.ceil(debt * 0.15));
+  g.closeSummary(); g.closeMarket(); g.cash = 0; g.feesDue = 900; g.turn = D.TURNS_PER_MONTH; g._endMonth(); assert.equal(g.phase, 'over');
 });
 t('신뢰도: 적재 80% 이상이면 +1, 특성은 업체마다 다름(냉장 1단계 용량 +2, 3단계 냉장 구역 +2)', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
@@ -105,7 +112,7 @@ t('파손: ⚠ 능력 없는 업체(철도 제외)는 25% 파손, 프래자일·
 });
 t('지연 입금: 철도는 다음 턴, 신뢰 1단계면 즉시', () => {
   const g = EMPTY(4); g.contracts[3] = g._makeContract('rail', 'normal'); g.parcels = [P(1, 'normal', 2)];
-  const cash = g.cash; const r = g.callCarrier(3, [1]); assert.ok(r.ok, r.msg); assert.equal(r.delay, 1); assert.equal(g.cash, cash - r.fee); g.wait(); assert.equal(g.cash, cash - r.fee + r.revenue);
+  const cash = g.cash; const r = g.callCarrier(3, [1]); assert.ok(r.ok, r.msg); assert.equal(r.delay, 1); assert.equal(g.cash, cash); assert.equal(g.feesDue, r.fee); g.wait(); assert.equal(g.cash, cash + r.revenue);
   g.trust.rail = 3; g.contracts[3].calls = 1; g.parcels = [P(2, 'normal', 2)]; const r2 = g.callCarrier(3, [2]); assert.ok(r2.ok, r2.msg); assert.equal(r2.delay, 0);
 });
 t('월말 정산 → 마켓 → 다음 달, 배차비는 정산에', () => {
@@ -130,7 +137,7 @@ t('데일리 설정은 날짜에 결정적', () => { const a = dailyConfig('2026
 t('직접 배송: 대기 턴에 1개, 보상 그대로 + 배송비 20c', () => {
   const g = EMPTY(8); for (let i = 0; i < 3; i++) g.parcels.push(P(900 + i, 'normal', 1));
   assert.equal(g.selfCount(), 1); assert.ok(!g.wait([900, 901]).ok);
-  const turn = g.turn, cash = g.cash; const r = g.wait([900]); assert.ok(r.ok); assert.equal(g.turn, turn + 1); assert.equal(g.cash, cash + 25 - 20); assert.equal(g.parcels.length, 2); assert.equal(g.stats.selfCalls, 1);
+  const turn = g.turn, cash = g.cash; const r = g.wait([900]); assert.ok(r.ok); assert.equal(g.turn, turn + 1); assert.equal(g.cash, cash + 25); assert.equal(g.feesDue, 20); assert.equal(g.parcels.length, 2); assert.equal(g.stats.selfCalls, 1);
   g.warehouse.driver = true; assert.equal(g.selfCount(), 2);
 });
 t('마켓 막힌 속성 보장: 처리 못 하는 특수 택배가 있으면 슬롯 A에 처리 가능한 업체', () => {
