@@ -54,7 +54,7 @@ t('고객 품목 해금: 0단계는 일반 85%, 2단계는 고객 정의, 3단�
   const g = NG(3); // 동네 택배: 새벽마켓 0단계
   const cnt = (lv) => { g.customers.dawn.xp = M.CUSTOMER_LEVELS[lv]; let n = 0, s = 0, prem = 0; for (let i = 0; i < 400; i++) { const sp = g._genParcelSpec(g._typeRatio(1), 1, { dawn: 1 }); n++; if (sp.type !== 'normal') s++; if (sp.premium) prem++; } return [s / n, prem / n]; };
   const [s0] = cnt(0), [s2] = cnt(2), [s3, p3] = cnt(3);
-  assert.ok(s0 < 0.3, 's0 ' + s0); assert.ok(s2 > 0.55, 's2 ' + s2); assert.ok(p3 > 0.1, 'prem ' + p3);
+  assert.equal(s0, 0, 's0 ' + s0); assert.ok(s2 > 0.55, 's2 ' + s2); assert.ok(p3 > 0.1, 'prem ' + p3);
 });
 t('마켓: 보유 업체는 더 높은 등급일 때만 등장(업그레이드), 같은 슬롯 중복 없음', () => {
   for (let s = 1; s <= 40; s++) { const g = EMPTY(s); while (g.phase === 'play') g.wait(); if (g.phase !== 'summary') continue; g.closeSummary();

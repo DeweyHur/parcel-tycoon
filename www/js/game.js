@@ -257,7 +257,7 @@
       const ratio = this._typeRatio(m);
       return Object.keys(w).map(id => {
         const share = w[id] / sum, n = total * share, lv = this.customerLevel(id), cust = M.CUSTOMERS[id];
-        const special = id === 'anon' || !cust.items ? Math.max(0, 1 - (ratio.normal || 0) / Object.values(ratio).reduce((a, b) => a + b, 0)) : (lv === 0 ? 0.1 : lv === 1 ? 0.4 : 1);
+        const special = id === 'anon' || !cust.items ? Math.max(0, 1 - (ratio.normal || 0) / Object.values(ratio).reduce((a, b) => a + b, 0)) : (lv === 0 ? 0 : lv === 1 ? 0.3 : 1);
         const types = cust.items ? Object.keys(cust.items).map(k => M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k).filter(t => t !== 'normal') : Object.keys(ratio).filter(t => t !== 'normal' && ratio[t] > 0);
         return { id, level: lv, min: Math.max(0, Math.floor(n - 1)), max: Math.ceil(n + 1), special, types };
       }).sort((a, b) => b.max - a.max);
@@ -668,7 +668,8 @@
       let type, attrs, sizes, premium = false;
       // 고객 특수 품목은 신뢰 단계로 열린다 (3장): 0단계 일반 85%, 1단계 55%, 2단계 고객 정의, 3단계 + 프리미엄 품목
       const clv = cust.items ? this.customerLevel(customer) : 0;
-      const normalShare = clv === 0 ? 0.9 : clv === 1 ? 0.6 : 0;
+      // 0단계 고객은 일반만, 1단계 30%, 2단계부터 고객 품목 그대로
+      const normalShare = clv === 0 ? 1 : clv === 1 ? 0.7 : 0;
       if (!cust.items || this.rng.next() < normalShare) type = this.rng.weighted(cust.items ? { normal: 1 } : ratio);
       else {
         const base = D.TYPE_RATIO[Math.min(6, m || this.month)], w = {};
