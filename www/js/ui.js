@@ -506,7 +506,8 @@
     const render = () => {
       const items = mk.items.map((it, i) => {
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], g = D.GRADES[it.grade]; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${car.desc}<br>${car.badge || ''} ${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}<br>${T('mk.vehicleLine', { vehicle: esc(car.vehicle || ''), cap: car.cap + g.cap + (R.carrierCapDelta[it.carrier] || 0), fee: Math.max(0, Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * g.fee * R.feeMult + R.feeDelta)), trucks: Math.max(1, car.trucks + g.calls + R.callsDelta) })}${it.grade !== 'normal' ? `<br><span style="color:var(--gold)">${T('mk.gradeVs', { cap0: car.cap, cap1: car.cap + g.cap, t0: car.trucks, t1: car.trucks + g.calls, f0: Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * R.feeMult), f1: Math.max(0, Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * g.fee * R.feeMult + R.feeDelta)), lv: [0, 1, 2, 3][['normal', 'trusted', 'expert', 'master'].indexOf(it.grade)] })}</span>` : ''} · ${trustBar(game, it.carrier)}${trustTrack(it.carrier, game.trustXp(it.carrier))}`; }
+        if (it.kind === 'contract' && it.standing) { const c = game.contracts.find(x => x && x.carrier === it.carrier); desc = `${T('mk.addDesc', { n: game.itemTrucks(it), max: c ? c.maxCalls : 0, next: Math.round(price * D.ADD_PRICE_STEP) })}`; }
+        else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], g = D.GRADES[it.grade]; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${car.desc}<br>${car.badge || ''} ${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}<br>${T('mk.vehicleLine', { vehicle: esc(car.vehicle || ''), cap: car.cap + g.cap + (R.carrierCapDelta[it.carrier] || 0), fee: Math.max(0, Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * g.fee * R.feeMult + R.feeDelta)), trucks: Math.max(1, car.trucks + g.calls + R.callsDelta) })}${it.grade !== 'normal' ? `<br><span style="color:var(--gold)">${T('mk.gradeVs', { cap0: car.cap, cap1: car.cap + g.cap, t0: car.trucks, t1: car.trucks + g.calls, f0: Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * R.feeMult), f1: Math.max(0, Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * g.fee * R.feeMult + R.feeDelta)), lv: [0, 1, 2, 3][['normal', 'trusted', 'expert', 'master'].indexOf(it.grade)] })}</span>` : ''} · ${trustBar(game, it.carrier)}${trustTrack(it.carrier, game.trustXp(it.carrier))}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
@@ -536,6 +537,18 @@
         const price = it.kind === 'contract' ? game.contractPrice(it) : it.price;
         if (game.cash < price) return toast(T('err.noCash'));
         if (it.kind === 'fac' || it.kind === 'item' || it.kind === 'customer') { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
+        // 보유 업체 계약(업그레이드·배차 추가)은 슬롯을 고르지 않고 그 슬롯을 갱신한다 — 확인만
+        if (it.kind === 'contract' && (it.upgrade || it.add)) {
+          const s = game.contracts.findIndex(c => c && c.carrier === it.carrier), c = game.contracts[s];
+          if (s < 0) return chooseSlot(it, +el.dataset.i, render);
+          const n = game.itemTrucks(it);
+          const msg = it.upgrade ? T('slot.upgradeAsk', { name: game.contractName(c), grade: D.GRADES[it.grade].name, n }) : T('slot.addAsk', { name: game.contractName(c), n });
+          modal(it.name, `<p>${msg}</p><p style="font-size:12px;color:var(--dim)">${T('slot.upkeepNote', { n: D.OPCOST_CONTRACT[it.upgrade ? it.grade : c.grade] })}</p>`, [
+            { label: T('btn.cancel'), onClick: render },
+            { label: it.upgrade ? T('slot.upgradeBtn') : T('slot.addBtn'), cls: 'primary', onClick: () => { const r = game.buy(+el.dataset.i, s, it.upgrade ? 'upgrade' : 'add'); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); } },
+          ]);
+          return;
+        }
         chooseSlot(it, +el.dataset.i, render);
       });
     };
@@ -550,19 +563,7 @@
     }).join('');
     const m = modal(it.name, body, [{ label: T('btn.cancel'), onClick: back }]);
     const doBuy = (s, mode) => { const r = game.buy(idx, s, mode); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back(); } else toast(r.msg); };
-    m.querySelectorAll('.card').forEach(el => el.onclick = () => {
-      const s = +el.dataset.s, c = game.contracts[s];
-      if (!isContract || !c || c.carrier !== it.carrier) return doBuy(s);
-      // 같은 업체: 등급이 높으면 업그레이드, 아니면 배차 추가(리필) — 교체 대신 확인 후 진행
-      const gr = Object.keys(D.GRADES), up = gr.indexOf(it.grade) > gr.indexOf(c.grade);
-      const n = game.itemTrucks(it);
-      const msg = up ? T('slot.upgradeAsk', { name: game.contractName(c), grade: D.GRADES[it.grade].name, n }) : T('slot.addAsk', { name: game.contractName(c), n });
-      modal(it.name, `<p>${msg}</p>`, [
-        { label: T('btn.cancel'), onClick: () => chooseSlot(it, idx, back) },
-        { label: T('slot.replaceBtn'), onClick: () => doBuy(s, 'replace') },
-        { label: up ? T('slot.upgradeBtn') : T('slot.addBtn'), cls: 'primary', onClick: () => doBuy(s, up ? 'upgrade' : 'add') },
-      ]);
-    });
+    m.querySelectorAll('.card').forEach(el => el.onclick = () => doBuy(+el.dataset.s));
   }
 
   // ---------- result ----------

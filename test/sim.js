@@ -54,19 +54,42 @@ const STRATS = {
 };
 
 function marketBot(g) {
-  // 1) 빈 슬롯 채우기(막힌 속성 힌트 우선) 2) 보유 업체 업그레이드는 여유 있을 때 3) 시설 4) 강화
-  const items = g.market.items;
-  const contractItems = items.map((it, i) => ({ it, i })).filter(x => x.it.kind === 'contract').sort((a, b) => (b.it.hint ? 1 : 0) - (a.it.hint ? 1 : 0));
-  for (const { it, i } of contractItems) {
-    const price = g.contractPrice(it);
+  // 용량 기준 구매: 다음 달 예상 물량(칸) vs 월 배차 용량(대수×칸). 모자라면 배차 추가·한도 강화·업그레이드·새 계약 순으로 채우고,
+  // 창고가 턴당 입고를 못 받으면 확장. 남는 돈은 시설·강화. 예비금 100c.
+  const items = g.market.items, reserve = 100;
+  const fc = g.customerForecast(); const parcels = fc.reduce((s, f) => s + (f.min + f.max) / 2, 0);
+  const needVol = parcels * 1.7 * 1.15;
+  const capVol = () => g.contracts.filter(Boolean).reduce((s, c) => s + c.maxCalls * g.vehicleCap(c), 0);
+  const can = price => g.cash - price >= reserve && g.market.bought < g.rules.marketMaxBuy;
+  const bySlotDelivered = () => { let slot = -1, max = -1; g.contracts.forEach((c, s) => { if (c && c.delivered > max) { max = c.delivered; slot = s; } }); return slot; };
+  const idx = pred => items.findIndex(it => !it.sold && pred(it));
+  // 1) 막힌 속성 힌트 계약은 항상 최우선 (빈 슬롯 → 가장 덜 쓴 슬롯)
+  for (let i = 0; i < items.length; i++) { const it = items[i]; if (it.sold || it.kind !== 'contract' || !it.hint) continue; const price = g.contractPrice(it); if (!can(price)) continue; let slot = g.contracts.findIndex(c => !c); if (slot < 0) { const seen = {}; g.contracts.forEach((c, s) => { if (!c) return; if (seen[c.carrier] != null) slot = s; seen[c.carrier] = s; }); } if (slot >= 0) g.buy(i, slot); }
+  // 2) 용량 부족분 채우기
+  let guard = 0;
+  while (capVol() < needVol && guard++ < 6) {
+    // 배차 추가: 살 수 있는 것 중 월 배차가 가장 적은 계약부터 (고르게 키운다)
+    const adds = items.map((it, i) => ({ it, i })).filter(x => !x.it.sold && x.it.kind === 'contract' && x.it.add && can(g.contractPrice(x.it)));
+    if (adds.length) { adds.sort((a, b) => { const ca = g.contracts.find(c => c && c.carrier === a.it.carrier), cb = g.contracts.find(c => c && c.carrier === b.it.carrier); return (ca ? ca.maxCalls * g.vehicleCap(ca) : 99) - (cb ? cb.maxCalls * g.vehicleCap(cb) : 99); }); const { it, i } = adds[0]; g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier), 'add'); continue; }
+    let i = -1;
+    i = idx(it => it.kind === 'enh' && /^limit/.test(it.enh) && can(it.price));
+    if (i >= 0) { const s = bySlotDelivered(); if (s >= 0 && g.buy(i, s).ok) continue; }
+    i = idx(it => it.kind === 'contract' && it.upgrade && can(g.contractPrice(it)));
+    if (i >= 0) { g.buy(i, g.contracts.findIndex(c => c && c.carrier === items[i].carrier), 'upgrade'); continue; }
+    i = idx(it => it.kind === 'contract' && !it.upgrade && !it.add && can(g.contractPrice(it)));
     const empty = g.contracts.findIndex(c => !c);
-    if (it.upgrade) { if (g.cash - price > 250) g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier), 'upgrade'); continue; }
-    if (it.add) { const s = g.contracts.findIndex(c => c && c.carrier === it.carrier); if (s >= 0 && g.cash - price > 300 && g.contracts[s].delivered >= 6) g.buy(i, s, 'add'); continue; }
-    if (empty >= 0 && g.cash - price > 120) { g.buy(i, empty); continue; }
-    if (it.hint && g.cash - price > 120) { let slot = -1, min = 99; g.contracts.forEach((c, s) => { if (c && c.delivered < min) { min = c.delivered; slot = s; } }); if (slot >= 0) g.buy(i, slot); }
+    if (i >= 0 && empty >= 0) { g.buy(i, empty); continue; }
+    i = idx(it => it.kind === 'enh' && it.enh === 'cap1' && can(it.price));
+    if (i >= 0) { const s = bySlotDelivered(); if (s >= 0 && g.buy(i, s).ok) continue; }
+    break;
   }
-  items.forEach((it, i) => { if (it.kind === 'fac' && it.fac && g.cash - it.price > 200) g.buy(i, null); });
-  items.forEach((it, i) => { if (it.kind === 'enh' && g.cash - it.price > 300) { let slot = 0, max = -1; g.contracts.forEach((c, s) => { if (c && c.delivered > max) { max = c.delivered; slot = s; } }); g.buy(i, slot); } });
+  // 3) 창고: 턴당 입고(2턴치)를 못 받으면 확장
+  const perTurn = parcels / D.TURNS_PER_MONTH * 1.7;
+  while (g.warehouse.cap < perTurn * 3) { const i = idx(it => it.kind === 'fac' && it.fac && /^expand/.test(it.fac) && can(it.price)); if (i < 0 || !g.buy(i, null).ok) break; }
+  // 4) 여유 자금: 시설 → 업그레이드 → 강화
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'fac' && it.fac && g.cash - it.price > reserve + 200 && g.market.bought < g.rules.marketMaxBuy) g.buy(i, null); });
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'contract' && it.upgrade && g.cash - g.contractPrice(it) > reserve + 250 && g.market.bought < g.rules.marketMaxBuy) g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier), 'upgrade'); });
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'enh' && g.cash - it.price > reserve + 300 && g.market.bought < g.rules.marketMaxBuy) { const s = bySlotDelivered(); if (s >= 0) g.buy(i, s); } });
 }
 
 function runOne(seed, strat, cfg) {

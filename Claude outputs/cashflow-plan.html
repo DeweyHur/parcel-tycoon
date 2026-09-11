@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>택배 타이쿤 자금 플로우 플래닝</title>
+<style>
+:root{--bg:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--grid:#e6e5e0;--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--warn:#e34948}
+body{margin:0;padding:20px 16px;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;max-width:900px;margin:auto}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:15px;margin:28px 0 6px}.sub{color:var(--ink2);font-size:12px;margin:0 0 12px}
+svg{width:100%;height:auto;display:block}.lg{display:flex;gap:16px;font-size:12px;color:var(--ink2);margin:6px 0}.lg i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+table{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px}th,td{padding:4px 6px;text-align:right;border-bottom:1px solid var(--grid)}th:first-child,td:first-child{text-align:left}th{color:var(--ink2);font-weight:500}
+.note{background:#f4f3ee;border-radius:6px;padding:10px 12px;font-size:13px;margin-top:20px}
+.tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--grid);border-radius:4px;padding:4px 8px;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.08);display:none}
+</style></head><body>
+<h1>자금 플로우 플래닝 — 배차비 ½ 이후</h1>
+<p class="sub">반기(6개월) 시나리오 · 동네 택배 · 정규 · 봇 50시드 평균. 값은 <b>월말 정산 후 순자금</b>(부채 차감). 죽은 시드는 그 달 이후 평균에서 빠짐.</p>
+
+<h2>월말 순자금</h2>
+<div class="lg"><span><i style="background:var(--s1)"></i>마켓 무구매</span><span><i style="background:var(--s2)"></i>보통 구매 (빈 슬롯·업그레이드·시설)</span><span><i style="background:var(--s3)"></i>공격적 구매 (현금 여유 절반까지)</span></div>
+<div style="position:relative"><svg id="c1" viewBox="0 0 860 300"></svg><div class="tip" id="t1"></div></div>
+
+<h2>생존율</h2>
+<div style="position:relative"><svg id="c2" viewBox="0 0 860 200"></svg><div class="tip" id="t2"></div></div>
+
+<h2>월별 내역 (생존 시드 평균, c)</h2>
+<table id="tbl"></table>
+
+<div class="note" id="note"></div>
+<script>
+const R = [{"strat":"none","label":"마켓 무구매","c":"var(--s1)","win":0,"months":[{"m":1,"alive":1,"cash":660,"rev":558,"fees":138,"op":210,"spent":0,"ret":0,"stress":0.6},{"m":2,"alive":0.92,"cash":1202,"rev":994,"fees":243,"op":198,"spent":0,"ret":1.3,"stress":6.4},{"m":3,"alive":0.56,"cash":2289,"rev":1504,"fees":309,"op":193,"spent":0,"ret":1.2,"stress":9.1},{"m":4,"alive":0.2,"cash":3682,"rev":1810,"fees":321,"op":197,"spent":0,"ret":2,"stress":11.6},{"m":5,"alive":0},{"m":6,"alive":0}]},
+{"strat":"moderate","label":"보통 구매","c":"var(--s2)","win":0.86,"months":[{"m":1,"alive":1,"cash":513,"rev":594,"fees":149,"op":221,"spent":368,"ret":0,"stress":0.3},{"m":2,"alive":1,"cash":924,"rev":1102,"fees":256,"op":221,"spent":452,"ret":0.5,"stress":3.1},{"m":3,"alive":0.92,"cash":1651,"rev":1722,"fees":310,"op":234,"spent":531,"ret":0.2,"stress":3.4},{"m":4,"alive":0.88,"cash":2543,"rev":2045,"fees":328,"op":254,"spent":641,"ret":0.3,"stress":4.7},{"m":5,"alive":0.86,"cash":3680,"rev":2449,"fees":310,"op":276,"spent":800,"ret":0.3,"stress":6.1},{"m":6,"alive":0.86,"cash":4805,"rev":2671,"fees":308,"op":298,"spent":0,"ret":0.3,"stress":7.8}]},
+{"strat":"aggressive","label":"공격적 구매","c":"var(--s3)","win":0.84,"months":[{"m":1,"alive":1,"cash":244,"rev":616,"fees":151,"op":238,"spent":620,"ret":0,"stress":0.3},{"m":2,"alive":1,"cash":675,"rev":1108,"fees":245,"op":236,"spent":487,"ret":0.5,"stress":2.9},{"m":3,"alive":0.94,"cash":1363,"rev":1728,"fees":300,"op":251,"spent":573,"ret":0.1,"stress":3.3},{"m":4,"alive":0.9,"cash":2236,"rev":2077,"fees":319,"op":270,"spent":678,"ret":0.4,"stress":4.5},{"m":5,"alive":0.9,"cash":3264,"rev":2387,"fees":303,"op":292,"spent":855,"ret":0.3,"stress":6.4},{"m":6,"alive":0.84,"cash":4352,"rev":2621,"fees":289,"op":312,"spent":0,"ret":0.5,"stress":7.6}]}];
+const NS='http://www.w3.org/2000/svg', el=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e};
+function chart(svgId,tipId,key,ymax,fmt){
+  const svg=document.getElementById(svgId), H=+svg.viewBox.baseVal.height, W=860, L=52,Rr=16,T=14,B=28;
+  const x=m=>L+(m-1)*(W-L-Rr)/5, y=v=>T+(H-T-B)*(1-v/ymax);
+  const steps=key==='alive'?[0,.5,1]:[0,1000,2000,3000,4000,5000];
+  for(const s of steps){svg.appendChild(el('line',{x1:L,x2:W-Rr,y1:y(s),y2:y(s),stroke:'#e6e5e0'}));const t=el('text',{x:L-6,y:y(s)+4,'text-anchor':'end','font-size':11,fill:'#52514e'});t.textContent=fmt(s);svg.appendChild(t);}
+  for(let m=1;m<=6;m++){const t=el('text',{x:x(m),y:H-8,'text-anchor':'middle','font-size':11,fill:'#52514e'});t.textContent=m+'월';svg.appendChild(t);}
+  const tip=document.getElementById(tipId);
+  for(const r of R){const pts=r.months.filter(d=>d.alive>0||key==='alive').map(d=>[x(d.m),y(key==='alive'?d.alive:d[key]),d]);
+    svg.appendChild(el('path',{d:pts.map((p,i)=>(i?'L':'M')+p[0]+' '+p[1]).join(' '),fill:'none',stroke:r.c,'stroke-width':2,'stroke-linejoin':'round'}));
+    for(const [px,py,d] of pts){const c=el('circle',{cx:px,cy:py,r:4,fill:r.c,stroke:'#fcfcfb','stroke-width':2});const hit=el('circle',{cx:px,cy:py,r:12,fill:'transparent'});
+      hit.onmouseenter=e=>{tip.style.display='block';tip.innerHTML=`<b>${r.label}</b> ${d.m}월<br>${key==='alive'?'생존 '+Math.round(d.alive*100)+'%':'순자금 '+d.cash+'c · 생존 '+Math.round(d.alive*100)+'%'}${d.rev?`<br>수입 ${d.rev} · 배차비 ${d.fees} · 운영비+보험 ${d.op}${d.spent?' · 마켓 '+d.spent:''}`:''}`;};
+      hit.onmousemove=e=>{const b=svg.getBoundingClientRect();tip.style.left=(e.clientX-b.left+12)+'px';tip.style.top=(e.clientY-b.top-10)+'px';};hit.onmouseleave=()=>tip.style.display='none';
+      svg.appendChild(c);svg.appendChild(hit);}
+    const last=pts[pts.length-1];const t=el('text',{x:last[0],y:last[1]+(key==='alive'?(r.strat==='moderate'?-10:r.strat==='aggressive'?16:-8):-8),'text-anchor':'middle','font-size':11,fill:'#0b0b0b'});t.textContent=key==='alive'?(r.strat==='none'?'전멸':Math.round(r.win*100)+'%'):last[2].cash+'c';svg.appendChild(t);}
+}
+chart('c1','t1','cash',5000,v=>v+'c');chart('c2','t2','alive',1,v=>Math.round(v*100)+'%');
+const tbl=document.getElementById('tbl');let h='<tr><th>전략 / 월</th>'+[1,2,3,4,5,6].map(m=>`<th>${m}월</th>`).join('')+'</tr>';
+for(const r of R){for(const [k,lab] of [['cash','순자금'],['rev','수입'],['fees','배차비'],['op','운영비+보험'],['spent','마켓 지출'],['ret','반송·폐기(개)'],['stress','스트레스']]){h+=`<tr><td>${lab===''?'':(k==='cash'?`<b>${r.label}</b> · `:'')}${lab}</td>`+r.months.map(d=>`<td>${d.alive>0?(d[k]??'-'):'—'}</td>`).join('')+'</tr>';}}
+tbl.innerHTML=h;
+document.getElementById('note').innerHTML=`<b>읽는 법</b><br>· <b>무구매</b>는 돈은 쌓이지만(4월 3,682c) 2월부터 특수 물품·물량을 못 받아 반송 스트레스로 전멸 — "실패해야 한다"는 조건은 충족하지만 <b>돈이 아니라 스트레스로</b> 죽는다. 통장에 3,600c를 두고 망하는 셈.<br>· <b>보통 구매</b>는 매달 370~800c를 마켓에 쓰고도 순자금이 매달 +400~1,100c씩 늘어 6월 4,805c. 1월 순익 +226c로 첫 달 계약 하나는 여유 있게 산다.<br>· <b>공격적 구매</b>는 1월 244c까지 떨어지지만 2월부터 보통과 같은 궤도. 즉 지금 밸런스에선 "얼마나 사느냐"가 결과를 거의 안 바꾼다 — 돈이 병목이 아니라는 뜻.`;
+</script></body></html>

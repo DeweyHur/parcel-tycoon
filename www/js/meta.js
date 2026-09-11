@@ -4,8 +4,10 @@
 
   // ----- 고객(화주) (docs/CUSTOMER_DESIGN.md 2장) -----
   // items: 품목 가중치(택배 종류). rule: 특수 규칙. claimMult: 폐기 시 손해배상 배율. perks[lv]: 신뢰 단계 혜택(2·3단계)
-  const CUSTOMER_LEVELS = [0, 4, 10, 18];
+  const CUSTOMER_LEVELS = [0, 8, 24, 60];
   const CUSTOMER_VOLUME = [0.6, 1.0, 1.3, 1.6];
+  // 고객 신뢰 단계별 월 추가 입고(개) — 신뢰가 오르면 물량이 배 이상으로 는다(총 입고에 더해짐)
+  const CUSTOMER_EXTRA = [0, 3, 6, 12];
   const CUSTOMER_BONUS = [0, 5, 10, 15];
   const CUSTOMERS = {
     anon:    { icon: '📦', items: null, sizeBias: null, rule: null, claimMult: 1.0, perks: {} },
@@ -92,14 +94,14 @@
       customers: [['dawn', 2], ['ice', 1], ['farm', 0], ['anon', 0]],
       icon: '🧊',
       warehouse: { cap: 22, cold: 10, xl: 1 }, cash: 380,
-      contracts: [{ carrier: 'cold', grade: 'trusted' }, { carrier: 'frozen' }, { carrier: 'bulk', calls: 2 }],
+      contracts: [{ carrier: 'cold', grade: 'trusted' }, { carrier: 'frozen' }, { carrier: 'bulk', calls: 3 }],
       mods: { freshExtra: 1, coldTrustBonus: 1, rewardMult: { fragile: 0.9, intl: 0.9 }, banCarriers: ['large'], marketWeight: { cold: 2, cold1: 2, cold2: 2 } },
       unlock: 'fresh30', tier: 2 },
     steel: {
       customers: [['factory', 2], ['mover', 1], ['import', 0], ['anon', 0]],
       icon: '🏗️',
       warehouse: { cap: 34, cold: 0, xl: 3 }, cash: 350,
-      contracts: [{ carrier: 'large' }, { carrier: 'rail' }, { carrier: 'bulk', calls: 2 }],
+      contracts: [{ carrier: 'large' }, { carrier: 'rail' }, { carrier: 'bulk', calls: 3 }],
       mods: { bigSizeDelta: -1, carrierCapDelta: { large: 1 }, coldCapMax: 4, marketWeight: { large: 2, expand1: 1.5, expand2: 1.5, expand3: 1.5, cold: 0.5 } },
       unlock: 'big20', tier: 2 },
     quick: {
@@ -113,14 +115,14 @@
       customers: [['import', 2], ['luxury', 1], ['glass', 0], ['anon', 0]],
       icon: '✈️',
       warehouse: { cap: 26, cold: 4, xl: 2 }, cash: 380,
-      contracts: [{ carrier: 'intl' }, { carrier: 'air' }, { carrier: 'bulk', calls: 2 }],
+      contracts: [{ carrier: 'intl' }, { carrier: 'air' }, { carrier: 'bulk', calls: 3 }],
       mods: { rewardDelta: { intl: 20, normal: -5 }, carrierStartTrust: { intl: 20 }, opCostRandom: [110, 190], marketWeight: { intl: 2 }, gradeShift: 0.3 },
       unlock: 'worldwide', tier: 2 },
     glass: {
       customers: [['glass', 2], ['mart', 1], ['anon', 0]],
       icon: '🫙',
       warehouse: { cap: 24, cold: 4, xl: 1 }, cash: 420,
-      contracts: [{ carrier: 'fragile', grade: 'trusted' }, { carrier: 'bulk', calls: 2 }],
+      contracts: [{ carrier: 'fragile', grade: 'trusted' }, { carrier: 'bulk', calls: 3 }],
       mods: { deadlineDelta: { fragile: 2 }, rewardDelta: { fragile: 15 }, carrierCapDelta: { bulk: -1 }, bigCallPenalty: 5, marketWeight: { fragile: 2, cap1: 0.7 } },
       unlock: 'fragile30', tier: 2 },
     thrifty: {
@@ -274,6 +276,6 @@
     daily7:       { kind: 'meta', rewardType: 'none', check: (s, p) => p.dailyStreak >= 7 },
   };
 
-  const META = { CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, DIFFICULTIES, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, DAILY_VARIANTS, DAILY_CONFLICTS, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['standard'], perkSlots: 1 } };
+  const META = { CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, DIFFICULTIES, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, DAILY_VARIANTS, DAILY_CONFLICTS, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['standard'], perkSlots: 1 } };
   if (typeof module !== 'undefined') module.exports = META; else root.META = META;
 })(typeof window !== 'undefined' ? window : globalThis);

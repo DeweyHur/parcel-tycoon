@@ -6,12 +6,15 @@
     START_CASH: 450,
     GAMEOVER_STRESS: 20,
     OPERATING_COST: 120,   // 월 기본 임대(창고·인건비). 여기에 계약 유지비 + 시설 유지비가 더해진다
-    OPCOST_CONTRACT: 10,   // 보유 계약 슬롯당 월 유지비
+    OPCOST_CONTRACT: { normal: 10, trusted: 30, expert: 60, master: 100 },   // 계약 등급별 월 유지비 — 프리미엄은 수입도 지출도 크다
     // 배차비·배송비는 후불: 월중에 쌓였다가 월말 정산에서 빠진다. 정산 후 자금이 음수면 단기 차입으로 메우고
     // 다음 정산에 원금+이자를 갚는다. 부채가 한도를 넘으면 부도.
     LOAN: { limit: 400, interest: 0.15 },
+    ADD_PRICE_STEP: 1.6,   // 배차 추가를 살 때마다 그 계약의 다음 추가 가격 배율
+    OPCOST_PER_PARCEL: 4,  // 인건비: 기준(22개)을 넘는 월 입고 1개당 운영비 — 물량이 늘면 지출도 는다
+    OPCOST_BASE_ARRIVALS: 22,
     CONTRACT_SLOTS: 4,
-    MARKET_MAX_BUY: 3,
+    MARKET_MAX_BUY: 5,
     REFRESH_COSTS: [40, 80, 140, 220],
 
     WAREHOUSE: { cap: 24, cold: 6, frozen: 4, xl: 1 },
@@ -65,16 +68,16 @@
     // 업체 = 배차 계약 (docs/BALANCE_DESIGN.md 1장): cap = 차량 한 대의 부피(칸), fee = 대당 배차비(호출 즉시 차감), trucks = 월 배차 한도(대), price = 계약가
     // caps = 안전하게 다루는 속성. need = 이 속성 중 하나가 있는 택배만. onlyPlain = 속성 없는 택배만. specialist = 특수 운송 보너스 종류. delay = 입금 지연 턴. badge = 운송 수단
     CARRIERS: {
-      bulk:    { badge: '🚚', cap: 6,  fee: 35, trucks: 3, price: 60,  caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2 },
+      bulk:    { badge: '🚚', cap: 6,  fee: 35, trucks: 5, price: 60,  caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2 },
       cold:    { badge: '🚚', cap: 5,  fee: 48, trucks: 3, price: 90, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'] },
       frozen:  { badge: '🚚', cap: 4,  fee: 55, trucks: 3, price: 100, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true },
       fragile: { badge: '🚚', cap: 4,  fee: 48, trucks: 3, price: 90, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
-      intl:    { badge: '🚚', cap: 8,  fee: 70, trucks: 2, price: 110, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
-      large:   { badge: '🚚', cap: 10, fee: 68, trucks: 2, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true },
+      intl:    { badge: '🚚', cap: 8,  fee: 70, trucks: 3, price: 110, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
+      large:   { badge: '🚚', cap: 10, fee: 68, trucks: 3, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true },
       // 원형(운송 수단) 업체: 속성이 겹치고 트레이드오프가 다르다
-      air:     { badge: '✈', cap: 4,  fee: 83, trucks: 2, price: 120, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
-      rail:    { badge: '🚆', cap: 16, fee: 95, trucks: 1, price: 80, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true },
-      sea:     { badge: '🚢', cap: 14, fee: 83, trucks: 1, price: 90, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
+      air:     { badge: '✈', cap: 4,  fee: 83, trucks: 3, price: 120, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
+      rail:    { badge: '🚆', cap: 16, fee: 95, trucks: 2, price: 80, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true },
+      sea:     { badge: '🚢', cap: 14, fee: 83, trucks: 2, price: 90, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
     },
     // 신뢰도 특성 (2장): 업체마다 1~3단계 효과. 문구는 locales data.TRUST_PERKS[carrier] = [t1, t2, t3]
     // 키: simul 동시 대수 / feeMult 배차비 배율 / cap 용량 +칸 / rewardDelta{type} / bonusDelta{type} / freezeOnCall / coldZone·frozenZone 구역 +칸 / customsDelta 통관 대기 / noCustomsDelay / xlDelta 초대형 점유 -1 / sizeMax / customsBonus / delay / trucks
@@ -134,13 +137,13 @@
       optFrozen:  { price: 220, kind: 'opt', attr: 'frozen', capDelta: -1, maxSizeMax: 4 },
     },
     FACILITIES: {
-      expand1: { price: 160, upkeep: 10, cap: 8 },
-      expand2: { price: 260, upkeep: 15, cap: 10, requires: 'expand1' },
-      expand3: { price: 400, upkeep: 20, cap: 12, requires: 'expand2' },
+      expand1: { price: 160, upkeep: 15, cap: 8 },
+      expand2: { price: 320, upkeep: 35, cap: 10, requires: 'expand1' },
+      expand3: { price: 640, upkeep: 70, cap: 12, requires: 'expand2' },
       cold1:   { price: 140, upkeep: 15, cold: 4 },
-      cold2:   { price: 240, upkeep: 20, cold: 6, requires: 'cold1' },
+      cold2:   { price: 300, upkeep: 35, cold: 6, requires: 'cold1' },
       yard:    { price: 180, upkeep: 10, xl: 1 },
-      freezer1: { price: 200, upkeep: 20, frozen: 4 },
+      freezer1: { price: 220, upkeep: 25, frozen: 4 },
       vent:    { price: 150, upkeep: 10, vent: true },
       // 차량: 자체 배송 확장 (마켓 차량 슬롯)
       coldvan: { price: 240, upkeep: 10, vehicle: true },

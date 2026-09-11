@@ -39,7 +39,7 @@
     priceMult: 1, contractPriceMult: 1, itemPriceMult: 1, facilityPriceMult: 1, waitStack: 0, skipBonus: 0,
     randomStart: false, freeRefresh: 0, marketContractSlots: 2, erosion: false, stressRelief: null, keepCalls: 0, marketMaxBuy: D.MARKET_MAX_BUY, expertFrom: 1,
     firstContractDiscount: 0, rebuyTrust: 0, spareCall: false, bundleRefund: null, overflowGrace: 0, capDelta: 0, freezer: 0, xlDelta: 0, xlPenalty: 3,
-    insurance: false, monthlyStress: 0, overdueMult: 0.75, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], guaranteeBlocked: true, returnGrace: D.RETURN_GRACE, theftMult: 1, overdueTurnStress: 0, breakMult: 1, warmLimit: D.WARM_LIMIT, customsWait: D.CUSTOMS_WAIT, customsDelayProb: D.CUSTOMS_DELAY_PROB, returnGraceFresh: 1, frozenCapMax: null, claimMult: 1, customerWeights: {}, forceCustomers: [], noAnon: false, closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
+    insurance: false, monthlyStress: 0, overdueMult: 0.75, overdueStress: 0, upcomingTurns: 2, urgentDiscount: 1, guaranteeCarriers: [], guaranteeBlocked: true, returnGrace: D.RETURN_GRACE, theftMult: 1, overdueTurnStress: 0, breakMult: 1, warmLimit: D.WARM_LIMIT, customsWait: D.CUSTOMS_WAIT, customsDelayProb: D.CUSTOMS_DELAY_PROB, returnGraceFresh: 1, frozenCapMax: null, claimMult: 1, customerWeights: {}, forceCustomers: [], noAnon: false, closingBonus: null, trustXpDelta: 0, trustXpMult: 1,
     arrivalsMult: 1, burstTurns: 0, winDelivered: 0, typeShift: null, typeOverride: null, freshSizes: null, warmMult: 2, heatAlerts: 0, winMaxDiscard: null,
     strike: false, xlWeight: null, winCash: 0, noRefresh: false, bigWeight: 1, bigCallBonus: null, winMaxOverdue: null,
     selfCapDelta: 0, allStartTrust: 0,
@@ -597,7 +597,9 @@
     monthsTotal() { return this.rules.endless ? Infinity : this.rules.months; }
 
     // ----- 월별 테이블 (무한 모드 확장 포함) -----
-    _extraArrivals(m) { return m <= 6 ? D.EXTRA_ARRIVALS[m] : 7 + (m - 6); }
+    // 고객 신뢰 단계에 따른 추가 입고: 단계가 오를수록 물량이 배 이상으로 는다
+    _customerExtra() { let n = 0; for (const id in this.customers) { const c = this.customers[id]; if (id === 'anon' || c.suspended) continue; n += (M.CUSTOMER_EXTRA[this.customerLevel(id)] || 0) * (c.slots || 1); } return n; }
+    _extraArrivals(m) { return (m <= 6 ? D.EXTRA_ARRIVALS[m] : 7 + (m - 6)) + this._customerExtra(); }
     _typeRatio(m) {
       const R = this.rules;
       let base = { ...(D.TYPE_RATIO[Math.min(6, m)]) };
@@ -632,9 +634,11 @@
       if (R.lateOpCost && m >= R.lateOpCost.from) rent += R.lateOpCost.delta;
       if (R.endless && m >= 12) rent += (m - 11) * 10;
       rent = Math.max(0, rent);
-      const contracts = this.contracts.filter(Boolean).length * D.OPCOST_CONTRACT;
+      const contracts = this.contracts.filter(Boolean).reduce((s, c) => s + (D.OPCOST_CONTRACT[c.grade] != null ? D.OPCOST_CONTRACT[c.grade] : D.OPCOST_CONTRACT.normal), 0);
       let facilities = 0; for (const f of Object.keys(D.FACILITIES)) if (this.warehouse[f]) facilities += D.FACILITIES[f].upkeep || 0;
-      return { rent, contracts, facilities, total: rent + contracts + facilities };
+      const arrivals = this.schedule ? this.schedule.reduce((s, t) => s + t.length, 0) : 0;
+      const labor = Math.max(0, arrivals - D.OPCOST_BASE_ARRIVALS) * D.OPCOST_PER_PARCEL;
+      return { rent, contracts, facilities, labor, arrivals, total: rent + contracts + facilities + labor };
     }
     _opCost(m) {
       const R = this.rules;
@@ -954,7 +958,7 @@
         if (isFrozen && !p.inFrozen) { discard.push([p, MSG('why.outsideFrozen')]); continue; }
         const freeze = isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer));
         const grace = isCold ? R.returnGraceFresh : R.returnGrace;
-        if (!p.overdue) { if (!freeze) p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; pen += 1; reasons.push(MSG('r.overdue', { short: D.PARCEL_TYPES[p.type].short })); this.monthStats.overdue++; } }
+        if (!p.overdue) { if (!freeze) p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; pen += R.overdueStress; if (R.overdueStress) reasons.push(MSG('r.overdue', { short: D.PARCEL_TYPES[p.type].short })); this.monthStats.overdue++; } }
         else { p.overdueTurns = (p.overdueTurns || 0) + 1; if (p.overdueTurns >= grace) returned.push(p); else if (R.overdueTurnStress) { pen += R.overdueTurnStress; reasons.push(MSG('r.overdueCont', { short: D.PARCEL_TYPES[p.type].short })); } }
       }
       for (const [p, why] of discard) { this._discardParcel(p, why, 2, 'discard'); reasons.push(MSG('r.discard', { why, short: D.PARCEL_TYPES[p.type].short })); }
@@ -1121,24 +1125,30 @@
         const rank = g => GRADE_RANK.indexOf(g);
         const owned = k => this.contracts.find(c => c && c.carrier === k);
         // 보유 업체: 같은 등급이면 배차 추가(리필) 제안, 높은 등급이면 업그레이드 제안, 낮은 등급은 제외
-        const blocked = k => items.some(it => it.carrier === k) || (owned(k) && rank(grade) < rank(owned(k).grade));
+        const blocked = k => items.some(it => it.carrier === k) || (owned(k) && rank(grade) <= rank(owned(k).grade)); // 같은 등급은 상시 '배차 추가' 카드가 대신한다
         if (!f && blocked(carrier)) { const alt = {}; for (const k in weights) if (!blocked(k)) alt[k] = weights[k]; if (Object.keys(alt).length) carrier = this.rng.weighted(alt); else { const alt2 = {}; for (const k in weights) if (!items.some(it => it.carrier === k)) alt2[k] = weights[k]; if (Object.keys(alt2).length) carrier = this.rng.weighted(alt2); } }
         let price = Math.round(D.CARRIERS[carrier].price * D.GRADES[grade].price * R.priceMult);
         const up = owned(carrier) && rank(grade) > rank(owned(carrier).grade);
         const add = owned(carrier) && rank(grade) === rank(owned(carrier).grade);
         items.push({ kind: 'contract', carrier, grade, price, name: D.CARRIERS[carrier].name + (grade !== 'normal' ? ` (${D.GRADES[grade].name})` : ''), sold: false, hint: f && f.hint || (up ? T('market.upgradeHint') : add ? T('market.addHint') : null), upgrade: !!up, add: !!add });
       }
+      // 상시 배차 추가: 보유 계약마다 월 배차 +n대(즉시 리필). 살 때마다 가격 ×D.ADD_PRICE_STEP — 물량이 늘수록 지출도 커지는 흡수 장치
+      for (const c of this.contracts) if (c) items.push({ kind: 'contract', carrier: c.carrier, grade: c.grade, standing: true, add: true, sold: false,
+        price: Math.round(D.CARRIERS[c.carrier].price * D.GRADES[c.grade].price * R.priceMult * Math.pow(D.ADD_PRICE_STEP, c.adds || 0)),
+        name: T('market.addName', { name: this.contractName(c), n: this.itemTrucks({ carrier: c.carrier, grade: c.grade }) }), hint: T('market.addHint') });
       const enhW = {}; for (const k of Object.keys(D.ENHANCEMENTS)) enhW[k] = R.marketWeight[k] || 1;
       const picked = []; for (let i = 0; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }
       for (const e of picked) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });
       const facW = {}, vehW = {};
       for (const f of Object.keys(D.FACILITIES)) { const F = D.FACILITIES[f]; if (this.warehouse[f]) continue; if (F.vehicle) { vehW[f] = R.marketWeight[f] || 1; continue; } if (F.requires && !this.warehouse[F.requires]) continue; if (F.cold && R.coldCapMax != null && this.warehouse.cold >= R.coldCapMax) continue; if (F.frozen && R.frozenCapMax != null && (this.warehouse.frozen || 0) >= R.frozenCapMax) continue; facW[f] = R.marketWeight[f] || 1; }
+      const facPrice = f => { let price = D.FACILITIES[f].price * mult * R.facilityPriceMult; if (R.facilityPriceMap && R.facilityPriceMap[f]) price *= R.facilityPriceMap[f]; for (const id in this.customers || {}) { const fp = this.customerPerk(id, 'facilityPrice'); if (fp && fp[f]) price *= fp[f]; } return Math.round(price); };
+      // 상시 창고 확장: 다음 단계 확장은 항상 살 수 있다(단계가 오를수록 비싸다). 나머지 시설은 무작위 1개
+      const nextExpand = ['expand1', 'expand2', 'expand3'].find(f => facW[f]);
+      if (nextExpand) { items.push({ kind: 'fac', fac: nextExpand, standing: true, price: facPrice(nextExpand), name: D.FACILITIES[nextExpand].name, sold: false }); delete facW[nextExpand]; }
       if (Object.keys(facW).length) {
         const f = this.rng.weighted(facW);
-        let price = D.FACILITIES[f].price * mult * R.facilityPriceMult; if (R.facilityPriceMap && R.facilityPriceMap[f]) price *= R.facilityPriceMap[f];
-        for (const id in this.customers || {}) { const fp = this.customerPerk(id, 'facilityPrice'); if (fp && fp[f]) price *= fp[f]; }
-        items.push({ kind: 'fac', fac: f, price: Math.round(price), name: D.FACILITIES[f].name, sold: false });
-      } else items.push({ kind: 'fac', fac: null, price: 0, name: T('market.facSoldOut'), sold: true });
+        items.push({ kind: 'fac', fac: f, price: facPrice(f), name: D.FACILITIES[f].name, sold: false });
+      } else if (!nextExpand) items.push({ kind: 'fac', fac: null, price: 0, name: T('market.facSoldOut'), sold: true });
       if (Object.keys(vehW).length && this.rng.next() < 0.5) { const f = this.rng.weighted(vehW); items.push({ kind: 'fac', fac: f, price: Math.round(D.FACILITIES[f].price * mult * R.facilityPriceMult), name: D.FACILITIES[f].name, sold: false }); }
       if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3) { const cands = Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !this.customers[k]); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: T('market.newCustomer', { name: M.CUSTOMERS[k].name }), sold: false }); } }
       if (this.rng.next() < 0.6) { const k = this.rng.pick(Object.keys(M.INS_ITEMS)); items.push({ kind: 'item', item: k, price: Math.round(M.INS_ITEMS[k].price * mult), name: M.INS_ITEMS[k].name, sold: false }); }
@@ -1187,7 +1197,7 @@
             this.say('log.upgradeContract', { name: this.contractName(old), price });
           } else {
             const n = this.itemTrucks(it);
-            old.maxCalls += n; old.calls += n;
+            old.maxCalls += n; old.calls += n; old.adds = (old.adds || 0) + 1;
             this.say('log.addContract', { name: this.contractName(old), n, price });
           }
           this.monthStats.firstContractBought = true; this.stats.contractsBought++;
