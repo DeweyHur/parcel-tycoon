@@ -18,8 +18,9 @@
     // 월별 택배 종류 비율 (large = 대형화물, 4개월차부터)
     // intl = 🛃 통관 (구 국제운송), frozen = ❆ 냉동 (4개월차부터)
     TYPE_RATIO: {
-      1: { normal: 62, fresh: 12, produce: 8, fragile: 12, intl: 6, large: 0, frozen: 0 },
-      2: { normal: 55, fresh: 13, produce: 9, fragile: 13, intl: 10, large: 0, frozen: 0 },
+      // 1~2개월차는 일반 위주 — 특수는 고객 신뢰가 쌓이며 열린다 (docs/BALANCE_DESIGN.md 3장)
+      1: { normal: 85, fresh: 0, produce: 5, fragile: 6, intl: 4, large: 0, frozen: 0 },
+      2: { normal: 70, fresh: 8, produce: 7, fragile: 9, intl: 6, large: 0, frozen: 0 },
       3: { normal: 50, fresh: 13, produce: 9, fragile: 15, intl: 13, large: 0, frozen: 0 },
       4: { normal: 42, fresh: 13, produce: 9, fragile: 16, intl: 12, large: 5, frozen: 3 },
       5: { normal: 38, fresh: 13, produce: 10, fragile: 17, intl: 13, large: 5, frozen: 4 },

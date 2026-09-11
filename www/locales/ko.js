@@ -23,6 +23,7 @@
     'mk.vehicleLine': "{vehicle} <b>{cap}</b>칸 · 대당 <b>{fee}</b>c · 월 <b>{trucks}</b>대",
     'mk.gradeVs': "표준 대비: 용량 {cap0}→{cap1}칸 · 월 {t0}→{t1}대 · 배차비 {f0}→{f1}c · 신뢰 {lv}단계 즉시",
     'grade.merit': "프리미엄 계약은 차량이 크고 배차가 많고 배차비가 싸며, 신뢰 특성이 즉시 열립니다",
+    'mk.forecast': "{m}개월차 예상 물량(대략)",
     'log.monthStart': '── {m}개월차 시작 ──',
     'log.prepMarket': '준비 마켓: 1개월차 시작 전 구매 (새로고침 1회 무료)',
     'log.bigCustomer': '대형 계약: {name}이(가) 물량 60%를 보냅니다',

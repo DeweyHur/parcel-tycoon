@@ -23,6 +23,7 @@
     'mk.vehicleLine': "{vehicle} <b>{cap}</b> slots · <b>{fee}</b>c per vehicle · <b>{trucks}</b>/month",
     'mk.gradeVs': "vs Standard: capacity {cap0}→{cap1} · {t0}→{t1}/month · fee {f0}→{f1}c · trust lv {lv} immediately",
     'grade.merit': "Premium contracts bring bigger vehicles, more dispatches, cheaper fees and instant trust perks",
+    'mk.forecast': "Expected volume, month {m} (approx.)",
     'log.monthStart': '── Month {m} begins ──',
     'log.prepMarket': 'Prep market: buy before month 1 starts (1 free refresh)',
     'log.bigCustomer': 'Big contract: {name} will send 60% of the volume',
