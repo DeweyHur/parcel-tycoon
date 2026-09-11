@@ -166,3 +166,5 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .diffrow .btn.on { border-color: var(--gold); color: var(--gold); background: #3a3320; }
 #hud-perks .hl { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 2px; } #hud-perks .hl:active { color: var(--gold); }
 .chip.up, .chip.wx, .wxline { cursor: pointer; } .chip.wx.now { border-color: var(--gold); }
+.truckgauge { margin: 6px 0; } .truckgauge .tg { position: relative; height: 22px; background: var(--panel2); border: 2px solid var(--line); } .truckgauge .tg i { display: block; height: 100%; background: #6c8cff; transition: width .15s; } .truckgauge .tg i.good { background: var(--green); } .truckgauge .tg span { position: absolute; left: 6px; top: 2px; font-size: 12px; color: var(--ink); text-shadow: 0 0 3px #000; }
+.truckgauge .tbtn { display: flex; gap: 6px; margin-top: 4px; align-items: center; }

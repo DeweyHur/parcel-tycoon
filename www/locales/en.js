@@ -5,6 +5,24 @@
   name: 'English',
   ui: {
     // ----- game core: logs (log.*) · errors (err.*) · penalty reasons (r.*) · discard reasons (why.*) · game over (over.*) -----
+    'err.overTrucks': "Up to {n} vehicles per call ({cap} slots total)",
+    'err.noTrucks': "Only {n} dispatches left this month",
+    'err.noCashFee': "Not enough cash for the {fee}c dispatch fee",
+    'market.upgradeHint': "Upgrade of a contract you own",
+    'fmt.trucks': "{n} vehicle{n:|s}",
+    'fmt.perTruck': "{fee}c per vehicle",
+    'fmt.vehicleCap': "{vehicle} {cap} slots",
+    'sum.fees': "Dispatch fees",
+    'call.trucks': "{n} vehicle{n:|s} · load {vol}/{cap} slots",
+    'call.addTruck': "Add a vehicle (+{fee}c)",
+    'call.removeTruck': "Remove a vehicle",
+    'call.fee': "Dispatch fee -{fee}c",
+    'call.net': "Net {net}c",
+    'call.fillOk': "Load efficiency ✓ trust +1",
+    'call.simulMax': "Max {n} at once",
+    'mk.vehicleLine': "{vehicle} <b>{cap}</b> slots · <b>{fee}</b>c per vehicle · <b>{trucks}</b>/month",
+    'mk.gradeVs': "vs Standard: capacity {cap0}→{cap1} · {t0}→{t1}/month · fee {f0}→{f1}c · trust lv {lv} immediately",
+    'grade.merit': "Premium contracts bring bigger vehicles, more dispatches, cheaper fees and instant trust perks",
     'log.monthStart': '── Month {m} begins ──',
     'log.prepMarket': 'Prep market: buy before month 1 starts (1 free refresh)',
     'log.bigCustomer': 'Big contract: {name} will send 60% of the volume',
@@ -34,14 +52,14 @@
     'log.callAllBroken': '{name} call: all {broken} parcels broken!',
     'log.trustUp': '{name} reached trust level {level}! ({effect})',
     'log.spareCall': 'Spare driver dispatched (call without remaining calls)',
-    'log.call': '{name} call: {count} shipped, +{revenue}c{delay}{broken}{refund} ({calls} calls left){instant}',
+    'log.call': "{name} call: {count} shipped, +{revenue}c{delay}{broken}{refund} (fee {fee}c · {calls} left)",
     'log.callDelay': ' (paid in {delay} turns)',
     'log.callBroken': ', {broken} broken',
     'log.callRefund': ' (bundle discount: call not consumed)',
     'log.callInstant': ' ⚡instant',
     'log.discard': 'Discarded: {short}{size} — {why}{pen}',
     'log.penalty': 'Penalty +{pen}: {reasons} (stress {stress})',
-    'log.erosion': 'Unstable: {name} remaining calls -1',
+    'log.erosion': 'Unstable: {name} monthly dispatch -1',
     'log.settle': 'Month {month} settlement: revenue {revenue}, operating cost {opCost}{closing}',
     'log.settleClosing': ', closing bonus +{closing}',
     'log.gameOver': 'Game over: {reason}',
@@ -101,7 +119,7 @@
     'err.cannotCallNow': 'Cannot call right now',
     'err.emptySlot': 'Empty slot',
     'err.struck': 'This carrier is on strike',
-    'err.noCalls': 'No calls remaining',
+    'err.noCalls': 'No dispatches left this month',
     'err.overCap': 'Can ship at most {cap}',
     'err.nothingToShip': 'Nothing to ship',
     'err.cannotShipNow': 'Cannot deliver right now',
@@ -120,17 +138,17 @@
     'err.hasExpress': 'Express dispatch already applied',
     'err.optOne': 'One rider per contract',
     'err.optHasAttr': 'Carrier already handles that attribute',
-    'err.optUrgent': 'Riders cannot be added to Urgent Express',
+    'err.optUrgent': 'Riders cannot be added to this contract',
     'err.optSize': 'Only contracts with max size {max} or less',
     'err.optPlain': 'Cannot add to a plain-parcel-only carrier',
     'err.customerMax': 'Up to {n} customers',
     'err.customerDup': 'Already a customer',
     'err.soldOut': 'Sold out',
     'xp.base': 'delivery +1',
-    'xp.cap80': 'capacity 80%↑ +1',
+    'xp.cap80': "Load efficiency 80%+ +1",
     'xp.specialist': 'specialist +1',
     'xp.coldChain': 'cold chain +1',
-    'note.regular': 'regular dispatch +1',
+    'note.regular': "First dispatch free this month",
     'note.express': 'express dispatch +1',
     'note.trust2': 'trust lv2 +1',
     'note.skip': 'skip bonus +1',
@@ -223,7 +241,7 @@
     'storage.left': 'pickup in {n}',
     'hud.buyInMarket': 'Buy a contract in the market',
     'hud.spare': 'Spare',
-    'hud.contractSub': '<b>{cap}</b> cap · <b>{elig}</b> eligible',
+    'hud.contractSub': "<b>{cap}</b>sl·{fee}c · <b>{elig}</b> elig",
     'hud.noTurn': 'no turn',
     'hud.regular': 'regular',
     'hud.express': 'express',
@@ -331,7 +349,7 @@
     'call.xpGain': 'This call <b>+{xp}xp</b> ({parts})',
     'call.nextLevel': 'Next level',
     'call.trackToggle': 'Level unlocks',
-    'call.capacity': 'Capacity <b>{cap}</b>',
+    'call.capacity': 'Capacity <b>{cap}</b> slots',
     'call.remain': 'Left',
     'call.btn': 'Call',
     'call.riskLine': '⚠ Break risk on {n} — {pct}% each (expected loss {loss}c). A broken parcel is discarded, stress +2',
@@ -339,12 +357,12 @@
     'call.size': 'Size {min}–{max}',
     'call.payLater': '⏱ paid in {n:# turn|# turns}',
     'call.bonus': 'Bonus',
-    'call.selected': 'Selected <b>{n}</b>/{cap}',
+    'call.selected': "Selected <b>{n}</b>/{cap}",
     'call.pickUrgent': 'Auto-pick urgent',
     'call.pickClear': 'Clear',
     'call.instant': '⚡Ship now',
     'call.noTurn': 'Does not use a turn',
-    'call.maxSelect': 'You can select up to {cap}',
+    'call.maxSelect': "Exceeds vehicle capacity {cap} — add a vehicle or remove parcels",
     'float.broken': '⚠ Broken! {short}',
     'float.delayed': '+{n}c (in {delay} turns)',
     'toast.custSuspend': '{name} suspended trade — resumes next month',
@@ -421,7 +439,7 @@
     'mk.sold': 'Sold',
     'mk.currentContracts': 'Current contracts (replacing loses remaining calls and upgrades{keep}; carrier trust is kept)',
     'mk.keepCalls': ', {n} call kept',
-    'mk.contractLine': '{calls}/{max} calls left, {cap}/call',
+    'mk.contractLine': '{calls}/{max} dispatches this month, vehicle {cap} slots',
     'mk.mine': 'My contracts',
     'mk.prepNote': 'Before month 1 starts.',
     'mk.bought': 'Bought',
@@ -480,15 +498,15 @@
     'ins.join': 'Sign up',
     'cust.rules': 'On-time delivery +1xp · special rule +1xp · discard -3xp (below 0 suspends trade). Higher trust raises volume and per-parcel reward; discards trigger damage claims.',
     'my.slot': 'Slot {n}',
-    'my.limit': 'call limit +{n}',
+    'my.limit': 'dispatch limit +{n}',
     'my.cap': 'capacity +{n}',
-    'my.remain': '{calls}/{max} calls left',
-    'my.stats': '<b>{cap}</b>/call · {calls} calls this run · {n} shipped',
+    'my.remain': "{calls}/{max} dispatches this month",
+    'my.stats': "{vehicle} <b>{cap}</b> slots · {fee}c/vehicle · up to {simul} at once · {calls} calls this run · {n} shipped",
     'my.others': 'Carriers with leftover trust but no contract',
     'my.note': 'Replacing loses remaining calls and upgrades{keep}; carrier trust is kept',
     'codex.carriersHead': 'Carriers · trust accrues per carrier and survives contract changes',
     'codex.liveRun': '(current run progress)',
-    'codex.carrierPrice': '{cap}/call · {calls} calls · {price}c',
+    'codex.carrierPrice': "{vehicle} {cap} slots · {fee}c/vehicle · {trucks}/month · {price}c",
     'codex.need': 'only({icons})',
     'codex.perkSlots': '{n} perk slots · one per family',
     'codex.slotReward': '{n} perk slots',
@@ -528,7 +546,7 @@
     'codex.ach.multi': 'First clear',
     'codex.ach.perk': 'Perk unlocks',
     'codex.ach.none': 'Records',
-    'help.body': '<div class="help">\n      <p>Parcels arrive at your warehouse every turn. Call a carrier to ship them, or <b>wait</b> and let them pile up. A call costs the same regardless of how many parcels it ships — you pay per <b>call</b>, so the more you ship at once, the better.</p>\n      <h3>Setting up a run</h3><p>Pick a <b>scenario</b> (length and rules) → a <b>company</b> (starting warehouse, contracts, traits) → <b>perks</b> (small rule tweaks). Companies, perks and scenarios are unlocked by <b>achievements</b>; the Codex shows conditions and progress. Companies open in tiers: <b>tier 1</b> (3 runs · first clear · 2 clears) → <b>tier 2</b> (30 of a parcel type in total) → <b>tier 3</b> (clear with 3 companies).</p>\n      <h3>Turn order</h3><p>Arrivals → call a carrier or wait → delivery → freshness and deadlines tick → overflow and delay penalties</p>\n      <h3>Parcel attributes — what happens in the warehouse</h3><table><tr><th>Attribute</th><th>Rule</th><th>Who can ship it</th></tr>\n      <tr><td>❄ Fresh</td><td>Outside the cold zone: <b>discarded next turn</b>. Deadline 3 turns</td><td>Any carrier (bonus from Cold Logistics only)</td></tr>\n      <tr><td>⚠ Fragile</td><td>A carrier without the ⚠ ability has a <b>25% break chance</b> (discard, +2 stress)</td><td>Any carrier. Safe: Fragile Pro · Heavy Haul · Rail · Air · Urgent · Padded Packing Rider</td></tr>\n      <tr><td>🛃 Customs</td><td><b>2 turns in customs</b> after arrival (20% chance of +1 delay). Takes space while waiting; the deadline starts afterwards</td><td>Any carrier once cleared. While in customs: Customs Broker · Air · Sea · Urgent only</td></tr>\n      <tr><td>❆ Frozen</td><td>Outside the freezer: <b>discarded immediately</b>. Deadline 8 turns. From month 4. Parcels larger than the freezer never arrive</td><td>Frozen Logistics · Reefer Container Rider only</td></tr>\n      <tr><td>🌾 Produce</td><td>Even inside, <b>heat waves cut the deadline by 2</b> (discarded if outside). Safe in spare cold space or with Ventilation. Deadline 5 turns</td><td>Any carrier (bonus from Cold Logistics). Self-delivery OK</td></tr>\n      <tr><td>Large (4–7)</td><td>Only carriers whose size range fits</td><td>Van Hire · Heavy Haul · Rail · Sea · Customs Broker</td></tr></table>\n      <h3>Wait · self-delivery · vehicles</h3><p>Pressing <b>Wait</b> opens the end-turn screen, where you can pick parcels to <b>self-deliver</b> — 1 per turn (Big Truck +1, City Quick and National Post +1), plain parcels and produce only, up to size 2. You keep the full reward but pay a <b>delivery cost</b> (15c + size×5c). Expand it with market <b>vehicles</b>: Reefer Van (❄❆), Padded Van (⚠ safe), Big Truck (size 4, +1). If anything is stored outside, the same screen leads to Arrange Storage. Tap a parcel row to see which contracts or self-delivery can handle it.</p>\n      <h3>Prep market</h3><p>Every run starts with a <b>prep market</b>. Before the first turn of month 1 you can spend your starting cash on contracts, upgrades, facilities and insurance, and you can see the first 1–2 turns of arrivals and weather. One free refresh. One-month scenarios are prepared here too.</p>\n      <h3>Difficulty</h3><p>Choose <b>Rookie · Regular · Veteran</b> at the top of the scenario screen. Rookie lowers arrivals, prices and damages and shows arrivals 3 turns ahead, but unlock achievements don\'t count. Veteran (after your first clear): arrivals +10%, damages ×1.5, theft and breakage ×1.3, stress limit 18, score ×1.4.</p>\n      <h3>Weather · storage · contracts · insurance</h3><p>Each turn has weather, forecast 2 turns ahead. <b>🌧 Rain</b> wets standard and ⚠ parcels outside (reward -20%), <b>🔥 heat waves</b> discard ❄❆ outside cold zones immediately, a <b>❄️ blizzard</b> turns the yard into a fridge (no ❄ spoilage, theft halved, ❄ shipping +10), and a <b>🌀 typhoon</b> doubles theft and pushes that turn\'s arrivals to the next turn.</p><p>When the warehouse overflows, pressing <b>Wait</b> opens <b>Arrange Storage</b>. Choose what goes outside yourself or use presets (urgent · high reward · high damages · by customer). It doesn\'t open on call turns — it\'s the reward for waiting.</p><p>Customers like the Moving Center offer <b>storage contracts</b>. Accepting pays an upfront fee and the volume occupies your warehouse for the term (not callable or arrangeable). Ending safely gives trust +2; returning early refunds the remaining term minus a 30c penalty. If it\'s put outside and stolen, damages ×2.</p><p><b>Insurance</b> is chosen at run start and can be switched in the market. It covers part of each damage claim, and the monthly premium is deducted at settlement. 0 claims → -20% next month (2 months in a row -30% + customer trust +1); many claims raise it. Uninsured, customers with damages ×2 (Glass Studio, Moving Center) send half the volume. The market also sells one-time insurance (Transit Certificate · Yard Insurance · Customs Bond).</p>\n      <h3>Customers</h3><p>Every parcel has a <b>customer</b> (icon on the left of the row). On-time delivery +1xp, meeting the customer\'s special rule +1xp, discard -3xp. Trust levels 1–3 raise volume and per-parcel reward, and levels 2–3 unlock customer perks. A discard (spoilage, return, theft, breakage) triggers a <b>damage claim</b> (base reward × damage multiplier) taken from your cash immediately, and if xp drops below 0 the customer stops trading until next month. Check the <b>Customers</b> button at the bottom.</p>\n      <p>The <b>ability</b> icons on a carrier card are the attributes it handles safely. A <b>rider</b> from the upgrade slot adds one attribute to a contract (1 per contract). ✈🚆🚢 only mark the transport mode and don\'t affect matching; Rail and Sea pay out 1–2 turns later.</p>\n      <h3>Three ways to ship</h3><p><b>Self-delivery</b>: on a wait turn, pick 1 parcel, pay the delivery cost, keep the full reward. <b>Carrier call</b>: spends 1 remaining call and the turn. Specialists get bonuses. <b>⚡Urgent Express</b>: ships 1 parcel instantly without using a turn — the safety net of a waiting strategy.</p>\n      <p>Van Hire takes any 1 parcel (no bonus, ⚠ break risk). Missing a deadline costs reward -25% and stress +1; 3 turns later the parcel is <b>returned</b> (stress +2). Whatever exceeds capacity is <b>stored outside</b>, newest arrivals first, and rolls for theft every turn (overflow 1–2: 15%, 3–5: 30%, 6+: 50%). Fresh food drops to 50% reward after 3 turns and is discarded the turn after (+3). Fresh food at room temperature (not ❄) spoils twice as fast.</p>\n      <h3>Warehouse</h3><p>Overflow of 1–2: +1 stress, 3 or more: +2 — the real danger is theft of what\'s outside. Stress {stress} is game over. Operating costs are settled at month end.</p>\n      <h3>Contracts and the market</h3><p>Each contract has a number of remaining calls, and you can\'t buy new contracts mid-month. Replace contracts and buy upgrades and facilities in the month-end market. Replacing a contract loses its remaining calls and upgrades. Grades: Standard &lt; Trusted &lt; Expert &lt; Master.</p>\n      <h3>Carrier trust</h3><p>Trust accrues per <b>carrier</b> and survives contract changes. Per call: delivery +1, capacity 80%+ +1, special parcels with a specialist +1. The call screen previews the xp for this call.</p>\n      <table><tr><th>Level</th><th>xp</th><th>Effect</th></tr><tr><td>1</td><td>3</td><td>Capacity +1 per call</td></tr><tr><td>2</td><td>8</td><td>+1 parcel every 4th call</td></tr><tr><td>3</td><td>15</td><td>Signature ability (Cold: deadlines freeze / Bulk · Broker · Heavy · Frozen · Urgent: +1 parcel / Van: special bonus / Fragile Pro: +15c / Air: size 4 / Rail · Sea: payment delay -1)</td></tr></table>\n      <p>Fastest route: call the same carrier <b>fully loaded</b> (80%+) for +2–3xp each time — level 3 in 5–6 calls.</p></div>',
+    'help.body': '<div class="help">\n      <p>Parcels arrive at your warehouse every turn. Calls are per <b>vehicle</b>: each contract has a vehicle (N slots) and you pay a <b>dispatch fee</b> per vehicle every call; fill it 80%+ to earn extra trust. Every call costs money, so pace waits and calls to keep cash from running dry. Call a carrier to ship them, or <b>wait</b> and let them pile up. A call costs the same regardless of how many parcels it ships — you pay per <b>call</b>, so the more you ship at once, the better.</p>\n      <h3>Setting up a run</h3><p>Pick a <b>scenario</b> (length and rules) → a <b>company</b> (starting warehouse, contracts, traits) → <b>perks</b> (small rule tweaks). Companies, perks and scenarios are unlocked by <b>achievements</b>; the Codex shows conditions and progress. Companies open in tiers: <b>tier 1</b> (3 runs · first clear · 2 clears) → <b>tier 2</b> (30 of a parcel type in total) → <b>tier 3</b> (clear with 3 companies).</p>\n      <h3>Turn order</h3><p>Arrivals → call a carrier or wait → delivery → freshness and deadlines tick → overflow and delay penalties</p>\n      <h3>Parcel attributes — what happens in the warehouse</h3><table><tr><th>Attribute</th><th>Rule</th><th>Who can ship it</th></tr>\n      <tr><td>❄ Fresh</td><td>Outside the cold zone: <b>discarded next turn</b>. Deadline 3 turns</td><td>Any carrier (bonus from Cold Logistics only)</td></tr>\n      <tr><td>⚠ Fragile</td><td>A carrier without the ⚠ ability has a <b>25% break chance</b> (discard, +2 stress)</td><td>Any carrier. Safe: Fragile Pro · Heavy Haul · Rail · Air · Urgent · Padded Packing Rider</td></tr>\n      <tr><td>🛃 Customs</td><td><b>2 turns in customs</b> after arrival (20% chance of +1 delay). Takes space while waiting; the deadline starts afterwards</td><td>Any carrier once cleared. While in customs: Customs Broker · Air · Sea · Urgent only</td></tr>\n      <tr><td>❆ Frozen</td><td>Outside the freezer: <b>discarded immediately</b>. Deadline 8 turns. From month 4. Parcels larger than the freezer never arrive</td><td>Frozen Logistics · Reefer Container Rider only</td></tr>\n      <tr><td>🌾 Produce</td><td>Even inside, <b>heat waves cut the deadline by 2</b> (discarded if outside). Safe in spare cold space or with Ventilation. Deadline 5 turns</td><td>Any carrier (bonus from Cold Logistics). Self-delivery OK</td></tr>\n      <tr><td>Large (4–7)</td><td>Only carriers whose size range fits</td><td>Van Hire · Heavy Haul · Rail · Sea · Customs Broker</td></tr></table>\n      <h3>Wait · self-delivery · vehicles</h3><p>Pressing <b>Wait</b> opens the end-turn screen, where you can pick parcels to <b>self-deliver</b> — 1 per turn (Big Truck +1, City Quick and National Post +1), plain parcels and produce only, up to size 2. You keep the full reward but pay a <b>delivery cost</b> (15c + size×5c). Expand it with market <b>vehicles</b>: Reefer Van (❄❆), Padded Van (⚠ safe), Big Truck (size 4, +1). If anything is stored outside, the same screen leads to Arrange Storage. Tap a parcel row to see which contracts or self-delivery can handle it.</p>\n      <h3>Prep market</h3><p>Every run starts with a <b>prep market</b>. Before the first turn of month 1 you can spend your starting cash on contracts, upgrades, facilities and insurance, and you can see the first 1–2 turns of arrivals and weather. One free refresh. One-month scenarios are prepared here too.</p>\n      <h3>Difficulty</h3><p>Choose <b>Rookie · Regular · Veteran</b> at the top of the scenario screen. Rookie lowers arrivals, prices and damages and shows arrivals 3 turns ahead, but unlock achievements don\'t count. Veteran (after your first clear): arrivals +10%, damages ×1.5, theft and breakage ×1.3, stress limit 18, score ×1.4.</p>\n      <h3>Weather · storage · contracts · insurance</h3><p>Each turn has weather, forecast 2 turns ahead. <b>🌧 Rain</b> wets standard and ⚠ parcels outside (reward -20%), <b>🔥 heat waves</b> discard ❄❆ outside cold zones immediately, a <b>❄️ blizzard</b> turns the yard into a fridge (no ❄ spoilage, theft halved, ❄ shipping +10), and a <b>🌀 typhoon</b> doubles theft and pushes that turn\'s arrivals to the next turn.</p><p>When the warehouse overflows, pressing <b>Wait</b> opens <b>Arrange Storage</b>. Choose what goes outside yourself or use presets (urgent · high reward · high damages · by customer). It doesn\'t open on call turns — it\'s the reward for waiting.</p><p>Customers like the Moving Center offer <b>storage contracts</b>. Accepting pays an upfront fee and the volume occupies your warehouse for the term (not callable or arrangeable). Ending safely gives trust +2; returning early refunds the remaining term minus a 30c penalty. If it\'s put outside and stolen, damages ×2.</p><p><b>Insurance</b> is chosen at run start and can be switched in the market. It covers part of each damage claim, and the monthly premium is deducted at settlement. 0 claims → -20% next month (2 months in a row -30% + customer trust +1); many claims raise it. Uninsured, customers with damages ×2 (Glass Studio, Moving Center) send half the volume. The market also sells one-time insurance (Transit Certificate · Yard Insurance · Customs Bond).</p>\n      <h3>Customers</h3><p>Every parcel has a <b>customer</b> (icon on the left of the row). On-time delivery +1xp, meeting the customer\'s special rule +1xp, discard -3xp. Trust levels 1–3 raise volume and per-parcel reward, and levels 2–3 unlock customer perks. A discard (spoilage, return, theft, breakage) triggers a <b>damage claim</b> (base reward × damage multiplier) taken from your cash immediately, and if xp drops below 0 the customer stops trading until next month. Check the <b>Customers</b> button at the bottom.</p>\n      <p>The <b>ability</b> icons on a carrier card are the attributes it handles safely. A <b>rider</b> from the upgrade slot adds one attribute to a contract (1 per contract). ✈🚆🚢 only mark the transport mode and don\'t affect matching; Rail and Sea pay out 1–2 turns later.</p>\n      <h3>Three ways to ship</h3><p><b>Self-delivery</b>: on a wait turn, pick 1 parcel, pay the delivery cost, keep the full reward. <b>Carrier call</b>: spends 1 remaining call and the turn. Specialists get bonuses. <b>⚡Urgent Express</b>: ships 1 parcel instantly without using a turn — the safety net of a waiting strategy.</p>\n      <p>Van Hire takes any 1 parcel (no bonus, ⚠ break risk). Missing a deadline costs reward -25% and stress +1; 3 turns later the parcel is <b>returned</b> (stress +2). Whatever exceeds capacity is <b>stored outside</b>, newest arrivals first, and rolls for theft every turn (overflow 1–2: 15%, 3–5: 30%, 6+: 50%). Fresh food drops to 50% reward after 3 turns and is discarded the turn after (+3). Fresh food at room temperature (not ❄) spoils twice as fast.</p>\n      <h3>Warehouse</h3><p>Overflow of 1–2: +1 stress, 3 or more: +2 — the real danger is theft of what\'s outside. Stress {stress} is game over. Operating costs are settled at month end.</p>\n      <h3>Contracts and the market</h3><p>Each contract has a number of remaining calls, and you can\'t buy new contracts mid-month. Replace contracts and buy upgrades and facilities in the month-end market. Replacing a contract loses its remaining calls and upgrades. Grades: Standard &lt; Trusted &lt; Expert &lt; Master.</p>\n      <h3>Carrier trust</h3><p>Trust accrues per <b>carrier</b> and survives contract changes. Per call: delivery +1, capacity 80%+ +1, special parcels with a specialist +1. The call screen previews the xp for this call.</p>\n      <table><tr><th>Level</th><th>xp</th><th>Effect</th></tr><tr><td>1</td><td>3</td><td>Capacity +1 per call</td></tr><tr><td>2</td><td>8</td><td>+1 parcel every 4th call</td></tr><tr><td>3</td><td>15</td><td>Signature ability (Cold: deadlines freeze / Bulk · Broker · Heavy · Frozen · Urgent: +1 parcel / Van: special bonus / Fragile Pro: +15c / Air: size 4 / Rail · Sea: payment delay -1)</td></tr></table>\n      <p>Fastest route: call the same carrier <b>fully loaded</b> (80%+) for +2–3xp each time — level 3 in 5–6 calls.</p></div>',
   },
   data:   {
     "ATTRS": {
@@ -579,74 +597,107 @@
       }
     },
     "CARRIERS": {
-      "target": {
-        "name": "Van Hire",
-        "short": "Van",
-        "desc": "Pick any 1 parcel and send a van (no special bonus, ⚠ break risk)"
+      "bulk": {
+        "name": "Bulk Sorting",
+        "short": "Bulk",
+        "vehicle": "Box Truck",
+        "desc": "Loads plain parcels (size 1–2) on a box truck. The backbone of a standard-parcel build"
       },
       "cold": {
         "name": "Cold Logistics",
         "short": "Cold",
+        "vehicle": "Reefer Truck",
         "desc": "Fresh & produce specialist. Fresh/produce bonus"
       },
-      "bulk": {
-        "name": "Bulk Sorting",
-        "short": "Bulk",
-        "desc": "Ships a batch of standard parcels at once"
+      "frozen": {
+        "name": "Frozen Logistics",
+        "short": "Frozen",
+        "vehicle": "Freezer Truck",
+        "desc": "Frozen only. Frozen bonus"
       },
       "fragile": {
         "name": "Fragile Pro",
         "short": "FragPro",
+        "vehicle": "Padded Van",
         "desc": "Fragile specialist. No breakage, fragile bonus"
       },
       "intl": {
         "name": "Customs Broker",
         "short": "Broker",
+        "vehicle": "Bonded Truck",
         "desc": "Clears and ships cargo still in customs. Customs bonus"
       },
       "large": {
         "name": "Heavy Haul",
         "short": "Heavy",
+        "vehicle": "Heavy Truck",
         "desc": "Ships size 4+ parcels (break-safe). Large bonus"
-      },
-      "frozen": {
-        "name": "Frozen Logistics",
-        "short": "Frozen",
-        "desc": "Frozen only. Frozen bonus"
-      },
-      "urgent": {
-        "name": "Urgent Express",
-        "short": "Urgent",
-        "desc": "⚡Ships 1 parcel instantly without using a turn. Safe for customs & fragile, no bonus"
       },
       "air": {
         "name": "Air Express",
         "short": "Air",
+        "vehicle": "Air Container",
         "desc": "Small (1–2) only. Handles customs & fragile safely. Pricey but fast"
       },
       "rail": {
         "name": "Rail Freight",
         "short": "Rail",
+        "vehicle": "Freight Train",
         "desc": "Break-safe, big batches. Paid next turn"
       },
       "sea": {
         "name": "Sea Freight",
         "short": "Sea",
-        "desc": "Customs container, size 2+, break-safe. Paid in 2 turns"
+        "vehicle": "Container",
+        "desc": "Customs container, size 2+, break-safe. Paid 2 turns later"
       }
     },
-    "CARRIER_L3": {
-      "target": "Special bonus applies when shipping special parcels",
-      "cold": "Fresh/produce deadlines freeze on call turns",
-      "bulk": "+1 standard parcel per call",
-      "fragile": "+15 reward on fragile parcels",
-      "intl": "+1 customs cargo per call",
-      "large": "Ships 2 XL parcels at once (capacity +1)",
-      "frozen": "+1 frozen per call",
-      "urgent": "Ships 2 at once",
-      "air": "Handles up to size 4",
-      "rail": "No payment delay",
-      "sea": "Payment delay 1 turn"
+    "TRUST_PERK_TEXT": {
+      "bulk": [
+        "Call 2 trucks at once",
+        "Dispatch fee -30%",
+        "Standard parcel reward +5"
+      ],
+      "cold": [
+        "Capacity +2",
+        "Fresh/produce deadlines freeze on call turns",
+        "Cold zone +2"
+      ],
+      "frozen": [
+        "Dispatch fee -20%",
+        "Capacity +2",
+        "Freezer zone +2"
+      ],
+      "fragile": [
+        "Dispatch fee -20%",
+        "Call 2 vans at once",
+        "Fragile reward +15"
+      ],
+      "intl": [
+        "Customs wait -1 turn",
+        "Capacity +4",
+        "No customs delay events"
+      ],
+      "large": [
+        "XL parcels take 1 less slot",
+        "Call 2 trucks at once",
+        "Large reward +10"
+      ],
+      "air": [
+        "Handles up to size 4",
+        "Dispatch fee -30%",
+        "+20 when shipping cargo still in customs"
+      ],
+      "rail": [
+        "No payment delay",
+        "Monthly dispatch +1",
+        "Capacity +6"
+      ],
+      "sea": [
+        "Payment delay 1 turn",
+        "Capacity +6",
+        "No payment delay"
+      ]
     },
     "SELF_DELIVERY": {
       "name": "Self-delivery"
@@ -656,41 +707,38 @@
         "name": "Standard"
       },
       "trusted": {
-        "name": "Trusted"
+        "name": "Premium"
       },
       "expert": {
-        "name": "Expert"
+        "name": "Elite"
       },
       "master": {
         "name": "Master"
       }
     },
     "TRUST_EFFECTS": [
-      "Base",
-      "Capacity +1 per call",
-      "+1 parcel every 4th call",
-      "Signature ability"
+      "Base"
     ],
     "ENHANCEMENTS": {
       "limit1": {
-        "name": "Call Limit +1",
-        "desc": "Max/remaining calls +1 (2 per contract)"
+        "name": "Dispatch Limit +1",
+        "desc": "Monthly dispatch limit & remaining trucks +1 (2 per contract)"
       },
       "limit2": {
-        "name": "Call Limit +2",
-        "desc": "Max/remaining calls +2 (2 per contract)"
+        "name": "Dispatch Limit +2",
+        "desc": "Monthly dispatch limit & remaining trucks +2 (2 per contract)"
       },
       "cap1": {
-        "name": "Capacity Boost I",
-        "desc": "Capacity +1 per call (3 per contract)"
+        "name": "Load Reinforcement",
+        "desc": "Vehicle capacity +1 (3 per contract)"
       },
       "regular": {
-        "name": "Regular Dispatch",
-        "desc": "+1 extra parcel every 4th successful call on this contract"
+        "name": "Free First Dispatch",
+        "desc": "The first truck of the first call each month is free"
       },
       "express": {
-        "name": "Express Dispatch",
-        "desc": "+1 extra parcel every 3rd successful call on this contract"
+        "name": "Double Dispatch",
+        "desc": "+1 vehicle per call"
       },
       "seal": {
         "name": "Trust Seal",
@@ -710,7 +758,7 @@
       },
       "optCustoms": {
         "name": "Customs Rider",
-        "desc": "This contract handles 🛃 cargo in customs, max calls -1"
+        "desc": "This contract handles 🛃 cargo in customs, monthly dispatch -1"
       },
       "optFrozen": {
         "name": "Reefer Container Rider",
@@ -761,6 +809,10 @@
       "bigvan": {
         "name": "Big Truck",
         "desc": "Self-delivery +1, up to size 4"
+      },
+      "driver": {
+        "name": "Courier",
+        "desc": "Direct delivery +1 parcel"
       }
     },
     "STRESS_NAMES": {
@@ -974,15 +1026,15 @@
     "DIFFICULTIES": {
       "rookie": {
         "name": "Rookie",
-        "desc": "Arrivals ×0.85, op cost -20, prices ×0.9, theft/break/damages ×0.5, forecast 3 turns, stress limit 24. Score ×0.7. Unlock achievements don't count"
+        "desc": "Arrivals ×0.85, op cost -30, dispatch fees ×0.8, prices ×0.9, theft/break/damages ×0.5, forecast 3 turns, stress limit 24. Score ×0.7. Unlock achievements don't count"
       },
       "normal": {
         "name": "Regular",
-        "desc": "Default rules"
+        "desc": "Default rules — every call costs money; keep the cash flowing"
       },
       "veteran": {
         "name": "Veteran",
-        "desc": "Arrivals ×1.1, op cost +30, prices ×1.1, theft/break ×1.3, damages ×1.5, dual-attribute parcels +3%p, stress limit 18. Score ×1.4"
+        "desc": "Arrivals ×1.15, op cost +60, dispatch fees ×1.3, theft/break ×1.3, damages ×1.5, dual-attribute parcels +3%p, stress limit 16. Score ×1.4"
       }
     },
     "COMPANIES": {
@@ -1007,7 +1059,7 @@
       "quick": {
         "name": "City Quick",
         "tag": "Tiny warehouse · frequent calls",
-        "passive": "Fast dispatch: all contracts max/remaining calls +2. Self-delivery +1",
+        "passive": "Fast dispatch: all contracts +1 dispatch per month. Direct delivery +1",
         "weakness": "Cramped: warehouse expansions half as effective. XL always needs +3 temp space"
       },
       "global": {
@@ -1025,19 +1077,19 @@
       "thrifty": {
         "name": "Penny Freight",
         "tag": "Extreme saver",
-        "passive": "Bargain contracts: all market prices -20%. Each waited turn adds +1 capacity to the next call (max +3)",
+        "passive": "Bargain contracts: all market prices & dispatch fees -20%. Each waited turn adds +1 slot to the next call's vehicle (max +3)",
         "weakness": "Short-staffed: all contracts max calls -1. Month-end op cost +40"
       },
       "startup": {
         "name": "Startup Delivery",
         "tag": "Random · high risk",
-        "passive": "Pivot: 1 free market refresh per month. 3 contract slots in the market. Trusted+ grade chance +15%p",
+        "passive": "Pivot: 1 free market refresh per month. 3 contract slots in the market. Premium+ grade chance +15%p",
         "weakness": "Unstable: each month end one starting contract loses 1 call. Op cost +30 from month 3"
       },
       "postal": {
         "name": "National Post",
         "tag": "Steady · long haul",
-        "passive": "Public service: op cost fixed at 80. Self-delivery +1. Stress -2 at month start if 10+. Replacing a contract keeps 1 call",
+        "passive": "Public service: op cost fixed at 180, dispatch fee fixed at 45c. Direct delivery +1. Stress -2 at month start if 10+",
         "weakness": "Slow approvals: 2 market purchases per month. Expert/Master from month 5. Special bonus -5"
       }
     },
@@ -1115,8 +1167,8 @@
         "desc": "Show arrivals 4 turns ahead"
       },
       "emergency": {
-        "name": "Emergency Response",
-        "desc": "Urgent Express contracts -30%, Urgent Express appears in every market"
+        "name": "Dispatch Deal",
+        "desc": "All dispatch fees -15%"
       },
       "regulars": {
         "name": "Regular Customers",
@@ -1198,8 +1250,8 @@
       },
       "peak": {
         "name": "Peak Season",
-        "desc": "Arrivals ×2.0, 5 surge turns (surge deadlines -2), return grace 2 turns. Reward +10, prices ×1.3, starting calls +2",
-        "win": "Survive 2 months + ship 42",
+        "desc": "Arrivals ×2.2, 5 surge turns (surge deadlines -2), return grace 2 turns. Reward +10, prices ×1.3, starting calls +2",
+        "win": "Survive 2 months + ship 50",
         "recommend": "City Quick · Steel Depot"
       },
       "heatwave": {
@@ -1210,7 +1262,7 @@
       },
       "strike": {
         "name": "Strike",
-        "desc": "One carrier type can't be called each month (announced at month start). Arrivals +20%, op cost +30. Urgent Express always available",
+        "desc": "One carrier type can't be called each month (announced at month start). Arrivals +20%, op cost +30",
         "win": "Survive 3 months",
         "recommend": "Startup"
       },
@@ -1229,7 +1281,7 @@
       "blackfriday": {
         "name": "Black Friday",
         "desc": "One hellish month. Arrivals ×2.3, 4 surge turns, prices ×1.4, return grace 4 turns. Reward +15, starting calls +3",
-        "win": "Survive 1 month + ship 22",
+        "win": "Survive 1 month + ship 30",
         "recommend": "City Quick · Penny Freight"
       },
       "audit": {
@@ -1433,8 +1485,8 @@
         "desc": "Wait 40 times in total"
       },
       "clutch": {
-        "name": "Clutch",
-        "desc": "Ship fresh food about to spoil with Urgent Express"
+        "name": "Full Load",
+        "desc": "15 calls at 80%+ load efficiency"
       },
       "normal100": {
         "name": "Hundred Standard",

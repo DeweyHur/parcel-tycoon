@@ -4,26 +4,32 @@ const { Game, DATA: D } = require('../www/js/game.js');
 function urgency(g) {
   // 가장 급한 택배 상태
   let minFresh = 99, minDead = 99;
-  for (const p of g.parcels) { if (p.type === 'fresh') minFresh = Math.min(minFresh, p.fresh); minDead = Math.min(minDead, p.deadline); }
+  for (const p of g.parcels) { if (p.type === 'fresh' && !p.inCold) minFresh = 0; minDead = Math.min(minDead, p.deadline); }
   return { minFresh, minDead };
 }
 function nextVolume(g) { const u = g.upcoming()[0]; return u.specs ? u.specs.reduce((s, x) => s + x.size, 0) : 0; }
 
 function pickBest(g, threshold) {
-  // 각 계약별 처리 가능 수 계산, 가장 많이 처리하는 계약 선택 (급한 것 우선). 자체 배송도 후보(i = -1)
+  // 계약별로 급한 순으로 차량에 담고(부피 기준), 배차비 대비 수입이 나오는 호출을 고른다
   let best = null;
   g.contracts.forEach((c, i) => {
-    if (!g.canCall(c) || D.CARRIERS[c.carrier].instant) return;
-    const cap = g.callCapacity(c);
+    if (!g.canCall(c)) return;
+    const vcap = g.vehicleCap(c), simul = Math.min(g.simulMax(c), c.calls), fee = g.truckFee(c);
     const elig = g.eligibleParcels(c);
-    // 급한 순: 부패 임박, 기한 임박
-    const sorted = elig.slice().sort((a, b) => (a.type === 'fresh' ? a.fresh : 9) - (b.type === 'fresh' ? b.fresh : 9) || (c.carrier === 'target' ? (a.type === 'normal') - (b.type === 'normal') : 0) || a.deadline - b.deadline);
-    const pick = sorted.slice(0, cap);
-    const urgent = pick.some(p => (p.type === 'fresh' && p.fresh <= 1) || p.deadline <= 1 || p.overdue);
-    const fill = pick.length / cap;
-    const specialPick = pick.filter(p => p.type !== 'normal').length;
-    const score = (urgent ? 100 : 0) + pick.length * 10 + fill * 5 + (c.carrier === 'target' ? specialPick * 8 - 6 : 0);
-    if (!best || score > best.score) best = { i, ids: pick.map(p => p.id), score, urgent, fill };
+    const sorted = elig.slice().sort((a, b) => (a.overdue ? -1 : 0) - (b.overdue ? -1 : 0) || a.deadline - b.deadline || b.size - a.size);
+    // 대수별로 담아보고 가장 좋은 대수 선택
+    for (let trucks = 1; trucks <= simul; trucks++) {
+      const cap = vcap * trucks; const pick = []; let vol = 0;
+      for (const p of sorted) { if (vol + p.size <= cap) { pick.push(p); vol += p.size; } }
+      if (!pick.length) break;
+      const urgent = pick.some(p => (p.type === 'fresh' && !p.inCold) || p.deadline <= 1 || p.overdue);
+      const fill = vol / cap, income = pick.reduce((s, p) => s + p.reward, 0), cost = g.callFee(c, trucks);
+      if (g.cash < cost) break;
+      const net = income - cost;
+      if (net <= 0 && !urgent) continue;
+      const score = (urgent ? 100 : 0) + net * 0.5 + fill * 20;
+      if (!best || score > best.score) best = { i, ids: pick.map(p => p.id), trucks, score, urgent, fill };
+    }
   });
   if (!best) return null;
   if (threshold != null && !best.urgent && best.fill < threshold) return null;
@@ -49,19 +55,18 @@ const STRATS = {
 };
 
 function marketBot(g) {
-  // 1) 잔여 호출이 적은 슬롯부터 계약 교체 (최대 2개) 2) 남는 돈으로 시설 3) 그래도 남으면 강화
+  // 1) 빈 슬롯 채우기(막힌 속성 힌트 우선) 2) 보유 업체 업그레이드는 여유 있을 때 3) 시설 4) 강화
   const items = g.market.items;
-  const contractItems = items.map((it, i) => ({ it, i })).filter(x => x.it.kind === 'contract')
-    .sort((a, b) => (b.it.calls || D.CARRIERS[b.it.carrier].calls) - (a.it.calls || D.CARRIERS[a.it.carrier].calls));
-  const used = new Set();
+  const contractItems = items.map((it, i) => ({ it, i })).filter(x => x.it.kind === 'contract').sort((a, b) => (b.it.hint ? 1 : 0) - (a.it.hint ? 1 : 0));
   for (const { it, i } of contractItems) {
-    let slot = -1, min = 99;
-    g.contracts.forEach((c, s) => { if (used.has(s)) return; const v = c ? c.calls : -1; if (v < min) { min = v; slot = s; } });
-    if (min > 2) break;
-    const r = g.buy(i, slot); if (r.ok) used.add(slot);
+    const price = g.contractPrice(it);
+    const empty = g.contracts.findIndex(c => !c);
+    if (it.upgrade) { if (g.cash - price > 250) g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier)); continue; }
+    if (empty >= 0 && g.cash - price > 120) { g.buy(i, empty); continue; }
+    if (it.hint && g.cash - price > 120) { let slot = -1, min = 99; g.contracts.forEach((c, s) => { if (c && c.delivered < min) { min = c.delivered; slot = s; } }); if (slot >= 0) g.buy(i, slot); }
   }
-  items.forEach((it, i) => { if (it.kind === 'fac' && it.fac && g.cash - it.price > 150) g.buy(i, null); });
-  items.forEach((it, i) => { if (it.kind === 'enh' && g.cash - it.price > 250) { let slot = 0, max = -1; g.contracts.forEach((c, s) => { if (c && c.calls > max) { max = c.calls; slot = s; } }); g.buy(i, slot); } });
+  items.forEach((it, i) => { if (it.kind === 'fac' && it.fac && g.cash - it.price > 200) g.buy(i, null); });
+  items.forEach((it, i) => { if (it.kind === 'enh' && g.cash - it.price > 300) { let slot = 0, max = -1; g.contracts.forEach((c, s) => { if (c && c.delivered > max) { max = c.delivered; slot = s; } }); g.buy(i, slot); } });
 }
 
 function runOne(seed, strat, cfg) {
@@ -72,10 +77,8 @@ function runOne(seed, strat, cfg) {
       // 보관 제안: 다음 턴 입고까지 넣어도 창고가 남으면 수락
       if (g.offer) { if (g.usedVolume() + g.offer.vol + nextVolume(g) <= g.warehouse.cap) g.acceptOffer(); else g.declineOffer(); }
       // 긴급 특송: 부패 직전·기한 임박 택배가 있으면 즉시 사용
-      const ui = g.contracts.findIndex(c => c && D.CARRIERS[c.carrier].instant && g.canCall(c));
-      if (ui >= 0) { const p = g.parcels.find(p => (p.type === 'fresh' && p.fresh <= 1) || p.deadline <= 1); if (p) { g.callCarrier(ui, [p.id]); continue; } }
       const b = STRATS[strat](g);
-      if (!b) { const se = g.selfEligible().sort((a, b) => a.deadline - b.deadline).slice(0, g.selfCount()); g.wait(g.cash > 150 ? se.map(p => p.id) : []); } else g.callCarrier(b.i, b.ids);
+      if (!b) { const se = g.selfEligible().sort((a, b) => a.deadline - b.deadline).slice(0, g.selfCount()); g.wait(g.cash > 150 ? se.map(p => p.id) : []); } else g.callCarrier(b.i, b.ids, b.trucks);
     } else if (g.phase === 'summary') g.closeSummary();
     else if (g.phase === 'market') { marketBot(g); g.closeMarket(); }
   }
