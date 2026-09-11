@@ -601,14 +601,23 @@
       for (const g of ['trusted', 'expert', 'master']) if (R.marketWeight[g]) p[g] = Math.round(p[g] * R.marketWeight[g]);
       return p;
     }
+    // 운영비 내역: 임대(기본/회사 고정/난이도·시나리오 보정) + 계약 유지비 + 시설 유지비
+    opCostBreakdown(m, rentRoll) {
+      const R = this.rules;
+      let rent = R.opCostFixed != null ? R.opCostFixed : D.OPERATING_COST;
+      if (R.opCostRandom) rent = rentRoll != null ? rentRoll : R.opCostRandom[0] + Math.floor((R.opCostRandom[1] - R.opCostRandom[0]) / 2);
+      rent += R.opCostDelta;
+      if (R.lateOpCost && m >= R.lateOpCost.from) rent += R.lateOpCost.delta;
+      if (R.endless && m >= 12) rent += (m - 11) * 10;
+      rent = Math.max(0, rent);
+      const contracts = this.contracts.filter(Boolean).length * D.OPCOST_CONTRACT;
+      let facilities = 0; for (const f of Object.keys(D.FACILITIES)) if (this.warehouse[f]) facilities += D.FACILITIES[f].upkeep || 0;
+      return { rent, contracts, facilities, total: rent + contracts + facilities };
+    }
     _opCost(m) {
       const R = this.rules;
-      let cost = R.opCostFixed != null ? R.opCostFixed : D.OPERATING_COST;
-      if (R.opCostRandom) cost = R.opCostRandom[0] + this.rng.int(R.opCostRandom[1] - R.opCostRandom[0] + 1);
-      cost += R.opCostDelta;
-      if (R.lateOpCost && m >= R.lateOpCost.from) cost += R.lateOpCost.delta;
-      if (R.endless && m >= 12) cost += (m - 11) * 10;
-      return Math.max(0, cost);
+      const roll = R.opCostRandom ? R.opCostRandom[0] + this.rng.int(R.opCostRandom[1] - R.opCostRandom[0] + 1) : null;
+      const b = this.opCostBreakdown(m, roll); this._lastOpCost = b; return b.total;
     }
 
     // ----- flow -----
@@ -990,7 +999,7 @@
       if (this.usage() <= 0.4) this.stats.tidyMonths++;
       if (this.contracts.filter(Boolean).length >= 4 && this.contracts.every(c => c && c.calls === 0)) this.stats.zeroCallsMonthEnd = true;
       if (this.cash >= 0 && this.cash <= 100) this.stats.brokeMonthEnd = true;
-      this.summary = { month: this.month, revenue: ms.revenue, opCost, calls: ms.calls, waits: ms.waits,
+      this.summary = { month: this.month, revenue: ms.revenue, opCost, opCostDetail: this._lastOpCost, calls: ms.calls, waits: ms.waits,
         delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, selfCost: ms.selfCost || 0, fees: ms.fees || 0, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, customers: this.customerSummary(),
         cash: this.cash, stress: this.stress, usage: Math.round(this.usage() * 100), left: this.parcels.length };
       this.say('log.settle', { month: this.month, revenue: ms.revenue, opCost, closing: closing ? MSG('log.settleClosing', { closing }) : '' });

@@ -76,9 +76,9 @@
   const CUSTOMER_SLOTS = 4; // 익명 제외 고객 최대 수
   // 난이도 (docs/CARRIER_CAPABILITY_DESIGN.md 4장): 시나리오 규칙 위에 곱해지는 얇은 층
   const DIFFICULTIES = {
-    rookie:  { icon: '🌱', mods: { arrivalsMult: 0.85, opCostDelta: -30, feeMult: 0.8, itemPriceMult: 0.9, contractPriceMult: 0.9, facilityPriceMult: 0.9, theftMult: 0.5, breakMult: 0.5, claimMult: 0.5, upcomingTurns: 3, gameoverStress: 24, scoreMult: 0.7, noDualAttrs: true }, unlock: null },
+    rookie:  { icon: '🌱', mods: { arrivalsMult: 0.85, opCostDelta: -20, feeMult: 0.8, itemPriceMult: 0.9, contractPriceMult: 0.9, facilityPriceMult: 0.9, theftMult: 0.5, breakMult: 0.5, claimMult: 0.5, upcomingTurns: 3, gameoverStress: 24, scoreMult: 0.7, noDualAttrs: true }, unlock: null },
     normal:  { icon: '📦', mods: {}, unlock: null },
-    veteran: { icon: '🔥', mods: { arrivalsMult: 1.15, opCostDelta: 60, feeMult: 1.3, theftMult: 1.3, breakMult: 1.3, claimMult: 1.5, gameoverStress: 16, scoreMult: 1.4, dualAttrBonus: 3 }, unlock: 'first_clear' },
+    veteran: { icon: '🔥', mods: { arrivalsMult: 1.15, opCostDelta: 40, feeMult: 1.3, theftMult: 1.3, breakMult: 1.3, claimMult: 1.5, gameoverStress: 16, scoreMult: 1.4, dualAttrBonus: 3 }, unlock: 'first_clear' },
   };
 
   const COMPANIES = {
@@ -114,7 +114,7 @@
       icon: '✈️',
       warehouse: { cap: 26, cold: 4, xl: 2 }, cash: 380,
       contracts: [{ carrier: 'intl' }, { carrier: 'air' }, { carrier: 'bulk', calls: 2 }],
-      mods: { rewardDelta: { intl: 20, normal: -5 }, carrierStartTrust: { intl: 20 }, opCostRandom: [100, 150], marketWeight: { intl: 2 }, gradeShift: 0.3 },
+      mods: { rewardDelta: { intl: 20, normal: -5 }, carrierStartTrust: { intl: 20 }, opCostRandom: [110, 190], marketWeight: { intl: 2 }, gradeShift: 0.3 },
       unlock: 'worldwide', tier: 2 },
     glass: {
       customers: [['glass', 2], ['mart', 1], ['anon', 0]],
@@ -141,7 +141,7 @@
       icon: '📮',
       warehouse: { cap: 28, cold: 6, xl: 1 }, cash: 450,
       contracts: [{ carrier: 'bulk', grade: 'trusted' }, { carrier: 'cold' }, { carrier: 'fragile', calls: 2 }],
-      mods: { premiumDelta: { premier: -30 }, opCostFixed: 230, feeFixed: 70, selfCapDelta: 1, stressRelief: { min: 10, amount: 2 }, marketMaxBuy: 2, expertFrom: 5, bonusDelta: -5, marketWeight: { trusted: 1.3, expert: 0.5, master: 0.5 } },
+      mods: { premiumDelta: { premier: -30 }, opCostFixed: 120, feeFixed: 70, selfCapDelta: 1, stressRelief: { min: 10, amount: 2 }, marketMaxBuy: 2, expertFrom: 5, bonusDelta: -5, marketWeight: { trusted: 1.3, expert: 0.5, master: 0.5 } },
       unlock: 'first_clear', tier: 1 },
   };
 
@@ -197,7 +197,7 @@
     heatwave: { icon: '🌡️', months: 3, mods: { season: 'summer', customerWeights: { dawn: 2, ice: 2 }, customerClaimMult: { dawn: 2 }, typeShift: { fresh: 12, produce: 8, normal: -20 }, freshSizes: [2, 4, 7], warmMult: 3, heatAlerts: 3, arrivalsMult: 1.0, facilityPriceMult: { cold1: 0.7, cold2: 0.7 }, marketWeight: { cold: 1.5 }, winMaxDiscard: 3 }, unlock: 'fresh20' },
     strike:   { icon: '✊', months: 3, mods: { strike: true, opCostDelta: 30 }, unlock: 'four_carriers' },
     port:     { icon: '🚢', months: 4, mods: { forceCustomers: ['import', 'luxury', 'factory'], noAnon: true, typeOverride: { normal: 40, fresh: 10, produce: 5, fragile: 13, intl: 20, large: 12 }, xlWeight: 7, arrivalsMult: 0.9, rewardDelta: { intl: 20, large: 20, normal: -5 }, xlDelta: 1, guaranteeCarriers: ['intl', 'large'] }, unlock: 'intl15' },
-    cashcrunch:{ icon: '💸', months: 3, mods: { cashMult: 0.5, opCostFixed: 380, noRefresh: true, itemPriceMult: 1.1, revenueMult: 1.1, trustXpMult: 2, winCash: 600 }, unlock: 'rich_clear' },
+    cashcrunch:{ icon: '💸', months: 3, mods: { cashMult: 0.5, opCostFixed: 260, noRefresh: true, itemPriceMult: 1.1, revenueMult: 1.1, trustXpMult: 2, winCash: 600 }, unlock: 'rich_clear' },
     blackfriday:{ icon: '🛒', months: 1, mods: { returnGrace: 4, arrivalsMult: 2.3, burstTurns: 4, itemPriceMult: 1.4, rewardAll: 15, startCallsDelta: 3, winDelivered: 30 }, unlock: 'peak_clear' },
     audit:    { icon: '📋', months: 3, mods: { premiumMult: 1.5, claimMult: 1.5, deadlineAll: -1, overdueMult: 0.5, monthlyStress: 1, opCostDelta: 0, winMaxOverdue: 4 }, unlock: 'perfect_month' },
     moving:   { icon: '🚚', months: 3, mods: { forceCustomers: ['mover'], storageOfferEvery: 5, storageOfferProb: 0.2, storageMax: 3, storageFeeMult: 1.5, season: 'spring', winStorage: 5 }, unlock: 'storage3' },

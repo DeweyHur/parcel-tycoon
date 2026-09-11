@@ -20,7 +20,7 @@ t('차량: 부피 합으로 대수 결정, 배차비 즉시 차감, 대수만큼
   g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2)];
   const cash = g.cash, trucks = c.calls, fee = g.truckFee(c); assert.equal(fee, 70);
   const r = g.callCarrier(i, [1, 2, 3]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 1); assert.equal(r.fee, 70); assert.equal(c.calls, trucks - 1);
-  assert.equal(g.cash, cash - 70 + r.revenue); assert.equal(r.revenue, 30 * 3); assert.ok(r.fill >= 0.8);
+  assert.equal(g.cash, cash - 70 + r.revenue); assert.equal(r.revenue, 35 * 3); assert.ok(r.fill >= 0.8);
 });
 t('차량: 용량을 넘기면 동시 대수 한도(기본 1)에서 거부, 신뢰 1단계 대량은 2대', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
@@ -42,12 +42,13 @@ t('신뢰도: 적재 80% 이상이면 +1, 특성은 업체마다 다름(냉장 1
   const cold0 = g.warehouse.cold; g._addTrust('cold', 12); assert.equal(g.trustLevel('cold'), 3); assert.equal(g.warehouse.cold, cold0 + 2);
   assert.equal(D.trustEffectText('cold', 1), '용량 +2칸'); assert.equal(D.trustEffectText('rail', 2), '배차 한도 +1대');
 });
-t('등급: 프리미엄은 용량 +2·한도 +1·배차비 -15%·신뢰 1단계 즉시, 가격 ×2.2', () => {
+t('등급: 프리미엄은 용량 +2·한도 +1·배차비 -15%·신뢰 1단계 즉시, 가격 ×2.5', () => {
   const g = EMPTY(3); const c = g._makeContract('bulk', 'trusted'); g.contracts[3] = c;
   assert.equal(g.trustLevel('bulk'), 1); assert.equal(c.maxCalls, 3 + 1); assert.equal(g.truckFee(c), Math.round(70 * 0.85)); // 프리미엄 -15% (대량 1단계 특성은 동시 2대라 배차비 무관)
-  assert.equal(D.GRADES.trusted.price, 2.2); assert.equal(D.GRADES.trusted.name, '프리미엄');
+  assert.equal(D.GRADES.trusted.price, 2.5); assert.equal(D.GRADES.trusted.name, '프리미엄');
 });
-t('보상표: 종류·크기별, 특수가 확실히 높다', () => { assert.equal(D.PARCEL_TYPES.normal.reward[2], 30); assert.equal(D.PARCEL_TYPES.fresh.reward[2], 60); assert.equal(D.PARCEL_TYPES.intl.reward[4], 110); const g = NG(2); for (const p of g.parcels) assert.equal(p.reward, g.baseReward(p.type, p.baseSize) * (p.premium ? 1.5 : 1)); });
+t('운영비 내역: 임대 120 + 계약 10/슬롯 + 시설 유지비', () => { const g = EMPTY(2); const n = g.contracts.filter(Boolean).length; let b = g.opCostBreakdown(1); assert.equal(b.rent, 120); assert.equal(b.contracts, n * 10); assert.equal(b.total, 120 + n * 10 + b.facilities); g.warehouse.cold1 = true; assert.equal(g.opCostBreakdown(1).facilities, b.facilities + 15); });
+t('보상표: 종류·크기별, 특수가 확실히 높다', () => { assert.equal(D.PARCEL_TYPES.normal.reward[2], 35); assert.equal(D.PARCEL_TYPES.fresh.reward[2], 60); assert.equal(D.PARCEL_TYPES.intl.reward[4], 110); const g = NG(2); for (const p of g.parcels) assert.equal(p.reward, g.baseReward(p.type, p.baseSize) * (p.premium ? 1.5 : 1)); });
 t('기한: 일반 4·파손 5·통관 5·대형 6·냉동 5, 반송 유예 2', () => { assert.equal(D.PARCEL_TYPES.normal.deadline, 4); assert.equal(D.PARCEL_TYPES.fragile.deadline, 5); assert.equal(D.PARCEL_TYPES.large.deadline, 6); assert.equal(D.RETURN_GRACE, 2);
   const g = EMPTY(4, { perks: ['skip', 'longdeal'] }); g.parcels = [P(1, 'normal', 1, { deadline: 1 })]; g.wait(); assert.ok(g.parcels[0].overdue); g.wait(); assert.equal(g.parcels.length, 1); g.wait(); assert.equal(g.parcels.length, 0); assert.equal(g.stats.returned, 1); });
 t('고객 품목 해금: 0단계는 일반 85%, 2단계는 고객 정의, 3단계는 프리미엄 품목', () => {
@@ -129,7 +130,7 @@ t('데일리 설정은 날짜에 결정적', () => { const a = dailyConfig('2026
 t('직접 배송: 대기 턴에 1개, 보상 그대로 + 배송비 20c', () => {
   const g = EMPTY(8); for (let i = 0; i < 3; i++) g.parcels.push(P(900 + i, 'normal', 1));
   assert.equal(g.selfCount(), 1); assert.ok(!g.wait([900, 901]).ok);
-  const turn = g.turn, cash = g.cash; const r = g.wait([900]); assert.ok(r.ok); assert.equal(g.turn, turn + 1); assert.equal(g.cash, cash + 20 - 20); assert.equal(g.parcels.length, 2); assert.equal(g.stats.selfCalls, 1);
+  const turn = g.turn, cash = g.cash; const r = g.wait([900]); assert.ok(r.ok); assert.equal(g.turn, turn + 1); assert.equal(g.cash, cash + 25 - 20); assert.equal(g.parcels.length, 2); assert.equal(g.stats.selfCalls, 1);
   g.warehouse.driver = true; assert.equal(g.selfCount(), 2);
 });
 t('마켓 막힌 속성 보장: 처리 못 하는 특수 택배가 있으면 슬롯 A에 처리 가능한 업체', () => {
@@ -143,11 +144,11 @@ t('고객: 입고 배정·신뢰 xp·손해배상·거래 중단', () => {
   g.parcels = [P(6, 'fragile', 2, { deadline: 1, customer: 'glass' })]; const cash = g.cash; g.wait(); g.wait(); g.wait();
   assert.equal(g.stats.returned, 1); assert.equal(cash - g.cash, 60 * 2); assert.ok(g.customers.glass.suspended); assert.ok(!('glass' in g._customerWeightsFor(1)));
 });
-t('고객 규칙: 새벽배송(입고 당 턴 처리 +20)', () => { const g = EMPTY(3); g.parcels = [P(7, 'normal', 1, { customer: 'dawn', arrivalTurn: g.totalTurn })]; const r = g.callCarrier(slot(g, 'bulk'), [7]); assert.equal(r.revenue, 20 + 20); assert.equal(g.customers.dawn.xp, 2); });
+t('고객 규칙: 새벽배송(입고 당 턴 처리 +20)', () => { const g = EMPTY(3); g.parcels = [P(7, 'normal', 1, { customer: 'dawn', arrivalTurn: g.totalTurn })]; const r = g.callCarrier(slot(g, 'bulk'), [7]); assert.equal(r.revenue, 25 + 20); assert.equal(g.customers.dawn.xp, 2); });
 t('날씨: 비에 야외 일반 택배 젖음(보상 -20%), 천막 퍽이면 무효', () => {
   for (const tent of [false, true]) { const g = EMPTY(5, { perks: tent ? ['tent'] : ['skip'] }); g.weather = Array(10).fill('rain'); g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2)]; g.warehouse.cap = 2; g._assignCold();
     assert.equal(g.outdoorParcels().length, 1); g.wait(); assert.equal(g.parcels.filter(p => p.wet).length, tent ? 0 : 1);
-    if (!tent) { g.warehouse.cap = 99; const wet = g.parcels.find(p => p.wet); const r = g.callCarrier(slot(g, 'bulk'), [wet.id]); assert.equal(r.revenue, Math.round(30 * 0.8)); } }
+    if (!tent) { g.warehouse.cap = 99; const wet = g.parcels.find(p => p.wet); const r = g.callCarrier(slot(g, 'bulk'), [wet.id]); assert.equal(r.revenue, Math.round(35 * 0.8)); } }
 });
 t('날씨: 폭설이면 야외 신선 안 썩고 도난 절반, 태풍 턴 입고는 다음 턴으로', () => {
   const g = EMPTY(5); g.weather = Array(10).fill('snow'); g.parcels = [P(1, 'fresh', 2, { deadline: 3 }), P(2, 'fresh', 2, { deadline: 3 })]; g.warehouse.cap = 2; g.warehouse.cold = 2; g._assignCold();

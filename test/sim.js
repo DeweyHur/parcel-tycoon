@@ -86,7 +86,7 @@ function runOne(seed, strat, cfg) {
   return g;
 }
 
-module.exports = { runOne, STRATS };
+module.exports = { runOne, STRATS, marketBot };
 function report(label, N, strat, cfg) {
   let wins = 0, cash = 0, calls = 0, waits = 0, stress = 0, rev = 0, months = 0;
   for (let s = 1; s <= N; s++) {
