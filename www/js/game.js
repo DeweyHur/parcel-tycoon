@@ -532,6 +532,13 @@
       return true;
     }
     baseReward(type, size) { const t = D.PARCEL_TYPES[type] || D.PARCEL_TYPES.normal; const tb = t.reward || {}; return tb[size] != null ? tb[size] : 25 + size * 15; }
+    // 호출 화면 미리보기용 예상 보상(전문 보너스·신뢰 보상 포함, 파손·날씨 변수 제외)
+    previewReward(c, p) {
+      const R = this.rules, car = D.CARRIERS[c.carrier], t = D.PARCEL_TYPES[p.type];
+      let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll + this.trustPerkMap('rewardDelta', p.type);
+      if (this.isSpecialist(car, p.type) && t.bonus) r += t.bonus + R.bonusDelta + (this.customerPerk(p.customer, 'bonusDelta') || 0) + this.trustPerkMap('bonusDelta', p.type);
+      return Math.round(r * (R.rewardMult[p.type] || 1));
+    }
     isSpecialist(car, type) { return Array.isArray(car.specialist) ? car.specialist.includes(type) : car.specialist === type; }
     canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c)); }
     // ⚠ 파손 확률: 능력에 fragile이 없으면

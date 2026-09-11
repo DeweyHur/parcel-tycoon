@@ -141,7 +141,7 @@
       icon: '📮',
       warehouse: { cap: 28, cold: 6, xl: 1 }, cash: 450,
       contracts: [{ carrier: 'bulk', grade: 'trusted' }, { carrier: 'cold' }, { carrier: 'fragile', calls: 2 }],
-      mods: { premiumDelta: { premier: -30 }, opCostFixed: 120, feeFixed: 70, selfCapDelta: 1, stressRelief: { min: 10, amount: 2 }, marketMaxBuy: 2, expertFrom: 5, bonusDelta: -5, marketWeight: { trusted: 1.3, expert: 0.5, master: 0.5 } },
+      mods: { premiumDelta: { premier: -30 }, opCostFixed: 120, feeFixed: 35, selfCapDelta: 1, stressRelief: { min: 10, amount: 2 }, marketMaxBuy: 2, expertFrom: 5, bonusDelta: -5, marketWeight: { trusted: 1.3, expert: 0.5, master: 0.5 } },
       unlock: 'first_clear', tier: 1 },
   };
 
