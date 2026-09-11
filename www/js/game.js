@@ -345,8 +345,7 @@
     returnStorage(id) {
       const s = this.storage.find(x => x.id === id); if (!s) return { ok: false, msg: T('err.noStorage') };
       const refund = Math.round(s.fee * s.left / s.turns), pen = 30, cost = refund + pen;
-      if (this.cash < cost) return { ok: false, msg: T('err.needRefundPenalty', { cost }) };
-      this.cash -= cost; this.run.spent += cost; this.monthStats.storageIncome -= refund;
+      this.feesDue += cost; this.run.spent += cost; this.monthStats.storageIncome -= refund;
       this.storage.splice(this.storage.indexOf(s), 1);
       this.outdoorPref = this.outdoorPref.filter(x => x !== 's' + s.id);
       this._custXp(s.customer, -1, MSG('why.earlyReturn')); this._assignCold();
@@ -608,6 +607,14 @@
       if (R.gradeShift) { const s = Math.round(p.normal * R.gradeShift); p.normal -= s; p.trusted += s; }
       for (const g of ['trusted', 'expert', 'master']) if (R.marketWeight[g]) p[g] = Math.round(p[g] * R.marketWeight[g]);
       return p;
+    }
+    // 월말 정산 후 예상 자금: 현금 + 지연 입금 − 후불 배차비 − 운영비 − 보험료 − 차입 상환(원금+이자)
+    projectedCash() {
+      const pending = (this.pendingRevenue || []).reduce((s, x) => s + (x.amount || 0), 0);
+      const op = this.opCostBreakdown(this.month).total;
+      const prem = this.insurer === 'none' ? 0 : this.premium();
+      const loan = this.debt > 0 ? this.debt + Math.ceil(this.debt * D.LOAN.interest) : 0;
+      return { cash: this.cash, pending, feesDue: this.feesDue, opCost: op, premium: prem, loan, total: this.cash + pending - this.feesDue - op - prem - loan };
     }
     // 운영비 내역: 임대(기본/회사 고정/난이도·시나리오 보정) + 계약 유지비 + 시설 유지비
     opCostBreakdown(m, rentRoll) {

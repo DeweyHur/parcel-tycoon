@@ -166,8 +166,9 @@
     updateMusic();
     $('#hud-month').textContent = T('fmt.monthN', { n: g.month });
     $('#hud-turn').textContent = T('hud.turn', { t: g.turn, max: D.TURNS_PER_MONTH });
-    $('#hud-cash').textContent = g.cash;
-    const due = $('#hud-due'); if (due) { const parts = []; if (g.feesDue) parts.push(T('hud.feesDue', { n: g.feesDue })); if (g.debt) parts.push(T('hud.debt', { n: g.debt })); due.textContent = parts.join(' · '); due.style.display = parts.length ? '' : 'none'; }
+    // 자금은 월말 정산 후 예상 잔액으로 보여준다 (사이클 중엔 모든 지출이 어음 — 자금 때문에 막히는 일이 없다)
+    const pj = g.projectedCash(); const hc = $('#hud-cash'); hc.textContent = pj.total; hc.style.color = pj.total < 0 ? 'var(--red)' : '';
+    const due = $('#hud-due'); if (due) { const parts = [T('hud.cashNow', { n: g.cash })]; if (pj.pending) parts.push(T('hud.pending', { n: pj.pending })); if (g.feesDue) parts.push(T('hud.feesDue', { n: g.feesDue })); parts.push(T('hud.opCostDue', { n: pj.opCost + pj.premium })); if (g.debt) parts.push(T('hud.debt', { n: pj.loan })); due.innerHTML = parts.join(' · ') + (pj.total < 0 ? ` · <span style="color:var(--orange)">${T('hud.loanWarn')}</span>` : ''); }
     $('#stress-num').textContent = `${g.stress}/${R.gameoverStress}`;
     $('#stress-label').textContent = g.stressState();
     const gauge = $('#stress-gauge'); gauge.querySelector('i').style.width = Math.min(100, g.stress / R.gameoverStress * 100) + '%';
@@ -428,7 +429,7 @@
       const rows = elig.map(p => { const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], on = picked.includes(p.id); return `<div class="parcel ${on ? 'sel' : ''} ${p.overdue ? 'overdue' : ''}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${T('wm.rewardCost', { reward: p.reward, cost: g.selfCost(p) })}</div><div class="st">${parcelStatus(p)}</div></div>`; }).join('');
       const blocked = g.parcels.filter(p => !g.selfCan(p)).length;
       const warn = []; if (f.overdue) warn.push(T('wm.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wm.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wm.frozenOver', { n: f.frozenOver }));
-      const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${g.cash}</b>c</span><span>${T('wm.nextWarehouse')} <b class="${f.used > f.cap ? 'bad' : ''}">${f.used}/${f.cap}</b></span>${nextWx ? `<span>${M.WEATHER[nextWx].icon} ${M.WEATHER[nextWx].name}</span>` : `<span>${T('hud.monthEnd')}</span>`}</div>
+      const body = `<div class="pickinfo"><span>${T('hud.cashLbl')} <b>${g.projectedCash().total}</b>c</span><span>${T('wm.nextWarehouse')} <b class="${f.used > f.cap ? 'bad' : ''}">${f.used}/${f.cap}</b></span>${nextWx ? `<span>${M.WEATHER[nextWx].icon} ${M.WEATHER[nextWx].name}</span>` : `<span>${T('hud.monthEnd')}</span>`}</div>
         ${warn.length ? `<div class="d" style="color:var(--red);margin-bottom:4px">${T('wm.ifWait')}: ${warn.join(' · ')}</div>` : ''}
         ${g.outdoorVolume() > 0 ? `<div class="d" style="margin-bottom:4px">${T('wm.outdoor', { vol: g.outdoorVolume(), pct: Math.round(g.theftProb() * 100) })} <button class="btn small" id="wm-reorder">${T('re.title')}</button></div>` : ''}
         <div style="font-size:12px;color:var(--gold);margin:6px 0 3px">${T('wm.selfHead', { n, size: g.selfSizeMax(), base: D.SELF_DELIVERY.costBase, per: D.SELF_DELIVERY.costPerSize })}</div>
@@ -673,7 +674,7 @@
   function applyStaticText() {
     document.title = T('title.name');
     document.documentElement.lang = I18n.lang;
-    $('#hud-cash-lbl').textContent = T('hud.cash'); $('#usage-lbl').textContent = T('common.warehouse'); $('#cold-lbl').textContent = D.ATTRS.cold.name;
+    $('#hud-cash-lbl').textContent = T('hud.cashLbl'); $('#usage-lbl').textContent = T('common.warehouse'); $('#cold-lbl').textContent = D.ATTRS.cold.name;
     $('#cust-btn').textContent = T('company.customers'); $('#log-btn').textContent = T('title.records'); $('#help-btn').textContent = T('btn.help'); $('#menu-btn').textContent = T('menu.title');
     if (scene && scene.relabel) scene.relabel();
   }
