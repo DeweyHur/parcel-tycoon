@@ -56,10 +56,25 @@ t('고객 품목 해금: 0단계는 일반 85%, 2단계는 고객 정의, 3단�
   const [s0] = cnt(0), [s2] = cnt(2), [s3, p3] = cnt(3);
   assert.equal(s0, 0, 's0 ' + s0); assert.ok(s2 > 0.55, 's2 ' + s2); assert.ok(p3 > 0.1, 'prem ' + p3);
 });
-t('마켓: 보유 업체는 더 높은 등급일 때만 등장(업그레이드), 같은 슬롯 중복 없음', () => {
+t('마켓: 보유 업체는 같은 등급(추가) 또는 높은 등급(업그레이드)만 등장, 같은 슬롯 중복 없음', () => {
+  const GR = ['normal', 'trusted', 'expert', 'master'];
   for (let s = 1; s <= 40; s++) { const g = EMPTY(s); while (g.phase === 'play') g.wait(); if (g.phase !== 'summary') continue; g.closeSummary();
     const cs = g.market.items.filter(it => it.kind === 'contract'); assert.equal(new Set(cs.map(it => it.carrier)).size, cs.length);
-    for (const it of cs) { const own = g.contracts.find(c => c && c.carrier === it.carrier); if (own) { assert.ok(['normal', 'trusted', 'expert', 'master'].indexOf(it.grade) > ['normal', 'trusted', 'expert', 'master'].indexOf(own.grade), `seed ${s} ${it.carrier}`); assert.ok(it.upgrade); } } }
+    for (const it of cs) { const own = g.contracts.find(c => c && c.carrier === it.carrier); if (own) { const d = GR.indexOf(it.grade) - GR.indexOf(own.grade); assert.ok(d >= 0, `seed ${s} ${it.carrier}`); assert.equal(!!it.upgrade, d > 0); assert.equal(!!it.add, d === 0); } } }
+});
+t('계약 업그레이드: 등급만 오르고 강화·잔여 배차 유지, 배차 추가: 한도·잔여 +n', () => {
+  const g = EMPTY(9); while (g.phase === 'play') g.wait(); g.closeSummary(); g.cash = 9999;
+  const b = slot(g, 'bulk'), c = g.contracts[b]; c.enh.limit = 1; c.calls = 1; const max0 = c.maxCalls, cash0 = g.cash;
+  g.market.items.push({ kind: 'contract', carrier: 'bulk', grade: 'expert', price: 100, name: 'x', sold: false, upgrade: true });
+  const i = g.market.items.length - 1;
+  assert.equal(g.buy(i, b, 'upgrade').ok, true);
+  assert.equal(c.grade, 'expert'); assert.equal(c.enh.limit, 1); assert.equal(c.maxCalls, max0 + 2); assert.equal(c.calls, 3); assert.ok(g.trustXp('bulk') >= 8); assert.ok(g.cash < cash0);
+  g.market.items.push({ kind: 'contract', carrier: 'bulk', grade: 'expert', price: 100, name: 'y', sold: false, add: true });
+  const j = g.market.items.length - 1, n = g.itemTrucks(g.market.items[j]);
+  assert.equal(g.buy(j, b).mode, 'add'); assert.equal(c.maxCalls, max0 + 2 + n); assert.equal(c.calls, 3 + n);
+  g.market.items.push({ kind: 'contract', carrier: 'bulk', grade: 'normal', price: 100, name: 'z', sold: false });
+  assert.equal(g.buy(g.market.items.length - 1, b, 'upgrade').ok, false);
+  const other = g.contracts.findIndex((x, k) => x && k !== b); if (other >= 0) assert.equal(g.buy(g.market.items.length - 1, other, 'add').ok, false);
 });
 t('공간 최적화: 크기 -1 (최소 1)', () => { const g = NG(2, { perks: ['compact', 'insure'] }); for (const p of g.parcels) assert.equal(p.size, Math.max(1, p.baseSize - 1)); });
 t('창고 초과 페널티', () => { const g = NG(11); g.warehouse.cap = 0; const s0 = g.stress; g.wait(); assert.ok(g.stress > s0); });

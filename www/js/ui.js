@@ -544,9 +544,19 @@
       return `<div class="card" data-s="${s}"><div class="t">${esc(game.contractName(c))}</div><div class="d">${info}</div></div>`;
     }).join('');
     const m = modal(it.name, body, [{ label: T('btn.cancel'), onClick: back }]);
+    const doBuy = (s, mode) => { const r = game.buy(idx, s, mode); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back(); } else toast(r.msg); };
     m.querySelectorAll('.card').forEach(el => el.onclick = () => {
-      const r = game.buy(idx, +el.dataset.s);
-      if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back(); } else toast(r.msg);
+      const s = +el.dataset.s, c = game.contracts[s];
+      if (!isContract || !c || c.carrier !== it.carrier) return doBuy(s);
+      // 같은 업체: 등급이 높으면 업그레이드, 아니면 배차 추가(리필) — 교체 대신 확인 후 진행
+      const gr = Object.keys(D.GRADES), up = gr.indexOf(it.grade) > gr.indexOf(c.grade);
+      const n = game.itemTrucks(it);
+      const msg = up ? T('slot.upgradeAsk', { name: game.contractName(c), grade: D.GRADES[it.grade].name, n }) : T('slot.addAsk', { name: game.contractName(c), n });
+      modal(it.name, `<p>${msg}</p>`, [
+        { label: T('btn.cancel'), onClick: () => chooseSlot(it, idx, back) },
+        { label: T('slot.replaceBtn'), onClick: () => doBuy(s, 'replace') },
+        { label: up ? T('slot.upgradeBtn') : T('slot.addBtn'), cls: 'primary', onClick: () => doBuy(s, up ? 'upgrade' : 'add') },
+      ]);
     });
   }
 

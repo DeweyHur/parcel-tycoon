@@ -61,7 +61,8 @@ function marketBot(g) {
   for (const { it, i } of contractItems) {
     const price = g.contractPrice(it);
     const empty = g.contracts.findIndex(c => !c);
-    if (it.upgrade) { if (g.cash - price > 250) g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier)); continue; }
+    if (it.upgrade) { if (g.cash - price > 250) g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier), 'upgrade'); continue; }
+    if (it.add) { const s = g.contracts.findIndex(c => c && c.carrier === it.carrier); if (s >= 0 && g.cash - price > 300 && g.contracts[s].delivered >= 6) g.buy(i, s, 'add'); continue; }
     if (empty >= 0 && g.cash - price > 120) { g.buy(i, empty); continue; }
     if (it.hint && g.cash - price > 120) { let slot = -1, min = 99; g.contracts.forEach((c, s) => { if (c && c.delivered < min) { min = c.delivered; slot = s; } }); if (slot >= 0) g.buy(i, slot); }
   }

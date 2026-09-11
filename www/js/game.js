@@ -1082,11 +1082,13 @@
         // 중복 방지: 같은 슬롯끼리 같은 업체 금지, 이미 보유한 업체는 보유 등급보다 높을 때만(업그레이드 제안)
         const rank = g => GRADE_RANK.indexOf(g);
         const owned = k => this.contracts.find(c => c && c.carrier === k);
-        const blocked = k => items.some(it => it.carrier === k) || (owned(k) && rank(grade) <= rank(owned(k).grade));
+        // 보유 업체: 같은 등급이면 배차 추가(리필) 제안, 높은 등급이면 업그레이드 제안, 낮은 등급은 제외
+        const blocked = k => items.some(it => it.carrier === k) || (owned(k) && rank(grade) < rank(owned(k).grade));
         if (!f && blocked(carrier)) { const alt = {}; for (const k in weights) if (!blocked(k)) alt[k] = weights[k]; if (Object.keys(alt).length) carrier = this.rng.weighted(alt); else { const alt2 = {}; for (const k in weights) if (!items.some(it => it.carrier === k)) alt2[k] = weights[k]; if (Object.keys(alt2).length) carrier = this.rng.weighted(alt2); } }
         let price = Math.round(D.CARRIERS[carrier].price * D.GRADES[grade].price * R.priceMult);
         const up = owned(carrier) && rank(grade) > rank(owned(carrier).grade);
-        items.push({ kind: 'contract', carrier, grade, price, name: D.CARRIERS[carrier].name + (grade !== 'normal' ? ` (${D.GRADES[grade].name})` : ''), sold: false, hint: f && f.hint || (up ? T('market.upgradeHint') : null), upgrade: !!up });
+        const add = owned(carrier) && rank(grade) === rank(owned(carrier).grade);
+        items.push({ kind: 'contract', carrier, grade, price, name: D.CARRIERS[carrier].name + (grade !== 'normal' ? ` (${D.GRADES[grade].name})` : ''), sold: false, hint: f && f.hint || (up ? T('market.upgradeHint') : add ? T('market.addHint') : null), upgrade: !!up, add: !!add });
       }
       const enhW = {}; for (const k of Object.keys(D.ENHANCEMENTS)) enhW[k] = R.marketWeight[k] || 1;
       const picked = []; for (let i = 0; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }
@@ -1121,7 +1123,10 @@
       if (R.firstContractDiscount && !this.monthStats.firstContractBought) p = Math.max(0, p - R.firstContractDiscount);
       return p;
     }
-    buy(itemIdx, target) {
+    // 계약 아이템의 월 배차 대수(업체 기본 + 등급 보너스)
+    itemTrucks(it) { return Math.max(1, D.CARRIERS[it.carrier].trucks + D.GRADES[it.grade].calls + this.rules.callsDelta); }
+    // mode: 'replace'(기본) | 'upgrade'(같은 업체·높은 등급: 등급만 올리고 강화·잔여 배차 유지) | 'add'(같은 업체: 월 배차 한도 추가 + 즉시 리필)
+    buy(itemIdx, target, mode) {
       if (this.phase !== 'market') return { ok: false, msg: T('err.notMarket') };
       const R = this.rules, it = this.market.items[itemIdx];
       if (!it || it.sold) return { ok: false, msg: T('err.sold') };
@@ -1132,6 +1137,25 @@
         if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         if (target == null || target < 0 || target >= D.CONTRACT_SLOTS) return { ok: false, msg: T('err.pickSlot') };
         const old = this.contracts[target];
+        const same = old && old.carrier === it.carrier;
+        if (!mode) mode = same ? (GRADE_RANK.indexOf(it.grade) > GRADE_RANK.indexOf(old.grade) ? 'upgrade' : 'add') : 'replace';
+        if (mode !== 'replace') {
+          if (!same) return { ok: false, msg: T('err.notSameCarrier') };
+          if (mode === 'upgrade' && GRADE_RANK.indexOf(it.grade) <= GRADE_RANK.indexOf(old.grade)) return { ok: false, msg: T('err.notHigherGrade') };
+          if (mode === 'upgrade') {
+            const delta = D.GRADES[it.grade].calls - D.GRADES[old.grade].calls;
+            old.grade = it.grade; old.maxCalls = Math.max(1, old.maxCalls + delta); old.calls = Math.max(0, old.calls + delta);
+            const gt = D.GRADES[it.grade].trust; if (gt) this._addTrust(it.carrier, Math.max(0, gt - this.trustXp(it.carrier)), true);
+            this.say('log.upgradeContract', { name: this.contractName(old), price });
+          } else {
+            const n = this.itemTrucks(it);
+            old.maxCalls += n; old.calls += n;
+            this.say('log.addContract', { name: this.contractName(old), n, price });
+          }
+          this.monthStats.firstContractBought = true; this.stats.contractsBought++;
+          this.cash -= price; this.run.spent += price; this.market.bought++; it.sold = true;
+          return { ok: true, mode };
+        }
         const nc = this._makeContract(it.carrier, it.grade);
         if (old) {
           if (old.calls >= 3) this.stats.replacedWithCalls = Math.max(this.stats.replacedWithCalls, old.calls);
