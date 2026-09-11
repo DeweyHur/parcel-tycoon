@@ -1090,7 +1090,7 @@
       "postal": {
         "name": "National Post",
         "tag": "Steady · long haul",
-        "passive": "Public service: op cost fixed at 180, dispatch fee fixed at 45c. Direct delivery +1. Stress -2 at month start if 10+",
+        "passive": "Public service: op cost fixed at 230, dispatch fee fixed at 70c. Direct delivery +1. Stress -2 at month start if 10+",
         "weakness": "Slow approvals: 2 market purchases per month. Expert/Master from month 5. Special bonus -5"
       }
     },
@@ -1251,31 +1251,31 @@
       },
       "peak": {
         "name": "Peak Season",
-        "desc": "Arrivals ×2.2, 5 surge turns (surge deadlines -2), return grace 2 turns. Reward +10, prices ×1.3, starting calls +2",
+        "desc": "Arrivals ×1.5, 5 surge turns (surge deadlines -2), return grace 2 turns. Reward +10, prices ×1.3, starting calls +2",
         "win": "Survive 2 months + ship 50",
         "recommend": "City Quick · Steel Depot"
       },
       "heatwave": {
         "name": "Heat Wave",
-        "desc": "Fresh share +20%p, room-temp spoilage ×3, heat alert turns (3/month), arrivals +10%",
+        "desc": "Fresh share +20%p, room-temp spoilage ×3, heat alert turns (3/month)",
         "win": "Survive 3 months + at most 3 discards",
         "recommend": "Fresh Logistics"
       },
       "strike": {
         "name": "Strike",
-        "desc": "One carrier type can't be called each month (announced at month start). Arrivals +20%, op cost +30",
+        "desc": "One carrier type can't be called each month (announced at month start). Op cost +30",
         "win": "Survive 3 months",
         "recommend": "Startup"
       },
       "port": {
         "name": "Port Contract",
-        "desc": "Customs 20% · large 12%, XL 7%, arrivals +10%. Customs/large reward +20, standard -5",
+        "desc": "Customs 20% · large 12%, XL 7%, arrivals -10%. Customs/large reward +20, standard -5",
         "win": "Survive 4 months",
         "recommend": "Global · Steel Depot"
       },
       "cashcrunch": {
         "name": "Cash Crunch",
-        "desc": "Starting cash -50%, op cost 240, no refresh, market prices +10%. Revenue +10%, trust ×2",
+        "desc": "Starting cash -50%, op cost 380, no refresh, market prices +10%. Revenue +10%, trust ×2",
         "win": "Survive 3 months + cash ≥ 600",
         "recommend": "Penny Freight · National Post"
       },
@@ -1287,14 +1287,14 @@
       },
       "audit": {
         "name": "Audit",
-        "desc": "All deadlines -1 turn, overdue reward -50%, stress +1 at month start, op cost +30",
+        "desc": "All deadlines -1 turn, overdue reward -50%, stress +1 at month start",
         "win": "Survive 3 months + at most 4 overdue deliveries",
         "recommend": "National Post · Glasshouse"
       },
       "moving": {
         "name": "Moving Season",
         "desc": "Moving Center included, a storage offer guaranteed every 5 turns, storage fees ×1.5. Spring weather",
-        "win": "Survive 3 months + complete 6 storage contracts",
+        "win": "Survive 3 months + complete 5 storage contracts",
         "recommend": "Steel Depot"
       },
       "bigdeal": {

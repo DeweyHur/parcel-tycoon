@@ -5,7 +5,7 @@
     TURNS_PER_MONTH: 10,
     START_CASH: 450,
     GAMEOVER_STRESS: 20,
-    OPERATING_COST: 240,
+    OPERATING_COST: 300,
     CONTRACT_SLOTS: 4,
     MARKET_MAX_BUY: 3,
     REFRESH_COSTS: [40, 80, 140, 220],
@@ -13,7 +13,7 @@
     WAREHOUSE: { cap: 24, cold: 6, frozen: 4, xl: 1 },
 
     // 월별 추가 입고 수 (기본 10 + 추가). 7개월차 이후는 무한 모드에서 확장
-    EXTRA_ARRIVALS: { 1: 5, 2: 7, 3: 9, 4: 11, 5: 13, 6: 15 },
+    EXTRA_ARRIVALS: { 1: 12, 2: 14, 3: 16, 4: 18, 5: 20, 6: 22 },
 
     // 월별 택배 종류 비율 (large = 대형화물, 4개월차부터)
     // intl = 🛃 통관 (구 국제운송), frozen = ❆ 냉동 (4개월차부터)
@@ -61,16 +61,16 @@
     // 업체 = 배차 계약 (docs/BALANCE_DESIGN.md 1장): cap = 차량 한 대의 부피(칸), fee = 대당 배차비(호출 즉시 차감), trucks = 월 배차 한도(대), price = 계약가
     // caps = 안전하게 다루는 속성. need = 이 속성 중 하나가 있는 택배만. onlyPlain = 속성 없는 택배만. specialist = 특수 운송 보너스 종류. delay = 입금 지연 턴. badge = 운송 수단
     CARRIERS: {
-      bulk:    { badge: '🚚', cap: 6,  fee: 45, trucks: 3, price: 80,  caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2 },
-      cold:    { badge: '🚚', cap: 5,  fee: 60, trucks: 3, price: 110, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'] },
-      frozen:  { badge: '🚚', cap: 4,  fee: 70, trucks: 3, price: 120, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true },
-      fragile: { badge: '🚚', cap: 4,  fee: 60, trucks: 3, price: 110, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
-      intl:    { badge: '🚚', cap: 8,  fee: 90, trucks: 2, price: 130, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
-      large:   { badge: '🚚', cap: 10, fee: 85, trucks: 2, price: 120, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true },
+      bulk:    { badge: '🚚', cap: 6,  fee: 70, trucks: 3, price: 80,  caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2 },
+      cold:    { badge: '🚚', cap: 5,  fee: 95, trucks: 3, price: 110, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'] },
+      frozen:  { badge: '🚚', cap: 4,  fee: 110, trucks: 3, price: 120, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true },
+      fragile: { badge: '🚚', cap: 4,  fee: 95, trucks: 3, price: 110, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
+      intl:    { badge: '🚚', cap: 8,  fee: 140, trucks: 2, price: 130, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
+      large:   { badge: '🚚', cap: 10, fee: 135, trucks: 2, price: 120, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true },
       // 원형(운송 수단) 업체: 속성이 겹치고 트레이드오프가 다르다
-      air:     { badge: '✈', cap: 4,  fee: 105, trucks: 2, price: 140, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
-      rail:    { badge: '🚆', cap: 16, fee: 120, trucks: 1, price: 100, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true },
-      sea:     { badge: '🚢', cap: 14, fee: 105, trucks: 1, price: 110, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
+      air:     { badge: '✈', cap: 4,  fee: 165, trucks: 2, price: 140, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
+      rail:    { badge: '🚆', cap: 16, fee: 190, trucks: 1, price: 100, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true },
+      sea:     { badge: '🚢', cap: 14, fee: 165, trucks: 1, price: 110, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
     },
     // 신뢰도 특성 (2장): 업체마다 1~3단계 효과. 문구는 locales data.TRUST_PERKS[carrier] = [t1, t2, t3]
     // 키: simul 동시 대수 / feeMult 배차비 배율 / cap 용량 +칸 / rewardDelta{type} / bonusDelta{type} / freezeOnCall / coldZone·frozenZone 구역 +칸 / customsDelta 통관 대기 / noCustomsDelay / xlDelta 초대형 점유 -1 / sizeMax / customsBonus / delay / trucks
