@@ -4,11 +4,11 @@
 
   // ----- 고객(화주) (docs/CUSTOMER_DESIGN.md 2장) -----
   // items: 품목 가중치(택배 종류). rule: 특수 규칙. claimMult: 폐기 시 손해배상 배율. perks[lv]: 신뢰 단계 혜택(2·3단계)
-  const CUSTOMER_LEVELS = [0, 8, 24, 60];
-  const CUSTOMER_VOLUME = [0.6, 1.0, 1.3, 1.6];
+  const CUSTOMER_LEVELS = [0, 8, 24, 60, 120, 220]; // 4·5단계: 한 해 후반의 성장 축(혜택은 3단계까지, 물량·보너스는 계속)
+  const CUSTOMER_VOLUME = [0.6, 1.0, 1.3, 1.6, 2.0, 2.4];
   // 고객 신뢰 단계별 월 추가 입고(개) — 신뢰가 오르면 물량이 배 이상으로 는다(총 입고에 더해짐)
-  const CUSTOMER_EXTRA = [0, 3, 6, 12];
-  const CUSTOMER_BONUS = [0, 5, 10, 15];
+  const CUSTOMER_EXTRA = [0, 3, 6, 12, 20, 32];
+  const CUSTOMER_BONUS = [0, 5, 10, 15, 20, 25];
   const CUSTOMERS = {
     anon:    { icon: '📦', items: null, sizeBias: null, rule: null, claimMult: 1.0, perks: {} },
     dawn:    { icon: '🌙', items: { fresh: 70, normal: 30 }, sizeBias: 'small', claimMult: 1.5,
@@ -193,8 +193,8 @@
   const DAILY_CONFLICTS = [['picky', 'generous'], ['express', 'picky']];
 
   const SCENARIOS = {
-    standard: { icon: '📦', months: 3, mods: {}, unlock: null },
-    half:     { icon: '📅', months: 6, mods: { scoreMult: 1.5 }, unlock: 'first_clear' },
+    half:     { icon: '🎓', months: 6, mods: { scoreMult: 0.8 }, unlock: null },
+    standard: { icon: '📅', months: 12, mods: { scoreMult: 1.5 }, unlock: null },
     peak:     { icon: '🎄', months: 2, mods: { eventGoods: true, returnGrace: 2, burstDeadlineDelta: -2, arrivalsMult: 1.5, burstTurns: 5, rewardAll: 10, itemPriceMult: 1.3, startCallsDelta: 2, winDelivered: 50 }, unlock: 'busy_month' },
     heatwave: { icon: '🌡️', months: 3, mods: { season: 'summer', customerWeights: { dawn: 2, ice: 2 }, customerClaimMult: { dawn: 2 }, typeShift: { fresh: 12, produce: 8, normal: -20 }, freshSizes: [2, 4, 7], warmMult: 3, heatAlerts: 3, arrivalsMult: 1.0, facilityPriceMult: { cold1: 0.7, cold2: 0.7 }, marketWeight: { cold: 1.5 }, winMaxDiscard: 3 }, unlock: 'fresh20' },
     strike:   { icon: '✊', months: 3, mods: { strike: true, opCostDelta: 30 }, unlock: 'four_carriers' },
@@ -240,7 +240,7 @@
     four_carriers:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'strike', check: s => s.distinctCarriersAtEnd >= 4 },
     intl15:       { kind: 'cum', rewardType: 'scenario', reward: 'port', check: (s, p) => p.deliveredByType.intl >= 15, prog: p => [p.deliveredByType.intl, 15] },
     rich_clear:   { kind: 'end', needWin: true, rewardType: 'scenario', reward: 'cashcrunch', check: (s, p, r) => r.scenario === 'standard' && r.cash >= 1000 },
-    half_clear:   { kind: 'end', needWin: true, rewardType: 'scenario', reward: 'endless', check: (s, p, r) => r.scenario === 'half' },
+    half_clear:   { kind: 'end', needWin: true, rewardType: 'scenario', reward: 'endless', check: (s, p, r) => r.scenario === 'standard' },
     three_unlocked:{ kind: 'meta', rewardType: 'scenario', reward: 'daily', check: (s, p, r, prof) => prof.unlocked.companies.length >= 3, prog: (p, prof) => [prof.unlocked.companies.length, 3] },
     veteran:      { kind: 'meta', rewardType: 'slot', reward: 3, check: (s, p, r, prof) => prof.unlocked.companies.length >= 5, prog: (p, prof) => [prof.unlocked.companies.length, 5] },
     // 퍽 해금
@@ -276,6 +276,6 @@
     daily7:       { kind: 'meta', rewardType: 'none', check: (s, p) => p.dailyStreak >= 7 },
   };
 
-  const META = { CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, DIFFICULTIES, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, DAILY_VARIANTS, DAILY_CONFLICTS, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['standard'], perkSlots: 1 } };
+  const META = { CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, DIFFICULTIES, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, DAILY_VARIANTS, DAILY_CONFLICTS, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['half', 'standard'], perkSlots: 1 } };
   if (typeof module !== 'undefined') module.exports = META; else root.META = META;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -291,6 +291,21 @@
     'up.note': 'Arrival order is fixed; customs and cold-zone assignment are decided on arrival.',
     'btn.close': 'Close',
     'common.none': 'none',
+    'season.note.1': "Off-season — volume −15%, a bit more frozen",
+    'season.note.2': "Gift season — volume −10%, more fragile",
+    'season.note.3': "New term & moving — baseline",
+    'season.note.4': "Spring greens — more produce",
+    'season.note.5': "Family month — volume +5%, more fragile (gifts)",
+    'season.note.6': "Early summer — more fresh",
+    'season.note.7': "Heat wave — more fresh & frozen, volume −5%",
+    'season.note.8': "Heat & holidays — more fresh & frozen, volume −5%",
+    'season.note.9': "Harvest & holiday — more produce, volume +5%",
+    'season.note.10': "Harvest & imports — more produce & customs, volume +10%",
+    'season.note.11': "Black Friday — volume +30%, more customs & fragile",
+    'season.note.12': "Year-end peak — volume +40%, more fragile, frozen, large",
+    'fmt.calMonth': "M{cal}<small>·run {n}</small>",
+    'mk.seasonLine': "Next: month {cal} · {season}: {note}",
+    'mk.seasonLineNow': 'This month {cal} · {season}: {note}',
     'season.spring': 'Spring',
     'season.summer': 'Summer',
     'season.autumn': 'Autumn',
@@ -1267,16 +1282,16 @@
     },
     "SCENARIOS": {
       "standard": {
-        "name": "Standard 3 Months",
-        "desc": "Default rules. Survive 3 months",
-        "win": "Survive 3 months",
+        "name": "One Year (12 months)",
+        "desc": "The main run. Starts in March and runs through heat waves, harvest, Black Friday and the year-end peak to next February. Customer trust doubles volume, and costs grow with it",
+        "win": "Survive 12 months (score ×1.5)",
         "recommend": "Local Parcel"
       },
       "half": {
-        "name": "Half-Year Review",
-        "desc": "Full 6-month run. Expert/Master grades and large cargo appear",
-        "win": "Survive 6 months (score ×1.5)",
-        "recommend": "National Post"
+        "name": "Tutorial (half year)",
+        "desc": "March to August, 6 months. A short run to learn contracts, trucks, the market and trust — through the summer heat",
+        "win": "Survive 6 months (score ×0.8)",
+        "recommend": "Local Parcel"
       },
       "peak": {
         "name": "Peak Season",
@@ -1448,11 +1463,11 @@
       },
       "rich_clear": {
         "name": "Rich Clear",
-        "desc": "Clear Standard 3 Months with cash ≥ 1,000"
+        "desc": "Clear One Year with 1,000+ cash"
       },
       "half_clear": {
-        "name": "Half-Year Clear",
-        "desc": "Clear Half-Year Review"
+        "name": "Full Year",
+        "desc": "Clear One Year (12 months)"
       },
       "three_unlocked": {
         "name": "Three Companies",

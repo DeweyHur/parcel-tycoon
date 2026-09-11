@@ -164,7 +164,7 @@
     if (!game) return;
     const g = game, R = g.rules;
     updateMusic();
-    $('#hud-month').textContent = T('fmt.monthN', { n: g.month });
+    $('#hud-month').innerHTML = T('fmt.calMonth', { cal: g.calMonth(), n: g.month });
     $('#hud-turn').textContent = T('hud.turn', { t: g.turn, max: D.TURNS_PER_MONTH });
     // 자금은 월말 정산 후 예상 잔액으로 보여준다 (사이클 중엔 모든 지출이 어음 — 자금 때문에 막히는 일이 없다)
     const pj = g.projectedCash(); const hc = $('#hud-cash'); const inPlay = g.phase === 'play';
@@ -509,7 +509,7 @@
     const render = () => {
       const items = mk.items.map((it, i) => {
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract' && it.standing) { const c = game.contracts.find(x => x && x.carrier === it.carrier); desc = `${T('mk.addDesc', { n: game.itemTrucks(it), max: c ? c.maxCalls : 0, next: Math.round(price * D.ADD_PRICE_STEP) })}`; }
+        if (it.kind === 'contract' && it.standing && it.add) { const c = game.contracts.find(x => x && x.carrier === it.carrier); desc = `${T('mk.addDesc', { n: game.itemTrucks(it), max: c ? c.maxCalls : 0, next: Math.round(price * D.ADD_PRICE_STEP) })}`; }
         else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], g = D.GRADES[it.grade]; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${car.desc}<br>${car.badge || ''} ${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}<br>${T('mk.vehicleLine', { vehicle: esc(car.vehicle || ''), cap: car.cap + g.cap + (R.carrierCapDelta[it.carrier] || 0), fee: Math.max(0, Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * g.fee * R.feeMult + R.feeDelta)), trucks: Math.max(1, car.trucks + g.calls + R.callsDelta) })}${it.grade !== 'normal' ? `<br><span style="color:var(--gold)">${T('mk.gradeVs', { cap0: car.cap, cap1: car.cap + g.cap, t0: car.trucks, t1: car.trucks + g.calls, f0: Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * R.feeMult), f1: Math.max(0, Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * g.fee * R.feeMult + R.feeDelta)), lv: [0, 1, 2, 3][['normal', 'trusted', 'expert', 'master'].indexOf(it.grade)] })}</span>` : ''} · ${trustBar(game, it.carrier)}${trustTrack(it.carrier, game.trustXp(it.carrier))}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
@@ -525,7 +525,9 @@
       const up = mk.prep ? game.upcoming() : [];
       const prepLine = mk.prep ? `<div class="d" style="font-size:12px;color:var(--gold);margin-bottom:4px">${T('mk.prepNote')} ${T('hud.upcoming')}: ${up.filter(u => u.specs).map(u => `${T('fmt.turnN', { n: u.turn })} ${u.specs.map(s => `<i class="sw" style="display:inline-block;width:8px;height:8px;background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}`).join(' · ')} · ${T('weather.title')} ${up.filter(u => u.weather).map(u => M.WEATHER[u.weather].icon).join('')}</div>` : '';
       const fcRows = game.customerForecast().map(f => { const cu = M.CUSTOMERS[f.id]; return `<span class="fc">${cu.icon} ${esc(cu.name)} <b>${f.min}~${f.max}</b> <small>${['normal', ...(f.special > 0 ? f.types : [])].map(t => `<i style="display:inline-block;width:7px;height:7px;background:${D.PARCEL_TYPES[t].css}"></i>${D.PARCEL_TYPES[t].short} ${f.range[t][0]}~${f.range[t][1]}`).join(' · ')}</small></span>`; }).join('');
-      const fcLine = `<div class="d fcline"><span style="color:var(--gold)">${T('mk.forecast', { m: mk.prep ? game.month : game.month + 1 })}</span> ${fcRows}</div>`;
+      const nm = mk.prep ? game.month : game.month + 1, cal = game.calMonth(nm);
+      const seasonLine = nm <= game.monthsTotal() ? `<div class="d" style="color:var(--dim)">${T(mk.prep ? 'mk.seasonLineNow' : 'mk.seasonLine', { cal, season: T('season.' + game.season(nm)), note: T('season.note.' + cal) })}</div>` : '';
+      const fcLine = `<div class="d fcline"><span style="color:var(--gold)">${T('mk.forecast', { m: nm })}</span> ${fcRows}</div>${seasonLine}`;
       const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span><span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>${whLine}${fcLine}${prepLine}${items}
         ${R.noRefresh ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('err.noRefresh')}</div>` : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}${contracts}`;
       const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: mk.month }), body, [{ label: T('mk.startMonth', { n: mk.month + 1 }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); } }], T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(6, Math.max(1, mk.month))] * R.itemPriceMult * R.priceMult).toFixed(2) }));

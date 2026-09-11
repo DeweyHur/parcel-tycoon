@@ -11,6 +11,8 @@
     // 다음 정산에 원금+이자를 갚는다. 부채가 한도를 넘으면 부도.
     LOAN: { limit: 400, interest: 0.15 },
     ADD_PRICE_STEP: 1.6,   // 배차 추가를 살 때마다 그 계약의 다음 추가 가격 배율
+    OPCOST_INFLATION: 1.08, // 임대는 매달 5%씩 오른다 (12개월차 ×1.7)
+    MONTH_RELIEF: { min: 1, amount: 2 }, // 월말 휴식: 스트레스 -2
     OPCOST_PER_PARCEL: 4,  // 인건비: 기준(22개)을 넘는 월 입고 1개당 운영비 — 물량이 늘면 지출도 는다
     OPCOST_BASE_ARRIVALS: 22,
     CONTRACT_SLOTS: 4,
@@ -20,7 +22,23 @@
     WAREHOUSE: { cap: 24, cold: 6, frozen: 4, xl: 1 },
 
     // 월별 추가 입고 수 (기본 10 + 추가). 7개월차 이후는 무한 모드에서 확장
-    EXTRA_ARRIVALS: { 1: 12, 2: 14, 3: 16, 4: 18, 5: 20, 6: 22 },
+    EXTRA_ARRIVALS: { 1: 12, 2: 14, 3: 16, 4: 18, 5: 20, 6: 22 }, // 7개월차부터 22 + (m-6)×2
+    // 달력: 런은 START_MONTH(3월, 봄)에 시작해 계절대로 흐른다. 달마다 예측 가능한 물량·품목 편차
+    START_MONTH: 3,
+    SEASON_MODS: {
+      1:  { arrivalsMult: 0.85, typeShift: { frozen: 3 } },                      // 1월 비수기
+      2:  { arrivalsMult: 0.9,  typeShift: { fragile: 3 } },                     // 2월 선물(파손)
+      3:  { arrivalsMult: 1.0,  typeShift: {} },                                 // 3월 새 학기·이사
+      4:  { arrivalsMult: 1.0,  typeShift: { produce: 3 } },                     // 4월 봄나물
+      5:  { arrivalsMult: 1.05, typeShift: { fragile: 3 } },                     // 5월 가정의 달(선물)
+      6:  { arrivalsMult: 1.0,  typeShift: { fresh: 4 } },                       // 6월 초여름 신선
+      7:  { arrivalsMult: 0.95, typeShift: { fresh: 6, frozen: 4, normal: -6 } },// 7월 폭염·냉동
+      8:  { arrivalsMult: 0.95, typeShift: { fresh: 6, frozen: 4, normal: -6 } },// 8월 폭염·휴가
+      9:  { arrivalsMult: 1.05, typeShift: { produce: 6, normal: -3 } },         // 9월 추수·명절
+      10: { arrivalsMult: 1.1,  typeShift: { produce: 5, intl: 3 } },            // 10월 수확·직구
+      11: { arrivalsMult: 1.3,  typeShift: { intl: 5, fragile: 3 } },            // 11월 블랙프라이데이
+      12: { arrivalsMult: 1.4,  typeShift: { fragile: 6, frozen: 3, large: 2 } },// 12월 연말 성수기
+    },
 
     // 월별 택배 종류 비율 (large = 대형화물, 4개월차부터)
     // intl = 🛃 통관 (구 국제운송), frozen = ❆ 냉동 (4개월차부터)
@@ -151,7 +169,7 @@
       bigvan:  { price: 220, upkeep: 10, vehicle: true },
       driver:  { price: 200, upkeep: 25, vehicle: true, driver: true },
     },
-    PRICE_MULT: { 1: 1.0, 2: 1.1, 3: 1.2, 4: 1.35, 5: 1.5, 6: 1.7 },
+    PRICE_MULT: { 1: 1.0, 2: 1.1, 3: 1.2, 4: 1.35, 5: 1.5, 6: 1.7, 7: 2.0, 8: 2.4, 9: 2.8, 10: 3.3, 11: 3.8, 12: 4.4 },
 
     // 스트레스 구간 → 상태 id. 표시 문구는 locales/<lang>.js data.STRESS_NAMES[id]
     STRESS_STATES: [[5, 'stable'], [10, 'caution'], [15, 'danger'], [19, 'crisis'], [20, 'gameover']],

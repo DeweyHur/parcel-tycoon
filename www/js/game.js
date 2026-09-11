@@ -44,7 +44,7 @@
     strike: false, xlWeight: null, winCash: 0, noRefresh: false, bigWeight: 1, bigCallBonus: null, winMaxOverdue: null,
     selfCapDelta: 0, allStartTrust: 0,
     // 3.5단계: 보험·날씨·보관·적재
-    premiumMult: 1, premiumDelta: {}, noInsurance: false, season: null, weatherWeights: {}, tent: false, forecastTurns: 2,
+    premiumMult: 1, premiumDelta: {}, noInsurance: false, season: null, startMonth: null, weatherWeights: {}, tent: false, forecastTurns: 2,
     storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, eventGoods: false, storageAnon: false,
     // 4단계: 난이도·시나리오 고객 규칙
     feeMult: 1, feeFixed: null, feeDelta: 0,
@@ -188,7 +188,7 @@
     customerCount() { return Object.keys(this.customers).filter(id => id !== 'anon').length; }
     _emptyCustMonth() { return { delivered: 0, revenue: 0, claims: 0, discarded: 0, lvStart: 0 }; }
     customerLevel(id) { const c = this.customers && this.customers[id]; if (!c || c.suspended) return 0; let lv = 0; for (let i = 1; i < M.CUSTOMER_LEVELS.length; i++) if (c.xp >= M.CUSTOMER_LEVELS[i]) lv = i; return lv; }
-    customerNext(id) { const lv = this.customerLevel(id); const c = this.customers[id]; return lv >= 3 ? null : { need: M.CUSTOMER_LEVELS[lv + 1], have: Math.max(0, c.xp) }; }
+    customerNext(id) { const lv = this.customerLevel(id); const c = this.customers[id]; return lv >= M.CUSTOMER_LEVELS.length - 1 ? null : { need: M.CUSTOMER_LEVELS[lv + 1], have: Math.max(0, c.xp) }; }
     customerPerk(id, key) { const cust = M.CUSTOMERS[id]; if (!cust || !cust.perks) return null; const lv = this.customerLevel(id); let v = null; for (const l of [2, 3]) if (lv >= l && cust.perks[l] && cust.perks[l][key] != null) v = cust.perks[l][key]; return v; }
     // 창고에 직접 적용되는 혜택(냉장·초대형)은 단계 도달 시 더하고, 거래 중단 시 뺀다
     _applyCustomerPerks(id) {
@@ -366,7 +366,12 @@
     }
 
     // ----- 날씨 (4.4장) -----
-    season(m) { const R = this.rules; if (R.season) return R.season; m = m || this.month; return m <= 2 ? 'spring' : m <= 4 ? 'summer' : m === 5 ? 'autumn' : 'winter'; }
+    // 물가: 임대·인건비·배차비가 매달 D.OPCOST_INFLATION씩 오른다 (수입이 커지는 만큼 지출 폭도 커진다)
+    inflation(m) { return Math.pow(D.OPCOST_INFLATION, Math.max(0, (m || this.month) - 1)); }
+    // 달력 월(1~12): 런은 D.START_MONTH(3월)에 시작
+    calMonth(m) { m = m || this.month; const start = this.rules.startMonth || D.START_MONTH; return ((start - 1 + m - 1) % 12) + 1; }
+    seasonMods(m) { return D.SEASON_MODS[this.calMonth(m)] || { arrivalsMult: 1, typeShift: {} }; }
+    season(m) { const R = this.rules; if (R.season) return R.season; const c = this.calMonth(m); return c >= 3 && c <= 5 ? 'spring' : c >= 6 && c <= 8 ? 'summer' : c >= 9 && c <= 11 ? 'autumn' : 'winter'; }
     _genWeather(m) {
       const R = this.rules, w = Object.assign({}, M.WEATHER_BY_SEASON[this.season(m)]);
       for (const k in R.weatherWeights) w[k] = (w[k] || (R.weatherWeights[k] > 1 ? 10 : 0)) * R.weatherWeights[k];
@@ -503,7 +508,7 @@
     truckFee(c) {
       const R = this.rules, car = D.CARRIERS[c.carrier];
       let fee = R.feeFixed != null ? R.feeFixed : car.fee;
-      fee = fee * D.GRADES[c.grade].fee * (this.trustPerk(c.carrier, 'feeMult') || 1) * R.feeMult + R.feeDelta;
+      fee = fee * D.GRADES[c.grade].fee * (this.trustPerk(c.carrier, 'feeMult') || 1) * R.feeMult * this.inflation() + R.feeDelta;
       return Math.max(0, Math.round(fee));
     }
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
@@ -599,11 +604,12 @@
     // ----- 월별 테이블 (무한 모드 확장 포함) -----
     // 고객 신뢰 단계에 따른 추가 입고: 단계가 오를수록 물량이 배 이상으로 는다
     _customerExtra() { let n = 0; for (const id in this.customers) { const c = this.customers[id]; if (id === 'anon' || c.suspended) continue; n += (M.CUSTOMER_EXTRA[this.customerLevel(id)] || 0) * (c.slots || 1); } return n; }
-    _extraArrivals(m) { return (m <= 6 ? D.EXTRA_ARRIVALS[m] : 7 + (m - 6)) + this._customerExtra(); }
+    _extraArrivals(m) { return Math.round((m <= 6 ? D.EXTRA_ARRIVALS[m] : D.EXTRA_ARRIVALS[6] + (m - 6) * 2) * this.seasonMods(m).arrivalsMult) + this._customerExtra(); }
     _typeRatio(m) {
       const R = this.rules;
       let base = { ...(D.TYPE_RATIO[Math.min(6, m)]) };
-      if (m > 6) { const k = (m - 6) * 2; base.normal = Math.max(5, base.normal - k * 2); base.fresh += k / 2; base.fragile += k / 2; base.intl += k / 2; base.large += k / 2; }
+      if (m > 6) { const k = Math.min(6, m - 6); base.normal = Math.max(20, base.normal - k * 2); base.fresh += k / 2; base.fragile += k / 2; base.intl += k / 2; base.large += k / 2; }
+      const sm = this.seasonMods(m).typeShift; for (const t in sm) base[t] = Math.max(0, (base[t] || 0) + sm[t]);
       if (R.typeOverride) base = { ...R.typeOverride };
       if (R.typeShift) for (const t in R.typeShift) base[t] = Math.max(0, (base[t] || 0) + R.typeShift[t]);
       return base;
@@ -635,11 +641,11 @@
       rent += R.opCostDelta;
       if (R.lateOpCost && m >= R.lateOpCost.from) rent += R.lateOpCost.delta;
       if (R.endless && m >= 12) rent += (m - 11) * 10;
-      rent = Math.max(0, rent);
+      rent = Math.max(0, Math.round(rent * this.inflation(m)));
       const contracts = this.contracts.filter(Boolean).reduce((s, c) => s + (D.OPCOST_CONTRACT[c.grade] != null ? D.OPCOST_CONTRACT[c.grade] : D.OPCOST_CONTRACT.normal), 0);
       let facilities = 0; for (const f of Object.keys(D.FACILITIES)) if (this.warehouse[f]) facilities += D.FACILITIES[f].upkeep || 0;
       const arrivals = this.schedule ? this.schedule.reduce((s, t) => s + t.length, 0) : 0;
-      const labor = Math.max(0, arrivals - D.OPCOST_BASE_ARRIVALS) * D.OPCOST_PER_PARCEL;
+      const labor = Math.round(Math.max(0, arrivals - D.OPCOST_BASE_ARRIVALS) * D.OPCOST_PER_PARCEL * this.inflation(m));
       return { rent, contracts, facilities, labor, arrivals, total: rent + contracts + facilities + labor };
     }
     _opCost(m) {
@@ -669,7 +675,7 @@
       }
       if (m > 1) {
         if (R.monthlyStress) this.stress = Math.max(0, this.stress + R.monthlyStress);
-        if (R.stressRelief && this.stress >= R.stressRelief.min) this.stress = Math.max(0, this.stress - R.stressRelief.amount);
+        const relief = R.stressRelief || D.MONTH_RELIEF; if (relief && this.stress >= relief.min) this.stress = Math.max(0, this.stress - relief.amount);
       }
       // 준비 마켓: 1개월차 첫 턴 전에 시작 자금으로 계약·시설·보험을 갖출 수 있다 (입고 예정이 보인다)
       if (m === 1 && this.cfg.prep && !this.prepDone) {
@@ -1100,7 +1106,7 @@
       return Object.values(acc).sort((a, b) => b.volume - a.volume);
     }
     _genMarketItems() {
-      const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(6, m)] * R.itemPriceMult * R.priceMult;
+      const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, m)] * R.itemPriceMult * R.priceMult;
       const items = [];
       const gp = this._gradeProb(m);
       const weights = this._carrierWeights();
@@ -1138,6 +1144,11 @@
       for (const c of this.contracts) if (c) items.push({ kind: 'contract', carrier: c.carrier, grade: c.grade, standing: true, add: true, sold: false,
         price: Math.round(D.CARRIERS[c.carrier].price * D.GRADES[c.grade].price * R.priceMult * Math.pow(D.ADD_PRICE_STEP, c.adds || 0)),
         name: T('market.addName', { name: this.contractName(c), n: this.itemTrucks({ carrier: c.carrier, grade: c.grade }) }), hint: T('market.addHint') });
+      // 상시 등급 업그레이드: 보유 계약의 다음 등급(프리미엄 → 엘리트 → 마스터). 가격은 등급 배율 그대로 — 후반 자금 흡수의 축
+      for (const c of this.contracts) if (c) { const ni = GRADE_RANK.indexOf(c.grade) + 1; if (ni >= GRADE_RANK.length) continue; const ng = GRADE_RANK[ni]; if (ng === 'master' && this.month < 6) continue; if (ng === 'expert' && this.month < R.expertFrom) continue;
+        if (items.some(it => it.kind === 'contract' && it.carrier === c.carrier && it.upgrade)) continue;
+        items.push({ kind: 'contract', carrier: c.carrier, grade: ng, standing: true, upgrade: true, sold: false, price: Math.round(D.CARRIERS[c.carrier].price * D.GRADES[ng].price * R.priceMult),
+          name: D.CARRIERS[c.carrier].name + ` (${D.GRADES[ng].name})`, hint: T('market.upgradeHint') }); }
       const enhW = {}; for (const k of Object.keys(D.ENHANCEMENTS)) enhW[k] = R.marketWeight[k] || 1;
       const picked = []; for (let i = 0; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }
       for (const e of picked) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });

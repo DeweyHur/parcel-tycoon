@@ -90,6 +90,8 @@ function marketBot(g) {
   items.forEach((it, i) => { if (!it.sold && it.kind === 'fac' && it.fac && g.cash - it.price > reserve + 200 && g.market.bought < g.rules.marketMaxBuy) g.buy(i, null); });
   items.forEach((it, i) => { if (!it.sold && it.kind === 'contract' && it.upgrade && g.cash - g.contractPrice(it) > reserve + 250 && g.market.bought < g.rules.marketMaxBuy) g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier), 'upgrade'); });
   items.forEach((it, i) => { if (!it.sold && it.kind === 'enh' && g.cash - it.price > reserve + 300 && g.market.bought < g.rules.marketMaxBuy) { const s = bySlotDelivered(); if (s >= 0) g.buy(i, s); } });
+  // 돈이 많이 남으면 배차 추가를 더 산다 (현금의 절반까지)
+  for (let k = 0; k < 3; k++) { const adds = items.map((it, i) => ({ it, i })).filter(x => !x.it.sold && x.it.kind === 'contract' && x.it.add && g.contractPrice(x.it) < g.cash * 0.5 && g.market.bought < g.rules.marketMaxBuy); if (!adds.length) break; adds.sort((a, b) => g.contractPrice(a.it) - g.contractPrice(b.it)); const { it, i } = adds[0]; if (!g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier), 'add').ok) break; }
 }
 
 function runOne(seed, strat, cfg) {

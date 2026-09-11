@@ -1,13 +1,14 @@
 const path = __dirname + '/../';
+const SCEN = process.argv[3] || 'standard';
 const { Game } = require(path + 'www/js/game.js');
 const sim = require(path + 'test/sim.js');
 // 전략: none(마켓 무구매) / moderate(봇 기본: 빈 슬롯·힌트·업그레이드·추가·시설·강화) / aggressive(현금 여유 기준 절반)
 function marketAggressive(g) { const c = g.cash; g.cash = c * 2; sim.marketBot(g); const spent = c * 2 - g.cash; g.cash = c - spent; }
 function run(strat, N) {
-  const M = 6, sum = { cash: Array(M + 1).fill(0), rev: Array(M + 1).fill(0), fees: Array(M + 1).fill(0), op: Array(M + 1).fill(0), spent: Array(M + 1).fill(0), ret: Array(M + 1).fill(0), stress: Array(M + 1).fill(0), alive: Array(M + 1).fill(0) };
+  const M = SCEN === 'standard' ? 12 : 6, sum = { cash: Array(M + 1).fill(0), rev: Array(M + 1).fill(0), fees: Array(M + 1).fill(0), op: Array(M + 1).fill(0), spent: Array(M + 1).fill(0), ret: Array(M + 1).fill(0), stress: Array(M + 1).fill(0), alive: Array(M + 1).fill(0) };
   let wins = 0, deaths = {};
   for (let s = 1; s <= N; s++) {
-    const g = new Game({ seed: s, perks: ['skip', 'insure'], insurer: 'sturdy', prep: true, scenario: 'half' });
+    const g = new Game({ seed: s, perks: ['skip', 'insure'], insurer: 'sturdy', prep: true, scenario: SCEN });
     let guard = 0, mspent = 0, lastCash = g.cash;
     while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 800) {
       if (g.phase === 'play') { const b = sim.STRATS.balanced(g); if (!b) g.wait([]); else g.callCarrier(b.i, b.ids, b.trucks); }
