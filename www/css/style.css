@@ -169,3 +169,30 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .truckgauge { margin: 6px 0; } .truckgauge .tg { position: relative; height: 22px; background: var(--panel2); border: 2px solid var(--line); } .truckgauge .tg i { display: block; height: 100%; background: #6c8cff; transition: width .15s; } .truckgauge .tg i.good { background: var(--green); } .truckgauge .tg span { position: absolute; left: 6px; top: 2px; font-size: 12px; color: var(--ink); text-shadow: 0 0 3px #000; }
 .truckgauge .tbtn { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
 .fcline { font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 4px 0 6px; } .fcline .fc small { color: var(--dim); }
+
+/* ---------- 스토리 모드: 창고장 대화창 · 강조 · 계절 문자 · 달력 ---------- */
+#story[hidden], #sms[hidden] { display: none !important; }
+#story { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; padding-bottom: calc(8px + var(--safe-bottom)); pointer-events: auto; }
+#story.top { justify-content: flex-start; padding-top: calc(8px + var(--safe-top)); }
+#story .sbox { display: flex; gap: 8px; background: var(--panel); border: 4px solid var(--line); box-shadow: 6px 6px 0 var(--shadow); padding: 8px; max-width: 460px; width: 100%; margin: 0 auto; box-sizing: border-box; animation: storyIn .18s steps(3); }
+@keyframes storyIn { from { transform: translateY(12px); opacity: 0; } }
+#story-face { width: 96px; height: 96px; image-rendering: pixelated; flex: 0 0 96px; background: #3a3555; border: 3px solid var(--line); align-self: flex-start; }
+#story .stext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#story .shead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+#story-name { color: var(--gold); font-weight: 700; font-size: 14px; }
+#story .sskip { font-family: inherit; background: none; border: none; color: var(--dim); font-size: 12px; cursor: pointer; padding: 2px 4px; }
+#story .sbody { font-size: 13px; line-height: 1.5; min-height: 58px; }
+#story .sfoot { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 6px; }
+#story-pages { color: var(--dim); font-size: 11px; margin-right: auto; }
+.story-hl { outline: 3px solid var(--gold) !important; outline-offset: 2px; animation: blink .7s steps(2) infinite; position: relative; z-index: 61; }
+#sms { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 5; background: #223028; border: 3px solid var(--line); box-shadow: 3px 3px 0 var(--shadow); padding: 6px 10px; font-size: 12px; line-height: 1.4; cursor: pointer; animation: storyIn .18s steps(3); }
+#sms b { color: var(--gold); }
+#hud-month.hl { cursor: pointer; text-decoration: underline dotted; }
+.calgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.calgrid .cm { background: var(--panel2); border: 3px solid var(--line); padding: 5px 6px; font-size: 11px; line-height: 1.35; }
+.calgrid .cm.now { border-color: var(--gold); } .calgrid .cm.past { opacity: .55; }
+.calgrid .cm .t { font-size: 13px; color: var(--ink); } .calgrid .cm .t b { color: var(--gold); }
+.calgrid .cm .ev { color: var(--orange); }
+.contract .calls.off { color: var(--dim); }
+.chip.off { border-color: var(--dim); color: var(--dim); }
+.card.toggle .t small { color: var(--dim); font-weight: 400; }

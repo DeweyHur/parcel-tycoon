@@ -23,22 +23,8 @@
 
     // 월별 추가 입고 수 (기본 10 + 추가). 7개월차 이후는 무한 모드에서 확장
     EXTRA_ARRIVALS: { 1: 12, 2: 14, 3: 16, 4: 18, 5: 20, 6: 22 }, // 7개월차부터 22 + (m-6)×2
-    // 달력: 런은 START_MONTH(3월, 봄)에 시작해 계절대로 흐른다. 달마다 예측 가능한 물량·품목 편차
+    // 달력: 런은 START_MONTH(3월, 봄)에 시작해 계절대로 흐른다. 달별 편차·이벤트는 META.CALENDARS[나라] (docs/STORY_TUTORIAL_DESIGN.md 5장)
     START_MONTH: 3,
-    SEASON_MODS: {
-      1:  { arrivalsMult: 0.85, typeShift: { frozen: 3 } },                      // 1월 비수기
-      2:  { arrivalsMult: 0.9,  typeShift: { fragile: 3 } },                     // 2월 선물(파손)
-      3:  { arrivalsMult: 1.0,  typeShift: {} },                                 // 3월 새 학기·이사
-      4:  { arrivalsMult: 1.0,  typeShift: { produce: 3 } },                     // 4월 봄나물
-      5:  { arrivalsMult: 1.05, typeShift: { fragile: 3 } },                     // 5월 가정의 달(선물)
-      6:  { arrivalsMult: 1.0,  typeShift: { fresh: 4 } },                       // 6월 초여름 신선
-      7:  { arrivalsMult: 0.95, typeShift: { fresh: 6, frozen: 4, normal: -6 } },// 7월 폭염·냉동
-      8:  { arrivalsMult: 0.95, typeShift: { fresh: 6, frozen: 4, normal: -6 } },// 8월 폭염·휴가
-      9:  { arrivalsMult: 1.05, typeShift: { produce: 6, normal: -3 } },         // 9월 추수·명절
-      10: { arrivalsMult: 1.1,  typeShift: { produce: 5, intl: 3 } },            // 10월 수확·직구
-      11: { arrivalsMult: 1.3,  typeShift: { intl: 5, fragile: 3 } },            // 11월 블랙프라이데이
-      12: { arrivalsMult: 1.4,  typeShift: { fragile: 6, frozen: 3, large: 2 } },// 12월 연말 성수기
-    },
 
     // 월별 택배 종류 비율 (large = 대형화물, 4개월차부터)
     // intl = 🛃 통관 (구 국제운송), frozen = ❆ 냉동 (4개월차부터)

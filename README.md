@@ -27,7 +27,8 @@ bash build-apk.sh    # → dist/parcel-tycoon-debug.apk (USB 연결된 폰이 �
 |---|---|
 | `www/js/data.js` | 밸런스 수치 (기획서 표를 그대로 옮김) — 튜닝은 여기서 |
 | `www/js/game.js` | 코어 규칙 상태 머신 (브라우저/Node 공용). 시나리오·회사·퍽 설정 → `rules` 객체 → 규칙 적용 |
-| `www/js/meta.js` | 회사 9 · 퍽 24 · 시나리오 9 · 데일리 변형 8 · 도전과제 46 정의 (`docs/META_DESIGN.md`) |
+| `www/js/meta.js` | 회사 9 · 퍽 24 · 시나리오 · 한국 달력(`CALENDARS.kr`, 달별 이벤트) · 데일리 변형 8 · 도전과제 정의 (`docs/META_DESIGN.md`, `docs/STORY_TUTORIAL_DESIGN.md`) |
+| `www/js/story.js` | 스토리 모드(창고장 안내): 전임 창고장 박 반장의 비트 23개 + 계절 문자 + 스프라이트 (`docs/STORY_TUTORIAL_DESIGN.md`) |
 | `www/js/storage.js` | 저장소 어댑터 (localStorage. 구글 플레이 게임즈 등으로 백엔드 교체 지점) |
 | `www/js/profile.js` | 프로필: 해금·도전과제·누적 통계·기록. 이전 기록 마이그레이션 |
 | `www/js/ui.js` | 화면/모달/저장/기록 |
@@ -39,6 +40,7 @@ bash build-apk.sh    # → dist/parcel-tycoon-debug.apk (USB 연결된 폰이 �
 | `test/unit.js` | 규칙 단위 테스트 `node test/unit.js` |
 | `test/sim.js` | 봇 밸런스 시뮬레이션 `node test/sim.js 300` |
 | `test/shot.js` | Playwright UI 스모크 테스트 + 스크린샷 |
+| `test/story-shot.js` · `test/story-run.js` | 스토리 모드 UI 스모크 (1개월차 · 5개월차까지 진행) |
 
 ## 음악 (BGM)
 

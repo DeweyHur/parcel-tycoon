@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """주석을 제외한 코드에 남은 한글을 찾는다: python3 tools/find-hangul.py [파일...]"""
 import re, sys, pathlib
-files = sys.argv[1:] or ['www/js/ui.js', 'www/js/game.js', 'www/js/data.js', 'www/js/meta.js', 'www/js/scene3d.js', 'www/js/profile.js', 'www/index.html']
+files = sys.argv[1:] or ['www/js/ui.js', 'www/js/game.js', 'www/js/story.js', 'www/js/data.js', 'www/js/meta.js', 'www/js/scene3d.js', 'www/js/profile.js', 'www/index.html']
 H = re.compile(r'[가-힣]')
 n = 0
 for f in files:

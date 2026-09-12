@@ -192,20 +192,49 @@
   };
   const DAILY_CONFLICTS = [['picky', 'generous'], ['express', 'picky']];
 
+  // ----- 나라별 달력 (docs/STORY_TUTORIAL_DESIGN.md 5장) -----
+  // 한 해 런은 달력을 따라 흐른다. 달마다 입고 배수·품목 이동·날씨 가중·이벤트가 있어 플레이어가 "다음 달"을 예측할 수 있다.
+  // months[cal] = { arrivalsMult, typeShift, weather(계절 기본 가중치에 곱), storageMult(보관 제안 확률 배율), storageFeeMult,
+  //   events: [{ id, turns: [from, to], arrivalsMult(그 턴 입고 배수), deadlineDelta(그 턴 입고분 기한), noCalls(업체 휴무: 호출 불가), noArrivals(입고 없음 → 휴무 뒤 첫 턴에 몰림), feeMult(배차비), rewardDelta{type} }] }
+  // 문구(label·note·sms)는 locales meta.CALENDARS[id].months[cal]
+  const CALENDARS = {
+    kr: {
+      startMonth: 3, icon: '🇰🇷',
+      months: {
+        3:  { arrivalsMult: 1.05, typeShift: { large: 3 }, storageMult: 1.5, icon: '🏠' },
+        4:  { arrivalsMult: 1.0,  typeShift: { produce: 3 }, weather: { rain: 1.3 }, storageMult: 1.5, icon: '🌸' },
+        5:  { arrivalsMult: 1.05, typeShift: { fragile: 8 }, icon: '🎁', events: [{ id: 'gift', turns: [5, 7], rewardDelta: { fragile: 10 } }] },
+        6:  { arrivalsMult: 1.0,  typeShift: { fresh: 4 }, weather: { rain: 2.2 }, icon: '☔' },
+        7:  { arrivalsMult: 0.95, typeShift: { fresh: 8, frozen: 4, normal: -6 }, weather: { rain: 1.6, heat: 1.4 }, heatAlerts: 1, icon: '🔥' },
+        8:  { arrivalsMult: 0.9,  typeShift: { fresh: 10, frozen: 4, normal: -10 }, weather: { heat: 2.0 }, icon: '🏖' },
+        9:  { arrivalsMult: 1.25, typeShift: { fresh: 5, produce: 5, fragile: 5, large: 3, normal: -6 }, icon: '🎑',
+              events: [{ id: 'holiday_rush', turns: [2, 4], arrivalsMult: 1.6, deadlineDelta: -1 }, { id: 'holiday_off', turns: [5, 6], noCalls: true, noArrivals: true }] },
+        10: { arrivalsMult: 1.05, typeShift: { produce: 8, intl: 2 }, storageMult: 1.5, storageFeeMult: 1.2, icon: '🍂' },
+        11: { arrivalsMult: 1.3,  typeShift: { produce: 6, intl: 3, fragile: 3 }, weather: { rain: 0.8 }, icon: '🛒',
+              events: [{ id: 'sale', turns: [7, 10], arrivalsMult: 1.5, typeShift: { normal: 10 }, feeMult: { bulk: 0.9 } }] },
+        12: { arrivalsMult: 1.4,  typeShift: { fragile: 8, frozen: 6, large: 5 }, weather: { snow: 1.0 }, returnGraceDelta: -1, icon: '🎄' },
+        1:  { arrivalsMult: 0.85, typeShift: { frozen: 3 }, weather: { snow: 1.4 }, noInflation: true, icon: '❄' },
+        2:  { arrivalsMult: 1.3,  typeShift: { fresh: 5, produce: 5, fragile: 5, frozen: 3, normal: -6 }, weather: { snow: 0.7 }, icon: '🧧',
+              events: [{ id: 'holiday_rush', turns: [2, 4], arrivalsMult: 1.6, deadlineDelta: -1 }, { id: 'holiday_off', turns: [5, 6], noCalls: true, noArrivals: true }] },
+      },
+    },
+  };
+
+  // 시나리오: 전부 한 해 달력 위에서 돈다. 짧은 것은 달력의 특정 달을 잘라낸 컷(startMonth + months)
   const SCENARIOS = {
-    half:     { icon: '🎓', months: 6, mods: { scoreMult: 0.8 }, unlock: null },
     standard: { icon: '📅', months: 12, mods: { scoreMult: 1.5 }, unlock: null },
-    peak:     { icon: '🎄', months: 2, mods: { eventGoods: true, returnGrace: 2, burstDeadlineDelta: -2, arrivalsMult: 1.5, burstTurns: 5, rewardAll: 10, itemPriceMult: 1.3, startCallsDelta: 2, winDelivered: 50 }, unlock: 'busy_month' },
-    heatwave: { icon: '🌡️', months: 3, mods: { season: 'summer', customerWeights: { dawn: 2, ice: 2 }, customerClaimMult: { dawn: 2 }, typeShift: { fresh: 12, produce: 8, normal: -20 }, freshSizes: [2, 4, 7], warmMult: 3, heatAlerts: 3, arrivalsMult: 1.0, facilityPriceMult: { cold1: 0.7, cold2: 0.7 }, marketWeight: { cold: 1.5 }, winMaxDiscard: 3 }, unlock: 'fresh20' },
-    strike:   { icon: '✊', months: 3, mods: { strike: true, opCostDelta: 30 }, unlock: 'four_carriers' },
-    port:     { icon: '🚢', months: 4, mods: { forceCustomers: ['import', 'luxury', 'factory'], noAnon: true, typeOverride: { normal: 40, fresh: 10, produce: 5, fragile: 13, intl: 20, large: 12 }, xlWeight: 7, arrivalsMult: 0.9, rewardDelta: { intl: 20, large: 20, normal: -5 }, xlDelta: 1, guaranteeCarriers: ['intl', 'large'] }, unlock: 'intl15' },
-    cashcrunch:{ icon: '💸', months: 3, mods: { cashMult: 0.5, opCostFixed: 260, noRefresh: true, itemPriceMult: 1.1, revenueMult: 1.1, trustXpMult: 2, winCash: 600 }, unlock: 'rich_clear' },
-    blackfriday:{ icon: '🛒', months: 1, mods: { returnGrace: 4, arrivalsMult: 2.3, burstTurns: 4, itemPriceMult: 1.4, rewardAll: 15, startCallsDelta: 3, winDelivered: 30 }, unlock: 'peak_clear' },
-    audit:    { icon: '📋', months: 3, mods: { premiumMult: 1.5, claimMult: 1.5, deadlineAll: -1, overdueMult: 0.5, monthlyStress: 1, opCostDelta: 0, winMaxOverdue: 4 }, unlock: 'perfect_month' },
-    moving:   { icon: '🚚', months: 3, mods: { forceCustomers: ['mover'], storageOfferEvery: 5, storageOfferProb: 0.2, storageMax: 3, storageFeeMult: 1.5, season: 'spring', winStorage: 5 }, unlock: 'storage3' },
-    bigdeal:  { icon: '🤝', months: 3, mods: { bigCustomer: true, claimMult: 1.2, winBigCustomer: true }, unlock: 'cust_l3' },
+    peak:     { icon: '🎄', months: 2, mods: { startMonth: 11, monthOffset: 3, eventGoods: true, returnGrace: 2, burstDeadlineDelta: -2, arrivalsMult: 1.0, burstTurns: 3, rewardAll: 10, itemPriceMult: 1.3, startCallsDelta: 2, winDelivered: 50 }, unlock: 'busy_month' },
+    heatwave: { icon: '🌡️', months: 2, mods: { startMonth: 7, monthOffset: 4, customerWeights: { dawn: 2, ice: 2 }, customerClaimMult: { dawn: 2 }, typeShift: { fresh: 10, produce: 6, normal: -16 }, freshSizes: [2, 4, 7], warmMult: 3, heatAlerts: 3, arrivalsMult: 1.1, facilityPriceMult: { cold1: 0.7, cold2: 0.7 }, marketWeight: { cold: 1.5 }, winMaxDiscard: 3 }, unlock: 'fresh20' },
+    strike:   { icon: '✊', months: 12, mods: { strike: true, opCostDelta: 30, scoreMult: 1.5 }, unlock: 'four_carriers' },
+    port:     { icon: '🚢', months: 12, mods: { forceCustomers: ['import', 'luxury', 'factory'], noAnon: true, typeOverride: { normal: 40, fresh: 10, produce: 5, fragile: 13, intl: 20, large: 12 }, xlWeight: 7, arrivalsMult: 0.9, rewardDelta: { intl: 20, large: 20, normal: -5 }, xlDelta: 1, guaranteeCarriers: ['intl', 'large'], scoreMult: 1.5 }, unlock: 'intl15' },
+    cashcrunch:{ icon: '💸', months: 12, mods: { cashMult: 0.5, opCostFixed: 260, noRefresh: true, itemPriceMult: 1.1, revenueMult: 1.1, trustXpMult: 2, winCash: 2500, scoreMult: 1.5 }, unlock: 'rich_clear' },
+    blackfriday:{ icon: '🛒', months: 1, mods: { startMonth: 11, monthOffset: 2, returnGrace: 4, arrivalsMult: 1.4, burstTurns: 3, itemPriceMult: 1.4, rewardAll: 15, startCallsDelta: 3, winDelivered: 30 }, unlock: 'peak_clear' },
+    audit:    { icon: '📋', months: 12, mods: { premiumMult: 1.5, claimMult: 1.5, deadlineAll: -1, overdueMult: 0.5, monthlyStress: 1, opCostDelta: 0, winMaxOverdue: 12, scoreMult: 1.5 }, unlock: 'perfect_month' },
+    moving:   { icon: '🚚', months: 12, mods: { forceCustomers: ['mover'], storageOfferEvery: 5, storageOfferProb: 0.2, storageMax: 3, storageFeeMult: 1.5, winStorage: 12, scoreMult: 1.5 }, unlock: 'storage3' },
+    bigdeal:  { icon: '🤝', months: 12, mods: { bigCustomer: true, claimMult: 1.2, winBigCustomer: true, scoreMult: 1.5 }, unlock: 'cust_l3' },
     endless:  { icon: '♾️', months: 99, mods: { endless: true }, unlock: 'half_clear' },
-    daily:    { icon: '📆', months: 3, mods: { daily: true }, unlock: 'three_unlocked' },
+    // 데일리: 달력의 무작위 한 달 컷 (그날 지정 달) + 변형 규칙 2개
+    daily:    { icon: '📆', months: 1, mods: { daily: true, startCallsDelta: 2, monthOffset: 3 }, unlock: 'three_unlocked' },
   };
 
   // 도전과제: kind = run(런 중 즉시) | end(런 종료 시, 승리 필요 여부 needWin) | cum(누적) | meta(해금 상태)
@@ -233,7 +262,7 @@
     landlord:     { kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.scenario === 'moving' },
     partner:      { kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.scenario === 'bigdeal' },
     veteran_clear:{ kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.difficulty === 'veteran' },
-    first_clear:  { kind: 'end', needWin: true, rewardType: 'multi', reward: ['company:postal', 'scenario:half', 'slot:2'], check: () => true },
+    first_clear:  { kind: 'end', needWin: true, rewardType: 'multi', reward: ['company:postal', 'slot:2'], check: () => true },
     busy_month:   { kind: 'run', rewardType: 'scenario', reward: 'peak', check: s => s.maxMonthDelivered >= 15 },
     peak_clear:   { kind: 'end', needWin: true, rewardType: 'scenario', reward: 'blackfriday', check: (s, p, r) => r.scenario === 'peak' },
     fresh20:      { kind: 'cum', rewardType: 'scenario', reward: 'heatwave', check: (s, p) => p.deliveredByType.fresh >= 20, prog: p => [p.deliveredByType.fresh, 20] },
@@ -276,6 +305,6 @@
     daily7:       { kind: 'meta', rewardType: 'none', check: (s, p) => p.dailyStreak >= 7 },
   };
 
-  const META = { CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, DIFFICULTIES, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, DAILY_VARIANTS, DAILY_CONFLICTS, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['half', 'standard'], perkSlots: 1 } };
+  const META = { CALENDARS, CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, DIFFICULTIES, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, DAILY_VARIANTS, DAILY_CONFLICTS, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['standard'], perkSlots: 1 } };
   if (typeof module !== 'undefined') module.exports = META; else root.META = META;
 })(typeof window !== 'undefined' ? window : globalThis);

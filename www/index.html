@@ -11,7 +11,7 @@
   <div id="app">
     <div id="scene">
       <div id="hud">
-        <div class="hud-box" id="hud-left"><b id="hud-month">1</b> <span id="hud-turn">1/10</span><br><span id="hud-cash-lbl">월말 예상</span> <b id="hud-cash">600</b>c<br><span id="hud-due" style="font-size:11px;color:var(--dim)"></span></div>
+        <div class="hud-box" id="hud-left"><b id="hud-month" class="hl">1</b> <span id="hud-turn">1/10</span><br><span id="hud-cash-lbl">월말 예상</span> <b id="hud-cash">600</b>c<br><span id="hud-due" style="font-size:11px;color:var(--dim)"></span></div>
         <div class="hud-box" id="hud-right">
           <div id="stress-wrap"><span id="stress-label"></span><div class="gauge" id="stress-gauge"><i style="width:0%"></i></div><span id="stress-num">0</span></div>
           <div id="hud-perks" style="color:var(--dim);font-size:11px"></div>
@@ -45,6 +45,9 @@
     </div>
   </div>
   <div id="modal-root"><div class="modal" id="modal"></div></div>
+  <!-- 스토리 모드 대화창 (창고장 안내) · 계절 문자 -->
+  <div id="story" hidden><div class="sbox"><img id="story-face" alt=""><div class="stext"><div class="shead"><span id="story-name"></span><button class="sskip" id="story-skip"></button></div><div class="sbody" id="story-body"></div><div class="sfoot"><span id="story-pages"></span><button class="btn small" id="story-cal" hidden></button><button class="btn small gold" id="story-next"></button></div></div></div></div>
+  <div id="sms" hidden><b id="sms-from"></b> <span id="sms-text"></span></div>
 
   <script src="js/three.min.js"></script>
   <script src="js/data.js"></script>
@@ -53,6 +56,7 @@
   <script src="locales/en.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/story.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/profile.js"></script>
   <script src="js/sfx.js"></script>

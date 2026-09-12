@@ -5,7 +5,7 @@
   const SAVE_KEY = 'save_v2', OPT_KEY = 'opts_v1';
   let game = null, scene = null, busy = false;
   if (typeof window !== 'undefined') Object.defineProperty(window, '__game', { get: () => game });
-  const opts = Object.assign({ sound: true, music: true, musicVol: 0.6 }, Store.get(OPT_KEY) || {});
+  const opts = Object.assign({ sound: true, music: true, musicVol: 0.6, sms: true }, Store.get(OPT_KEY) || {});
   SFX.setEnabled(opts.sound); BGM.setEnabled(opts.music); BGM.setVolume(opts.musicVol);
   Profile.load();
 
@@ -50,12 +50,14 @@
 
   // ---------- title ----------
   function showTitle() {
+    $('#story').hidden = true; $('#sms').hidden = true; clearStoryHl(); storyBusy = false;
     const save = loadSave(), P = Profile.get();
     const nUnlocked = P.unlocked.companies.length + P.unlocked.perks.length + P.unlocked.scenarios.length;
     const nTotal = Object.keys(M.COMPANIES).length + Object.keys(M.PERKS).length + Object.keys(M.SCENARIOS).length;
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
-      ${save ? `<button class="btn primary" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(M.SCENARIOS[save.cfg.scenario].name)} · ${T('fmt.monthTurn', { m: save.month, t: save.turn })})</small></button>` : ''}
-      <button class="btn gold" id="t-new">${T('title.new')}</button>
+      ${save ? `<button class="btn primary" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(save.story ? T('title.story') : M.SCENARIOS[save.cfg.scenario] ? M.SCENARIOS[save.cfg.scenario].name : save.cfg.scenario)} · ${T('fmt.monthTurn', { m: save.month, t: save.turn })})</small></button>` : ''}
+      <button class="btn ${P.story && P.story.seen ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${T('title.storySub')}</small></button>
+      <button class="btn ${P.story && P.story.seen ? 'gold' : ''}" id="t-new">${T('title.new')}</button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).length, d: Object.keys(M.ACHIEVEMENTS).length })}</small></button>
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
       <button class="btn" id="t-help">${T('title.help')}</button>
@@ -64,6 +66,7 @@
     const m = modal(T('title.modal'), body, null, 'v0.3 meta');
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
     m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort')); return; } showScenarioSelect(); };
+    m.querySelector('#t-story').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-story').click(); }, T('title.newShort')); return; } showStoryStart(); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex('companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
@@ -71,6 +74,15 @@
     m.querySelector('#t-music').onclick = () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); SFX.resume(); BGM.resume(); SFX.click(); showTitle(); };
     m.querySelector('#t-lang').onclick = () => { const ids = I18n.languages().map(l => l.id); I18n.setLang(ids[(ids.indexOf(I18n.lang) + 1) % ids.length]); SFX.click(); applyStaticText(); showTitle(); };
     BGM.play('title');
+  }
+
+  // ---------- 인수인계 (스토리 모드): 표준 한 해 · 동네 택배 · 퍽 없음 · 난이도만 고른다 ----------
+  let storyDiff = 'rookie';
+  function showStoryStart() {
+    const diffRow = `<div class="diffrow">${['rookie', 'normal'].map(id => { const d = M.DIFFICULTIES[id]; return `<button class="btn small ${storyDiff === id ? 'on' : ''}" data-diff="${id}" title="${esc(d.desc)}">${d.icon} ${d.name}</button>`; }).join('')}</div><div class="d" style="font-size:11px;color:var(--dim);margin-bottom:6px">${esc(M.DIFFICULTIES[storyDiff].desc)}</div>`;
+    const face = `<img src="${Story.SPRITES.smile}" style="width:64px;height:64px;image-rendering:pixelated;float:left;margin:0 10px 6px 0;border:3px solid var(--line);background:#3a3555">`;
+    const m = modal(T('story.startTitle'), `<p>${face}${T('story.startBody')}</p><div style="clear:both"></div><div class="perk-count">${T('story.diffAsk')}</div>${diffRow}`, [{ label: T('btn.back'), onClick: showTitle }, { label: T('story.start'), cls: 'primary', onClick: () => { game = new Game({ scenario: 'standard', company: 'local', perks: [], insurer: 'none', difficulty: storyDiff, story: true, prep: false }); closeModal(); startPlay(); } }]);
+    m.querySelectorAll('[data-diff]').forEach(el => el.onclick = () => { SFX.select(); storyDiff = el.dataset.diff; showStoryStart(); });
   }
 
   // ---------- 런 준비: 시나리오 → 회사 → 퍽 ----------
@@ -83,7 +95,7 @@
     const cards = Object.keys(M.SCENARIOS).map(id => {
       const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id);
       let extra = '';
-      if (id === 'daily') extra = `<div class="d">${T('prep.today')}: ${esc(M.COMPANIES[daily.company].name)} · ${daily.variants.map(v => esc(M.DAILY_VARIANTS[v].name)).join(' + ')}${Profile.dailyDoneToday(daily.date) ? ` · <b>${T('prep.dailyDone')}</b>` : ''}</div>`;
+      if (id === 'daily') extra = `<div class="d">${T('prep.today')}: ${T('fmt.calOnly', { cal: daily.startMonth })} · ${esc(M.COMPANIES[daily.company].name)} · ${daily.variants.map(v => esc(M.DAILY_VARIANTS[v].name)).join(' + ')}${Profile.dailyDoneToday(daily.date) ? ` · <b>${T('prep.dailyDone')}</b>` : ''}</div>`;
       const rec = P.records[id]; const best = rec ? Math.max(0, ...Object.values(rec).map(r => r.bestScore)) : 0;
       return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">${s.months >= 99 ? '∞' : T('fmt.months', { n: s.months })}</small></span><span class="price">${best ? T('fmt.pts', { n: best }) : ''}</span></div>
         <div class="d">${esc(s.desc)}<br>${T('prep.win')}: ${esc(s.win)} · ${T('prep.recommend')}: ${esc(s.recommend)}</div>${un ? extra : `<div class="d">${esc(unlockText(s.unlock))}</div>`}</div>`;
@@ -127,11 +139,14 @@
       return `<div class="card ${!un || conflict ? 'dis' : ''} ${sel ? 'sel' : ''}" data-id="${id}"><div class="t">${esc(pk.name)}</div><div class="d">${un ? esc(pk.desc) + (conflict ? ` <span style="color:var(--orange)">(${esc(conflict)})</span>` : '') : esc(unlockText(pk.unlock))}</div></div>`;
     }).join('')).join('');
     const head = `<div class="perk-count">${T('prep.step3')} — ${esc(M.SCENARIOS[prep.scenario].name)} · ${co.icon} ${esc(co.name)}${daily ? ` · ${T('prep.variants')}: ${daily.variants.map(v => esc(M.DAILY_VARIANTS[v].name + '(' + M.DAILY_VARIANTS[v].desc + ')')).join(', ')}` : ''}<br>${T('prep.perkCount', { n: prep.perks.length, slots })}</div>`;
+    if (prep.story == null) prep.story = !(P.story && P.story.seen); // 첫 런은 안내가 기본으로 켜진다
+    const storyCard = `<div style="font-size:12px;color:var(--gold);margin:10px 0 4px">${T('prep.story')}</div><div class="card toggle ${prep.story ? 'sel' : ''}" id="prep-story"><div class="t"><span>${prep.story ? '☑' : '☐'} ${T('prep.story')}</span></div><div class="d">${T('prep.storyDesc')}</div></div>`;
     const noIns = !!(co.mods && co.mods.noInsurance);
-    const insCards = `<div style="font-size:12px;color:var(--gold);margin:10px 0 4px">${T('prep.insuranceHead')}</div>` + (noIns ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('prep.startupNoIns')}</div>` : Object.keys(M.INSURERS).map(id => { const I = M.INSURERS[id]; const fee = Math.max(0, Math.round((I.fee + ((co.mods && co.mods.premiumDelta || {})[id] || 0)) * ((co.mods && co.mods.premiumMult) || 1) * ((M.SCENARIOS[prep.scenario].mods || {}).premiumMult || 1))); return `<div class="card ins ${prep.insurer === id ? 'sel' : ''}" data-ins="${id}"><div class="t"><span>${I.icon} ${esc(I.name)}</span><span class="price">${fee ? T('fmt.perMonth', { n: fee }) : '0c'}</span></div><div class="d">${esc(I.desc)}${I.fans.length ? `<br><span style="color:var(--green)">${T('prep.fans', { list: I.fans.map(f => M.CUSTOMERS[f].icon + M.CUSTOMERS[f].name).join(' ') })}</span>` : ''}</div></div>`; }).join(''));
+    const insCards = storyCard + `<div style="font-size:12px;color:var(--gold);margin:10px 0 4px">${T('prep.insuranceHead')}</div>` + (noIns ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('prep.startupNoIns')}</div>` : Object.keys(M.INSURERS).map(id => { const I = M.INSURERS[id]; const fee = Math.max(0, Math.round((I.fee + ((co.mods && co.mods.premiumDelta || {})[id] || 0)) * ((co.mods && co.mods.premiumMult) || 1) * ((M.SCENARIOS[prep.scenario].mods || {}).premiumMult || 1))); return `<div class="card ins ${prep.insurer === id ? 'sel' : ''}" data-ins="${id}"><div class="t"><span>${I.icon} ${esc(I.name)}</span><span class="price">${fee ? T('fmt.perMonth', { n: fee }) : '0c'}</span></div><div class="d">${esc(I.desc)}${I.fans.length ? `<br><span style="color:var(--green)">${T('prep.fans', { list: I.fans.map(f => M.CUSTOMERS[f].icon + M.CUSTOMERS[f].name).join(' ') })}</span>` : ''}</div></div>`; }).join(''));
     const m = modal(T('prep.perkTitle'), head + groups + insCards, [{ label: T('btn.back'), onClick: daily ? showScenarioSelect : showCompanySelect }, { label: T('prep.start'), cls: 'primary', onClick: () => startRun(daily) }]);
     m.querySelectorAll('.card.ins').forEach(el => el.onclick = () => { SFX.select(); prep.insurer = el.dataset.ins; showPerkSelect(daily); });
-    m.querySelectorAll('.card:not(.ins)').forEach(el => el.onclick = () => {
+    m.querySelector('#prep-story').onclick = () => { SFX.select(); prep.story = !prep.story; showPerkSelect(daily); };
+    m.querySelectorAll('.card:not(.ins):not(.toggle)').forEach(el => el.onclick = () => {
       const id = el.dataset.id;
       if (!P.unlocked.perks.includes(id)) { toast(unlockText(M.PERKS[id].unlock), 2500); return; }
       if (prep.perks.includes(id)) { prep.perks = prep.perks.filter(p => p !== id); SFX.cancel(); }
@@ -140,8 +155,8 @@
     });
   }
   function startRun(daily) {
-    const cfg = { scenario: prep.scenario, company: prep.company, perks: prep.perks.slice(), variants: [], insurer: prep.insurer, difficulty: prep.difficulty, prep: true };
-    if (daily) { cfg.seed = daily.seed; cfg.variants = daily.variants; cfg.date = daily.date; cfg.company = daily.company; }
+    const cfg = { scenario: prep.scenario, company: prep.company, perks: prep.perks.slice(), variants: [], insurer: prep.insurer, difficulty: prep.difficulty, prep: true, story: !!prep.story };
+    if (daily) { cfg.seed = daily.seed; cfg.variants = daily.variants; cfg.date = daily.date; cfg.company = daily.company; cfg.startMonth = daily.startMonth; }
     game = new Game(cfg);
     closeModal(); startPlay();
   }
@@ -153,6 +168,7 @@
     saveGame();
     renderAll();
     checkPhase();
+    if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); }
   }
   function updateMusic() {
     if (!game) { BGM.play('title'); return; }
@@ -164,7 +180,7 @@
     if (!game) return;
     const g = game, R = g.rules;
     updateMusic();
-    $('#hud-month').innerHTML = T('fmt.calMonth', { cal: g.calMonth(), n: g.month });
+    $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { cal: g.calMonth(), n: g.month })}`;
     $('#hud-turn').textContent = T('hud.turn', { t: g.turn, max: D.TURNS_PER_MONTH });
     // 자금은 월말 정산 후 예상 잔액으로 보여준다 (사이클 중엔 모든 지출이 어음 — 자금 때문에 막히는 일이 없다)
     const pj = g.projectedCash(); const hc = $('#hud-cash'); const inPlay = g.phase === 'play';
@@ -183,7 +199,7 @@
     bu.className = 'bar usage ' + (pct > 100 ? 'over' : pct > 90 ? 'danger' : pct > 75 ? 'caution' : pct > 60 ? 'eff' : '');
     const cu = g.coldUsed(), cc = g.warehouse.cold; const bc = $('#bar-cold'); bc.querySelector('i').style.width = cc ? Math.min(100, cu / cc * 100) + '%' : '100%'; const fz = g.warehouse.frozen || 0, fu = g.frozenUsed(); $('#cold-txt').textContent = (cc ? `${cu}/${cc}` : T('common.none')) + (fz || fu ? ` · ❆ ${fu}/${fz}` : ''); bc.className = 'bar cold ' + (cu > cc || fu > fz ? 'over' : '');
     const up = g.upcoming();
-    $('#upcoming').innerHTML = `<span>${T('hud.upcoming')}</span>` + up.map(u => u.specs ? `<span class="chip up ${u.heat ? 'heat' : ''}" data-turn="${u.turn}">${T('fmt.turnN', { n: u.turn })}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}</span>` : `<span class="chip none">${u.turn > D.TURNS_PER_MONTH ? T('hud.monthEnd') : '-'}</span>`).join('');
+    $('#upcoming').innerHTML = `<span>${T('hud.upcoming')}</span>` + up.map(u => u.specs ? `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${T('fmt.turnN', { n: u.turn })}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}</span>` : `<span class="chip none">${u.turn > D.TURNS_PER_MONTH ? T('hud.monthEnd') : '-'}</span>`).join('');
     const wxNow = g.weatherNow(), W = M.WEATHER[wxNow];
     const fc = up.filter(u => u.weather && u.turn > g.turn).map(u => `${T('fmt.turnN', { n: u.turn })} ${M.WEATHER[u.weather].icon}`).join(' · ');
     $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.desc)}">${W.icon} ${W.name}${fc ? ` <small style="color:var(--dim)">→ ${fc}</small>` : ''}</span>` + $('#upcoming').innerHTML;
@@ -207,7 +223,7 @@
       const spare = c.calls === 0 && R.spareCall && !g.monthStats.spareUsed;
       const caps = g.contractCaps(c), fee = g.truckFee(c), simul = g.simulMax(c), eligVol = elig.reduce((s, p) => s + p.size, 0);
       const pd = g.trustPerk(c.carrier, 'delay'), delay = pd != null ? pd : (car.delay || 0);
-      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${caps.length ? ` <small>${attrIcons(caps)}</small>` : ''}</span><span class="calls ${c.calls === 0 ? 'zero' : ''}">${struck ? T('hud.strike') : spare ? T('hud.spare') : T('fmt.trucks', { n: c.calls })}</span></div>
+      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${caps.length ? ` <small>${attrIcons(caps)}</small>` : ''}</span><span class="calls ${c.calls === 0 ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : spare ? T('hud.spare') : T('fmt.trucks', { n: c.calls })}</span></div>
         <div class="sub">${T('hud.contractSub', { cap: vcap, fee, elig: elig.length, vol: eligVol })}${simul > 1 ? ` · ×${simul}` : ''}${delay ? ` · ⏱${delay}` : ''}${c.enh.regular && !c.freeUsedMonth ? ` · ${T('hud.regular')}` : ''} ${trustBar(g, c.carrier)}</div>`;
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
@@ -391,9 +407,11 @@
     render();
   }
 
+  let pendingCall = null; // 방금 호출 결과 — afterTurn 에서 스토리 비트(첫 호출 등)에 넘긴다
   function doCall(i, ids, trucks) {
     const r = game.callCarrier(i, ids, trucks);
     if (!r.ok) { toast(r.msg); return; }
+    pendingCall = r;
     busy = true; renderAll();
     const events = game.takeEvents();
     const delivered = events.filter(e => e.type === 'deliver').map(e => e.parcel.id);
@@ -460,6 +478,8 @@
       announceTrust(events);
       if (game.phase === 'play' || game.phase === 'summary') announce(Profile.evaluate(game, null));
       checkPhase();
+      const call = pendingCall; pendingCall = null;
+      if (game.phase === 'play') storyCheck(call ? { kind: 'call', result: call, events } : { kind: 'turn', events });
     }, pen ? 500 : 150);
   }
   function checkPhase() {
@@ -500,6 +520,7 @@
       ${s.customers ? `<hr><div style="font-size:12px;color:var(--dim);margin-bottom:4px">${T('company.customers')}</div>` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${T('common.trust')} ${c.month.lvStart}→${c.level}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : ''}`;
     const last = !R.endless && game.month >= R.months;
     modal(T('sum.title', { n: s.month }), body, [{ label: last ? T('sum.final') : T('sum.toMarket'), cls: 'primary', onClick: () => { closeModal(); game.closeSummary(); saveGame(); checkPhase(); } }]);
+    storyCheck({ kind: 'summary' });
   }
 
   // ---------- market ----------
@@ -526,12 +547,13 @@
       const prepLine = mk.prep ? `<div class="d" style="font-size:12px;color:var(--gold);margin-bottom:4px">${T('mk.prepNote')} ${T('hud.upcoming')}: ${up.filter(u => u.specs).map(u => `${T('fmt.turnN', { n: u.turn })} ${u.specs.map(s => `<i class="sw" style="display:inline-block;width:8px;height:8px;background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}`).join(' · ')} · ${T('weather.title')} ${up.filter(u => u.weather).map(u => M.WEATHER[u.weather].icon).join('')}</div>` : '';
       const fcRows = game.customerForecast().map(f => { const cu = M.CUSTOMERS[f.id]; return `<span class="fc">${cu.icon} ${esc(cu.name)} <b>${f.min}~${f.max}</b> <small>${['normal', ...(f.special > 0 ? f.types : [])].map(t => `<i style="display:inline-block;width:7px;height:7px;background:${D.PARCEL_TYPES[t].css}"></i>${D.PARCEL_TYPES[t].short} ${f.range[t][0]}~${f.range[t][1]}`).join(' · ')}</small></span>`; }).join('');
       const nm = mk.prep ? game.month : game.month + 1, cal = game.calMonth(nm);
-      const seasonLine = nm <= game.monthsTotal() ? `<div class="d" style="color:var(--dim)">${T(mk.prep ? 'mk.seasonLineNow' : 'mk.seasonLine', { cal, season: T('season.' + game.season(nm)), note: T('season.note.' + cal) })}</div>` : '';
+      const seasonLine = nm <= game.monthsTotal() ? `<div class="d" style="color:var(--dim)">${T(mk.prep ? 'mk.seasonLineNow' : 'mk.seasonLine', { cal, season: T('season.' + game.season(nm)), note: T(`cal.${game.rules.calendar}.${cal}.note`) })}</div>` : '';
       const fcLine = `<div class="d fcline"><span style="color:var(--gold)">${T('mk.forecast', { m: nm })}</span> ${fcRows}</div>${seasonLine}`;
       const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span><span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>${whLine}${fcLine}${prepLine}${items}
         ${R.noRefresh ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('err.noRefresh')}</div>` : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}${contracts}`;
-      const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: mk.month }), body, [{ label: T('mk.startMonth', { n: mk.month + 1 }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); } }], T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(6, Math.max(1, mk.month))] * R.itemPriceMult * R.priceMult).toFixed(2) }));
+      const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: mk.month }), body, [{ label: T('mk.startMonth', { n: mk.month + 1 }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(6, Math.max(1, mk.month))] * R.itemPriceMult * R.priceMult).toFixed(2) }));
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
+      if (!mk.storyShown) { mk.storyShown = true; storyCheck({ kind: 'market' }); }
       m.querySelector('#mk-mine').onclick = () => { SFX.click(); showMyContracts(render); };
       m.querySelector('#mk-cust').onclick = () => { SFX.click(); showCustomers(render); };
       m.querySelector('#mk-ins').onclick = () => { SFX.click(); showInsurance(render); };
@@ -591,7 +613,7 @@
   }
   function showRecords(back) {
     const P = Profile.get();
-    const recs = Object.keys(P.records).map(sc => `<div style="margin-top:6px"><b>${esc(M.SCENARIOS[sc].name)}</b>: ${Object.keys(P.records[sc]).map(co => `${esc(M.COMPANIES[co].name)} ${T('fmt.pts', { n: P.records[sc][co].bestScore })}`).join(' · ')}</div>`).join('');
+    const recs = Object.keys(P.records).map(sc => `<div style="margin-top:6px"><b>${esc(M.SCENARIOS[sc] ? M.SCENARIOS[sc].name : sc)}</b>: ${Object.keys(P.records[sc]).map(co => `${esc(M.COMPANIES[co].name)} ${T('fmt.pts', { n: P.records[sc][co].bestScore })}`).join(' · ')}</div>`).join('');
     const body = `<div class="records"><p>${T('rec.head', { best: P.stats.bestScore, runs: P.stats.runs, clears: P.stats.clears })}${P.stats.dailyStreak ? ` · ${T('rec.dailyStreak', { n: P.stats.dailyStreak })}` : ''}</p>${recs}<hr>${P.recentRuns.length ? P.recentRuns.map(r => `<div>${r.date} · <b>${T('fmt.pts', { n: r.score })}</b> · ${r.win ? T('rec.win') : T('rec.lose')} · ${esc(M.SCENARIOS[r.scenario] ? M.SCENARIOS[r.scenario].name : r.scenario)} / ${esc(M.COMPANIES[r.company] ? M.COMPANIES[r.company].name : r.company)} (${T('fmt.monthTurn', { m: r.month, t: r.turn })})</div>`).join('') : `<p>${T('rec.empty')}</p>`}</div>`;
     modal(T('rec.title'), body, [{ label: T('btn.close'), onClick: back }]);
   }
@@ -661,7 +683,70 @@
   }
   function showHelp(back) {
     const body = T('help.body', { stress: D.GAMEOVER_STRESS });
-    modal(T('title.help'), body, [{ label: T('btn.close'), onClick: back }]);
+    modal(T('title.help'), body, [{ label: T('help.notes'), onClick: () => showNotes(() => showHelp(back)) }, { label: T('btn.close'), onClick: back }]);
+  }
+  // 창고장 노트: 이 런에서 들은 비트 전문
+  function showNotes(back) {
+    const notes = game && game.story && game.story.notes ? game.story.notes : [];
+    const body = notes.length ? notes.map(n => `<div class="card" style="cursor:default"><div class="t"><span>${T('story.name')}</span><span class="price">${T('fmt.monthTurn', { m: n.month, t: n.turn })}</span></div><div class="d">${n.text.join('<br><br>')}</div></div>`).join('') : `<p style="color:var(--dim)">${T('help.notesEmpty')}</p>`;
+    modal(T('help.notes'), body, [{ label: T('btn.close'), onClick: back }]);
+  }
+  // ---------- 달력 (한 해 · 이벤트) ----------
+  function showCalendar(back) {
+    const g = game; if (!g) return;
+    const cells = g.calendarMonths().map(x => {
+      const evs = x.events.map(e => `<div class="ev">${esc(T('cal.event.' + e.id).split(' — ')[0])} <small>${T('cal.eventTurns', { a: e.turns[0], b: e.turns[1] })}</small></div>`).join('');
+      const pct = Math.round((x.arrivalsMult - 1) * 100); const vol = pct ? (pct > 0 ? '+' : '') + pct + '%' : '±0';
+      return `<div class="cm ${x.m === g.month ? 'now' : x.m < g.month ? 'past' : ''}"><div class="t">${x.icon} <b>${T('fmt.calOnly', { cal: x.cal })}</b> ${esc(T(`cal.${g.rules.calendar}.${x.cal}.label`))}${x.m === g.month ? ` <small style="color:var(--gold)">${T('cal.thisMonth')}</small>` : ''}</div><div style="color:var(--dim)">${T('cal.arrivals', { pct: vol })}</div>${evs}</div>`;
+    }).join('');
+    const now = g.calMonth();
+    modal(T('cal.title'), `<div class="calgrid">${cells}</div><hr><div class="d" style="font-size:12px">${g.seasonMods().icon || ''} ${esc(T(`cal.${g.rules.calendar}.${now}.note`))}</div>`, [{ label: T('btn.close'), onClick: back || closeModal }]);
+  }
+
+  // ---------- 스토리 모드: 창고장 대화창 · 계절 문자 ----------
+  let storyHl = null, storyBusy = false;
+  function clearStoryHl() { if (storyHl) { storyHl.classList.remove('story-hl'); storyHl = null; } }
+  // 지금 상황에 맞는 비트가 있으면 보여준다. 비트가 닫히면 같은 상황으로 한 번 더 본다 (사고 + 첫 호출처럼 둘이 겹칠 때)
+  function storyCheck(ctx, depth) {
+    if (!game || !window.Story || storyBusy) return;
+    const beat = Story.check(game, ctx || { kind: 'turn' });
+    if (!beat) return;
+    if (beat.id === 'intro') { const P = Profile.get(); P.story = Object.assign({}, P.story, { seen: true }); Profile.save(); }
+    saveGame();
+    showStoryBeat(beat, () => { if ((depth || 0) < 1) storyCheck(ctx, (depth || 0) + 1); });
+  }
+  function showStoryBeat(beat, after) {
+    const el = $('#story'); let i = 0; storyBusy = true;
+    $('#story-name').textContent = beat.name;
+    $('#story-skip').textContent = T('story.skip');
+    const calBtn = $('#story-cal'); calBtn.hidden = !beat.calendar; calBtn.textContent = T('story.calendar');
+    const render = () => {
+      const pg = beat.pages[i];
+      $('#story-face').src = Story.SPRITES[pg.expr] || Story.SPRITES.neutral;
+      $('#story-body').innerHTML = pg.text;
+      $('#story-pages').textContent = beat.pages.length > 1 ? `${i + 1}/${beat.pages.length}` : '';
+      $('#story-next').textContent = i < beat.pages.length - 1 ? T('story.next') : T('story.ok');
+      clearStoryHl();
+      let top = false;
+      if (pg.hl) { const t = document.querySelector(pg.hl); if (t && !t.hidden && t.offsetParent !== null) { t.classList.add('story-hl'); storyHl = t; const r = t.getBoundingClientRect(); top = r.top + r.height / 2 > window.innerHeight * 0.55; } }
+      el.classList.toggle('top', top);
+      el.hidden = false;
+    };
+    const close = () => { el.hidden = true; clearStoryHl(); storyBusy = false; if (after) after(); };
+    $('#story-next').onclick = () => { SFX.click(); if (i < beat.pages.length - 1) { i++; render(); } else close(); };
+    $('#story-skip').onclick = () => { SFX.cancel(); close(); };
+    calBtn.onclick = () => { SFX.click(); showCalendar(closeModal); };
+    el.onclick = e => { if (e.target === el) $('#story-next').click(); };
+    render();
+  }
+  // 6월 이후 월초 문자 한 줄 (스토리 모드가 아니어도 옵션이 켜져 있으면)
+  let smsTimer = null;
+  function showSms() {
+    const el = $('#sms'); if (!game || !opts.sms || game.month < 5 || game.turn !== 1 || (game.story && Story.active(game))) { el.hidden = true; return; }
+    const s = Story.sms(game); if (!s) { el.hidden = true; return; }
+    $('#sms-from').textContent = T('sms.from'); $('#sms-text').textContent = s; el.hidden = false;
+    clearTimeout(smsTimer); smsTimer = setTimeout(() => { el.hidden = true; }, 9000);
+    el.onclick = () => { el.hidden = true; };
   }
   function showMenu() {
     const g = game, R = g.rules;
@@ -670,6 +755,8 @@
       { label: T('menu.continue'), cls: 'primary', onClick: closeModal },
       { label: T('opt.sound', { v: T(opts.sound ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); closeModal(); } },
       { label: T('opt.music', { v: T(opts.music ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); closeModal(); } },
+      { label: T('menu.story', { v: T(g.story && !g.story.off ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { if (!g.story) g.story = { seen: [], notes: [] }; g.story.off = !g.story.off; saveGame(); closeModal(); if (!g.story.off && g.phase === 'play') storyCheck({ kind: 'turn' }); } },
+      { label: T('menu.sms', { v: T(opts.sms ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.sms = !opts.sms; saveOpts(); closeModal(); } },
       { label: T('menu.abandon'), cls: 'warn', onClick: () => askConfirm(T('menu.abandonConfirm'), () => { Store.remove(SAVE_KEY); game = null; showTitle(); }, T('menu.abandonBtn')) },
     ]);
     m.querySelector('#vol').oninput = e => { opts.musicVol = +e.target.value; BGM.setVolume(opts.musicVol); saveOpts(); };
@@ -693,6 +780,7 @@
     $('#cust-btn').onclick = () => { if (game) { SFX.click(); showCustomers(closeModal); } };
     $('#help-btn').onclick = () => { SFX.click(); showHelp(closeModal); };
     $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
+    $('#hud-month').onclick = () => { if (game) { SFX.click(); showCalendar(closeModal); } };
     document.addEventListener('touchstart', () => { SFX.resume(); BGM.resume(); }, { once: true });
     document.addEventListener('click', () => { SFX.resume(); BGM.resume(); }, { once: true });
     BGM.preload(['title', 'warehouse']);
@@ -701,6 +789,6 @@
     }
     showTitle();
   }
-  window.PT = { get game() { return game; }, renderAll, saveGame, prep, startRun, showTitle };
+  window.PT = { get game() { return game; }, get busy() { return busy; }, renderAll, saveGame, prep, startRun, showTitle };
   init();
 })();

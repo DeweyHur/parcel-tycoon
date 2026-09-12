@@ -10,7 +10,7 @@ const slot = (g, carrier) => g.contracts.findIndex(c => c && c.carrier === carri
 
 t('시작 상태: 자금 450, 계약 3개(대량·냉장·프래자일), 준비 없이 play', () => { const g = NG(1); assert.equal(g.cash, 450); assert.equal(g.contracts.filter(Boolean).length, 3); assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk', 'cold', 'fragile']); assert.equal(g.phase, 'play'); assert.equal(g.month, 1); });
 t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.sizeDelta, -1); });
-t('월 입고량 = 10 + 12 + 고객 단계 추가 (1개월차), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.equal(sp.length, 22 + g._customerExtra()); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
+t('월 입고량 = 10 + 12×달력 배수 + 고객 단계 추가 (1개월차 3월), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.equal(sp.length, 10 + Math.round(12 * g.seasonMods(1).arrivalsMult) + g._customerExtra()); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
 t('조커 업체 없음: 용달·긴급 삭제', () => { assert.ok(!D.CARRIERS.target && !D.CARRIERS.urgent); for (const id in M.COMPANIES) for (const c of M.COMPANIES[id].contracts || []) assert.ok(D.CARRIERS[c.carrier], id + ' ' + c.carrier); });
 t('대기는 배차를 차감하지 않음', () => { const g = NG(3); const calls = g.contracts.map(c => c && c.calls); g.wait(); assert.deepEqual(g.contracts.map(c => c && c.calls), calls); assert.equal(g.turn, 2); });
 
@@ -202,5 +202,54 @@ t('i18n: 자리표시자·복수형·메시지 객체 렌더링', () => {
   assert.equal(I18n.t('fmt.calls', { n: 1 }), '1 call'); assert.equal(I18n.t('fmt.calls', { n: 3 }), '3 calls');
   assert.equal(D.PARCEL_TYPES.fresh.name, 'Fresh Food'); assert.equal(M.COMPANIES.local.name, 'Local Parcel'); assert.equal(D.trustEffectText('cold', 2), 'Fresh/produce deadlines freeze on call turns');
   assert.ok(I18n.setLang('ko')); assert.equal(D.PARCEL_TYPES.fresh.name, '신선식품');
+});
+// ----- 달력 (docs/STORY_TUTORIAL_DESIGN.md 5장) -----
+t('달력: 한국 3월 시작, 9월·2월 명절 = 폭주 2~4턴 + 휴무 5~6턴(호출 불가, 입고는 7턴에 몰림)', () => {
+  const g = NG(7); assert.equal(g.calMonth(1), 3); assert.equal(g.calMonth(12), 2);
+  g.month = 6; g._startMonth(7); assert.equal(g.calMonth(), 9);
+  assert.ok(g.isRushTurn(3) && !g.isRushTurn(1)); assert.ok(g.isOffTurn(5) && g.isOffTurn(6) && !g.isOffTurn(7));
+  assert.equal(g.schedule[4].length + g.schedule[5].length, 0); assert.ok(g.schedule[6].length >= 3);
+  for (const sp of g.schedule[2]) assert.equal(sp.deadlineDelta, -1);
+  g.turn = 4; g.parcels = [P(1, 'normal', 1)]; const i = slot(g, 'bulk'); assert.ok(g.canCall(g.contracts[i]));
+  g.turn = 5; assert.ok(!g.canCall(g.contracts[i])); const r = g.callCarrier(i, [1]); assert.ok(!r.ok);
+  assert.ok(g.upcoming()[0].off);
+});
+t('달력: 시나리오 컷은 startMonth로 시작 달을 정한다 (성수기 11월, 폭염 7월), 데일리는 cfg.startMonth', () => {
+  assert.equal(new Game({ seed: 1, scenario: 'peak' }).calMonth(1), 11); assert.equal(new Game({ seed: 1, scenario: 'heatwave' }).calMonth(1), 7);
+  assert.equal(new Game({ seed: 1, scenario: 'daily', startMonth: 12 }).calMonth(1), 12);
+  const g = NG(3); assert.equal(g.calendarMonths().length, 12); assert.equal(g.calendarMonths()[6].cal, 9);
+});
+t('달력: 1월은 인플레 한 단계를 건너뛴다, 12월은 반송 유예 -1', () => {
+  const g = NG(3); assert.ok(Math.abs(g.inflation(11) - Math.pow(D.OPCOST_INFLATION, 10)) < 1e-9); // 1월(11개월차)까지 10단계
+  assert.ok(Math.abs(g.inflation(12) - Math.pow(D.OPCOST_INFLATION, 10)) < 1e-9); // 2월: 1월이 한 단계를 건너뛰어 그대로 10단계
+  g.month = 10; assert.equal(g.calMonth(), 12); assert.equal(g.returnGraceFor(P(1, 'normal', 1)), D.RETURN_GRACE - 1);
+});
+// ----- 스토리 모드 (docs/STORY_TUTORIAL_DESIGN.md 3·4장) -----
+const Story = require('../www/js/story.js'); globalThis.I18n = I18n; globalThis.DATA = D;
+t('스토리: cfg.story 가 있어야 비트가 나오고, 1개월차 1턴 시작에 intro, 같은 상황을 다시 물어도 한 번만', () => {
+  assert.equal(Story.check(NG(1), { kind: 'start' }), null);
+  const g = NG(1, { story: true }); const b = Story.check(g, { kind: 'start' });
+  assert.ok(b && b.id === 'intro' && b.pages.length === 3 && b.pages[2].hl === '#wait-btn' && /기다려/.test(b.pages[2].text), JSON.stringify(b && b.id));
+  assert.equal(Story.check(g, { kind: 'start' }), null); assert.deepEqual(g.story.seen, ['intro']); assert.equal(g.story.notes.length, 1);
+  // 2턴: 창고 게이지 비트. 호출 턴(kind call)에도 turn 비트는 나온다
+  g.wait(); const u = Story.check(g, { kind: 'call', result: { ok: true } }); assert.ok(u && ['usage', 'firstCall', 'rain'].includes(u.id), u && u.id);
+});
+t('스토리: 달마다 다른 비트, 6월(4개월차) 1턴 작별에 달력 카드, 그 뒤엔 문자만', () => {
+  const g = NG(2, { story: true }); g.story.seen = Story.BEATS.filter(b => b.id !== 'farewell' && b.id !== 'win').map(b => b.id);
+  g.month = 3; g.turn = 6; const w = Story.check(g, { kind: 'turn' }); assert.equal(w.id, 'win'); assert.ok(/3월/.test(w.pages[0].text) && /2월/.test(w.pages[0].text), w.pages[0].text);
+  g.month = 4; g.turn = 1; const f = Story.check(g, { kind: 'turn' }); assert.equal(f.id, 'farewell'); assert.ok(f.calendar); assert.ok(Story.done(g)); assert.ok(!Story.active(g));
+  g.month = 5; g.turn = 1; assert.equal(Story.check(g, { kind: 'turn' }), null); assert.ok(/폭염/.test(Story.sms(g))); g.turn = 2; assert.equal(Story.sms(g), null);
+  g.month = 1; assert.equal(Story.sms(g), null); // 3월은 문자 없음
+});
+t('스토리: 끄면 안 나오고, 세이브에 진행 상태가 남는다', () => {
+  const g = NG(3, { story: true }); g.story.off = true; assert.equal(Story.check(g, { kind: 'start' }), null); g.story.off = false;
+  Story.check(g, { kind: 'start' }); const g2 = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.deepEqual(g2.story.seen, ['intro']); assert.equal(Story.check(g2, { kind: 'start' }), null);
+});
+t('스토리: 비트 문구 키가 ko/en 에 모두 있다', () => {
+  for (const b of Story.BEATS) b.pages.forEach((pg, i) => { if (pg.k) return; const k = `story.${b.id}.${i + 1}`; assert.ok(KO.ui[k] && EN.ui[k], k); });
+  for (const a of ['cold', 'fragile', 'customs', 'frozen']) assert.ok(KO.ui['story.special.' + a] && EN.ui['story.special.' + a]);
+  for (const k of ['good', 'bad']) assert.ok(KO.ui['story.summary3.' + k]);
+  for (let c = 1; c <= 12; c++) assert.ok(KO.ui[`cal.kr.${c}.note`] && KO.ui[`cal.kr.${c}.label`] && EN.ui[`cal.kr.${c}.note`], 'cal ' + c);
+  for (const id of ['holiday_rush', 'holiday_off', 'gift', 'sale']) assert.ok(KO.ui['cal.event.' + id] && EN.ui['cal.event.' + id]);
 });
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);
