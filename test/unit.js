@@ -241,6 +241,23 @@ t('스토리: 끄면 안 나오고, 세이브에 진행 상태가 남는다', ()
   const g = NG(3, { story: true }); g.story.off = true; assert.equal(Story.check(g, { kind: 'start' }), null); g.story.off = false;
   Story.check(g, { kind: 'start' }); const g2 = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.deepEqual(g2.story.seen, ['intro']); assert.equal(Story.check(g2, { kind: 'start' }), null);
 });
+t('스토리: 팝업 비트는 kind modal + modal 이름이 맞을 때만, 선택 수에 따라 자동선택 → 호출 순서. 비 비트는 마당에 택배가 있을 때만', () => {
+  const g = NG(4, { story: true }); g.story.seen = ['intro', 'usage', 'callReady'];
+  assert.equal(Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 3, outdoor: 0 }), null);
+  const a = Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3 }); assert.ok(a && a.id === 'callModal' && a.pages[0].hl === '#pick-urgent' && a.pages[0].gate);
+  assert.equal(Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3 }), null);
+  const b = Story.check(g, { kind: 'modal', modal: 'call', sel: 2, elig: 3 }); assert.ok(b && b.id === 'callGo' && b.pages[1].hl === '#modal .foot .btn.primary' && b.pages[1].gate);
+  const drain = () => { let x, ids = []; while ((x = Story.check(g, { kind: 'turn' }))) ids.push(x.id); return ids; };
+  g.weatherNow = () => 'rain'; assert.ok(!drain().includes('rain')); // 마당이 비어 있으면 비가 와도 rain 은 안 나온다
+  // 대기 팝업: noContract 를 본 뒤에만 waitSelf → waitGo
+  g.month = 2; g.story.seen.push('noContract');
+  const w = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 2, outdoor: 0 }); assert.ok(w && w.id === 'waitSelf' && w.pages[0].hl === '#modal .zone .parcel');
+  const w2 = Story.check(g, { kind: 'modal', modal: 'wait', picked: 1, elig: 2, outdoor: 0 }); assert.ok(w2 && w2.id === 'waitGo');
+  // 비: 마당에 택배 + 비일 때만. 그 뒤 대기 팝업에서 적재 정리 버튼
+  g.outdoorVolume = () => 3;
+  let r; while ((r = Story.check(g, { kind: 'turn' })) && r.id !== 'rain'); assert.ok(r && /3칸/.test(r.pages[0].text) && r.pages[1].gate, JSON.stringify(g.story.seen));
+  const rr = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 2, outdoor: 3 }); assert.ok(rr && rr.id === 'rainReorder' && rr.pages[0].hl === '#wm-reorder');
+});
 t('스토리: 비트 문구 키가 ko/en 에 모두 있다', () => {
   for (const b of Story.BEATS) b.pages.forEach((pg, i) => { if (pg.k) return; const k = `story.${b.id}.${i + 1}`; assert.ok(KO.ui[k] && EN.ui[k], k); });
   for (const a of ['cold', 'fragile', 'customs', 'frozen']) assert.ok(KO.ui['story.special.' + a] && EN.ui['story.special.' + a]);

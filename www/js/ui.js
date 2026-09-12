@@ -46,7 +46,7 @@
   }
   // window.confirm은 웹뷰·아티팩트 샌드박스에서 막히므로 자체 확인 모달
   function askConfirm(msg, onYes, yesLabel = T('btn.ok')) { modal(T('btn.ok'), `<p>${esc(msg)}</p>`, [{ label: T('btn.cancel'), onClick: closeModal }, { label: yesLabel, cls: 'warn', onClick: () => { closeModal(); onYes(); } }]); }
-  function closeModal() { $('#modal-root').classList.remove('show'); $('#modal').innerHTML = ''; }
+  function closeModal() { $('#modal-root').classList.remove('show'); $('#modal').innerHTML = ''; if (gateTarget && !document.body.contains(gateTarget)) clearGate(); }
 
   // ---------- title ----------
   function showTitle() {
@@ -403,6 +403,7 @@
         let v = 0; const maxCap = vcap * Math.min(simul, Math.max(1, c.calls)); for (const p of sorted) { if (v + p.size <= maxCap) { sel.add(p.id); v += p.size; } } SFX.select(); render();
       };
       m.querySelector('#pick-clear').onclick = () => { sel.clear(); SFX.cancel(); render(); };
+      storyCheck({ kind: 'modal', modal: 'call', sel: sel.size, elig: elig.length });
     };
     render();
   }
@@ -459,6 +460,7 @@
       const m = modal(T('wm.title'), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: picked.length ? T('wm.selfWait', { n: picked.length, cost }) : T('wm.justWait'), cls: 'primary', onClick: () => { closeModal(); doWait(picked.slice()); } }], T('wm.sub'));
       m.querySelectorAll('.parcel[data-id]').forEach(el => el.onclick = () => { const id = +el.dataset.id; SFX.click(); if (picked.includes(id)) picked = picked.filter(x => x !== id); else { if (picked.length >= n) { toast(T('wm.limit', { n })); return; } picked.push(id); } render(); });
       const rb = m.querySelector('#wm-reorder'); if (rb) rb.onclick = () => { SFX.click(); showReorder(() => { render(); }); };
+      storyCheck({ kind: 'modal', modal: 'wait', picked: picked.length, elig: elig.length, outdoor: g.outdoorVolume() });
     };
     render();
   }

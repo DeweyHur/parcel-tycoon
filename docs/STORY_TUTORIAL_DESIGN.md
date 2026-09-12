@@ -308,3 +308,13 @@ M.CALENDARS.kr = {
 - **조연** `Story.REPS`(여 실장=대량, 노 기사=대형·철도, 강 소장=냉장·냉동, 이름 없는 담당자=그 외; neutral/talk/smile). 계약 체결 직후 `Story.greet(g, c, from)` → 담당자 인사(`rep.greet.<family>[.<tier>]`, 갈아타기면 `rep.switch` 먼저). 스토리 조연: firstCall 2페이지 담당자, rain 1페이지 노 기사, loss 2페이지 강 소장. 페이지에 `speaker`가 있으면 대화창 이름·스프라이트가 바뀐다(`Story.sprite(speaker, expr, talk)`).
 - **봇** `marketBot`: 충전(0대 또는 75% 이하) → 한도 강화 → 갈아타기 → 빈 슬롯 새 계약 → 적재. 힌트 계약은 switchFrom 슬롯으로. 결과(30시드): 표준 0%(평균 6.4개월, 자금 6천 남기고 스트레스로 죽음 — 봇이 용량·창고를 못 늘림), 성수기 70·폭염 100·블프 83. **사람 플레이테스트로 재조정 필요**: 배차 풀·충전가·tier 등장 확률.
 - **남은 것** 항공·해상·통관 담당자 얼굴, 도감 센터 탭에 담당자, 강 소장 베테랑 안내, 스토리에서 첫 충전 유도 비트(게이트).
+
+## 부록 E. 팝업 안 게이트 · 조건부 비 비트 (v1.5.1)
+
+유저 지적: "급한 순으로 눌러"라고 말하는데 그 버튼은 호출 팝업 안에 있어서 안 보인다 / 창고가 안 찼는데 "밖에 둘 물품을 고르라"는 비 비트가 헷갈린다.
+
+- **팝업 비트** `kind: 'modal'` + `modal: 'call' | 'wait'`. 팝업이 (다시) 그려질 때마다 `storyCheck({ kind: 'modal', modal, sel/picked, elig, outdoor })`를 부르므로, 선택 수가 바뀌면 다음 비트로 이어진다. 게이트 오버레이(z 59)가 모달(z 50) 위에 있으니 팝업 안 버튼도 그대로 강제 클릭 대상이 된다. `closeModal()`은 대상이 사라진 게이트를 정리한다.
+- **호출 체인** `callReady`(계약 카드 게이트) → `callModal`(sel 0: `#pick-urgent` 게이트) → `callGo`(sel > 0: 목록 설명 → 하단 호출 버튼 `#modal .foot .btn.primary` 게이트). '급한 순 자동 선택' 설명은 callReady.2에서 callModal.1로 옮겼다.
+- **대기 체인** `noContract`(대기 버튼 게이트) → `waitSelf`(picked 0: 첫 택배 `#modal .zone .parcel` 게이트) → `waitGo`(picked > 0: 대기 버튼 게이트). noContract 를 본 뒤에만.
+- **비 비트는 조건부** `rain`: `outdoorVolume() > 0` 이고 비(현재 또는 예보)일 때만 — 마당에 나가 있는 게 없으면 나오지 않는다. 문구도 "지금 마당에 {outdoor}칸 나가 있잖아"로. 2페이지가 대기 버튼 게이트 → `rainReorder`(대기 팝업의 `#wm-reorder` 게이트). 3개월 안에 조건이 안 걸리면 그냥 안 나온다(창고장 노트에도 없음).
+- **테스트** unit 56개(팝업·비 조건 1개 추가). Playwright `passGate()`는 게이트가 이어지는 동안 반복해서 대상을 누르고 그 사이 비트를 읽는다(계약 → 자동선택 → 호출 3단 게이트 확인).
