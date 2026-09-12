@@ -1,40 +1,61 @@
 // 8비트 효과음 (WebAudio 합성, 외부 에셋 없음)
+// 컨텍스트는 BGM 과 공유한다 — 따로 만들면 창이 가려졌을 때 음악만 멈추고 효과음만 계속 울린다.
 window.SFX = (function () {
   let ctx = null, master = null, enabled = true;
+  let voices = 0, lastBlip = -1;
+  const MAX_VOICES = 16;   // 동시에 울리는 목소리 상한 — 겹쳐 쌓여 "삐-" 한 음으로 뭉치지 않게
   function init() {
     if (ctx) return;
     try {
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      ctx = (window.BGM && window.BGM.context && window.BGM.context()) || new (window.AudioContext || window.webkitAudioContext)();
+      if (!ctx) return;
       master = ctx.createGain(); master.gain.value = 0.25; master.connect(ctx.destination);
     } catch (e) { ctx = null; }
   }
-  function resume() { init(); if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  function resume() {
+    init(); if (!ctx) return;
+    if (window.BGM && window.BGM.resume) window.BGM.resume();   // 같은 컨텍스트 — 음악 복구까지 함께
+    else if (ctx.state !== 'running') ctx.resume();
+  }
   function tone(freq, dur, type = 'square', vol = 1, when = 0, slide = 0) {
-    if (!ctx || !enabled) return;
+    if (!ctx || !enabled || ctx.state !== 'running') return;
+    if (voices >= MAX_VOICES) return;
     const t0 = ctx.currentTime + when;
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, t0);
     if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq + slide), t0 + dur);
     g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
     o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.02);
+    voices++;
+    o.onended = () => { voices--; try { o.disconnect(); g.disconnect(); } catch (e) { } };
   }
   function noise(dur, vol = 0.5, when = 0) {
-    if (!ctx || !enabled) return;
+    if (!ctx || !enabled || ctx.state !== 'running') return;
+    if (voices >= MAX_VOICES) return;
     const t0 = ctx.currentTime + when;
-    const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+    const buf = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * dur)), ctx.sampleRate);
     const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     const s = ctx.createBufferSource(); s.buffer = buf;
     const g = ctx.createGain(); g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900;
-    s.connect(f); f.connect(g); g.connect(master); s.start(t0);
+    s.connect(f); f.connect(g); g.connect(master); s.start(t0); s.stop(t0 + dur + 0.02);
+    voices++;
+    s.onended = () => { voices--; try { s.disconnect(); f.disconnect(); g.disconnect(); } catch (e) { } };
   }
   const S = {
     resume, init,
     setEnabled(v) { enabled = v; },
     isEnabled() { return enabled; },
     click() { tone(880, 0.05, 'square', 0.4); },
-    // 대화 타자 소리: 글자마다 짧은 삑. n으로 음높이를 조금씩 흔들어 "말하는" 느낌
-    blip(n = 0) { const f = 300 + [0, 35, 70, 20, 55][n % 5]; tone(f, 0.035, 'square', 0.16, 0, 60); },
+    // 대화 타자 소리: 글자마다 짧은 삑. n으로 음높이를 조금씩 흔들어 "말하는" 느낌.
+    // 최소 간격을 둬서 타자 루프가 겹쳐 돌더라도 이어진 한 음(삐-)으로 들리지 않게 한다.
+    blip(n = 0) {
+      if (!ctx || !enabled) return;
+      const now = ctx.currentTime;
+      if (lastBlip >= 0 && now - lastBlip < 0.05) return;
+      lastBlip = now;
+      const f = 300 + [0, 35, 70, 20, 55][n % 5]; tone(f, 0.035, 'square', 0.16, 0, 60);
+    },
     nudge() { tone(330, 0.05, 'square', 0.3, 0, -120); },
     select() { tone(660, 0.06, 'square', 0.4); tone(990, 0.06, 'square', 0.3, 0.05); },
     cancel() { tone(440, 0.08, 'square', 0.4, 0, -200); },

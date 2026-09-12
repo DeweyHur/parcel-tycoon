@@ -735,7 +735,7 @@
   }
 
   // ---------- 스토리 모드: 창고장 대화창 · 계절 문자 ----------
-  let storyHl = null, storyBusy = false;
+  let storyHl = null, storyBusy = false, storyStopTyping = null;
   function clearStoryHl() { if (storyHl) { if (storyHl !== gateTarget) storyHl.classList.remove('story-hl'); storyHl = null; } }
   // 지금 상황에 맞는 비트가 있으면 보여준다. 비트가 닫히면 같은 상황으로 한 번 더 본다 (사고 + 첫 호출처럼 둘이 겹칠 때)
   function storyCheck(ctx, depth) {
@@ -778,6 +778,8 @@
     const calBtn = $('#story-cal'); calBtn.hidden = !beat.calendar; calBtn.textContent = T('story.calendar');
     const face = $('#story-face'), next = $('#story-next'), cursor = $('#story-cursor');
     const stopTyping = () => { if (typing && typing.timer) clearTimeout(typing.timer); };
+    if (storyStopTyping) storyStopTyping();  // 앞 대화의 타자 루프가 남아 있으면 끊는다 (말소리가 겹쳐 이어지지 않게)
+    storyStopTyping = stopTyping;
     const finishTyping = () => { if (!typing) return; stopTyping(); typing.chars.forEach(c => c.classList.add('on')); face.src = typing.base; typing.done = true; next.hidden = false; cursor.hidden = false; };
     const render = () => {
       const pg = beat.pages[i];
@@ -807,7 +809,7 @@
       };
       typing.timer = setTimeout(tick, 80);
     };
-    const close = () => { stopTyping(); const pg = beat.pages[i]; const target = pg.gate && pg.hl ? document.querySelector(pg.hl) : null; el.hidden = true; clearStoryHl(); storyBusy = false; if (target && !target.disabled) openGate(target); else if (after) after(); };
+    const close = () => { stopTyping(); if (storyStopTyping === stopTyping) storyStopTyping = null; const pg = beat.pages[i]; const target = pg.gate && pg.hl ? document.querySelector(pg.hl) : null; el.hidden = true; clearStoryHl(); storyBusy = false; if (target && !target.disabled) openGate(target); else if (after) after(); };
     // 탭: 타자 중이면 전부 보여주고, 다 보였으면 다음 페이지 / 닫기
     const advance = () => { SFX.resume(); if (typing && !typing.done) { finishTyping(); return; } SFX.click(); if (i < beat.pages.length - 1) { i++; render(); } else close(); };
     next.onclick = e => { e.stopPropagation(); advance(); };
