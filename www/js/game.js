@@ -76,6 +76,8 @@
   }
 
   const GRADE_RANK = ['normal', 'trusted', 'expert', 'master'];
+  // 센터 id → 계열, 계열 키로 적힌 규칙 표(marketWeight·carrierCapDelta·feeMult…)를 센터에도 적용
+  const FAM = k => D.familyOf(k); const famVal = (map, k) => (map && map[k] != null) ? map[k] : (map ? map[FAM(k)] : undefined);
   function dailySeed(dateStr) { let h = 2166136261; for (const c of dateStr) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
   function dailyConfig(dateStr) {
     const rng = new Rng(dailySeed(dateStr));
@@ -117,7 +119,7 @@
       this.strikeCarrier = null; this.heatTurns = []; this.burstTurns = [];
       this.story = cfg.story ? { seen: [], notes: [] } : null; // 창고장 안내(스토리 모드) 진행 상태 — 본 비트 id
       this.trust = {}; // 업체별 신뢰도 경험치 (런 내 유지)
-      for (const k of Object.keys(D.CARRIERS)) this.trust[k] = (this.rules.carrierStartTrust[k] || 0) + this.rules.allStartTrust;
+      for (const k of Object.keys(D.CARRIERS)) this.trust[k] = (famVal(this.rules.carrierStartTrust, k) || 0) + this.rules.allStartTrust;
       this._initCompany();
       this._initCustomers();
       this.insurer = this.rules.noInsurance ? 'none' : (cfg.insurer && M.INSURERS[cfg.insurer] ? cfg.insurer : 'none');
@@ -147,8 +149,9 @@
       let wh, contracts;
       if (R.randomStart) {
         wh = { cap: 20 + this.rng.int(11), cold: this.rng.int(11), xl: this.rng.int(3) };
-        const pool = Object.keys(D.CARRIERS).filter(k => !R.banCarriers.includes(k));
-        contracts = this.rng.shuffle(pool).slice(0, 4).map(k => ({ carrier: k, grade: this.rng.next() < 0.3 ? 'trusted' : 'normal' }));
+        const pool = Object.keys(D.CARRIERS).filter(k => !this.isBanned(k) && D.CARRIERS[k].tier <= 1);
+        const fams = [...new Set(this.rng.shuffle(pool).map(FAM))].slice(0, 4);
+        contracts = fams.map(f => ({ carrier: f, grade: this.rng.next() < 0.3 ? 'trusted' : 'normal' }));
       } else { wh = { ...co.warehouse }; contracts = co.contracts; }
       wh.cap += R.capDelta; wh.xl += R.xlDelta;
       if (R.coldCapMax != null) wh.cold = Math.min(wh.cold, R.coldCapMax);
@@ -157,7 +160,7 @@
       this.warehouse = wh;
       this.cash = Math.round((co.cash + R.cashDelta) * R.cashMult);
       this.contracts = contracts.map(s => {
-        const c = this._makeContract(s.carrier, s.grade || 'normal', null, true);
+        const c = this._makeContract(this.resolveCenter(s.carrier, s.grade || 'normal'), null, null, true);
         if (s.calls != null) c.calls = Math.min(c.maxCalls, s.calls + R.startCallsDelta);
         return c;
       });
@@ -423,16 +426,19 @@
 
     // ----- helpers -----
     // 계약 = 배차 계약: calls/maxCalls = 이번 달 남은 배차 대수 / 월 배차 한도 (docs/BALANCE_DESIGN.md 1장)
+    // 계열 이름(bulk…) + 등급 → 센터 id. 이미 센터 id면 그대로
+    resolveCenter(k, grade) { if (D.CARRIERS[k]) return k; return D.centerFor(k, Math.max(0, GRADE_RANK.indexOf(grade || 'normal'))) || k; }
+    isBanned(k) { return this.rules.banCarriers.includes(k) || this.rules.banCarriers.includes(FAM(k)); }
     _makeContract(carrier, grade, calls, isStart) {
-      const c = D.CARRIERS[carrier], g = D.GRADES[grade], R = this.rules;
-      const maxCalls = Math.max(1, c.trucks + g.calls + R.callsDelta + (isStart ? R.startCallsDelta : 0) + (this.trustPerk(carrier, 'trucks') || 0));
-      if (g.trust) this._addTrust(carrier, Math.max(0, g.trust - this.trustXp(carrier)), true);
+      carrier = this.resolveCenter(carrier, grade);
+      const c = D.CARRIERS[carrier], R = this.rules; grade = c.grade;
+      const maxCalls = Math.max(1, c.trucks + R.callsDelta + (isStart ? R.startCallsDelta : 0) + (this.trustPerk(carrier, 'trucks') || 0));
       return { id: this.nextId++, carrier, grade, maxCalls, calls: calls == null ? maxCalls : calls,
         enh: { limit: 0, cap: 0, regular: false, express: false, opt: null, capDelta: 0 }, successCalls: 0, totalCalls: 0, delivered: 0 };
     }
     // 신뢰도 특성: 현재 단계까지의 효과를 합친다 (뒤 단계가 같은 키를 덮는다)
     trustPerk(carrier, key) {
-      const lv = this.trustLevel(carrier), perks = D.TRUST_PERKS[carrier] || []; let v = null;
+      const lv = this.trustLevel(carrier), perks = D.TRUST_PERKS[FAM(carrier)] || []; let v = null;
       for (let i = 0; i < Math.min(lv, perks.length); i++) if (perks[i][key] != null) v = perks[i][key];
       return v;
     }
@@ -447,7 +453,7 @@
       if (after > before) {
         this.trustPerkApplied = this.trustPerkApplied || {};
         for (let lv = before + 1; lv <= after; lv++) {
-          const pk = (D.TRUST_PERKS[carrier] || [])[lv - 1] || {}; const key = carrier + ':' + lv;
+          const pk = (D.TRUST_PERKS[FAM(carrier)] || [])[lv - 1] || {}; const key = carrier + ':' + lv;
           if (!this.trustPerkApplied[key]) { this.trustPerkApplied[key] = true; if (pk.coldZone && this.warehouse) this.warehouse.cold += pk.coldZone; if (pk.frozenZone && this.warehouse) this.warehouse.frozen = (this.warehouse.frozen || 0) + pk.frozenZone; }
           if (!silent) { this.say('log.trustUp', { name: D.CARRIERS[carrier].name, level: lv, effect: D.trustEffectText(carrier, lv) }); this.emit('trustup', { carrier, level: lv }); }
         }
@@ -502,14 +508,14 @@
       }
       return { used: this.usedVolume() + incoming, cap: this.warehouse.cap, incoming, count: nxt.length, overdue, spoil, frozenOver, monthEnd: this.turn >= D.TURNS_PER_MONTH };
     }
-    contractName(c) { return D.CARRIERS[c.carrier].name + (c.grade !== 'normal' ? ` (${D.GRADES[c.grade].name})` : ''); }
+    contractName(c) { return D.CARRIERS[c.carrier].name; }
     isStruck(c) { return this.rules.strike && this.strikeCarrier === c.carrier; }
 
     // 차량 한 대의 용량(칸): 업체 + 등급 + 적재 보강 + 특약 + 신뢰 특성 + 회사·고객 보정. 대기 보너스(스킵·짠돌이 대기 누적·첫 호출)는 칸으로 더해진다
     vehicleCap(c) {
       const R = this.rules;
-      let cap = D.CARRIERS[c.carrier].cap + D.GRADES[c.grade].cap + c.enh.cap + c.enh.capDelta + (R.carrierCapDelta[c.carrier] || 0) + (this.trustPerk(c.carrier, 'cap') || 0);
-      for (const id in this.customers || {}) { const cc = this.customerPerk(id, 'carrierCap'); if (cc && cc[c.carrier]) cap += cc[c.carrier]; }
+      let cap = D.CARRIERS[c.carrier].cap + c.enh.cap + c.enh.capDelta + (famVal(R.carrierCapDelta, c.carrier) || 0) + (this.trustPerk(c.carrier, 'cap') || 0);
+      for (const id in this.customers || {}) { const cc = this.customerPerk(id, 'carrierCap'); const d = famVal(cc, c.carrier); if (d) cap += d; }
       if (R.skipBonus && this.waitedLastTurn) cap += R.skipBonus;
       if (R.waitStack) cap += Math.min(R.waitStack, this.waitStack);
       if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) cap += R.firstCallBonus;
@@ -518,13 +524,13 @@
     baseCapacity(c) { return this.vehicleCap(c); }
     callCapacity(c) { return this.vehicleCap(c) * this.simulMax(c); }
     // 한 호출에 부를 수 있는 최대 대수
-    simulMax(c) { return Math.max(1, (this.trustPerk(c.carrier, 'simul') || 1) + (c.enh.express ? 1 : 0)); }
+    simulMax(c) { return Math.max(1, Math.max(D.CARRIERS[c.carrier].simul || 1, this.trustPerk(c.carrier, 'simul') || 1) + (c.enh.express ? 1 : 0)); }
     // 대당 배차비
     truckFee(c) {
       const R = this.rules, car = D.CARRIERS[c.carrier];
       let fee = R.feeFixed != null ? R.feeFixed : car.fee;
-      let evMult = 1; for (const ev of this.eventsAt()) if (ev.feeMult && ev.feeMult[c.carrier]) evMult *= ev.feeMult[c.carrier];
-      fee = fee * D.GRADES[c.grade].fee * (this.trustPerk(c.carrier, 'feeMult') || 1) * R.feeMult * evMult * this.inflation() + R.feeDelta;
+      let evMult = 1; for (const ev of this.eventsAt()) { const m = famVal(ev.feeMult, c.carrier); if (m) evMult *= m; }
+      fee = fee * (this.trustPerk(c.carrier, 'feeMult') || 1) * R.feeMult * evMult * this.inflation() + R.feeDelta;
       return Math.max(0, Math.round(fee));
     }
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
@@ -679,7 +685,8 @@
       if (this.customers) for (const id in this.customers) { const c = this.customers[id]; if (c.suspended && m > 1) { c.suspended = false; c.xp = 0; this.say('log.custResume', { name: M.CUSTOMERS[id].name }); } c.month = this._emptyCustMonth(); c.month.lvStart = this.customerLevel(id); }
       this.monthStats = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false };
       // 월 배차 한도 리셋 (계약은 만료되지 않는다 — 마켓은 업그레이드·새 업체용)
-      for (const c of this.contracts) if (c) { c.successCalls = 0; c.freeUsedMonth = false; if (m > 1) c.calls = c.maxCalls; }
+      // v1.5: 배차는 소모품 — 월초 리셋 없음. 마켓의 '가득 충전'으로만 채운다
+      for (const c of this.contracts) if (c) { c.successCalls = 0; c.freeUsedMonth = false; }
       this.monthStats.insClaims = 0; this.monthStats.covered = 0; this.monthStats.premium = 0; this.monthStats.storageIncome = 0; this.monthStats.fees = 0;
       const heatN = R.heatAlerts + (this.seasonMods(m).heatAlerts || 0);
       this.heatTurns = heatN ? this.rng.shuffle([...Array(D.TURNS_PER_MONTH).keys()].map(i => i + 1)).slice(0, heatN).sort((a, b) => a - b) : [];
@@ -1127,7 +1134,7 @@
     }
     _carrierWeights() {
       const R = this.rules, w = {};
-      for (const k of Object.keys(D.CARRIERS)) { if (R.banCarriers.includes(k)) continue; w[k] = R.marketWeight[k] || 1; }
+      for (const k of Object.keys(D.FAMILIES)) { if (this.isBanned(k)) continue; w[k] = R.marketWeight[k] || 1; }
       for (const id in this.customers || {}) { const mw = this.customerPerk(id, 'marketWeight'); if (mw) for (const k in mw) if (w[k]) w[k] *= mw[k]; }
       return w;
     }
@@ -1145,46 +1152,40 @@
       const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(m))] * R.itemPriceMult * R.priceMult;
       const items = [];
       const gp = this._gradeProb(m);
-      const weights = this._carrierWeights();
-      const forced = R.guaranteeCarriers.filter(k => weights[k]).map(k => ({ carrier: k }));
-      // 막힌 속성 보장: 처리할 계약이 없는 특수 택배가 있으면 그것을 처리할 업체(용달·긴급 제외)를 반드시 하나 배치
+      const weights = this._carrierWeights(); // 계열 가중치
+      const tierOf = grade => GRADE_RANK.indexOf(grade);
+      const ownedFam = fam => this.contracts.find(c => c && FAM(c.carrier) === fam);
+      // 계열 + 등급 → 센터. 이미 그 계열 계약이 있으면 더 높은 tier 센터만 나온다(다른 센터와 신규 계약 = 갈아타기)
+      const centerFor = (fam, grade) => { const k = D.centerFor(fam, tierOf(grade)); if (!k) return null; const own = ownedFam(fam); if (own && D.CARRIERS[k].tier <= D.CARRIERS[own.carrier].tier) { const up = D.centersOf(fam).find(x => D.CARRIERS[x].tier === D.CARRIERS[own.carrier].tier + 1 && D.CARRIERS[x].tier <= Math.max(tierOf(grade), 1)); return up || null; } return k; };
+      const forced = R.guaranteeCarriers.filter(k => weights[k]).map(k => ({ family: k }));
+      // 막힌 속성 보장: 처리할 계약이 없는 특수 택배가 있으면 그것을 처리할 계열을 반드시 하나 배치
       if (R.guaranteeBlocked) {
-        for (const b of this.blockedTypes()) {
-          const pp = { type: b.type, size: b.maxSize, customs: 0 };
-          const safe = k => { const car = D.CARRIERS[k]; return this._carrierAccepts(car, pp) && (!D.PARCEL_TYPES[b.type].attrs.includes('fragile') || car.caps.includes('fragile')); };
-          if (forced.some(f => safe(f.carrier))) break;
+        for (const bt of this.blockedTypes()) {
+          const pp = { type: bt.type, size: bt.maxSize, customs: 0 };
+          const safe = fam => { const car = D.CARRIERS[D.centerFor(fam, 0)]; return this._carrierAccepts(car, pp) && (!D.PARCEL_TYPES[bt.type].attrs.includes('fragile') || car.caps.includes('fragile')); };
+          if (forced.some(f => safe(f.family))) break;
           const cand = {}; for (const k of Object.keys(weights)) if (safe(k)) cand[k] = weights[k];
           if (!Object.keys(cand).length) continue;
-          forced.unshift({ carrier: this.rng.weighted(cand), hint: T('market.hint', { short: D.PARCEL_TYPES[b.type].short, count: b.count }) });
+          forced.unshift({ family: this.rng.weighted(cand), hint: T('market.hint', { short: D.PARCEL_TYPES[bt.type].short, count: bt.count }) });
           break;
         }
       }
       for (let i = 0; i < R.marketContractSlots; i++) {
         let grade = this.rng.weighted(gp);
-        // 보호 규칙: 계약 슬롯 중 하나는 현재 보유 등급보다 높게
-        if (i === 1 && items[0].grade === 'normal' && grade === 'normal' && this.contracts.every(c => !c || c.grade === 'normal')) grade = 'trusted';
+        // 보호 규칙: 계약 슬롯 중 하나는 표준보다 높게
+        if (i === 1 && items[0] && items[0].grade === 'normal' && grade === 'normal' && this.contracts.every(c => !c || c.grade === 'normal')) grade = 'trusted';
         const f = forced[i];
-        let carrier = f ? f.carrier : this.rng.weighted(weights);
-        // 중복 방지: 같은 슬롯끼리 같은 업체 금지, 이미 보유한 업체는 보유 등급보다 높을 때만(업그레이드 제안)
-        const rank = g => GRADE_RANK.indexOf(g);
-        const owned = k => this.contracts.find(c => c && c.carrier === k);
-        // 보유 업체: 같은 등급이면 배차 추가(리필) 제안, 높은 등급이면 업그레이드 제안, 낮은 등급은 제외
-        const blocked = k => items.some(it => it.carrier === k) || (owned(k) && rank(grade) <= rank(owned(k).grade)); // 같은 등급은 상시 '배차 추가' 카드가 대신한다
-        if (!f && blocked(carrier)) { const alt = {}; for (const k in weights) if (!blocked(k)) alt[k] = weights[k]; if (Object.keys(alt).length) carrier = this.rng.weighted(alt); else { const alt2 = {}; for (const k in weights) if (!items.some(it => it.carrier === k)) alt2[k] = weights[k]; if (Object.keys(alt2).length) carrier = this.rng.weighted(alt2); } }
-        let price = Math.round(D.CARRIERS[carrier].price * D.GRADES[grade].price * R.priceMult);
-        const up = owned(carrier) && rank(grade) > rank(owned(carrier).grade);
-        const add = owned(carrier) && rank(grade) === rank(owned(carrier).grade);
-        items.push({ kind: 'contract', carrier, grade, price, name: D.CARRIERS[carrier].name + (grade !== 'normal' ? ` (${D.GRADES[grade].name})` : ''), sold: false, hint: f && f.hint || (up ? T('market.upgradeHint') : add ? T('market.addHint') : null), upgrade: !!up, add: !!add });
+        const taken = fam => items.some(it => it.kind === 'contract' && FAM(it.carrier) === fam);
+        let fam = f ? f.family : this.rng.weighted(weights), carrier = centerFor(fam, grade);
+        if (!f && (!carrier || taken(fam))) { const alt = {}; for (const k in weights) if (!taken(k) && centerFor(k, grade)) alt[k] = weights[k]; if (Object.keys(alt).length) { fam = this.rng.weighted(alt); carrier = centerFor(fam, grade); } }
+        if (!carrier && f) carrier = D.centerFor(fam, tierOf(grade));
+        if (!carrier || items.some(it => it.carrier === carrier) || this.contracts.some(c => c && c.carrier === carrier)) continue;
+        const car = D.CARRIERS[carrier]; grade = car.grade;
+        const own = ownedFam(fam);
+        items.push({ kind: 'contract', carrier, grade, price: Math.round(car.price * R.priceMult), name: car.name, sold: false, hint: f && f.hint || (own ? T('market.switchHint', { name: D.CARRIERS[own.carrier].name }) : null), switchFrom: own ? own.id : null });
       }
-      // 상시 배차 추가: 보유 계약마다 월 배차 +n대(즉시 리필). 살 때마다 가격 ×D.ADD_PRICE_STEP — 물량이 늘수록 지출도 커지는 흡수 장치
-      for (const c of this.contracts) if (c) items.push({ kind: 'contract', carrier: c.carrier, grade: c.grade, standing: true, add: true, sold: false,
-        price: Math.round(D.CARRIERS[c.carrier].price * D.GRADES[c.grade].price * R.priceMult * Math.pow(D.ADD_PRICE_STEP, c.adds || 0)),
-        name: T('market.addName', { name: this.contractName(c), n: this.itemTrucks({ carrier: c.carrier, grade: c.grade }) }), hint: T('market.addHint') });
-      // 상시 등급 업그레이드: 보유 계약의 다음 등급(프리미엄 → 엘리트 → 마스터). 가격은 등급 배율 그대로 — 후반 자금 흡수의 축
-      for (const c of this.contracts) if (c) { const ni = GRADE_RANK.indexOf(c.grade) + 1; if (ni >= GRADE_RANK.length) continue; const ng = GRADE_RANK[ni]; if (ng === 'master' && this.month < 6) continue; if (ng === 'expert' && this.month < R.expertFrom) continue;
-        if (items.some(it => it.kind === 'contract' && it.carrier === c.carrier && it.upgrade)) continue;
-        items.push({ kind: 'contract', carrier: c.carrier, grade: ng, standing: true, upgrade: true, sold: false, price: Math.round(D.CARRIERS[c.carrier].price * D.GRADES[ng].price * R.priceMult),
-          name: D.CARRIERS[c.carrier].name + ` (${D.GRADES[ng].name})`, hint: T('market.upgradeHint') }); }
+      // 상시 배차 충전: 배차가 빈 계약마다 '가득 충전' 카드. 정액이라 다 쓰지 않고 충전하면 그만큼 손해
+      for (const c of this.contracts) if (c && c.calls < c.maxCalls) items.push({ kind: 'refill', contractId: c.id, carrier: c.carrier, standing: true, sold: false, price: this.refillPrice(c), name: T('market.refillName', { name: this.contractName(c) }) });
       const enhW = {}; for (const k of Object.keys(D.ENHANCEMENTS)) enhW[k] = R.marketWeight[k] || 1;
       const picked = []; for (let i = 0; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }
       for (const e of picked) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });
@@ -1220,39 +1221,30 @@
       if (R.firstContractDiscount && !this.monthStats.firstContractBought) p = Math.max(0, p - R.firstContractDiscount);
       return p;
     }
-    // 계약 아이템의 월 배차 대수(업체 기본 + 등급 보너스)
-    itemTrucks(it) { return Math.max(1, D.CARRIERS[it.carrier].trucks + D.GRADES[it.grade].calls + this.rules.callsDelta); }
-    // mode: 'replace'(기본) | 'upgrade'(같은 업체·높은 등급: 등급만 올리고 강화·잔여 배차 유지) | 'add'(같은 업체: 월 배차 한도 추가 + 즉시 리필)
+    // 계약 아이템의 배차 대수(센터 기본 + 회사 보정)
+    itemTrucks(it) { return Math.max(1, D.CARRIERS[it.carrier].trucks + this.rules.callsDelta); }
+    // 가득 충전 가격: 센터 정액 × 물가. 남은 배차와 무관(그래서 다 쓰고 충전하는 게 이득)
+    refillPrice(c) { return Math.round(D.CARRIERS[c.carrier].refill * this.rules.priceMult * this.inflation()); }
+    refill(contractId) {
+      if (this.phase !== 'market') return { ok: false, msg: T('err.notMarket') };
+      const c = this.contracts.find(x => x && x.id === contractId); if (!c) return { ok: false, msg: T('err.emptySlot') };
+      if (c.calls >= c.maxCalls) return { ok: false, msg: T('err.refillFull') };
+      const price = this.refillPrice(c); if (this.cash < price) return { ok: false, msg: T('err.noCash') };
+      const wasted = c.calls; c.calls = c.maxCalls; this.cash -= price; this.run.spent += price; this.stats.refills = (this.stats.refills || 0) + 1;
+      this.say('log.refill', { name: this.contractName(c), n: c.maxCalls, price, wasted: wasted ? MSG('log.refillWasted', { n: wasted }) : '' });
+      return { ok: true, price, wasted };
+    }
     buy(itemIdx, target, mode) {
       if (this.phase !== 'market') return { ok: false, msg: T('err.notMarket') };
       const R = this.rules, it = this.market.items[itemIdx];
       if (!it || it.sold) return { ok: false, msg: T('err.sold') };
-      if (this.market.bought >= R.marketMaxBuy) return { ok: false, msg: T('err.marketMax', { n: R.marketMaxBuy }) };
+      if (it.kind !== 'refill' && this.market.bought >= R.marketMaxBuy) return { ok: false, msg: T('err.marketMax', { n: R.marketMaxBuy }) };
       let price = it.price;
       if (it.kind === 'contract') {
         price = this.contractPrice(it);
         if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         if (target == null || target < 0 || target >= D.CONTRACT_SLOTS) return { ok: false, msg: T('err.pickSlot') };
         const old = this.contracts[target];
-        const same = old && old.carrier === it.carrier;
-        if (!mode) mode = same ? (GRADE_RANK.indexOf(it.grade) > GRADE_RANK.indexOf(old.grade) ? 'upgrade' : 'add') : 'replace';
-        if (mode !== 'replace') {
-          if (!same) return { ok: false, msg: T('err.notSameCarrier') };
-          if (mode === 'upgrade' && GRADE_RANK.indexOf(it.grade) <= GRADE_RANK.indexOf(old.grade)) return { ok: false, msg: T('err.notHigherGrade') };
-          if (mode === 'upgrade') {
-            const delta = D.GRADES[it.grade].calls - D.GRADES[old.grade].calls;
-            old.grade = it.grade; old.maxCalls = Math.max(1, old.maxCalls + delta); old.calls = Math.max(0, old.calls + delta);
-            const gt = D.GRADES[it.grade].trust; if (gt) this._addTrust(it.carrier, Math.max(0, gt - this.trustXp(it.carrier)), true);
-            this.say('log.upgradeContract', { name: this.contractName(old), price });
-          } else {
-            const n = this.itemTrucks(it);
-            old.maxCalls += n; old.calls += n; old.adds = (old.adds || 0) + 1;
-            this.say('log.addContract', { name: this.contractName(old), n, price });
-          }
-          this.monthStats.firstContractBought = true; this.stats.contractsBought++;
-          this.cash -= price; this.run.spent += price; this.market.bought++; it.sold = true;
-          return { ok: true, mode };
-        }
         const nc = this._makeContract(it.carrier, it.grade);
         if (old) {
           if (old.calls >= 3) this.stats.replacedWithCalls = Math.max(this.stats.replacedWithCalls, old.calls);
@@ -1261,6 +1253,9 @@
         this.contracts[target] = nc;
         this.monthStats.firstContractBought = true; this.stats.contractsBought++;
         this.say('log.buyContract', { name: it.name, price, old: old ? MSG('log.buyContractOld', { name: this.contractName(old), calls: old.calls }) : '' });
+      } else if (it.kind === 'refill') {
+        const r = this.refill(it.contractId); if (!r.ok) return r;
+        it.sold = true; return { ok: true, refill: true, wasted: r.wasted }; // 충전은 월 구매 한도에 안 들어간다
       } else if (it.kind === 'enh') {
         if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         const c = this.contracts[target];
@@ -1332,6 +1327,8 @@
       // 세이브 마이그레이션 (v0.4: 속성·특약·냉동·통관)
       const es = Game.emptyStats(); for (const k in es) if (g.stats[k] == null) g.stats[k] = es[k];
       for (const k of ['deliveredByType', 'onTimeByType']) for (const t in D.PARCEL_TYPES) if (g.stats[k][t] == null) g.stats[k][t] = 0;
+      for (const c of g.contracts) if (c && !D.CARRIERS[c.carrier]) { const nk = D.centerFor(c.carrier, GRADE_RANK.indexOf(c.grade || 'normal')) || 'bulk0'; if (g.trust && g.trust[c.carrier] != null) { g.trust[nk] = g.trust[c.carrier]; } c.carrier = nk; c.grade = D.CARRIERS[nk].grade; }
+      for (const k of Object.keys(D.CARRIERS)) if (g.trust && g.trust[k] == null) g.trust[k] = 0;
       for (const c of g.contracts) if (c) { c.enh = Object.assign({ limit: 0, cap: 0, regular: false, express: false, opt: null, capDelta: 0 }, c.enh || {}); if (c.enh.capDelta == null) c.enh.capDelta = 0; }
       for (const p of g.parcels) { if (!p.attrs) p.attrs = D.PARCEL_TYPES[p.type].attrs.slice(); if (p.warm == null) p.warm = 0; if (p.customs == null) p.customs = 0; if (p.inFrozen == null) p.inFrozen = false; delete p.fresh; }
       if (g.warehouse && g.warehouse.frozen == null) g.warehouse.frozen = g.warehouse.cold > 0 ? D.WAREHOUSE.frozen : 0;

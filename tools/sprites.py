@@ -104,8 +104,11 @@ def face(img, expr, eye=(40, 40, 50), skin_sh=None, blush=True, wrinkles=False, 
         hline(img, 14, 17, 16, m)
     if talk:
         # 입 벌림: 기존 입 지우고 열린 입
-        rect(img, 12, 15, 19, 18, P["s"]) if not mustache else None
-        rect(img, 14, 15, 17, 18, m); rect(img, 15, 16, 16, 17, (90, 30, 30)); hline(img, 14, 17, 15, o)
+        if mustache:
+            rect(img, 14, 16, 17, 18, m); rect(img, 15, 17, 16, 17, (90, 30, 30))
+        else:
+            rect(img, 12, 15, 19, 18, P["s"])
+            rect(img, 14, 15, 17, 18, m); rect(img, 15, 16, 16, 17, (90, 30, 30)); hline(img, 14, 17, 15, o)
     if wrinkles:
         px(img, 9, 15, skin_sh); px(img, 22, 15, skin_sh)
         px(img, 10, 9, skin_sh); px(img, 21, 9, skin_sh)
@@ -246,19 +249,19 @@ def char_A(expr, talk=False):
     mug(img)
     return img
 
-def char_B(expr):
+def char_B(expr, talk=False):
     """강 소장 — 50대 여성, 쪽머리+새치, 안전모 없이 클립보드. 깐깐한 베테랑"""
     img = new()
     skin, sh = (235, 195, 160), (195, 150, 118)
     bust(img, skin, sh, (60, 90, 80), (40, 65, 58), collar=(210, 220, 215))
     head(img, skin, sh)
     hair_bun_dark(img)
-    face(img, expr, skin_sh=sh, wrinkles=True, blush=False)
+    face(img, expr, skin_sh=sh, wrinkles=True, blush=False, talk=talk)
     name_tag(img, x=19, y=26)
     clipboard(img)
     return img
 
-def char_C(expr):
+def char_C(expr, talk=False):
     """노 기사 — 70대, 빨간 트럭 캡, 흰 콧수염, 목에 수건. 옛날 트럭 기사 출신"""
     img = new()
     skin, sh = (225, 180, 140), (185, 135, 100)
@@ -266,12 +269,12 @@ def char_C(expr):
     towel(img)
     head(img, skin, sh)
     cap_trucker(img)
-    face(img, expr, skin_sh=sh, wrinkles=True, mustache=(225, 225, 230))
+    face(img, expr, skin_sh=sh, wrinkles=True, mustache=(225, 225, 230), talk=talk)
     # thick brows white
     hline(img, 10, 12, 9, (225, 225, 230)); hline(img, 19, 21, 9, (225, 225, 230))
     return img
 
-def char_D(expr):
+def char_D(expr, talk=False):
     """여 실장 — 40대, 포니테일, 헤드셋, 형광 조끼, 태블릿. 빠릿한 현장 실장"""
     img = new()
     skin, sh = (245, 210, 180), (205, 165, 135)
@@ -279,7 +282,7 @@ def char_D(expr):
     hivis(img)
     head(img, skin, sh)
     hair_ponytail_brown(img)
-    face(img, expr, skin_sh=sh)
+    face(img, expr, skin_sh=sh, talk=talk)
     headset(img)
     tablet(img)
     return img
@@ -364,6 +367,19 @@ if __name__ == "__main__":
     main()
 
 
+def char_generic(expr="neutral", talk=False):
+    """이름 없는 센터 담당자: 회색 실루엣 + 전화기"""
+    img = new()
+    g1, g2 = (120, 120, 140), (90, 90, 110)
+    bust(img, g1, g2, (70, 70, 90), (50, 50, 70))
+    head(img, g1, g2)
+    rect(img, 8, 4, 23, 7, g2); hline(img, 9, 22, 3, P["o"]); rect(img, 7, 5, 7, 9, g2); rect(img, 24, 5, 24, 9, g2)
+    # 전화기
+    rect(img, 24, 10, 26, 18, (40, 40, 50)); rect(img, 25, 11, 25, 17, (90, 180, 210)); px(img, 27, 12, P["o"]); px(img, 27, 16, P["o"])
+    if talk: rect(img, 14, 15, 17, 17, (60, 60, 80))
+    else: hline(img, 14, 17, 16, (60, 60, 80))
+    return img
+
 def export_js():
     import base64, io
     out = []
@@ -375,6 +391,14 @@ def export_js():
             key = ek + ("_talk" if talk else "")
             out.append(f"    {key}: 'data:image/png;base64,{base64.b64encode(b.getvalue()).decode()}',")
     open(OUT + "/sprites_b64.txt", "w").write("\n".join(out) + "\n")
+    # 조연: 여 실장(D)·노 기사(C)·강 소장(B)·이름 없는 담당자 — neutral/talk/smile
+    reps = []
+    for rid, fn in (("yeo", char_D), ("noh", char_C), ("kang", char_B), ("rep", char_generic)):
+        for ek, talk in (("neutral", False), ("neutral", True), ("smile", False)):
+            im = fn(ek, talk).quantize(colors=32, method=Image.Quantize.FASTOCTREE, dither=0)
+            b = io.BytesIO(); im.save(b, format="PNG", optimize=True)
+            reps.append(f"    {rid}_{ek}{'_talk' if talk else ''}: 'data:image/png;base64,{base64.b64encode(b.getvalue()).decode()}',")
+    open(OUT + "/reps_b64.txt", "w").write("\n".join(reps) + "\n")
     # 시트
     K = 5; cols = len(EXPRS)
     sheet = Image.new("RGB", (cols * (32 * K + 12) + 12, 2 * (32 * K + 12) + 12), (28, 30, 36))

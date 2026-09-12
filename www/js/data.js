@@ -10,7 +10,6 @@
     // 배차비·배송비는 후불: 월중에 쌓였다가 월말 정산에서 빠진다. 정산 후 자금이 음수면 단기 차입으로 메우고
     // 다음 정산에 원금+이자를 갚는다. 부채가 한도를 넘으면 부도.
     LOAN: { limit: 400, interest: 0.15 },
-    ADD_PRICE_STEP: 1.6,   // 배차 추가를 살 때마다 그 계약의 다음 추가 가격 배율
     OPCOST_INFLATION: 1.08, // 임대는 매달 5%씩 오른다 (12개월차 ×1.7)
     MONTH_RELIEF: { min: 1, amount: 2 }, // 월말 휴식: 스트레스 -2
     OPCOST_PER_PARCEL: 4,  // 인건비: 기준(22개)을 넘는 월 입고 1개당 운영비 — 물량이 늘면 지출도 는다
@@ -71,18 +70,67 @@
     // specialist = 이 종류를 처리하면 특수 운송 보너스. delay = 보상이 N턴 뒤 입금. badge = 운송 수단(매칭 무관)
     // 업체 = 배차 계약 (docs/BALANCE_DESIGN.md 1장): cap = 차량 한 대의 부피(칸), fee = 대당 배차비(호출 즉시 차감), trucks = 월 배차 한도(대), price = 계약가
     // caps = 안전하게 다루는 속성. need = 이 속성 중 하나가 있는 택배만. onlyPlain = 속성 없는 택배만. specialist = 특수 운송 보너스 종류. delay = 입금 지연 턴. badge = 운송 수단
-    CARRIERS: {
-      bulk:    { badge: '🚚', cap: 6,  fee: 35, trucks: 5, price: 60,  caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2 },
-      cold:    { badge: '🚚', cap: 5,  fee: 48, trucks: 3, price: 90, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'] },
-      frozen:  { badge: '🚚', cap: 4,  fee: 55, trucks: 3, price: 100, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true },
-      fragile: { badge: '🚚', cap: 4,  fee: 48, trucks: 3, price: 90, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
+    // ----- 운송센터 (docs/STORY_TUTORIAL_DESIGN.md 부록 D) -----
+    // 계열(family) = 하는 일(대량·냉장·냉동·파손·통관·대형·항공·철도·해상). 계열 기본값은 FAMILIES, 센터는 그 위에 tier별 보정.
+    // 상위 tier는 "같은 센터 업그레이드"가 아니라 **다른 센터와 신규 계약**이다 — 배차가 많고, 차가 크고, 배차비가 싸고, 복합 능력(extraCaps)이 붙는다. 신뢰도는 센터별.
+    // trucks = 배차 풀(소모품: 월초 리셋 없음, 마켓에서 '가득 충전'만). refill = 가득 충전 가격. rep = 담당자(스토리 캐릭터) id
+    FAMILIES: {
+      bulk:    { badge: '🚚', cap: 6,  fee: 35, trucks: 7, price: 60,  caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2, rep: 'yeo' },
+      cold:    { badge: '🚚', cap: 5,  fee: 48, trucks: 4, price: 90, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'], rep: 'kang' },
+      frozen:  { badge: '🚚', cap: 4,  fee: 55, trucks: 4, price: 100, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true, rep: 'kang' },
+      fragile: { badge: '🚚', cap: 4,  fee: 48, trucks: 4, price: 90, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
       intl:    { badge: '🚚', cap: 8,  fee: 70, trucks: 3, price: 110, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
-      large:   { badge: '🚚', cap: 10, fee: 68, trucks: 3, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true },
-      // 원형(운송 수단) 업체: 속성이 겹치고 트레이드오프가 다르다
+      large:   { badge: '🚚', cap: 10, fee: 68, trucks: 3, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true, rep: 'noh' },
       air:     { badge: '✈', cap: 4,  fee: 83, trucks: 3, price: 120, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
-      rail:    { badge: '🚆', cap: 16, fee: 95, trucks: 2, price: 80, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true },
+      rail:    { badge: '🚆', cap: 16, fee: 95, trucks: 2, price: 80, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true, rep: 'noh' },
       sea:     { badge: '🚢', cap: 14, fee: 83, trucks: 2, price: 90, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
     },
+    // tier 공통 보정: 배차 +, 용량 +, 배차비 배율, 계약가 배율. 센터가 개별 값을 주면 그것이 우선
+    TIERS: [
+      { grade: 'normal',  trucks: 0, cap: 0, fee: 1.0,  price: 1.0 },
+      { grade: 'trusted', trucks: 2, cap: 1, fee: 0.9,  price: 2.2 },
+      { grade: 'expert',  trucks: 4, cap: 2, fee: 0.8,  price: 4.0 },
+      { grade: 'master',  trucks: 6, cap: 3, fee: 0.7,  price: 7.0 },
+    ],
+    // 센터 목록. 이름·설명은 locales data.CARRIERS[id]. extraCaps = 복합 능력(그 센터 차는 이 속성도 안전하게), sizeMax/delay/simul 개별 보정
+    CENTERS: {
+      // 대량 (일반 특화의 축)
+      bulk0:   { family: 'bulk', tier: 0 },
+      bulk1:   { family: 'bulk', tier: 1 },
+      bulk2:   { family: 'bulk', tier: 2, extraCaps: ['fragile'] },            // 완충 탑차: 파손도 안전
+      bulk3:   { family: 'bulk', tier: 3, extraCaps: ['fragile'], simul: 2 },  // 2대 동시
+      // 냉장
+      cold0:   { family: 'cold', tier: 0 },
+      cold1:   { family: 'cold', tier: 1 },
+      cold2:   { family: 'cold', tier: 2, extraCaps: ['frozen'] },             // 냉동칸 딸린 냉장차
+      cold3:   { family: 'cold', tier: 3, extraCaps: ['frozen'], sizeMax: 7 },
+      // 냉동
+      frozen0: { family: 'frozen', tier: 0 },
+      frozen1: { family: 'frozen', tier: 1 },
+      frozen2: { family: 'frozen', tier: 2, extraCaps: ['cold'] },
+      // 파손
+      fragile0: { family: 'fragile', tier: 0 },
+      fragile1: { family: 'fragile', tier: 1 },
+      fragile2: { family: 'fragile', tier: 2, sizeMax: 7 },                    // 대형 파손까지
+      fragile3: { family: 'fragile', tier: 3, sizeMax: 7, extraCaps: ['cold'] },
+      // 통관
+      intl0:   { family: 'intl', tier: 0 },
+      intl1:   { family: 'intl', tier: 1 },
+      intl2:   { family: 'intl', tier: 2, extraCaps: ['fragile'] },
+      // 대형
+      large0:  { family: 'large', tier: 0 },
+      large1:  { family: 'large', tier: 1 },
+      large2:  { family: 'large', tier: 2, extraCaps: ['cold'] },              // 냉장 대형차
+      // 원형(운송 수단)
+      air0:    { family: 'air', tier: 0 },
+      air1:    { family: 'air', tier: 1, sizeMax: 4 },
+      rail0:   { family: 'rail', tier: 0 },
+      rail1:   { family: 'rail', tier: 1, delay: 0 },
+      sea0:    { family: 'sea', tier: 0 },
+      sea1:    { family: 'sea', tier: 1, delay: 1 },
+    },
+    // CARRIERS = 센터별 완성 스탯 (계열 + tier + 개별). 게임 코드는 이 표만 본다. 키 = 센터 id, family/tier/grade 필드로 계열·등급을 안다
+    CARRIERS: {},
     // 신뢰도 특성 (2장): 업체마다 1~3단계 효과. 문구는 locales data.TRUST_PERKS[carrier] = [t1, t2, t3]
     // 키: simul 동시 대수 / feeMult 배차비 배율 / cap 용량 +칸 / rewardDelta{type} / bonusDelta{type} / freezeOnCall / coldZone·frozenZone 구역 +칸 / customsDelta 통관 대기 / noCustomsDelay / xlDelta 초대형 점유 -1 / sizeMax / customsBonus / delay / trucks
     TRUST_PERKS: {
@@ -105,10 +153,11 @@
 
     GRADES: {
       // 등급 = 프리미엄 계약 (신뢰도와 무관). cap +칸, calls +대, fee 배율, trust 시작 xp, price 배율
-      normal:  { cap: 0, calls: 0, fee: 1.0,  trust: 0,  price: 1.0 },
-      trusted: { cap: 2, calls: 1, fee: 0.85, trust: 3,  price: 2.5 },
-      expert:  { cap: 4, calls: 2, fee: 0.7,  trust: 8,  price: 4.5 },
-      master:  { cap: 6, calls: 3, fee: 0.6,  trust: 15, price: 8.0, special: true },
+      // v1.5: 스탯은 센터(CENTERS/TIERS)에 있다. 여기는 등급 이름·유지비(OPCOST_CONTRACT) 키만 남는다
+      normal:  { cap: 0, calls: 0, fee: 1.0, trust: 0, price: 1.0 },
+      trusted: { cap: 0, calls: 0, fee: 1.0, trust: 0, price: 2.2 },
+      expert:  { cap: 0, calls: 0, fee: 1.0, trust: 0, price: 4.0 },
+      master:  { cap: 0, calls: 0, fee: 1.0, trust: 0, price: 7.0, special: true },
     },
     GRADE_PROB: {
       1: { normal: 70, trusted: 30, expert: 0, master: 0 },
@@ -123,7 +172,7 @@
     TRUST_LEVELS: [0, 3, 8, 15],
     TRUST_EFFECTS: [], // 단계 0 문구 — locales data.TRUST_EFFECTS[0]
     // 단계별 효과 문구 (마켓 카드·호출 모달·도감이 같은 문자열을 읽는다)
-    trustEffectText(carrier, lv) { if (lv >= 1 && DATA.TRUST_PERK_TEXT[carrier]) return DATA.TRUST_PERK_TEXT[carrier][lv - 1]; return DATA.TRUST_EFFECTS[0]; },
+    trustEffectText(carrier, lv) { const f = DATA.familyOf ? DATA.familyOf(carrier) : carrier; if (lv >= 1 && DATA.TRUST_PERK_TEXT[f]) return DATA.TRUST_PERK_TEXT[f][lv - 1]; return DATA.TRUST_EFFECTS[0]; },
 
     ENHANCEMENTS: {
       // 차량 언어: limit = 배차 한도 +대, cap = 적재 보강 +칸(계약당 3회), regular = 월 첫 배차 무료, express = 동시 대수 +1
@@ -161,5 +210,18 @@
     STRESS_STATES: [[5, 'stable'], [10, 'caution'], [15, 'danger'], [19, 'crisis'], [20, 'gameover']],
     STRESS_NAMES: {},
   };
+  for (const id in DATA.CENTERS) {
+    const c = DATA.CENTERS[id], f = DATA.FAMILIES[c.family], t = DATA.TIERS[c.tier];
+    const caps = f.caps.slice(); for (const x of c.extraCaps || []) if (!caps.includes(x)) caps.push(x);
+    DATA.CARRIERS[id] = Object.assign({}, f, { id, family: c.family, tier: c.tier, grade: t.grade, caps,
+      trucks: c.trucks != null ? c.trucks : f.trucks + t.trucks, cap: c.cap != null ? c.cap : f.cap + t.cap,
+      fee: c.fee != null ? c.fee : Math.round(f.fee * t.fee), price: c.price != null ? c.price : Math.round(f.price * t.price),
+      refill: c.refill != null ? c.refill : Math.round(f.price * 0.5 * (1 + c.tier * 0.5)),
+      sizeMax: c.sizeMax != null ? c.sizeMax : f.sizeMax, delay: c.delay != null ? c.delay : (f.delay || 0), simul: c.simul || 1 });
+  }
+  // 계열 → 센터 id (tier 순). 회사 시작 계약·보장·가중치는 계열 이름으로 쓴다
+  DATA.centersOf = fam => Object.keys(DATA.CARRIERS).filter(k => DATA.CARRIERS[k].family === fam).sort((a, b) => DATA.CARRIERS[a].tier - DATA.CARRIERS[b].tier);
+  DATA.centerFor = (fam, tier) => { const list = DATA.centersOf(fam); if (!list.length) return null; let best = list[0]; for (const k of list) if (DATA.CARRIERS[k].tier <= tier) best = k; return best; };
+  DATA.familyOf = k => (DATA.CARRIERS[k] || {}).family || k;
   if (typeof module !== 'undefined') module.exports = DATA; else root.DATA = DATA;
 })(typeof window !== 'undefined' ? window : globalThis);

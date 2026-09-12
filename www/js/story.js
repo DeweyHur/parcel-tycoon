@@ -21,7 +21,43 @@
     laugh: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAADwzKkeGBxkgqDX19zIoH339/A8RlpwUzxGX3iWRkZQPCiqqrTm5uHIyNLIPDLNm3gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2wxz0AAAAIHRSTlMA/////////////////////wAAAAAAAAAAAAAAAAAAAEzjGe4AAADQSURBVHjavZLbEoMgDETDWpGr7f9/bUOQioGpfeqOM4nsIQQmRH8ULpr4j4tw4w9E8Y0x1asJFJASryeRJANglDTA29bT5TQpALrC9aZib6w+QgHbBvHYhRAYKsh3RugeZPOrHaFfG6XzECwrhHIN/db1FkFkhgN+AUg9BCbjsHaaDQR9n5dqt+0TBAurAZIT7crPOVeAE/7tbHgfncNSlkV5gXNx91BAIzgUwA+AfVp71IDrOy1AjAzYE+ASLFyBTkCh7VHj08MIEG6A+wr0BqIGCYwngxlPAAAAAElFTkSuQmCC',
   };
 
+  // 조연(운송센터 담당자): 여 실장(대량) · 노 기사(대형·철도) · 강 소장(냉장·냉동) · 이름 없는 담당자(그 외). neutral / neutral_talk / smile
+  const REPS = {
+    yeo_neutral: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAAAeGBz10rR4Sy1abpYyMjz6vihatNLNpYcoKDJVMh48UHPc3Obw+fx4eIKWRkbceHhaWmTNm3gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkjsMJAAAAIHRSTlMA////////////////////////AAAAAAAAAAAAAAAAAG84GDUAAAC5SURBVHjarZKLDoMgDEW5ojLwscf/f+xKK5FCtyyZJzGS3kMBxbmLmAxUTg8UR/EE8ApW6tx34HIhHfXkE9M48EOZOQikJlSfgep0OMl44KepFTStkGtblEzehhAPIVoCrfrI5RcrNIQS3I52D1CnIEPKd8IWsO9P3QHN/yJD5d2VAW4VgHGrmvtixmW6oWAkisBjI68EvRaWZWZEGzEjFvBJCMIXYcucwsoUYe079AI3CH/uIfzU4Q1IdQwPur1n/QAAAABJRU5ErkJggg==',
+    yeo_neutral_talk: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAAAeGBz10rR4Sy1abpYyMjz6vihatNLNpYcoKDJVMh48UHPwyKXc3Obw+fyWRkZ4eIJaHh7ceHhaWmTNm3gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB1aq1pAAAAIHRSTlMA//////////////////////////8AAAAAAAAAAAAAAGTP5fYAAADDSURBVHjarZKLDoMgDEW94mMgvrb9/7euFIkU6rJknoRI2gMUadPcRK8g8jQgOIIngBGwkudNBW4X3BF3xjGFA9OmlW2EVIfsN1CcLhdzPDF9XwqSUgixxcZc/CqCPQSrCXTqM4TfrNAUQmg2rs/78Azec6XiFmREYd33VRewbS8poHgvMoJAsICqZYBHBqB0VdEvajotVxR0RBJ4ruQzQZ6FaRqYqHUYYBO4EsbIF2EJnMLMJGGud6gF3mD8s4bxpx0+evMNS5y9SrQAAAAASUVORK5CYII=',
+    yeo_smile: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAAAeGBz10rR4Sy1abpYyMjz6vihatNLNpYcoKDJVMh48UHPc3Obw+v+WRkZ4eILceHhaWmTNm3gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD68qTRAAAAIHRSTlMA////////////////////////AAAAAAAAAAAAAAAAAG84GDUAAAC1SURBVHjarZIBDoMgDEX5ILKhG9vuf9hhC5NCXZbMlxhJ/2tFxZiT8AoizxcEpbgDOAEpbe4GcLoQSz26SHQOnK2dlslqRPMZav2D834UwBk0gQM0N0WQdEJuemzlF4V5CSGYRFPv3Es3iLfIBkeE1QSk9BRbKL9UGCIfjgxwaQCUU9WdFzWu7YqCKVMFWit5I8hnYVlmgrUJM64VHAmB+SLcNnZhJaqwjhNGgQaEP/cQfprwBhL9DAFtCpvzAAAAAElFTkSuQmCC',
+    noh_neutral: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAACWlpseGBzhtIzIPDI4KCVubna5h2TIyM3h4eaWKCPz8/CWRkbceHgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABTZUWtAAAAIHRSTlMA/////////////////wAAAAAAAAAAAAAAAAAAAAAAAMhUwNYAAACkSURBVHja3ZJBEsMgCEUjFMXY3v+6RWlGAknddNW3Cc5/GVTctp8BjpA/HLDIvXEIbW/tu9AWwn2LPXASgJip1kqDXsiayAqCHF6FWdzeUrgtwE4jtF+7CRXoI1AUpAfiC7EORumnAViOvBsF/bS0CT4FjA2mMInzXuSyzWKID8Zf1lUuk9bfpbh4cgmYWQUpZOlzL1gDck4qpIEKKWc4CYF/Et6GTQk81d/NtAAAAABJRU5ErkJggg==',
+    noh_neutral_talk: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAACWlpseGBzIPDLhtIw4KCVubna5h2TIyM3h4eaWKCPz8/CWRkZaHh7ceHgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABHcUxBAAAAIHRSTlMA//////////////////8AAAAAAAAAAAAAAAAAAAAAAFkoFncAAACoSURBVHja3ZJLFoMwCAANhXxM7f2PKwnaIiR101VnI3mMQYFl+RlgcPmHAW7y1jiFutb6Xag3wrzE6rgIQDlTKYU6LeAzkRYY/nkRPsG0S65bgI1KqJ/6I0SgQyAvcA3EF2Lp9NBOAzCd+WYktNOSIvhk0BdQwrZNhMN43wCDhUkKvzC2WaM8T1pe52CwcgFyziJwwEebt4I2IMYgQuiIEGKEi+D4J2EHrDMJiB7Sdx0AAAAASUVORK5CYII=',
+    noh_smile: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAACWlpseGBzhtIzIPDI8KCNubna5h2TIyM3h4eaWKCPy8vCWRkbceHgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC63fErAAAAIHRSTlMA/////////////////wAAAAAAAAAAAAAAAAAAAAAAAMhUwNYAAACeSURBVHja3ZLLEsMgCEXjJb5i+/+/W4TJjIKpm656NsFwHBjwOH4GDC5/GrDJW+MW2tXad6FthOcSl2MSEEuJtdYo9IDPMY7CEjxOyU0L1AFh+NDYhP4xzF2y8iaqgoR2G6B857uRyW5Li7wEX2DVhd/3Js9t5gH/YOywVnnetF7nYPHkAkopKnDAR5u3wmggpaBCEFQIKWESHP8kfACMuQlAIxUpZwAAAABJRU5ErkJggg==',
+    kang_neutral: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAADrw6A8WlAeGBw6LCj09OrDlnaWbkYoQTooHhyWlqDS3Nd4eIK+ub6WRkbIPDIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADmpgQOAAAAIHRSTlMA////////////////////AAAAAAAAAAAAAAAAAAAAAEGSIDkAAADCSURBVHjanZLrEoQgCEZFUMu27f3fdvFWJDQ70/mjo8cPzJyTYMU9glTBl0IJp5UhswyW0/u+U2dWWvi1rwohKd4I64ktRDiJhgDAl2vbdXIXEAxQCYFAjlqgLpAW3CgPZ6fqU0KU9SPMr9ETvoxu0byHek/8s89tRoH536Hgvv5h2vo4LhVMqQgpofdD8AwKoYHbtjWBJ8LAFCqcUJYrbbIsOAnD6MMlHDnnKnTCEYKdMIQwCXlK8P6phyehBLxP+AGUDQm+5VlQngAAAABJRU5ErkJggg==',
+    kang_neutral_talk: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAADrw6A8WlAeGBw6LCj09OrDlnaWbkYoQTooHhyWlqDS3Nd4eIKWRka+ub5aHh7IPDIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADVCgWWAAAAIHRSTlMA/////////////////////wAAAAAAAAAAAAAAAAAAAEzjGe4AAADESURBVHjanZJZEoQgDAWBF0BxXO5/2gmbIsQqy/6BIs1LXJRqQUI9AkrgoxDDaWZIbIN4e9s2KvRKDr/qQyPQwBdhPpEFp0+cIGjND5fLaXMXoAUwCJZ0u44CFYFGQdX2+px0eJW5hDKp0/3XKAnrvq/jiK+EYqyMXOcxXYP436Hhfv5j8nm93irwPgrew5gqGAaNkMGyLFngTWPA2wQnxONE3kwTOqEaZbmEI4SQhII9rJUTqmA7IXQJxjzN8CTEgO8Jf2zSCjF62jnRAAAAAElFTkSuQmCC',
+    kang_smile: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAADrw6A8WlAeGBw8LSj09OrDlnaWbkYoQTooHhyWlqDS3Nd4eIKWRka+ub7IPDIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABBqP39AAAAIHRSTlMA////////////////////AAAAAAAAAAAAAAAAAAAAAEGSIDkAAAC8SURBVHjanZJRDoQgDAWVB6K46v1vu5QCYqkxYX4g7fBKxGlqQWJ6BTaBQYHC7Rax6hjQ6fM8bUYqHH73u0GwHSPCVtGFZa4sijALngK4KJZOALfyogiC54yi1Jt2n5JaB/cO8uRrcMKR6Adot+jeEx/9eM2lQf3v0PCs/yJcL8dbBd6T4D2MKYKJoBEY7PvOQtw0BrxLxAQqJ3izrhBCMfJyC1cIIQkZdzmnJxTBCSGIBGPe7vAmUMB4wh++MAnVhG6ufAAAAABJRU5ErkJggg==',
+    rep_neutral: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAABGRlp4eIxaWm4eGBwzM0coKDJatNIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADGiUehAAAAIHRSTlMA/////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO2GcZQAAABqSURBVHja5ZJLCsAgDESjnaT3v3HFIuRHVSjd9K2EeYZBQ/QhMMT8cMzyYLwgVMeuAHhBRHReA3LOBWxMyDpYgVYFbmQdFiZ4A/Ydek39EdlC0PO+3PG4nigojSH0c5IbQRtgLgnM+I9wATVGBeDixWZkAAAAAElFTkSuQmCC',
+    rep_neutral_talk: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAABGRlp4eIxaWm4eGBw0NEgoKDJatNIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSjDNvAAAAIHRSTlMA/////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO2GcZQAAABqSURBVHja5ZJLCsAgDETVTuL9b1yxBPKjVijd9K2EeQ5BU8qHwBDzw7HKg/GC0By7AuAFZtZ5C3BfC9hoyGawgnTQ4LmArQY/J+w7zDH1R2QLUe735YrleqKgDkSY5yQ3gjZAVBOI8B/hBGU6BfhXzkJMAAAAAElFTkSuQmCC',
+    rep_smile: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAYFBMVEUAAABGRlp4eIxaWm4eGBwzM0coKDJatNIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADGiUehAAAAIHRSTlMA/////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAO2GcZQAAABqSURBVHja5ZJLCsAgDESjnaT3v3HFIuRHVSjd9K2EeYZBQ/QhMMT8cMzyYLwgVMeuAHhBRHReA3LOBWxMyDpYgVYFbmQdFiZ4A/Ydek39EdlC0PO+3PG4nigojSH0c5IbQRtgLgnM+I9wATVGBeDixWZkAAAAAElFTkSuQmCC',
+  };
   const CHARACTER = { id: 'park', nameKey: 'story.name' };
+  const REP_NAMES = { yeo: 'story.name.yeo', noh: 'story.name.noh', kang: 'story.name.kang', rep: 'story.name.rep' };
+  // 화자별 스프라이트: 박 반장은 SPRITES, 조연은 REPS[id_expr]
+  function sprite(speaker, expr, talk) {
+    if (!speaker || speaker === 'park') return SPRITES[expr + (talk ? '_talk' : '')] || SPRITES[expr] || SPRITES.neutral;
+    const base = REPS[`${speaker}_${expr}`] || REPS[`${speaker}_neutral`];
+    return (talk && REPS[`${speaker}_neutral_talk`]) || base;
+  }
+  // 센터의 담당자 id (계열 rep, 없으면 generic 'rep')
+  function repOf(carrier) { const car = root.DATA.CARRIERS[carrier]; return (car && car.rep) || 'rep'; }
+  function repName(id, carrier) { const k = REP_NAMES[id] || REP_NAMES.rep; return root.I18n.t(k, { center: carrier ? root.DATA.CARRIERS[carrier].name : '' }); }
+  // 새 계약을 맺을 때 담당자 인사 (마켓에서 계약 구매 직후). 문구 rep.greet.<family> 없으면 generic
+  function greet(g, c, switchedFrom) {
+    const car = root.DATA.CARRIERS[c.carrier], fam = root.DATA.familyOf(c.carrier), id = repOf(c.carrier);
+    const p = { center: car.name, cap: g.vehicleCap(c), fee: g.truckFee(c), trucks: c.maxCalls, vehicle: car.vehicle || '', from: switchedFrom ? root.DATA.CARRIERS[switchedFrom].name : '', tier: car.tier };
+    const kf = `rep.greet.${fam}.${car.tier}`, kg = `rep.greet.${fam}`, T = root.I18n.t;
+    const text = T(kf, p) !== kf ? T(kf, p) : T(kg, p) !== kg ? T(kg, p) : T('rep.greet.generic', p);
+    const pages = [{ speaker: id, expr: 'smile', text }];
+    if (switchedFrom) pages.unshift({ speaker: id, expr: 'neutral', text: T('rep.switch', p) });
+    return { id: 'greet:' + c.id, pages, name: repName(id, c.carrier), calendar: false };
+  }
+
 
   const attrsOf = (g, p) => p.attrs || root.DATA.PARCEL_TYPES[p.type].attrs;
   const usage = g => g.usedVolume() / g.warehouse.cap;
@@ -35,7 +71,7 @@
     { id: 'intro', months: [1], kind: 'start', when: () => true, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: '#parcels' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
     { id: 'usage', months: [1], kind: 'turn', when: g => g.turn >= 2, pages: [{ expr: 'neutral', hl: '#bar-usage' }] },
     { id: 'callReady', months: [1], kind: 'turn', when: g => g.turn >= 3 || bestReadySlot(g).fill >= 0.8, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
-    { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { expr: 'neutral' }] },
+    { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
     { id: 'deadline1', months: [1, 2, 3], kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1 && !(p.customs > 0)), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'usage76', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.76, pages: [{ expr: 'worry', hl: '#bar-usage' }, { expr: 'neutral', hl: '#upcoming' }] },
     { id: 'usage91', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.91, pages: [{ expr: 'shock', hl: '#bar-usage' }] },
@@ -52,8 +88,8 @@
     // ----- 5월 (3개월차): 손실, 승리, 작별 -----
     { id: 'm3', months: [3], kind: 'turn', when: g => g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'fragileRisk', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => attrsOf(g, p).includes('fragile')) && !g.contracts.some(c => c && g.contractCaps(c).includes('fragile')), pages: [{ expr: 'neutral', hl: '#parcels' }] },
-    { id: 'loss', months: [1, 2, 3], kind: 'any', when: (g, ctx) => hasEvent(ctx, ['discard', 'returned', 'stolen', 'broken', 'claim']), pages: [{ expr: 'shock' }, { expr: 'neutral' }] },
-    { id: 'rain', months: [1, 2, 3], kind: 'turn', when: g => g.weatherNow() === 'rain' || g.upcoming().some(u => u.weather === 'rain'), pages: [{ expr: 'neutral', hl: '#upcoming' }, { expr: 'neutral', hl: '#wait-btn' }] },
+    { id: 'loss', months: [1, 2, 3], kind: 'any', when: (g, ctx) => hasEvent(ctx, ['discard', 'returned', 'stolen', 'broken', 'claim']), pages: [{ expr: 'shock' }, { speaker: 'kang', expr: 'neutral', k: () => 'story.loss.rep' }, { expr: 'neutral', k: () => 'story.loss.2' }] },
+    { id: 'rain', months: [1, 2, 3], kind: 'turn', when: g => g.weatherNow() === 'rain' || g.upcoming().some(u => u.weather === 'rain'), pages: [{ speaker: 'noh', expr: 'neutral', hl: '#upcoming' }, { expr: 'neutral', hl: '#wait-btn' }] },
     { id: 'win', months: [3], kind: 'turn', when: g => g.turn >= 5, pages: [{ expr: 'neutral' }, { expr: 'smile' }, { expr: 'think' }] },
     { id: 'summary3', months: [3], kind: 'summary', when: () => true, pages: [{ expr: g => (g.summary && g.summary.cash > 0 ? 'laugh' : 'worry'), k: g => 'story.summary3.' + (g.summary && g.summary.cash > 0 ? 'good' : 'bad') }] },
     { id: 'farewell', months: [4], kind: 'turn', when: g => g.turn === 1, calendar: true, pages: [{ expr: 'smile' }, { expr: 'neutral' }, { expr: 'laugh' }] },
@@ -90,7 +126,8 @@
     const p = params(g);
     const pages = b.pages.map((pg, i) => {
       const key = pg.k ? pg.k(g) : `story.${b.id}.${i + 1}`;
-      return { expr: typeof pg.expr === 'function' ? pg.expr(g) : pg.expr, hl: typeof pg.hl === 'function' ? pg.hl(g) : pg.hl || null, gate: typeof pg.gate === 'function' ? !!pg.gate(g) : !!pg.gate, text: root.I18n.t(key, p) };
+      const speaker = typeof pg.speaker === 'function' ? pg.speaker(g) : pg.speaker || 'park';
+      return { speaker, name: speaker === 'park' ? root.I18n.t(CHARACTER.nameKey) : repName(speaker), expr: typeof pg.expr === 'function' ? pg.expr(g) : pg.expr, hl: typeof pg.hl === 'function' ? pg.hl(g) : pg.hl || null, gate: typeof pg.gate === 'function' ? !!pg.gate(g) : !!pg.gate, text: root.I18n.t(key, p) };
     });
     if (!g.story.notes) g.story.notes = [];
     g.story.notes.push({ id: b.id, month: g.month, turn: g.turn, text: pages.map(x => x.text) });
@@ -106,6 +143,6 @@
   function done(g) { return !!(g && g.story && g.story.seen.includes('farewell')); }
   function active(g) { return !!(g && g.story && !g.story.off && !done(g)); }
 
-  const Story = { BEATS, SPRITES, CHARACTER, check, sms, done, active };
+  const Story = { BEATS, SPRITES, REPS, CHARACTER, check, sms, done, active, sprite, repOf, repName, greet };
   if (typeof module !== 'undefined') module.exports = Story; else root.Story = Story;
 })(typeof window !== 'undefined' ? window : globalThis);

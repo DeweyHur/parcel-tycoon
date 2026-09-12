@@ -297,6 +297,40 @@
     'story.next': 'Next ▶',
     'story.ok': 'Got it',
     'story.tapHere': 'Tap here',
+    'story.name.yeo': 'Yeo',
+    'story.name.noh': 'Noh',
+    'story.name.kang': 'Kang',
+    'story.name.rep': '{center} rep',
+    'story.firstCall.rep': 'Thanks for the first dispatch, boss! The fuller you load us, the better for both of us. Call again anytime.',
+    'story.loss.rep': 'Boss, the incident\'s logged. Unless it\'s on us, the claim goes to the customer. Please keep to the deadlines next time.',
+    'rep.switch': 'Your contract with {from} ends here. Their leftover trucks can\'t be returned — from now on, you\'re with us.',
+    'rep.greet.generic': 'This is {center}. {vehicle}, {cap} cells, {fee}c per truck, {trucks} trucks to start. When you run out, refill at the market.',
+    'rep.greet.bulk': 'Yeo from {center}! {vehicle}, {cap} cells at {fee}c per truck, {trucks} trucks. Send us all your plain parcels — full trucks are the cheapest per parcel.',
+    'rep.greet.bulk.2': 'Yeo from {center}. These trucks are padded, so ⚠ fragile rides safe too. {cap} cells, {fee}c per truck, {trucks} trucks.',
+    'rep.greet.bulk.3': '{center}, Yeo here. We can send two trucks at once. {trucks} padded trucks of {cap} cells, {fee}c each. Volume won\'t be your problem anymore.',
+    'rep.greet.cold': 'Kang from {center}. {vehicle}, {cap} cells, {fee}c per truck, {trucks} trucks. Fresh goods start dying the moment they leave the cold zone. Don\'t call late.',
+    'rep.greet.cold.2': 'Kang from {center}. This truck has a freezer compartment — ❄ cold and ❆ frozen ride together. {cap} cells, {fee}c per truck, {trucks} trucks.',
+    'rep.greet.frozen': 'Kang from {center}. Frozen is gone the moment it leaves the freezer, so batch them up when you call. {cap} cells, {fee}c per truck, {trucks} trucks.',
+    'rep.greet.large': 'Noh, {center}. Big stuff doesn\'t break on my truck. {cap} cells, {fee}c a truck, {trucks} trucks lined up. Only send me the size-4-plus ones.',
+    'rep.greet.large.2': 'Noh, {center}. This one\'s a reefer heavy truck — ❄ big fresh goods ride too. {cap} cells, {fee}c a truck, {trucks} trucks.',
+    'rep.greet.rail': 'Noh, {center}. A train takes {cap} cells in one go. The money comes next turn, though. {trucks} runs, {fee}c each.',
+    'rep.greet.rail.1': 'Noh, {center}. Express freight — you get paid right away. {cap} cells, {fee}c a run, {trucks} runs.',
+    'market.refillName': 'Refill {name} trucks',
+    'market.switchHint': 'Switch from {name} (higher-tier center, same line)',
+    'err.refillFull': 'Trucks are already full',
+    'log.refill': 'Refill: {name} to {n} trucks (-{price}c){wasted}',
+    'log.refillWasted': ' · {n} leftover trucks wasted',
+    'mk.refillDesc': 'Refills this contract to {max} trucks (now {calls}). Flat price, so leftover trucks are wasted — use them up before refilling.',
+    'mk.refillWaste': '⚠ {n} trucks still left — refilling now wastes {n}',
+    'mk.tierVs': 'vs. line standard: {cap0}→{cap1} cells · {t0}→{t1} trucks · {f0}→{f1}c/truck',
+    'mk.detail': 'Details',
+    'mk.refillBtn': 'Refill {price}c',
+    'cd.rep': 'Rep: {name}',
+    'cd.family': 'Line: {name} · {tier}',
+    'cd.refillLine': 'Full refill {price}c (at the market)',
+    'toast.refill': 'Refilled: {name} {n} trucks',
+    'slot.switchAsk': 'Ends the {from} contract and signs with <b>{to}</b>. The {calls} leftover trucks are lost, and trust starts from 0 with the new center.',
+    'slot.switchBtn': 'Switch',
     'story.calendar': '📅 Calendar',
     'story.intro.1': 'Welcome. As of today, you\'re the boss here.<br>I\'ll stick around for three months to nag, then I\'m gone. Hit that × if you\'d rather not hear it.',
     'story.intro.2': 'Those are today\'s parcels. Every one of them is money — but left like that, they just fill the warehouse.<br>See the ⏳? Four turns to ship. March is moving season, so it\'s mostly plain boxes.',
@@ -313,7 +347,7 @@
     'story.summary1.1': 'First month\'s settlement. Look at the cost breakdown — rent {rent}c, contract upkeep, facilities, labor.<br>Rent doesn\'t budge. The only thing you can save is dispatch fees.',
     'story.summary1.2': 'That\'s why I keep saying: fill the truck. Next up, the market. Contracts are only sold there.',
     'story.market1.1': 'This is the market. Contracts are bought here, once a month.<br>A contract = "the right to call this carrier\'s trucks N times a month".',
-    'story.market1.2': 'Each card lists truck capacity, fee per truck, and monthly limit. See \'Next month forecast\' up top? That\'s roughly what\'s coming.<br>Fill the gaps in what you can haul.',
+    'story.market1.2': 'Each card lists truck capacity, fee per truck, and truck count. Trucks get used up and don\'t come back at month start — only a full refill here. See \'Next month forecast\' up top? That\'s roughly what\'s coming.<br>Fill the gaps in what you can haul.',
     'story.market1.3': 'Premium grades are pricey. Talk to me when you have money to spare — standard is plenty for now.<br>In April customers start sending special goods, so keep the cold zone empty.',
     'story.m2.1': 'April. Time we talked about customers.',
     'story.m2.2': 'See the icon on each parcel? That\'s who sent it. Deliver on time and their trust rises; higher trust means more volume and better pay.<br>Discard one and it\'s −3. Keep doing that and they walk.',
@@ -328,7 +362,7 @@
     'story.cash.1': 'The cash number up top isn\'t what you hold — it\'s the <b>projected month-end balance</b>. Dispatch fees don\'t leave mid-month; they all go out at settlement.<br>You\'ll never be blocked from calling a truck for lack of cash.',
     'story.cash.2': 'Red means you\'ll be short at month end. The gap becomes a short-term loan at {interest}% interest.<br>Two months in a row hurts, so ship more this month.',
     'story.summary2.1': 'Look at income per customer below. Lean on one customer and you fall when they do. Keep two legs.',
-    'story.market2.1': 'Owned contracts always have an \'add trucks\' card. Warehouse expansion is always there too.<br>Expansions get pricier every step — don\'t put them off.',
+    'story.market2.1': "See the 'Refill' button on each contract up top? Flat price, so use them up before refilling. When a bigger center in the same line shows up you can switch — new rep, trust from zero.<br>Expansions get pricier every step — don't put them off.",
     'story.m3.1': 'May, Family Month. More gift boxes — fragile ones.',
     'story.m3.2': 'Breakage means claims, so let\'s talk insurance. See the insurer in the HUD? You pick one at the market.<br>No claims and the premium drops.',
     'story.fragileRisk.1': 'Fragile goods but no padded van. The call screen shows the break chance and the claim amount up front.<br>"25% means one in four you pay for" — decide on that number.',
@@ -584,9 +618,9 @@
     'mk.afterBuy': 'After purchase',
     'mk.allFacilities': 'All facilities already bought',
     'mk.sold': 'Sold',
-    'mk.currentContracts': 'Current contracts (replacing loses remaining calls and upgrades{keep}; carrier trust is kept)',
+    'mk.currentContracts': 'Current contracts — trucks are consumable: no monthly reset, only full refills here{keep}',
     'mk.keepCalls': ', {n} call kept',
-    'mk.contractLine': '{calls}/{max} dispatches this month, vehicle {cap} slots',
+    'mk.contractLine': '{calls}/{max} trucks left, vehicle {cap} slots',
     'mk.mine': 'My contracts',
     'mk.prepNote': 'Before month 1 starts.',
     'mk.bought': 'Bought',
@@ -647,10 +681,10 @@
     'my.slot': 'Slot {n}',
     'my.limit': 'dispatch limit +{n}',
     'my.cap': 'capacity +{n}',
-    'my.remain': "{calls}/{max} dispatches this month",
+    'my.remain': "{calls}/{max} trucks",
     'my.stats': "{vehicle} <b>{cap}</b> slots · {fee}c/vehicle · up to {simul} at once · {calls} calls this run · {n} shipped",
     'my.others': 'Carriers with leftover trust but no contract',
-    'my.note': 'Replacing loses remaining calls and upgrades{keep}; carrier trust is kept',
+    'my.note': 'Trucks are consumable (no monthly reset; full refills at the market). Replacing loses leftover trucks and upgrades{keep}; trust is per center',
     'codex.carriersHead': 'Carriers · trust accrues per carrier and survives contract changes',
     'codex.liveRun': '(current run progress)',
     'codex.carrierPrice': "{vehicle} {cap} slots · {fee}c/vehicle · {trucks}/month · {price}c",
@@ -744,60 +778,179 @@
       }
     },
     "CARRIERS": {
-      "bulk": {
-        "name": "Bulk Sorting",
-        "short": "Bulk",
-        "vehicle": "Box Truck",
-        "desc": "Loads plain parcels (size 1–2) on a box truck. The backbone of a standard-parcel build"
+      "bulk0": {
+        "name": "Hangil Logistics",
+        "short": "Hangil",
+        "vehicle": "box truck",
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · standard contract"
       },
-      "cold": {
-        "name": "Cold Logistics",
-        "short": "Cold",
-        "vehicle": "Reefer Truck",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus"
+      "bulk1": {
+        "name": "QuickHands Express",
+        "short": "QuickHands",
+        "vehicle": "box truck",
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Premium — trucks +1 · cap +1 · fee −10%"
       },
-      "frozen": {
-        "name": "Frozen Logistics",
-        "short": "Frozen",
-        "vehicle": "Freezer Truck",
-        "desc": "Frozen only. Frozen bonus"
+      "bulk2": {
+        "name": "Blueway Logis",
+        "short": "Blueway",
+        "vehicle": "padded box truck",
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Elite — trucks +2 · cap +2 · fee −20% · ⚠ break-safe added"
       },
-      "fragile": {
-        "name": "Fragile Pro",
-        "short": "FragPro",
-        "vehicle": "Padded Van",
-        "desc": "Fragile specialist. No breakage, fragile bonus"
+      "bulk3": {
+        "name": "MegaHub Logistics",
+        "short": "MegaHub",
+        "vehicle": "padded box truck",
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Master — trucks +3 · cap +3 · fee −30% · ⚠ break-safe added · 2 trucks at once"
       },
-      "intl": {
-        "name": "Customs Broker",
-        "short": "Broker",
-        "vehicle": "Bonded Truck",
-        "desc": "Clears and ships cargo still in customs. Customs bonus"
+      "cold0": {
+        "name": "Dawn Chill",
+        "short": "Dawn Chill",
+        "vehicle": "reefer truck",
+        "desc": "Fresh & produce specialist. Fresh/produce bonus · standard contract"
       },
-      "large": {
-        "name": "Heavy Haul",
-        "short": "Heavy",
-        "vehicle": "Heavy Truck",
-        "desc": "Ships size 4+ parcels (break-safe). Large bonus"
+      "cold1": {
+        "name": "Ice Road",
+        "short": "Ice Road",
+        "vehicle": "reefer truck",
+        "desc": "Fresh & produce specialist. Fresh/produce bonus · Premium — trucks +1 · cap +1 · fee −10%"
       },
-      "air": {
-        "name": "Air Express",
-        "short": "Air",
-        "vehicle": "Air Container",
-        "desc": "Small (1–2) only. Handles customs & fragile safely. Pricey but fast"
+      "cold2": {
+        "name": "ColdChain Center",
+        "short": "ColdChain",
+        "vehicle": "reefer/freezer truck",
+        "desc": "Fresh & produce specialist. Fresh/produce bonus · Elite — trucks +2 · cap +2 · fee −20% · ❆ frozen-capable added"
       },
-      "rail": {
-        "name": "Rail Freight",
-        "short": "Rail",
-        "vehicle": "Freight Train",
-        "desc": "Break-safe, big batches. Paid next turn"
+      "cold3": {
+        "name": "Polar Logis",
+        "short": "Polar",
+        "vehicle": "large reefer",
+        "desc": "Fresh & produce specialist. Fresh/produce bonus · Master — trucks +3 · cap +3 · fee −30% · ❆ frozen-capable added · up to size 7"
       },
-      "sea": {
-        "name": "Sea Freight",
-        "short": "Sea",
-        "vehicle": "Container",
-        "desc": "Customs container, size 2+, break-safe. Paid 2 turns later"
+      "frozen0": {
+        "name": "Glacier Frozen",
+        "short": "Glacier",
+        "vehicle": "freezer truck",
+        "desc": "Frozen only. Frozen bonus · standard contract"
+      },
+      "frozen1": {
+        "name": "Snowfield Frozen",
+        "short": "Snowfield",
+        "vehicle": "freezer truck",
+        "desc": "Frozen only. Frozen bonus · Premium — trucks +1 · cap +1 · fee −10%"
+      },
+      "frozen2": {
+        "name": "Minus 30",
+        "short": "Minus30",
+        "vehicle": "freezer/reefer truck",
+        "desc": "Frozen only. Frozen bonus · Elite — trucks +2 · cap +2 · fee −20% · ❄ cold-capable added"
+      },
+      "fragile0": {
+        "name": "Easy Does It",
+        "short": "EasyDoes",
+        "vehicle": "padded van",
+        "desc": "Fragile specialist. No breakage, fragile bonus · standard contract"
+      },
+      "fragile1": {
+        "name": "Glass Hands",
+        "short": "GlassHands",
+        "vehicle": "padded van",
+        "desc": "Fragile specialist. No breakage, fragile bonus · Premium — trucks +1 · cap +1 · fee −10%"
+      },
+      "fragile2": {
+        "name": "Padding Masters",
+        "short": "Padding",
+        "vehicle": "large padded truck",
+        "desc": "Fragile specialist. No breakage, fragile bonus · Elite — trucks +2 · cap +2 · fee −20% · up to size 7"
+      },
+      "fragile3": {
+        "name": "Porcelain Logis",
+        "short": "Porcelain",
+        "vehicle": "chilled padded truck",
+        "desc": "Fragile specialist. No breakage, fragile bonus · Master — trucks +3 · cap +3 · fee −30% · ❄ cold-capable added · up to size 7"
+      },
+      "intl0": {
+        "name": "Customs Bridge",
+        "short": "Customs",
+        "vehicle": "bonded truck",
+        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · standard contract"
+      },
+      "intl1": {
+        "name": "Bonded Express",
+        "short": "Bonded",
+        "vehicle": "bonded truck",
+        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · Premium — trucks +1 · cap +1 · fee −10%"
+      },
+      "intl2": {
+        "name": "WorldGate",
+        "short": "WorldGate",
+        "vehicle": "bonded padded truck",
+        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · Elite — trucks +2 · cap +2 · fee −20% · ⚠ break-safe added"
+      },
+      "large0": {
+        "name": "Giant Freight",
+        "short": "Giant",
+        "vehicle": "heavy truck",
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus · standard contract"
+      },
+      "large1": {
+        "name": "Taesan Heavy",
+        "short": "Taesan",
+        "vehicle": "heavy truck",
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Premium — trucks +1 · cap +1 · fee −10%"
+      },
+      "large2": {
+        "name": "Elephant Special",
+        "short": "Elephant",
+        "vehicle": "reefer heavy truck",
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Elite — trucks +2 · cap +2 · fee −20% · ❄ cold-capable added"
+      },
+      "air0": {
+        "name": "Skyway Air",
+        "short": "Skyway",
+        "vehicle": "air container",
+        "desc": "Small (1-2) only. Handles customs & fragile safely. Pricey but fast · standard contract"
+      },
+      "air1": {
+        "name": "Jet Cargo",
+        "short": "Jet",
+        "vehicle": "air container",
+        "desc": "Small (1-2) only. Handles customs & fragile safely. Pricey but fast · Premium — trucks +1 · cap +1 · fee −10% · up to size 4"
+      },
+      "rail0": {
+        "name": "Ironhorse Freight",
+        "short": "Ironhorse",
+        "vehicle": "freight train",
+        "desc": "Break-safe, big batches. Paid next turn · standard contract"
+      },
+      "rail1": {
+        "name": "Bullet Cargo",
+        "short": "Bullet",
+        "vehicle": "express freight train",
+        "desc": "Break-safe, big batches. Paid next turn · Premium — trucks +1 · cap +1 · fee −10% · paid immediately"
+      },
+      "sea0": {
+        "name": "Wave Shipping",
+        "short": "Wave",
+        "vehicle": "container",
+        "desc": "Customs container, size 2+, break-safe. Paid in 2 turns · standard contract"
+      },
+      "sea1": {
+        "name": "Ocean Container",
+        "short": "Ocean",
+        "vehicle": "container",
+        "desc": "Customs container, size 2+, break-safe. Paid in 2 turns · Premium — trucks +1 · cap +1 · fee −10% · payment delay 1 turn"
       }
+    },
+    "FAMILIES": {
+      "bulk": { "name": "Bulk" },
+      "cold": { "name": "Cold" },
+      "frozen": { "name": "Frozen" },
+      "fragile": { "name": "Fragile" },
+      "intl": { "name": "Customs" },
+      "large": { "name": "Large" },
+      "air": { "name": "Air" },
+      "rail": { "name": "Rail" },
+      "sea": { "name": "Sea" }
     },
     "TRUST_PERK_TEXT": {
       "bulk": [

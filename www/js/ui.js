@@ -530,9 +530,9 @@
     BGM.play('market');
     const render = () => {
       const items = mk.items.map((it, i) => {
+        if (it.kind === 'refill') return ''; // 충전은 위 '현재 계약' 칸에서
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract' && it.standing && it.add) { const c = game.contracts.find(x => x && x.carrier === it.carrier); desc = `${T('mk.addDesc', { n: game.itemTrucks(it), max: c ? c.maxCalls : 0, next: Math.round(price * D.ADD_PRICE_STEP) })}`; }
-        else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], g = D.GRADES[it.grade]; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${car.desc}<br>${car.badge || ''} ${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}<br>${T('mk.vehicleLine', { vehicle: esc(car.vehicle || ''), cap: car.cap + g.cap + (R.carrierCapDelta[it.carrier] || 0), fee: Math.max(0, Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * g.fee * R.feeMult + R.feeDelta)), trucks: Math.max(1, car.trucks + g.calls + R.callsDelta) })}${it.grade !== 'normal' ? `<br><span style="color:var(--gold)">${T('mk.gradeVs', { cap0: car.cap, cap1: car.cap + g.cap, t0: car.trucks, t1: car.trucks + g.calls, f0: Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * R.feeMult), f1: Math.max(0, Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * g.fee * R.feeMult + R.feeDelta)), lv: [0, 1, 2, 3][['normal', 'trusted', 'expert', 'master'].indexOf(it.grade)] })}</span>` : ''} · ${trustBar(game, it.carrier)}${trustTrack(it.carrier, game.trustXp(it.carrier))}`; }
+        if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier], base = D.FAMILIES[car.family]; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${esc(car.desc)}<br>${car.badge || ''} ${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}<br>${T('mk.vehicleLine', { vehicle: esc(car.vehicle || ''), cap: car.cap + (R.carrierCapDelta[car.family] || 0), fee: Math.max(0, Math.round((R.feeFixed != null ? R.feeFixed : car.fee) * R.feeMult + R.feeDelta)), trucks: Math.max(1, car.trucks + R.callsDelta) })}${car.tier > 0 ? `<br><span style="color:var(--gold)">${T('mk.tierVs', { cap0: base.cap, cap1: car.cap, t0: base.trucks, t1: car.trucks, f0: Math.round(base.fee * R.feeMult), f1: Math.round(car.fee * R.feeMult) })}</span>` : ''} · ${T('cd.rep', { name: esc(Story.repName(Story.repOf(it.carrier), it.carrier)) })}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
@@ -540,7 +540,14 @@
         const kindLbl = T('kind.' + it.kind);
         return `<div class="card ${it.sold ? 'sold' : ''}" data-i="${i}"><div class="t"><span>[${kindLbl}] ${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div></div>`;
       }).join('');
-      const contracts = `<hr><div style="font-size:12px;color:var(--dim);margin-bottom:4px">${T('mk.currentContracts', { keep: R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : '' })}</div>` + game.contracts.map(c => c ? `<div style="font-size:12px">· ${esc(game.contractName(c))} — ${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })} ${trustBar(game, c.carrier)}</div>` : `<div style="font-size:12px">· (${T('err.emptySlot')})</div>`).join('');
+      // 현재 계약: 맨 위. 카드마다 상세 버튼 + 배차 충전 버튼(정액·남은 배차는 버려짐)
+      const contracts = `<div style="font-size:12px;color:var(--gold);margin:4px 0">${T('mk.currentContracts', { keep: R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : '' })}</div>` + game.contracts.map((c, si) => {
+        if (!c) return `<div class="card dis" style="cursor:default"><div class="t">${T('my.slot', { n: si + 1 })} · ${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>`;
+        const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
+        return `<div class="card" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${T('my.remain', { calls: c.calls, max: c.maxCalls })}</span></div>
+          <div class="d">${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })} ${trustBar(game, c.carrier)}${rit && c.calls > 0 ? `<br><span style="color:var(--orange)">${T('mk.refillWaste', { n: c.calls })}</span>` : ''}</div>
+          <div class="ob" style="display:flex;gap:6px;margin-top:4px"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</div></div>`;
+      }).join('') + '<hr>';
       const rc = game.refreshCost();
       const wh = game.warehouse, used = game.usedVolume(), outd = game.outdoorVolume();
       const whLine = `<div class="pickinfo whinfo"><span>${T('common.warehouse')} <b class="${used > wh.cap ? 'bad' : ''}">${used}/${wh.cap}</b></span><span>${D.ATTRS.cold.name} <b>${game.coldUsed()}/${wh.cold}</b></span>${wh.frozen || game.frozenUsed() ? `<span>${D.ATTRS.frozen.name} <b>${game.frozenUsed()}/${wh.frozen || 0}</b></span>` : ''}<span>${T('common.xl')} <b>${game.parcels.filter(p => p.baseSize >= 7).length}/${wh.xl}</b></span>${outd ? `<span class="bad">${T('hud.outdoorTag')} ${T('fmt.cells', { n: outd })}</span>` : ''}<button class="btn small" id="mk-ins">${T('kind.item')}</button><button class="btn small" id="mk-cust">${T('kind.customer')}</button><button class="btn small" id="mk-mine">${T('mk.mine')}</button></div>`;
@@ -550,37 +557,58 @@
       const nm = mk.prep ? game.month : game.month + 1, cal = game.calMonth(nm);
       const seasonLine = nm <= game.monthsTotal() ? `<div class="d" style="color:var(--dim)">${T(mk.prep ? 'mk.seasonLineNow' : 'mk.seasonLine', { cal, season: T('season.' + game.season(nm)), note: T(`cal.${game.rules.calendar}.${cal}.note`) })}</div>` : '';
       const fcLine = `<div class="d fcline"><span style="color:var(--gold)">${T('mk.forecast', { m: nm })}</span> ${fcRows}</div>${seasonLine}`;
-      const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span><span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>${whLine}${fcLine}${prepLine}${items}
-        ${R.noRefresh ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('err.noRefresh')}</div>` : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}${contracts}`;
+      const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span><span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>${whLine}${contracts}${fcLine}${prepLine}${items}
+        ${R.noRefresh ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('err.noRefresh')}</div>` : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
       const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: mk.month }), body, [{ label: T('mk.startMonth', { n: mk.month + 1 }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(6, Math.max(1, mk.month))] * R.itemPriceMult * R.priceMult).toFixed(2) }));
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
       if (!mk.storyShown) { mk.storyShown = true; storyCheck({ kind: 'market' }); }
       m.querySelector('#mk-mine').onclick = () => { SFX.click(); showMyContracts(render); };
       m.querySelector('#mk-cust').onclick = () => { SFX.click(); showCustomers(render); };
       m.querySelector('#mk-ins').onclick = () => { SFX.click(); showInsurance(render); };
-      m.querySelectorAll('.card').forEach(el => el.onclick = () => {
+      m.querySelectorAll('[data-detail]').forEach(b => b.onclick = e => { e.stopPropagation(); SFX.click(); showContractDetail(game.contracts[+b.dataset.detail], render); });
+      m.querySelectorAll('[data-refill]').forEach(b => b.onclick = e => { e.stopPropagation(); const it = mk.items[+b.dataset.refill]; const c = game.contracts.find(x => x && x.id === it.contractId);
+        const go = () => { const r = game.buy(+b.dataset.refill, null); if (r.ok) { SFX.buy(); saveGame(); toast(T('toast.refill', { name: game.contractName(c), n: c.maxCalls })); render(); } else toast(r.msg); };
+        if (c && c.calls > 0) askConfirm(T('mk.refillWaste', { n: c.calls }) + ' — ' + T('mk.refillDesc', { max: c.maxCalls, calls: c.calls }), go, T('mk.refillBtn', { price: it.price })); else go(); });
+      m.querySelectorAll('.card[data-i]').forEach(el => el.onclick = () => {
         const it = mk.items[+el.dataset.i]; if (it.sold) return;
         SFX.click();
         if (mk.bought >= R.marketMaxBuy) return toast(T('err.marketMax', { n: R.marketMaxBuy }));
         const price = it.kind === 'contract' ? game.contractPrice(it) : it.price;
         if (game.cash < price) return toast(T('err.noCash'));
         if (it.kind === 'fac' || it.kind === 'item' || it.kind === 'customer') { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
-        // 보유 업체 계약(업그레이드·배차 추가)은 슬롯을 고르지 않고 그 슬롯을 갱신한다 — 확인만
-        if (it.kind === 'contract' && (it.upgrade || it.add)) {
-          const s = game.contracts.findIndex(c => c && c.carrier === it.carrier), c = game.contracts[s];
-          if (s < 0) return chooseSlot(it, +el.dataset.i, render);
-          const n = game.itemTrucks(it);
-          const msg = it.upgrade ? T('slot.upgradeAsk', { name: game.contractName(c), grade: D.GRADES[it.grade].name, n }) : T('slot.addAsk', { name: game.contractName(c), n });
-          modal(it.name, `<p>${msg}</p><p style="font-size:12px;color:var(--dim)">${T('slot.upkeepNote', { n: D.OPCOST_CONTRACT[it.upgrade ? it.grade : c.grade] })}</p>`, [
-            { label: T('btn.cancel'), onClick: render },
-            { label: it.upgrade ? T('slot.upgradeBtn') : T('slot.addBtn'), cls: 'primary', onClick: () => { const r = game.buy(+el.dataset.i, s, it.upgrade ? 'upgrade' : 'add'); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); } },
-          ]);
-          return;
+        // 같은 계열 상위 센터로 갈아타기: 그 슬롯을 바로 대상으로, 확인만
+        if (it.kind === 'contract' && it.switchFrom) {
+          const si = game.contracts.findIndex(c => c && c.id === it.switchFrom), c = game.contracts[si];
+          if (si >= 0) { modal(it.name, `<p>${T('slot.switchAsk', { from: esc(game.contractName(c)), to: esc(it.name), calls: c.calls })}</p>`, [{ label: T('btn.cancel'), onClick: render }, { label: T('slot.switchBtn'), cls: 'primary', onClick: () => buyContractInto(it, +el.dataset.i, si, render) }]); return; }
         }
         chooseSlot(it, +el.dataset.i, render);
       });
     };
     render();
+  }
+  // 계약 구매 → 그 센터 담당자가 인사한다 (스토리 안내가 꺼져 있으면 생략)
+  function buyContractInto(it, idx, slot, back) {
+    const old = game.contracts[slot]; const from = old ? old.carrier : null;
+    const r = game.buy(idx, slot); if (!r.ok) { toast(r.msg); return; }
+    SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back();
+    const nc = game.contracts[slot];
+    if (nc && !(game.story && game.story.off)) showStoryBeat(Story.greet(game, nc, from && D.familyOf(from) === D.familyOf(nc.carrier) ? from : null), null);
+  }
+  // 계약 상세: 차량·능력·배차비·배차·신뢰 특성·강화·담당자
+  function showContractDetail(c, back) {
+    const g = game, car = D.CARRIERS[c.carrier], fam = D.FAMILIES[car.family];
+    const enh = [c.enh.limit ? T('my.limit', { n: c.enh.limit }) : '', c.enh.cap ? T('my.cap', { n: c.enh.cap }) : '', c.enh.regular ? D.ENHANCEMENTS.regular.name : '', c.enh.express ? D.ENHANCEMENTS.express.name : '', c.enh.opt ? D.ENHANCEMENTS[c.enh.opt].name : ''].filter(Boolean);
+    const rep = Story.repOf(c.carrier);
+    const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d"><b>${esc(car.name)}</b>${gradeBadge(c.grade)}<br>${T('cd.rep', { name: esc(Story.repName(rep, c.carrier)) })}<br>${T('cd.family', { name: esc(fam.name), tier: esc(D.GRADES[c.grade].name) })}</div></div>
+      <div class="d" style="margin-top:8px">${esc(car.desc)}</div>
+      <div class="kv" style="margin-top:6px"><span>${T('call.caps')}</span><span class="v">${g.contractCaps(c).length ? attrIcons(g.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: g.contractSizeMax(c) })}</span>
+      <span>${esc(car.vehicle || '')}</span><span class="v">${T('fmt.cells', { n: g.vehicleCap(c) })} · ×${g.simulMax(c)}</span>
+      <span>${T('sum.fees')}</span><span class="v">${g.truckFee(c)}c${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}</span>
+      <span>${T('fmt.trucks', { n: c.maxCalls })}</span><span class="v ${c.calls === 0 ? 'bad' : ''}">${T('my.remain', { calls: c.calls, max: c.maxCalls })} · ${T('cd.refillLine', { price: g.refillPrice(c) })}</span>
+      <span>${T('common.trust')}</span><span class="v">${trustBar(g, c.carrier)}</span></div>
+      ${trustTrack(c.carrier, g.trustXp(c.carrier))}${enh.length ? `<div class="d">${T('kind.enh')}: ${enh.join(', ')}</div>` : ''}
+      <div class="d" style="color:var(--dim)">${T('my.stats', { vehicle: esc(car.vehicle || ''), cap: g.vehicleCap(c), fee: g.truckFee(c), simul: g.simulMax(c), calls: c.totalCalls, n: c.delivered })}</div>`;
+    modal(g.contractName(c), body, [{ label: T('btn.close'), onClick: back || closeModal }]);
   }
   function chooseSlot(it, idx, back) {
     const isContract = it.kind === 'contract';
@@ -590,7 +618,7 @@
       return `<div class="card" data-s="${s}"><div class="t">${esc(game.contractName(c))}</div><div class="d">${info}</div></div>`;
     }).join('');
     const m = modal(it.name, body, [{ label: T('btn.cancel'), onClick: back }]);
-    const doBuy = (s, mode) => { const r = game.buy(idx, s, mode); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back(); } else toast(r.msg); };
+    const doBuy = (s) => { if (isContract) return buyContractInto(it, idx, s, back); const r = game.buy(idx, s); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back(); } else toast(r.msg); };
     m.querySelectorAll('.card').forEach(el => el.onclick = () => doBuy(+el.dataset.s));
   }
 
@@ -663,7 +691,7 @@
     const tabs = ['companies', 'carriers', 'perks', 'scenarios', 'achievements', 'stats'].map(id => [id, T('codex.tab.' + id)]);
     let body = `<div class="tabs">${tabs.map(([id, nm]) => `<button class="btn small ${tab === id ? 'gold' : ''}" data-tab="${id}">${nm}</button>`).join('')}</div>`;
     if (tab === 'companies') body += [0, 1, 2, 3].map(t => `<div class="perk-count">${TIER_NAMES()[t]}</div>` + Object.keys(M.COMPANIES).filter(id => (M.COMPANIES[id].tier || 0) === t).map(id => { const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id); const clears = P.stats.clearsByCompany[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? co.icon : '🔒'} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div>${un ? companyInfo(co, id) : `<div class="d">${esc(unlockText(co.unlock))}</div>`}</div>`; }).join('')).join('');
-    else if (tab === 'carriers') { const live = game && game.phase !== 'over' && game.phase !== 'win'; body += `<div class="perk-count">${T('codex.carriersHead')}${live ? ` ${T('codex.liveRun')}` : ''}</div>` + Object.keys(D.CARRIERS).map(k => { const car = D.CARRIERS[k]; return `<div class="card" style="cursor:default"><div class="t"><span>${car.badge || ''} ${esc(car.name)}</span><span class="price">${T('codex.carrierPrice', { vehicle: esc(car.vehicle || ''), cap: car.cap, fee: car.fee, trucks: car.trucks, price: car.price })}</span></div><div class="d">${esc(car.desc)}<br>${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.need ? ` · ${T('codex.need', { icons: car.need.map(a => D.ATTRS[a].icon).join('') })}` : ''}${car.onlyPlain ? ` · ${T('pd.plainOnly')}` : ''}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}${trustTrack(k, live ? game.trustXp(k) : null)}</div></div>`; }).join(''); }
+    else if (tab === 'carriers') { const live = game && game.phase !== 'over' && game.phase !== 'win'; body += `<div class="perk-count">${T('codex.carriersHead')}${live ? ` ${T('codex.liveRun')}` : ''}</div>` + Object.keys(D.FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${esc(D.FAMILIES[f].name)}</div>` + D.centersOf(f).map(k => { const car = D.CARRIERS[k]; return `<div class="card" style="cursor:default"><div class="t"><span>${car.badge || ''} ${esc(car.name)}${gradeBadge(car.grade)}</span><span class="price">${T('codex.carrierPrice', { vehicle: esc(car.vehicle || ''), cap: car.cap, fee: car.fee, trucks: car.trucks, price: car.price })}</span></div><div class="d">${esc(car.desc)}<br>${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.need ? ` · ${T('codex.need', { icons: car.need.map(a => D.ATTRS[a].icon).join('') })}` : ''}${car.onlyPlain ? ` · ${T('pd.plainOnly')}` : ''}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}${trustTrack(k, live ? game.trustXp(k) : null)}</div></div>`; }).join('')).join(''); }
     else if (tab === 'perks') body += `<div class="perk-count">${T('codex.perkSlots', { n: Profile.perkSlots() })}</div>` + Object.keys(M.PERK_FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${T('prep.family', { family: M.PERK_FAMILIES[f] })}</div>` + Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f).map(id => { const pk = M.PERKS[id], un = P.unlocked.perks.includes(id); return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t">${un ? '' : '🔒 '}${esc(pk.name)}</div><div class="d">${esc(pk.desc)}${un ? '' : `<br>${esc(unlockText(pk.unlock))}`}</div></div>`; }).join('')).join('');
     else if (tab === 'scenarios') body += Object.keys(M.SCENARIOS).map(id => { const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id); const clears = P.stats.clearsByScenario[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? s.icon : '🔒'} ${esc(s.name)}</span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div><div class="d">${esc(s.desc)}<br>${T('prep.win')}: ${esc(s.win)}${un ? '' : `<br>${esc(unlockText(s.unlock))}`}</div></div>`; }).join('');
     else if (tab === 'achievements') {
@@ -751,7 +779,8 @@
     const finishTyping = () => { if (!typing) return; stopTyping(); typing.chars.forEach(c => c.classList.add('on')); face.src = typing.base; typing.done = true; next.hidden = false; cursor.hidden = false; };
     const render = () => {
       const pg = beat.pages[i];
-      const base = Story.SPRITES[pg.expr] || Story.SPRITES.neutral, talk = Story.SPRITES[pg.expr + '_talk'] || base;
+      const base = Story.sprite(pg.speaker, pg.expr, false), talk = Story.sprite(pg.speaker, pg.expr, true);
+      $('#story-name').textContent = pg.name || beat.name;
       face.src = base;
       const body = $('#story-body'); body.innerHTML = pg.text;
       const chars = wrapChars(body);

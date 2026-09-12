@@ -61,22 +61,23 @@ function marketBot(g) {
   const needVol = parcels * 1.7 * 1.15;
   const capVol = () => g.contracts.filter(Boolean).reduce((s, c) => s + c.maxCalls * g.vehicleCap(c), 0);
   const can = price => g.cash - price >= reserve && g.market.bought < g.rules.marketMaxBuy;
+  const canR = price => g.cash - price >= reserve;
   const bySlotDelivered = () => { let slot = -1, max = -1; g.contracts.forEach((c, s) => { if (c && c.delivered > max) { max = c.delivered; slot = s; } }); return slot; };
   const idx = pred => items.findIndex(it => !it.sold && pred(it));
   // 1) 막힌 속성 힌트 계약은 항상 최우선 (빈 슬롯 → 가장 덜 쓴 슬롯)
-  for (let i = 0; i < items.length; i++) { const it = items[i]; if (it.sold || it.kind !== 'contract' || !it.hint) continue; const price = g.contractPrice(it); if (!can(price)) continue; let slot = g.contracts.findIndex(c => !c); if (slot < 0) { const seen = {}; g.contracts.forEach((c, s) => { if (!c) return; if (seen[c.carrier] != null) slot = s; seen[c.carrier] = s; }); } if (slot >= 0) g.buy(i, slot); }
-  // 2) 용량 부족분 채우기
+  for (let i = 0; i < items.length; i++) { const it = items[i]; if (it.sold || it.kind !== 'contract' || !it.hint) continue; const price = g.contractPrice(it); if (!can(price)) continue; let slot = it.switchFrom ? g.contracts.findIndex(c => c && c.id === it.switchFrom) : g.contracts.findIndex(c => !c); if (slot < 0) { const seen = {}; g.contracts.forEach((c, s) => { if (!c) return; const f = D.familyOf(c.carrier); if (seen[f] != null) slot = s; seen[f] = s; }); } if (slot >= 0) g.buy(i, slot); }
+  // 1.5) 배차 충전: 배차가 절반 이하로 남은 계약은 가득 충전 (남은 배차가 많으면 아까우니 미룬다). 0대는 무조건
+  for (let k = 0; k < 4; k++) { const rf = items.map((it, i) => ({ it, i })).filter(x => !x.it.sold && x.it.kind === 'refill').map(x => ({ ...x, c: g.contracts.find(c => c && c.id === x.it.contractId) })).filter(x => x.c && (x.c.calls === 0 || x.c.calls <= x.c.maxCalls * 0.75) && canR(x.it.price)); if (!rf.length) break; rf.sort((a, b) => a.c.calls - b.c.calls); if (!g.buy(rf[0].i, null).ok) break; }
+  // 2) 용량 부족분 채우기: 한도 강화 → 같은 계열 상위 센터로 갈아타기 → 빈 슬롯에 새 계약 → 적재 보강
   let guard = 0;
-  while (capVol() < needVol && guard++ < 6) {
-    // 배차 추가: 살 수 있는 것 중 월 배차가 가장 적은 계약부터 (고르게 키운다)
-    const adds = items.map((it, i) => ({ it, i })).filter(x => !x.it.sold && x.it.kind === 'contract' && x.it.add && can(g.contractPrice(x.it)));
-    if (adds.length) { adds.sort((a, b) => { const ca = g.contracts.find(c => c && c.carrier === a.it.carrier), cb = g.contracts.find(c => c && c.carrier === b.it.carrier); return (ca ? ca.maxCalls * g.vehicleCap(ca) : 99) - (cb ? cb.maxCalls * g.vehicleCap(cb) : 99); }); const { it, i } = adds[0]; g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier), 'add'); continue; }
+  const monthCap = () => g.contracts.filter(Boolean).reduce((s, c) => s + c.calls * g.vehicleCap(c), 0);
+  while (monthCap() < needVol && guard++ < 6) {
     let i = -1;
     i = idx(it => it.kind === 'enh' && /^limit/.test(it.enh) && can(it.price));
     if (i >= 0) { const s = bySlotDelivered(); if (s >= 0 && g.buy(i, s).ok) continue; }
-    i = idx(it => it.kind === 'contract' && it.upgrade && can(g.contractPrice(it)));
-    if (i >= 0) { g.buy(i, g.contracts.findIndex(c => c && c.carrier === items[i].carrier), 'upgrade'); continue; }
-    i = idx(it => it.kind === 'contract' && !it.upgrade && !it.add && can(g.contractPrice(it)));
+    i = idx(it => it.kind === 'contract' && it.switchFrom && can(g.contractPrice(it)));
+    if (i >= 0) { const s = g.contracts.findIndex(c => c && c.id === items[i].switchFrom); if (s >= 0 && g.buy(i, s).ok) continue; }
+    i = idx(it => it.kind === 'contract' && !it.switchFrom && can(g.contractPrice(it)));
     const empty = g.contracts.findIndex(c => !c);
     if (i >= 0 && empty >= 0) { g.buy(i, empty); continue; }
     i = idx(it => it.kind === 'enh' && it.enh === 'cap1' && can(it.price));
@@ -88,10 +89,10 @@ function marketBot(g) {
   while (g.warehouse.cap < perTurn * 3) { const i = idx(it => it.kind === 'fac' && it.fac && /^expand/.test(it.fac) && can(it.price)); if (i < 0 || !g.buy(i, null).ok) break; }
   // 4) 여유 자금: 시설 → 업그레이드 → 강화
   items.forEach((it, i) => { if (!it.sold && it.kind === 'fac' && it.fac && g.cash - it.price > reserve + 200 && g.market.bought < g.rules.marketMaxBuy) g.buy(i, null); });
-  items.forEach((it, i) => { if (!it.sold && it.kind === 'contract' && it.upgrade && g.cash - g.contractPrice(it) > reserve + 250 && g.market.bought < g.rules.marketMaxBuy) g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier), 'upgrade'); });
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'contract' && it.switchFrom && g.cash - g.contractPrice(it) > reserve + 250 && g.market.bought < g.rules.marketMaxBuy) { const s = g.contracts.findIndex(c => c && c.id === it.switchFrom); if (s >= 0) g.buy(i, s); } });
   items.forEach((it, i) => { if (!it.sold && it.kind === 'enh' && g.cash - it.price > reserve + 300 && g.market.bought < g.rules.marketMaxBuy) { const s = bySlotDelivered(); if (s >= 0) g.buy(i, s); } });
-  // 돈이 많이 남으면 배차 추가를 더 산다 (현금의 절반까지)
-  for (let k = 0; k < 3; k++) { const adds = items.map((it, i) => ({ it, i })).filter(x => !x.it.sold && x.it.kind === 'contract' && x.it.add && g.contractPrice(x.it) < g.cash * 0.5 && g.market.bought < g.rules.marketMaxBuy); if (!adds.length) break; adds.sort((a, b) => g.contractPrice(a.it) - g.contractPrice(b.it)); const { it, i } = adds[0]; if (!g.buy(i, g.contracts.findIndex(c => c && c.carrier === it.carrier), 'add').ok) break; }
+  // 돈이 넉넉하면 남은 계약도 충전해 둔다
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'refill' && g.cash - it.price > reserve + 400) g.buy(i, null); });
 }
 
 function runOne(seed, strat, cfg) {
