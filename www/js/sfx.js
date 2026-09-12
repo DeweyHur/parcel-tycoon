@@ -33,6 +33,9 @@ window.SFX = (function () {
     setEnabled(v) { enabled = v; },
     isEnabled() { return enabled; },
     click() { tone(880, 0.05, 'square', 0.4); },
+    // 대화 타자 소리: 글자마다 짧은 삑. n으로 음높이를 조금씩 흔들어 "말하는" 느낌
+    blip(n = 0) { const f = 300 + [0, 35, 70, 20, 55][n % 5]; tone(f, 0.035, 'square', 0.16, 0, 60); },
+    nudge() { tone(330, 0.05, 'square', 0.3, 0, -120); },
     select() { tone(660, 0.06, 'square', 0.4); tone(990, 0.06, 'square', 0.3, 0.05); },
     cancel() { tone(440, 0.08, 'square', 0.4, 0, -200); },
     arrive() { tone(220, 0.08, 'triangle', 0.7, 0, -100); noise(0.08, 0.3, 0.02); },

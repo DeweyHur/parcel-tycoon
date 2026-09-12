@@ -50,7 +50,7 @@
 
   // ---------- title ----------
   function showTitle() {
-    $('#story').hidden = true; $('#sms').hidden = true; clearStoryHl(); storyBusy = false;
+    $('#story').hidden = true; $('#sms').hidden = true; clearStoryHl(); clearGate(); storyBusy = false;
     const save = loadSave(), P = Profile.get();
     const nUnlocked = P.unlocked.companies.length + P.unlocked.perks.length + P.unlocked.scenarios.length;
     const nTotal = Object.keys(M.COMPANIES).length + Object.keys(M.PERKS).length + Object.keys(M.SCENARIOS).length;
@@ -483,6 +483,7 @@
     }, pen ? 500 : 150);
   }
   function checkPhase() {
+    if (game.phase !== 'play') clearGate();
     if (game.phase === 'summary') showSummary();
     else if (game.phase === 'market') showMarket();
     else if (game.phase === 'over' || game.phase === 'win') showResult();
@@ -705,7 +706,7 @@
 
   // ---------- 스토리 모드: 창고장 대화창 · 계절 문자 ----------
   let storyHl = null, storyBusy = false;
-  function clearStoryHl() { if (storyHl) { storyHl.classList.remove('story-hl'); storyHl = null; } }
+  function clearStoryHl() { if (storyHl) { if (storyHl !== gateTarget) storyHl.classList.remove('story-hl'); storyHl = null; } }
   // 지금 상황에 맞는 비트가 있으면 보여준다. 비트가 닫히면 같은 상황으로 한 번 더 본다 (사고 + 첫 호출처럼 둘이 겹칠 때)
   function storyCheck(ctx, depth) {
     if (!game || !window.Story || storyBusy) return;
@@ -715,28 +716,73 @@
     saveGame();
     showStoryBeat(beat, () => { if ((depth || 0) < 1) storyCheck(ctx, (depth || 0) + 1); });
   }
+  // 텍스트를 글자 단위 span으로 감싼다 (<b>·<br> 유지) — 타자 효과용
+  function wrapChars(node) {
+    const out = [];
+    for (const n of Array.from(node.childNodes)) {
+      if (n.nodeType === 3) { const frag = document.createDocumentFragment(); for (const ch of n.textContent) { const sp = document.createElement('span'); sp.className = 'ch'; sp.textContent = ch; frag.appendChild(sp); out.push(sp); } n.replaceWith(frag); }
+      else if (n.nodeType === 1 && n.tagName !== 'BR') out.push(...wrapChars(n));
+    }
+    return out;
+  }
+  // 강제 클릭 게이트: 대화가 끝난 뒤 hl 대상만 누를 수 있다. 다른 곳을 누르면 손가락이 흔들린다
+  let gateTarget = null;
+  function clearGate() { const g = $('#story-gate'); g.hidden = true; g.onclick = null; if (gateTarget) { gateTarget.classList.remove('story-hl'); gateTarget = null; } }
+  function openGate(target) {
+    clearGate(); if (!target) return;
+    gateTarget = target; target.classList.add('story-hl');
+    const g = $('#story-gate'), pt = $('#story-point'); pt.textContent = T('story.tapHere');
+    const place = () => { const r = target.getBoundingClientRect(); const below = r.top < 60; pt.className = 'spoint' + (below ? ' below' : ''); pt.style.left = (r.left + r.width / 2) + 'px'; pt.style.top = (below ? r.bottom + 10 : r.top - 8) + 'px'; };
+    place(); g.hidden = false;
+    g.onclick = e => {
+      const r = target.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom && !target.disabled) { clearGate(); target.click(); return; }
+      SFX.nudge(); pt.classList.remove('shake'); void pt.offsetWidth; pt.classList.add('shake'); place();
+    };
+  }
   function showStoryBeat(beat, after) {
-    const el = $('#story'); let i = 0; storyBusy = true;
+    const el = $('#story'); let i = 0; storyBusy = true; clearGate();
+    let typing = null; // { timer, done, chars, base, talk }
     $('#story-name').textContent = beat.name;
     $('#story-skip').textContent = T('story.skip');
     const calBtn = $('#story-cal'); calBtn.hidden = !beat.calendar; calBtn.textContent = T('story.calendar');
+    const face = $('#story-face'), next = $('#story-next'), cursor = $('#story-cursor');
+    const stopTyping = () => { if (typing && typing.timer) clearTimeout(typing.timer); };
+    const finishTyping = () => { if (!typing) return; stopTyping(); typing.chars.forEach(c => c.classList.add('on')); face.src = typing.base; typing.done = true; next.hidden = false; cursor.hidden = false; };
     const render = () => {
       const pg = beat.pages[i];
-      $('#story-face').src = Story.SPRITES[pg.expr] || Story.SPRITES.neutral;
-      $('#story-body').innerHTML = pg.text;
+      const base = Story.SPRITES[pg.expr] || Story.SPRITES.neutral, talk = Story.SPRITES[pg.expr + '_talk'] || base;
+      face.src = base;
+      const body = $('#story-body'); body.innerHTML = pg.text;
+      const chars = wrapChars(body);
       $('#story-pages').textContent = beat.pages.length > 1 ? `${i + 1}/${beat.pages.length}` : '';
-      $('#story-next').textContent = i < beat.pages.length - 1 ? T('story.next') : T('story.ok');
+      next.textContent = i < beat.pages.length - 1 ? T('story.next') : T('story.ok');
+      next.hidden = true; cursor.hidden = true;
       clearStoryHl();
       let top = false;
       if (pg.hl) { const t = document.querySelector(pg.hl); if (t && !t.hidden && t.offsetParent !== null) { t.classList.add('story-hl'); storyHl = t; const r = t.getBoundingClientRect(); top = r.top + r.height / 2 > window.innerHeight * 0.55; } }
       el.classList.toggle('top', top);
       el.hidden = false;
+      // 타자: 글자마다 삑 소리 + 입 벌림 프레임 교대. 문장 부호에서 잠깐 쉼
+      stopTyping(); typing = { timer: null, done: false, chars, base, talk };
+      let k = 0;
+      const tick = () => {
+        if (k >= chars.length) return finishTyping();
+        const c = chars[k]; c.classList.add('on'); const ch = c.textContent; k++;
+        let d = 34;
+        if (ch.trim()) { if (k % 2 === 1) SFX.blip(k); face.src = Math.floor(k / 3) % 2 === 0 ? talk : base; }
+        if (/[.!?…。]/.test(ch)) d = 260; else if (/[,·、—]/.test(ch)) d = 120; else if (ch === ' ') d = 20;
+        typing.timer = setTimeout(tick, d);
+      };
+      typing.timer = setTimeout(tick, 80);
     };
-    const close = () => { el.hidden = true; clearStoryHl(); storyBusy = false; if (after) after(); };
-    $('#story-next').onclick = () => { SFX.click(); if (i < beat.pages.length - 1) { i++; render(); } else close(); };
-    $('#story-skip').onclick = () => { SFX.cancel(); close(); };
-    calBtn.onclick = () => { SFX.click(); showCalendar(closeModal); };
-    el.onclick = e => { if (e.target === el) $('#story-next').click(); };
+    const close = () => { stopTyping(); const pg = beat.pages[i]; const target = pg.gate && pg.hl ? document.querySelector(pg.hl) : null; el.hidden = true; clearStoryHl(); storyBusy = false; if (target && !target.disabled) openGate(target); else if (after) after(); };
+    // 탭: 타자 중이면 전부 보여주고, 다 보였으면 다음 페이지 / 닫기
+    const advance = () => { SFX.resume(); if (typing && !typing.done) { finishTyping(); return; } SFX.click(); if (i < beat.pages.length - 1) { i++; render(); } else close(); };
+    next.onclick = e => { e.stopPropagation(); advance(); };
+    $('#story-skip').onclick = e => { e.stopPropagation(); SFX.cancel(); close(); };
+    calBtn.onclick = e => { e.stopPropagation(); SFX.click(); showCalendar(closeModal); };
+    el.onclick = () => advance();
     render();
   }
   // 6월 이후 월초 문자 한 줄 (스토리 모드가 아니어도 옵션이 켜져 있으면)

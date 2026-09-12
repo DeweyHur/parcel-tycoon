@@ -196,3 +196,15 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .contract .calls.off { color: var(--dim); }
 .chip.off { border-color: var(--dim); color: var(--dim); }
 .card.toggle .t small { color: var(--dim); font-weight: 400; }
+
+/* 타자 효과 · 계속 커서 · 강제 클릭 게이트 */
+#story .sbody .ch { visibility: hidden; } #story .sbody .ch.on { visibility: visible; }
+.scursor { color: var(--gold); font-size: 12px; animation: blink .6s steps(2) infinite; margin-right: auto; }
+#story-gate[hidden] { display: none !important; }
+#story-gate { position: fixed; inset: 0; z-index: 59; background: transparent; }
+.spoint { position: absolute; transform: translate(-50%, -100%); background: var(--gold); color: var(--line); font-weight: 700; font-size: 12px; padding: 3px 8px; border: 3px solid var(--line); box-shadow: 3px 3px 0 var(--shadow); white-space: nowrap; animation: pointBob .7s steps(2) infinite; pointer-events: none; }
+.spoint::after { content: ''; position: absolute; left: 50%; bottom: -9px; margin-left: -5px; border: 5px solid transparent; border-top-color: var(--line); }
+.spoint.below { transform: translate(-50%, 0); } .spoint.below::after { bottom: auto; top: -9px; border-top-color: transparent; border-bottom-color: var(--line); }
+@keyframes pointBob { 50% { margin-top: -4px; } }
+@keyframes shake { 25% { transform: translate(-50%, -100%) translateX(-4px); } 75% { transform: translate(-50%, -100%) translateX(4px); } }
+.spoint.shake { animation: shake .2s steps(2) 2; }

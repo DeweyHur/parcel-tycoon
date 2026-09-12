@@ -296,6 +296,7 @@
     'story.skip': 'Skip ×',
     'story.next': 'Next ▶',
     'story.ok': 'Got it',
+    'story.tapHere': 'Tap here',
     'story.calendar': '📅 Calendar',
     'story.intro.1': 'Welcome. As of today, you\'re the boss here.<br>I\'ll stick around for three months to nag, then I\'m gone. Hit that × if you\'d rather not hear it.',
     'story.intro.2': 'Those are today\'s parcels. Every one of them is money — but left like that, they just fill the warehouse.<br>See the ⏳? Four turns to ship. March is moving season, so it\'s mostly plain boxes.',
