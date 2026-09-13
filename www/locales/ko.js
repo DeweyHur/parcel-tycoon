@@ -331,7 +331,7 @@
     'up.note': '입고 순서는 예정대로이며, 통관 대기·냉장 배정은 입고 시점 상태로 정해집니다.',
     'btn.close': '닫기',
     'common.none': '없음',
-    'fmt.calMonth': "<small class='yr'>{y}</small>{cal}월<small class='yr'>·{n}개월차</small>",
+    'fmt.calMonth': "<small class='yr'>{y}</small>{cal}월<small>·{n}개월차</small>",
     'story.name': '박 반장',
     'story.skip': '건너뛰기 ×',
     'story.next': '다음 ▶',

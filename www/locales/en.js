@@ -330,7 +330,7 @@
     'up.note': 'Arrival order is fixed; customs and cold-zone assignment are decided on arrival.',
     'btn.close': 'Close',
     'common.none': 'none',
-    'fmt.calMonth': "<small class='yr'>{y}</small>M{cal}<small class='yr'>·run {n}</small>",
+    'fmt.calMonth': "<small class='yr'>{y}</small>M{cal}<small>·run {n}</small>",
     'story.name': 'Park',
     'story.skip': 'Skip ×',
     'story.next': 'Next ▶',

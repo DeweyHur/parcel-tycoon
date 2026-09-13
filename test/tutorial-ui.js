@@ -64,6 +64,7 @@ const fs = require('fs');
     if (st.m > 3) { console.log('3개월차 완료 → 4개월차 진입'); break; }
     await readBeat();
     if (await passGate()) continue;
+    if (st.phase === 'weekend') { await page.click('.wkopts .wkc:not([disabled])', { force: true }); await page.waitForTimeout(600); await readBeat(); continue; }
     if (st.phase === 'summary') { await page.click('.foot .btn.primary'); await page.waitForTimeout(400); continue; }
     if (st.phase === 'market') {
       if (!shots['mk' + st.m]) { shots['mk' + st.m] = 1; await page.screenshot({ path: `shots/t-market-m${st.m}.png` }); }

@@ -266,7 +266,7 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .how .art .cal s.last { background: var(--gold); }
 
 /* ---------- 주말 ---------- */
-#hud-month .yr { color: var(--dim); font-size: 10px; margin-right: 2px; letter-spacing: -.5px; }
+#hud-month .yr { color: var(--dim); font-size: 11px; margin-right: 3px; }  /* Galmuri11 은 11px 가 원본 크기 — 10px 로 줄이면 도트가 뭉갠다 */
 .wkopts { display: flex; flex-direction: column; gap: 6px; }
 .wkopts .wkc { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 8px 10px; }
 .wkopts .wkc small { color: var(--dim); font-weight: 400; }

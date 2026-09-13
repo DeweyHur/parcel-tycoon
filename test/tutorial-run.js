@@ -56,6 +56,15 @@ while (g.month <= 3 && guard++ < 200) {
     beats({ kind: 'summary' }); g.closeSummary(); continue;
   }
   if (g.phase === 'market') { beats({ kind: 'market' }); market(); beats({ kind: 'turn' }); continue; }
+  // 주말은 턴이 아니다 — 마당에 물건이 있고 자금이 넉넉하면 알바, 아니면 휴식
+  if (g.phase === 'weekend') {
+    const w = g.weekend; beats({ kind: 'weekend' });
+    const o = g.weekendChoices().find(x => x.id === 'parttime');
+    const pick = o && o.ok && g.cash > o.cost + 300 ? 'parttime' : 'rest';
+    g.weekendChoose(pick);
+    console.log(`${g.month}-${w.after} 주말(${w.days[0]}~${w.days[1]}일) → ${pick}${w.outdoor ? ` · 야외 ${w.outdoor}칸` : ''}`);
+    g.takeEvents(); continue;
+  }
   if (g.phase !== 'play') break;
   const m = g.month, t = g.turn;
   const arrived = (g.schedule[t - 1] || []).map(s => s.type + s.size).join(',');
