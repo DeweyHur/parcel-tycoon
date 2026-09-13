@@ -105,6 +105,9 @@
       this.phase = 'play';           // play | summary | market | over | win
       this.perks = cfg.perks.slice();
       this.month = 0; this.turn = 0;
+      // 런을 시작한 해를 찍어 세이브에 고정한다 (3월 시작 → 1·2월은 이듬해). 나중에 열어도 숫자가 안 바뀐다
+      this.year = cfg.year || new Date().getFullYear();
+      this.weekend = null; this.weekendBonus = null;
       this.stress = 0;
       this.parcels = [];
       this.schedule = [];
@@ -402,7 +405,18 @@
     isOffTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.noCalls); }
     isRushTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.arrivalsMult && e.arrivalsMult > 1); }
     // 런 전체의 달력: 개월차 순서대로 [{ m, cal, icon, events }]
-    calendarMonths() { const out = []; const n = this.rules.endless ? 12 : Math.min(12, this.rules.months); for (let m = 1; m <= n; m++) { const cal = this.calMonth(m), sm = this.seasonMods(m); out.push({ m, cal, icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1, events: (sm.events || []).map(e => ({ id: e.id, turns: e.turns })) }); } return out; }
+    calendarMonths() { const out = []; const n = this.rules.endless ? 12 : Math.min(12, this.rules.months); for (let m = 1; m <= n; m++) { const cal = this.calMonth(m), sm = this.seasonMods(m); out.push({ m, cal, icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1, events: (sm.events || []).map(e => ({ id: e.id, turns: e.turns, days: [this.turnDays(e.turns[0])[0], this.turnDays(e.turns[1])[1]] })) }); } return out; }
+    // ----- 달력 날짜 (1턴 = 평일 2일, 주말은 턴이 아니다) -----
+    // 기한·보관 기간은 영업일 기준이라 주말에는 진행하지 않는다. 요일은 표시하지 않는다(가상 달력)
+    yearOf(m) { m = m || this.month || 1; const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return this.year + Math.floor((start - 1 + m - 1) / 12); }
+    monthDays(m) { return D.MONTH_DAYS[this.calMonth(m)] || 30; }
+    // t번째 영업 턴이 덮는 이틀
+    turnDays(t) { t = t || this.turn || 1; const a = (t - 1) * 2 + 1 + 2 * Math.floor((t - 1) / 2); return [a, a + 1]; }
+    isWeekendAfter(t) { return D.WEEKEND_AFTER.indexOf(t || this.turn) >= 0; }
+    weekendDays(t) { const b = this.turnDays(t)[1]; return [b + 1, b + 2]; }
+    // 월말 정산이 먹는 꼬리 날짜 (2월은 28일에 딱 끝나 없음)
+    monthEndDays(m) { const last = this.monthDays(m), from = this.turnDays(D.TURNS_PER_MONTH)[1] + 1; return from > last ? null : [from, last]; }
+    dateLabel(t, m) { const d = this.turnDays(t); return T('fmt.date', { cal: this.calMonth(m), a: d[0], b: d[1] }); }
     returnGraceFor(p) { const R = this.rules; return Math.max(1, (this._attrs(p).includes('cold') ? R.returnGraceFresh : R.returnGrace) + (this.seasonMods().returnGraceDelta || 0)); }
     season(m) { const R = this.rules; if (R.season) return R.season; const c = this.calMonth(m); return c >= 3 && c <= 5 ? 'spring' : c >= 6 && c <= 8 ? 'summer' : c >= 9 && c <= 11 ? 'autumn' : 'winter'; }
     _genWeather(m) {
@@ -497,7 +511,7 @@
       xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       return { xp, parts };
     }
-    selfCount() { return Math.max(1, D.SELF_DELIVERY.count + this.rules.selfCapDelta + (this.warehouse.bigvan ? 1 : 0) + (this.warehouse.driver ? 1 : 0)); }
+    selfCount() { return Math.max(1, D.SELF_DELIVERY.count + this.rules.selfCapDelta + (this.warehouse.bigvan ? 1 : 0) + (this.warehouse.driver ? 1 : 0) + ((this.weekendBonus && this.weekendBonus.self) || 0)); }
     selfCost(p) { return D.SELF_DELIVERY.costBase + D.SELF_DELIVERY.costPerSize * p.size; }
     selfCapacity() { return this.selfCount(); }
     selfSizeMax() { return this.warehouse.bigvan ? 4 : D.SELF_DELIVERY.sizeMax; }
@@ -743,7 +757,7 @@
         return;
       }
       this.phase = 'play';
-      this.say('log.monthStart', { m });
+      this.say('log.monthStart', { m, y: this.yearOf(m), cal: this.calMonth(m) });
       this._startTurn();
     }
     _makeSchedule(m) {
@@ -846,9 +860,9 @@
       let note = '';
       const wx = this.weatherNow(); if (wx !== 'sunny') note = ` ${M.WEATHER[wx].icon}${M.WEATHER[wx].name}`;
       if (this.heatTurns.includes(this.turn)) note = MSG('log.heatAlert');
-      for (const ev of this.eventsAt()) if (ev.turns[0] === this.turn) this.say('log.calEvent', { name: MSG('cal.event.' + ev.id), a: ev.turns[0], b: ev.turns[1] });
+      for (const ev of this.eventsAt()) if (ev.turns[0] === this.turn) this.say('log.calEvent', { name: MSG('cal.event.' + ev.id), a: this.turnDays(ev.turns[0])[0], b: this.turnDays(ev.turns[1])[1] });
       if (this.isOffTurn()) note = MSG('log.holidayOff');
-      this.say('log.arrive', { month: this.month, turn: this.turn, list: arrived.map(p => D.PARCEL_TYPES[p.type].short + p.size).join(', '), usage: Math.round(this.usage() * 100), note });
+      this.say('log.arrive', { date: this.dateLabel(), list: arrived.map(p => D.PARCEL_TYPES[p.type].short + p.size).join(', '), usage: Math.round(this.usage() * 100), note });
     }
     upcoming() {
       const out = [];
@@ -1022,8 +1036,33 @@
       if (!insured) this._claim(p, why, evt === 'broken' ? 'broken' : 'discard');
       if (evt === 'broken') { const cc = this.customers && this.customers[p.customer]; if (cc) cc.streak = 0; }
     }
+    // 야외 적재 도난 판정 — 영업일 끝과 주말에 각각 한 번씩 돈다. 늘어난 스트레스를 돌려준다
+    _theftRoll(reasons) {
+      const R = this.rules, tp = this.theftProb();
+      let pen = 0;
+      if (tp <= 0) return 0;
+      for (const p of this.outdoorParcels()) {
+        if (this.rng.next() >= tp) continue;
+        this.parcels.splice(this.parcels.indexOf(p), 1);
+        this.monthStats.stolen++; this.stats.stolen++;
+        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push(MSG('r.stolenInsured')); this.emit('stolen', { parcel: p }); }
+        else { pen += 2; reasons.push(MSG('r.stolen', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); this.emit('stolen', { parcel: p }); this._claim(p, MSG('why.stolen'), 'stolen'); }
+      }
+      // 야외 보관 물품 도난: 배상 ×2
+      for (const s of this.storage.slice()) {
+        if (!s.outdoor || this.rng.next() >= tp) continue;
+        this.storage.splice(this.storage.indexOf(s), 1);
+        const full = Math.round((s.fee || s.perTurn * s.turns) * 2), covered = Math.round(full * this.coverRate('stolen', { attrs: [] })), amount = full - covered;
+        if (covered) this.monthStats.insClaims++;
+        this.cash -= amount; this.monthStats.claims += amount; this.stats.claims += amount; pen += 2; reasons.push(MSG('r.storageStolen', { amount }));
+        this._custXp(s.customer, -3, MSG('why.storageStolen')); this.emit('storageStolen', { storage: s, amount });
+      }
+      return pen;
+    }
+
     _endTurn(waited, freezeFresh) {
       const R = this.rules;
+      this.weekendBonus = null; // 야근 보너스는 주말 다음 영업일 한 번만
       this.waitedLastTurn = waited;
       const usageBefore = this.usage();
       let pen = 0; const reasons = [];
@@ -1056,24 +1095,7 @@
         else { const ns = M.INSURERS[this.insurer].noReturnStress; if (!ns) pen += 2; reasons.push(MSG('r.returned', { short: D.PARCEL_TYPES[p.type].short, pen: ns ? '' : ' +2' })); this.emit('returned', { parcel: p }); this._claim(p, MSG('why.returned'), 'returned'); }
       }
       this._assignCold();
-      // 도난: 야외 적재 택배는 각각 판정
-      const tp = this.theftProb();
-      if (tp > 0) for (const p of this.outdoorParcels()) {
-        if (this.rng.next() >= tp) continue;
-        this.parcels.splice(this.parcels.indexOf(p), 1);
-        this.monthStats.stolen++; this.stats.stolen++;
-        if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push(MSG('r.stolenInsured')); this.emit('stolen', { parcel: p }); }
-        else { pen += 2; reasons.push(MSG('r.stolen', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); this.emit('stolen', { parcel: p }); this._claim(p, MSG('why.stolen'), 'stolen'); }
-      }
-      // 야외 보관 물품 도난: 배상 ×2
-      if (tp > 0) for (const s of this.storage.slice()) {
-        if (!s.outdoor || this.rng.next() >= tp) continue;
-        this.storage.splice(this.storage.indexOf(s), 1);
-        const full = Math.round((s.fee || s.perTurn * s.turns) * 2), covered = Math.round(full * this.coverRate('stolen', { attrs: [] })), amount = full - covered;
-        if (covered) this.monthStats.insClaims++;
-        this.cash -= amount; this.monthStats.claims += amount; this.stats.claims += amount; pen += 2; reasons.push(MSG('r.storageStolen', { amount }));
-        this._custXp(s.customer, -3, MSG('why.storageStolen')); this.emit('storageStolen', { storage: s, amount });
-      }
+      pen += this._theftRoll(reasons);
       this._tickStorage(reasons);
       this.outdoorPref = this.outdoorPref.filter(id => typeof id === 'string' ? this.storage.some(s => 's' + s.id === id) : this.parcels.some(p => p.id === id));
       this._assignCold();
@@ -1091,7 +1113,47 @@
       } else if (reasons.length) this.say(reasons.join(', '));
       if (this.stress >= this.rules.gameoverStress) return this._gameOver(MSG('over.stress'));
       if (this.turn >= D.TURNS_PER_MONTH) return this._endMonth();
+      if (this.isWeekendAfter(this.turn)) return this._startWeekend();
       this._startTurn();
+    }
+
+    // ----- 주말 -----
+    // 턴이 아니다: 입고·호출·기한 진행 없음(기한은 영업일 기준). 마당에 둔 건 이틀 더 밖에 있으니 도난만 한 번 더 돈다
+    _startWeekend() {
+      this.phase = 'weekend';
+      const d = this.weekendDays(this.turn);
+      this.weekend = { after: this.turn, days: d, outdoor: this.outdoorVolume(), last: this.turn === D.WEEKEND_AFTER[D.WEEKEND_AFTER.length - 1] };
+      this.emit('weekendStart', { weekend: this.weekend });
+      return true;
+    }
+    weekendChoices() {
+      return D.WEEKEND_CHOICES.map(c => {
+        const cost = c.cost ? Math.round(c.cost * this.rules.itemPriceMult * this.inflation()) : 0;
+        return { id: c.id, cost, stress: c.stress || 0, self: c.self || 0,
+          ok: (!cost || this.cash >= cost) && (!c.needOutdoor || this.outdoorVolume() > 0) };
+      });
+    }
+    weekendChoose(id) {
+      if (this.phase !== 'weekend') return { ok: false, msg: T('err.cannotCallNow') };
+      const def = D.WEEKEND_CHOICES.find(c => c.id === id);
+      if (!def) return { ok: false, msg: T('err.cannotCallNow') };
+      const opt = this.weekendChoices().find(c => c.id === id);
+      if (!opt.ok) return { ok: false, msg: T(opt.cost && this.cash < opt.cost ? 'err.noCash' : 'err.noOutdoor') };
+      const days = this.weekend.days;
+      if (opt.cost) { this.cash -= opt.cost; this.monthStats.spent += opt.cost; this.run.spent += opt.cost; }
+      if (def.stress) this.stress = Math.max(0, this.stress + def.stress);
+      if (def.self) this.weekendBonus = { self: def.self };
+      const reasons = [];
+      const pen = def.noTheft ? 0 : this._theftRoll(reasons);
+      if (pen > 0) { this.stress += pen; this.monthStats.penalty += pen; }
+      this._assignCold();
+      this.say('log.weekend', { a: days[0], b: days[1], choice: T('wk.' + id + '.done'), extra: reasons.length ? ' — ' + reasons.join(', ') : '' });
+      this.emit('weekendEnd', { choice: id, pen });
+      this.weekend = null;
+      this.phase = 'play';
+      if (this.stress >= this.rules.gameoverStress) return this._gameOver(MSG('over.stress'));
+      this._startTurn();
+      return { ok: true, pen };
     }
 
     _endMonth() {

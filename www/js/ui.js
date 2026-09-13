@@ -222,8 +222,9 @@
     if (!game) return;
     const g = game, R = g.rules;
     updateMusic();
-    $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { cal: g.calMonth(), n: g.month })}`;
-    $('#hud-turn').textContent = T('hud.turn', { t: g.turn, max: D.TURNS_PER_MONTH });
+    $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { y: g.yearOf(), cal: g.calMonth(), n: g.month })}`;
+    const _d = g.turnDays();
+    $('#hud-turn').textContent = T('hud.turn', { a: _d[0], b: _d[1] });
     // 자금은 월말 정산 후 예상 잔액으로 보여준다 (사이클 중엔 모든 지출이 어음 — 자금 때문에 막히는 일이 없다)
     const pj = g.projectedCash(); const hc = $('#hud-cash'); const inPlay = g.phase === 'play';
     hc.textContent = inPlay ? pj.total : g.cash; hc.style.color = inPlay && pj.total < 0 ? 'var(--red)' : '';
@@ -246,14 +247,15 @@
     let sawEnd = false;   // 월말 정산 칩이 두 번 세 번 반복되면 줄만 길어진다 — 한 번만
     // 기획서대로 앞 2턴만 — 3턴 뒤 입고는 지금 결정에 쓰이지 않는데 줄만 세 줄로 늘어난다
     $('#upcoming').innerHTML = `<span>${T('hud.upcoming')}</span>` + up.slice(0, 2).map(u => {
-      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${T('fmt.turnN', { n: u.turn })}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}</span>`;
+      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${T('fmt.dayRange', { a: g.turnDays(u.turn)[0], b: g.turnDays(u.turn)[1] })}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}</span>`;
       const end = u.turn > D.TURNS_PER_MONTH;
       if (end && sawEnd) return '';
       if (end) sawEnd = true;
       return `<span class="chip none">${end ? T('hud.monthEnd') : '-'}</span>`;
     }).join('');
+    if (g.isWeekendAfter(g.turn)) $('#upcoming').innerHTML += `<span class="chip none">🛌 ${T('hud.weekend')}</span>`;
     const wxNow = g.weatherNow(), W = M.WEATHER[wxNow];
-    const fc = up.filter(u => u.weather && u.turn > g.turn).map(u => `${T('fmt.turnN', { n: u.turn })} ${M.WEATHER[u.weather].icon}`).join(' · ');
+    const fc = up.filter(u => u.weather && u.turn > g.turn).map(u => `${T('fmt.dayRange', { a: g.turnDays(u.turn)[0], b: g.turnDays(u.turn)[1] })} ${M.WEATHER[u.weather].icon}`).join(' · ');
     $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.desc)}">${W.icon} ${W.name}${fc ? ` <small style="color:var(--dim)">→ ${fc}</small>` : ''}</span>` + $('#upcoming').innerHTML;
     $('#upcoming').querySelectorAll('.chip.wx').forEach(el => el.onclick = () => { SFX.click(); showWeatherInfo(); });
     $('#upcoming').querySelectorAll('.chip.up').forEach(el => el.onclick = () => { SFX.click(); showUpcomingInfo(+el.dataset.turn); });
@@ -329,7 +331,7 @@
   }
   function showWeatherInfo() {
     const g = game, now = g.weatherNow();
-    const known = []; for (let t = 1; t <= D.TURNS_PER_MONTH; t++) { const k = t <= g.turn ? 'past' : t <= g.turn + g.rules.forecastTurns ? 'known' : 'unknown'; known.push(`<span class="chip wx ${k === 'unknown' ? '' : g.weatherAt(t)} ${t === g.turn ? 'now' : ''}" style="${k === 'past' ? 'opacity:.5' : ''}">${T('fmt.turnN', { n: t })} ${k === 'unknown' ? '?' : M.WEATHER[g.weatherAt(t)].icon}</span>`); }
+    const known = []; for (let t = 1; t <= D.TURNS_PER_MONTH; t++) { const k = t <= g.turn ? 'past' : t <= g.turn + g.rules.forecastTurns ? 'known' : 'unknown'; known.push(`<span class="chip wx ${k === 'unknown' ? '' : g.weatherAt(t)} ${t === g.turn ? 'now' : ''}" style="${k === 'past' ? 'opacity:.5' : ''}">${T('fmt.dayRange', { a: g.turnDays(t)[0], b: g.turnDays(t)[1] })} ${k === 'unknown' ? '?' : M.WEATHER[g.weatherAt(t)].icon}</span>`); }
     const rows = Object.keys(M.WEATHER).map(k => { const W = M.WEATHER[k]; return `<div class="ttrow ${k === now ? 'on' : ''}"><span class="lv">${W.icon}</span><span class="ef"><b>${esc(W.name)}</b>${W.desc ? ' — ' + esc(W.desc) : ' — ' + T('weather.noEffect')}</span></div>`; }).join('');
     const season = T('season.' + g.season());
     modal(T('weather.title'), `<div class="d">${T('weather.head', { season: `<b>${season}</b>`, n: g.rules.forecastTurns })}${g.rules.tent ? ` · ${T('weather.tent')}` : ''}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">${known.join('')}</div><div class="ttrack">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">${T('weather.note')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]);
@@ -346,7 +348,7 @@
       if (s.burst) note += (note ? ' · ' : '') + `<b style="color:var(--orange)">${T('up.burst')}</b>`;
       return `<div class="parcel"><div class="sw" style="background:${t.css}"></div><div><span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: s.size })} · ${game.baseReward(s.type, s.size)}c · ${esc(cu.name)}</div><div class="st">${note}</div></div>`; }).join('');
     const vol = u.specs.reduce((v, s) => v + s.size, 0), used = g.usedVolume();
-    modal(T('up.title', { n: turn }), `<div class="pickinfo"><span>${T('up.volume', { vol })}</span><span>${T('common.warehouse')} ${used} → <b class="${used + vol > g.warehouse.cap ? 'bad' : ''}">${used + vol}</b>/${g.warehouse.cap}</span>${wx ? `<span>${wx.icon} ${wx.name}</span>` : ''}</div>${u.heat ? `<div class="d" style="color:var(--orange)">${T('up.heat')}</div>` : ''}<div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">${T('up.note')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]);
+    modal(T('up.title', { date: g.dateLabel(turn) }), `<div class="pickinfo"><span>${T('up.volume', { vol })}</span><span>${T('common.warehouse')} ${used} → <b class="${used + vol > g.warehouse.cap ? 'bad' : ''}">${used + vol}</b>/${g.warehouse.cap}</span>${wx ? `<span>${wx.icon} ${wx.name}</span>` : ''}</div>${u.heat ? `<div class="d" style="color:var(--orange)">${T('up.heat')}</div>` : ''}<div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">${T('up.note')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]);
   }
   // ---------- 택배 상세 ----------
   function showParcelDetail(id) {
@@ -627,9 +629,36 @@
   }
   function checkPhase() {
     if (game.phase !== 'play') clearGate();
-    if (game.phase === 'summary') showSummary();
+    if (game.phase === 'weekend') showWeekend();
+    else if (game.phase === 'summary') showSummary();
     else if (game.phase === 'market') showMarket();
     else if (game.phase === 'over' || game.phase === 'win') showResult();
+  }
+
+  // ---------- 주말 ----------
+  // 턴이 아니다: 차를 부를 수 없고 기한도 멈춘다. 마당에 둔 것만 이틀 더 위험하다
+  function showWeekend() {
+    const g = game, w = g.weekend;
+    if (!w) return;
+    const out = g.outdoorVolume(), pct = Math.round(g.theftProb() * 100);
+    const opts = g.weekendChoices();
+    const rows = opts.map(o => `<button class="btn wkc" data-id="${o.id}" ${o.ok ? '' : 'disabled'}><b>${esc(T('wk.' + o.id))}</b><small>${esc(T('wk.' + o.id + '.d', { cost: o.cost }))}</small></button>`).join('');
+    const body = `<div class="d">${T('wk.sub')}</div>
+      <div class="pickinfo"><span>${out > 0 ? T('wk.outdoor', { vol: out, pct }) : T('wk.safe')}</span></div>
+      <div class="wkopts">${rows}</div>`;
+    const m = modal(T('wk.title'), body, null, T('wk.head', { cal: g.calMonth(), a: w.days[0], b: w.days[1] }));
+    storyCheck({ kind: 'weekend' });
+    m.querySelectorAll('.wkc').forEach(btn => btn.onclick = () => {
+      if (busy) return;
+      SFX.resume(); SFX.click();
+      const r = g.weekendChoose(btn.dataset.id);
+      if (r && r.ok === false) return toast(r.msg);
+      closeModal();
+      busy = true; renderAll();
+      const events = g.takeEvents();
+      saveGame();
+      setTimeout(() => afterTurn(events), 250);
+    });
   }
 
   // ---------- summary ----------
@@ -944,7 +973,7 @@
   function showCalendar(back) {
     const g = game; if (!g) return;
     const cells = g.calendarMonths().map(x => {
-      const evs = x.events.map(e => `<div class="ev">${esc(T('cal.event.' + e.id).split(' — ')[0])} <small>${T('cal.eventTurns', { a: e.turns[0], b: e.turns[1] })}</small></div>`).join('');
+      const evs = x.events.map(e => `<div class="ev">${esc(T('cal.event.' + e.id).split(' — ')[0])} <small>${T('cal.eventTurns', { a: e.days ? e.days[0] : e.turns[0], b: e.days ? e.days[1] : e.turns[1] })}</small></div>`).join('');
       const pct = Math.round((x.arrivalsMult - 1) * 100); const vol = pct ? (pct > 0 ? '+' : '') + pct + '%' : '±0';
       return `<div class="cm ${x.m === g.month ? 'now' : x.m < g.month ? 'past' : ''}"><div class="t">${x.icon} <b>${T('fmt.calOnly', { cal: x.cal })}</b> ${esc(T(`cal.${g.rules.calendar}.${x.cal}.label`))}${x.m === g.month ? ` <small style="color:var(--gold)">${T('cal.thisMonth')}</small>` : ''}</div><div style="color:var(--dim)">${T('cal.arrivals', { pct: vol })}</div>${evs}</div>`;
     }).join('');

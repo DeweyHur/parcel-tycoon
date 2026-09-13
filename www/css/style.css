@@ -264,3 +264,10 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .how .art .cal s { background: var(--panel2); border: 1px solid var(--line); text-decoration: none; }
 .how .art .cal s.on { background: var(--green); }
 .how .art .cal s.last { background: var(--gold); }
+
+/* ---------- 주말 ---------- */
+#hud-month .yr { color: var(--dim); font-size: 10px; margin-right: 2px; letter-spacing: -.5px; }
+.wkopts { display: flex; flex-direction: column; gap: 6px; }
+.wkopts .wkc { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 8px 10px; }
+.wkopts .wkc small { color: var(--dim); font-weight: 400; }
+.wkopts .wkc[disabled] { opacity: .45; }

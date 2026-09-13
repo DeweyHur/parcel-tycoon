@@ -11,6 +11,7 @@
   let lang = FALLBACK, D = null, M = null;
   const listeners = [];
   const warned = new Set();
+  const DAYS_PER_TURN = 2; // data.js DAYS_PER_TURN 과 같은 값 (i18n 은 DATA 를 참조하지 않는다)
 
   function detect() {
     try { const v = localStorage.getItem(KEY); if (v && LOCALES[JSON.parse(v)]) return JSON.parse(v); } catch (e) { }
@@ -61,8 +62,10 @@
 
   function format(str, p) {
     if (!p) return str;
-    return str.replace(/\{(\w+)(?::([^{}|]*)\|([^{}]*))?\}(은\/는|이\/가|을\/를|과\/와|으로\/로)?/g, (m, key, one, other, josa) => {
-      const v = p[key];
+    return str.replace(/\{(\w+)(#d)?(?::([^{}|]*)\|([^{}]*))?\}(은\/는|이\/가|을\/를|과\/와|으로\/로)?/g, (m, key, toDays, one, other, josa) => {
+      let v = p[key];
+      // {n#d}: 턴 수를 영업일로 (1턴 = 평일 2일). 문구만 날짜 단위라 호출부는 턴 그대로 넘긴다
+      if (toDays && typeof v === 'number') v = v * DAYS_PER_TURN;
       let out;
       if (one !== undefined) out = (v === 1 ? one : other).replace('#', v);
       else if (v === undefined || v === null) return m;

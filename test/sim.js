@@ -98,13 +98,18 @@ function marketBot(g) {
 function runOne(seed, strat, cfg) {
   const g = new Game(Object.assign({ seed, perks: ['skip', 'insure'], insurer: 'sturdy', prep: true }, cfg || {}));
   let guard = 0;
-  while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 500) {
+  while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 900) {
     if (g.phase === 'play') {
       // 보관 제안: 다음 턴 입고까지 넣어도 창고가 남으면 수락
       if (g.offer) { if (g.usedVolume() + g.offer.vol + nextVolume(g) <= g.warehouse.cap) g.acceptOffer(); else g.declineOffer(); }
       // 긴급 특송: 부패 직전·기한 임박 택배가 있으면 즉시 사용
       const b = STRATS[strat](g);
       if (!b) { const se = g.selfEligible().sort((a, b) => a.deadline - b.deadline).slice(0, g.selfCount()); g.wait(g.cash > 150 ? se.map(p => p.id) : []); } else g.callCarrier(b.i, b.ids, b.trucks);
+    } else if (g.phase === 'weekend') {
+      // 주말: 마당에 물건이 있고 자금이 넉넉하면 알바를 세우고, 아니면 쉰다
+      const opt = g.weekendChoices();
+      const part = opt.find(o => o.id === 'parttime');
+      g.weekendChoose(part && part.ok && g.cash > part.cost + 400 ? 'parttime' : 'rest');
     } else if (g.phase === 'summary') g.closeSummary();
     else if (g.phase === 'market') { marketBot(g); g.closeMarket(); }
   }

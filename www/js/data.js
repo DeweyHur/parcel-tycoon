@@ -3,6 +3,17 @@
 (function (root) {
   const DATA = {
     TURNS_PER_MONTH: 10,
+    // 달력 표기: 1턴 = 평일 2일. 주말은 턴이 아니다(호출·입고·기한 진행 없음, 야외 도난만 돈다).
+    // 한 달 = [1~2][3~4] 주말 [7~8][9~10] 주말 [13~14][15~16] 주말 [19~20][21~22] 주말 [25~26][27~28] + 월말 정산(29~말일)
+    DAYS_PER_TURN: 2,
+    MONTH_DAYS: { 1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31 },
+    WEEKEND_AFTER: [2, 4, 6, 8],
+    // 주말 선택지: 하나만 고른다
+    WEEKEND_CHOICES: [
+      { id: 'rest', stress: -1 },                        // 휴식: 스트레스 -1
+      { id: 'overtime', stress: 1, self: 2 },             // 야근: 다음 영업일 직접 배송 +2
+      { id: 'parttime', cost: 50, noTheft: true, needOutdoor: true }, // 알바: 야적 지킴 — 이번 주말 도난 없음
+    ],
     START_CASH: 450,
     GAMEOVER_STRESS: 20,
     OPERATING_COST: 120,   // 월 기본 임대(창고·인건비). 여기에 계약 유지비 + 시설 유지비가 더해진다
