@@ -15,7 +15,7 @@
     months: {
       // ----- 1개월차 (3월): 쌓았다가 꽉 채워 보낸다. 3턴에 딱 한 대(6칸), 8턴에 딱 두 대(12칸) -----
       1: {
-        weather: ['sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny'],
+        weather: ['sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny'],
         turns: turns([
           ['normal 2 mart'],
           ['normal 2 anon'],
@@ -27,6 +27,8 @@
           ['normal 2 mart', 'normal 2 anon', 'normal 2 glass', 'normal 2 mart'], // 누적 12칸 = 두 대 동시 호출 정확히
           ['normal 1 anon', 'normal 2 mart'],
           ['normal 2 mart'],
+          ['normal 2 mart', 'normal 1 anon'],                   // 2주차 — 마지막 일요일 전에 한 번 더 비울 기회
+          ['normal 2 mart'],
         ]),
         // 마켓(1개월차 정산 후): 배차를 늘리는 세 가지가 한 화면에 다 있어야 한다 — 충전(상시) · 한도 강화 · 상위 센터
         // 1개월차 마켓: 배차를 늘리는 두 가지(충전 · 한도 강화)와 창고 확장만. 갈아타기는 신뢰가 쌓인 2·3개월차에 꺼낸다
@@ -35,7 +37,7 @@
 
       // ----- 2개월차 (4월): 고객과 특수 품목. ⚠ 3개 vs 시작 배차 2대 → 배차가 떨어진다 -----
       2: {
-        weather: ['sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny'],
+        weather: ['sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'rain'],
         turns: turns([
           ['normal 2 mart', 'fresh 2 dawn'],
           ['normal 2 anon', 'fragile 2 glass'],                 // ⚠ 첫 등장
@@ -47,6 +49,8 @@
           ['normal 2 mart', 'normal 2 anon', 'normal 2 mart'],
           ['normal 2 mart', 'fragile 2 glass'],                 // ⚠ 넷째 — 시작 배차 2대를 다 쓰게 된다
           ['normal 2 anon', 'fresh 2 dawn'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['fresh 2 dawn', 'normal 2 mart'],
         ]),
         offer: { turn: 5, kind: 'move', vol: 6, turns: 4, customer: 'anon' }, // 이사철 보관 제안
         // 2개월차 마켓: 배차가 바닥난 ⚠ 계약을 어떻게 할지 — 충전(싸다) vs 상위 센터 갈아타기(배차·용량이 늘지만 신뢰는 0부터)
@@ -55,7 +59,7 @@
 
       // ----- 3개월차 (5월): 가정의 달 ⚠. 창고가 차고, 비가 오고, 배차를 관리해야 한다 -----
       3: {
-        weather: ['sunny', 'sunny', 'rain', 'rain', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny'],
+        weather: ['sunny', 'sunny', 'rain', 'rain', 'sunny', 'rain', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny'],
         turns: turns([
           ['normal 2 mart', 'fragile 2 glass'],
           ['normal 2 mart', 'fragile 2 glass', 'normal 1 anon'],
@@ -66,6 +70,8 @@
           ['normal 2 mart', 'normal 1 anon'],
           ['normal 2 mart', 'fresh 2 dawn'],
           ['normal 2 mart', 'fragile 2 glass'],
+          ['normal 2 mart'],
+          ['normal 2 mart', 'normal 2 anon'],
           ['normal 2 mart'],
         ]),
         market: { contracts: ['bulk1'], enh: ['cap1'], fac: ['expand1'] },

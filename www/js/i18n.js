@@ -11,7 +11,7 @@
   let lang = FALLBACK, D = null, M = null;
   const listeners = [];
   const warned = new Set();
-  const DAYS_PER_TURN = 2; // data.js DAYS_PER_TURN 과 같은 값 (i18n 은 DATA 를 참조하지 않는다)
+  const DAYS_PER_TURN = 1; // data.js DAYS_PER_TURN 과 같은 값 (1턴 = 하루). {n#d} 는 이제 항등이지만 단위를 바꿀 때를 위해 남겨 둔다
 
   function detect() {
     try { const v = localStorage.getItem(KEY); if (v && LOCALES[JSON.parse(v)]) return JSON.parse(v); } catch (e) { }

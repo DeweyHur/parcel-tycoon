@@ -12,7 +12,7 @@ const slot = (g, fam) => g.contracts.findIndex(c => c && D.familyOf(c.carrier) =
 
 t('시작 상태: 자금 450, 계약 3개(대량·냉장·프래자일), 준비 없이 play', () => { const g = NG(1); assert.equal(g.cash, 450); assert.equal(g.contracts.filter(Boolean).length, 3); assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk0', 'cold0', 'fragile0']); assert.equal(g.phase, 'play'); assert.equal(g.month, 1); });
 t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.sizeDelta, -1); });
-t('월 입고량 = 10 + 12×달력 배수 + 고객 단계 추가 (1개월차 3월), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.equal(sp.length, 10 + Math.round(12 * g.seasonMods(1).arrivalsMult) + g._customerExtra()); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
+t('월 입고량 = 영업일 수 + 12×달력 배수 + 고객 단계 추가 (1개월차 3월), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.equal(sp.length, D.TURNS_PER_MONTH + Math.round(12 * g.seasonMods(1).arrivalsMult) + g._customerExtra()); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
 t('조커 업체 없음: 용달·긴급 삭제', () => { assert.ok(!D.CARRIERS.target && !D.CARRIERS.urgent); for (const id in M.COMPANIES) for (const c of M.COMPANIES[id].contracts || []) assert.ok(D.FAMILIES[c.carrier] || D.CARRIERS[c.carrier], id + ' ' + c.carrier); });
 t('대기는 배차를 차감하지 않음', () => { const g = NG(3); const calls = g.contracts.map(c => c && c.calls); adv(g); assert.deepEqual(g.contracts.map(c => c && c.calls), calls); assert.equal(g.turn, 2); });
 
@@ -194,7 +194,7 @@ t('i18n: ko/en data·meta 텍스트 필드 모양이 일치', () => {
 t('i18n: 자리표시자·복수형·메시지 객체 렌더링', () => {
   assert.equal(I18n.lang, 'ko');
   assert.equal(I18n.t('log.monthStart', { m: 2, y: 2026, cal: 4 }), '── 2026년 4월 · 2개월차 시작 ──');
-  assert.equal(I18n.t('ps.deadline', { n: 4 }), '⏳ <b>8</b>일');                       // {n#d}: 턴 → 영업일
+  assert.equal(I18n.t('ps.deadline', { n: 4 }), '⏳ <b>4</b>일');                       // 1턴 = 하루
   assert.equal(I18n.t('story.intro.3', { name: '한길 물류', fee: 38 }).slice(0, 60).includes('한길 물류는'), true); // 조사 자동 선택
   assert.equal(I18n.text({ k: 'log.penalty', p: { pen: 2, reasons: [{ k: 'r.overdue', p: { short: '일반' } }, { k: 'r.stolenInsured' }], stress: 5 } }), '페널티 +2: 기한 초과 일반, 도난 (보험 적용) (스트레스 5)');
   assert.equal(I18n.text('옛 세이브 문자열'), '옛 세이브 문자열');
@@ -204,39 +204,44 @@ t('i18n: 자리표시자·복수형·메시지 객체 렌더링', () => {
   assert.ok(I18n.setLang('ko')); assert.equal(D.PARCEL_TYPES.fresh.name, '신선식품');
 });
 // ----- 달력 (docs/STORY_TUTORIAL_DESIGN.md 5장) -----
-t('달력 날짜: 1턴 = 평일 2일, 주말 4회, 월말 정산은 남은 날', () => {
+t('시간: 1턴 = 하루, 월~토 엿새 뒤 일요일 휴무, 한 사이클 = 2주', () => {
   const g = NG(5);
-  assert.deepEqual(g.turnDays(1), [1, 2]); assert.deepEqual(g.turnDays(2), [3, 4]);
-  assert.deepEqual(g.turnDays(3), [7, 8]); assert.deepEqual(g.turnDays(10), [27, 28]);
-  assert.deepEqual(g.weekendDays(2), [5, 6]); assert.deepEqual(g.weekendDays(8), [23, 24]);
-  assert.ok(g.isWeekendAfter(4) && !g.isWeekendAfter(3) && !g.isWeekendAfter(10));
-  assert.deepEqual(g.monthEndDays(1), [29, 31]);            // 3월 31일
-  g.month = 12; assert.equal(g.monthEndDays(12), null);     // 2월은 28일에 딱 끝난다
+  assert.equal(D.TURNS_PER_MONTH, 12); assert.equal(D.TURNS_PER_WEEK, 6);
+  assert.equal(g.weekOf(1), 1); assert.equal(g.weekOf(6), 1); assert.equal(g.weekOf(7), 2); assert.equal(g.weekOf(12), 2);
+  assert.equal(g.dowOf(1), 0); assert.equal(g.dowOf(6), 5); assert.equal(g.dowOf(7), 0);   // 월…토, 다시 월
+  assert.ok(g.isWeekendAfter(6) && g.isWeekendAfter(12) && !g.isWeekendAfter(5) && !g.isWeekendAfter(7));
   assert.equal(g.yearOf(1), g.year); assert.equal(g.yearOf(11), g.year + 1); // 1월이면 해가 바뀐다
+  assert.equal(g.dateLabel(4, 1), '3월 4일차');
 });
 t('주말: 턴이 아니다 — 기한·입고는 멈추고 야외 도난만 한 번 더', () => {
-  const g = EMPTY(6); g.parcels = [P(1, 'normal', 2, { deadline: 3 })];
-  g.wait(); g.wait();
-  assert.equal(g.phase, 'weekend'); assert.equal(g.turn, 2);
-  const dl = g.parcels[0].deadline, st = g.stress;
-  g.weekendChoose('rest');
-  assert.equal(g.phase, 'play'); assert.equal(g.turn, 3);
-  assert.equal(g.parcels[0].deadline, dl);                 // 기한은 영업일 기준
-  assert.equal(g.stress, Math.max(0, st - 1));             // 휴식 -1
+  const g = EMPTY(6); g.parcels = [P(1, 'normal', 2, { deadline: 8 })];
+  for (let i = 0; i < 6; i++) g.wait();
+  assert.equal(g.phase, 'weekend'); assert.equal(g.turn, 6);
+  const dl = g.parcels[0].deadline, self = g.selfCount();
   // 야근: 다음 영업일에만 직접 배송 +2
-  g.wait(); g.wait(); assert.equal(g.phase, 'weekend');
-  const self = g.selfCount(); g.weekendChoose('overtime');
-  assert.equal(g.selfCount(), self + 2); g.wait(); assert.equal(g.selfCount(), self);
+  g.weekendChoose('overtime');
+  assert.equal(g.phase, 'play'); assert.equal(g.turn, 7);
+  assert.equal(g.parcels[0].deadline, dl);                 // 기한은 영업일 기준 — 일요일엔 안 준다
+  assert.equal(g.selfCount(), self + 2);
+  g.wait(); assert.equal(g.selfCount(), self);             // 하루만
+  // 둘째 일요일(12턴) 다음은 월말 정산
+  const h = EMPTY(7); h.stress = 5;
+  for (let i = 0; i < 6; i++) h.wait();
+  h.weekendChoose('rest'); assert.equal(h.stress, 4);      // 휴식 -1
+  for (let i = 0; i < 6; i++) h.wait();
+  assert.equal(h.phase, 'weekend'); assert.equal(h.turn, 12);
+  h.weekendChoose('rest');
+  assert.equal(h.phase, 'summary');
 });
-t('달력: 한국 3월 시작, 9월·2월 명절 = 폭주 2~4턴 + 연휴 5~6턴(호출 불가, 입고는 계속)', () => {
+t('달력: 한국 3월 시작, 9월·2월 명절 = 폭주 3~5일차 + 연휴 6~7일차(호출 불가, 입고는 계속)', () => {
   const g = NG(7); assert.equal(g.calMonth(1), 3); assert.equal(g.calMonth(12), 2);
   g.month = 6; g._startMonth(7); assert.equal(g.calMonth(), 9);
-  assert.ok(g.isRushTurn(3) && !g.isRushTurn(1)); assert.ok(g.isOffTurn(5) && g.isOffTurn(6) && !g.isOffTurn(7));
+  assert.ok(g.isRushTurn(3) && g.isRushTurn(5) && !g.isRushTurn(1)); assert.ok(g.isOffTurn(6) && g.isOffTurn(7) && !g.isOffTurn(8));
   // 현실: 연휴에 멈추는 건 배송이지 창고가 아니다 — 입고는 그대로 들어오고 차만 못 부른다
-  assert.ok(g.schedule[4].length > 0 && g.schedule[5].length > 0);
-  for (const sp of g.schedule[2]) assert.equal(sp.deadlineDelta, -1);
-  g.turn = 4; g.parcels = [P(1, 'normal', 1)]; const i = slot(g, 'bulk'); assert.ok(g.canCall(g.contracts[i]));
-  g.turn = 5; assert.ok(!g.canCall(g.contracts[i])); const r = g.callCarrier(i, [1]); assert.ok(!r.ok);
+  assert.ok(g.schedule[5].length > 0 && g.schedule[6].length > 0);
+  for (const sp of g.schedule[3]) assert.equal(sp.deadlineDelta, -1);
+  g.turn = 5; g.parcels = [P(1, 'normal', 1)]; const i = slot(g, 'bulk'); assert.ok(g.canCall(g.contracts[i]));
+  g.turn = 6; assert.ok(!g.canCall(g.contracts[i])); const r = g.callCarrier(i, [1]); assert.ok(!r.ok);
   assert.ok(g.upcoming()[0].off);
 });
 t('달력: 시나리오 컷은 startMonth로 시작 달을 정한다 (성수기 11월, 폭염 7월), 데일리는 cfg.startMonth', () => {

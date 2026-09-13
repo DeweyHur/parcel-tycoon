@@ -405,18 +405,18 @@
     isOffTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.noCalls); }
     isRushTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.arrivalsMult && e.arrivalsMult > 1); }
     // 런 전체의 달력: 개월차 순서대로 [{ m, cal, icon, events }]
-    calendarMonths() { const out = []; const n = this.rules.endless ? 12 : Math.min(12, this.rules.months); for (let m = 1; m <= n; m++) { const cal = this.calMonth(m), sm = this.seasonMods(m); out.push({ m, cal, icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1, events: (sm.events || []).map(e => ({ id: e.id, turns: e.turns, days: [this.turnDays(e.turns[0])[0], this.turnDays(e.turns[1])[1]] })) }); } return out; }
-    // ----- 달력 날짜 (1턴 = 평일 2일, 주말은 턴이 아니다) -----
-    // 기한·보관 기간은 영업일 기준이라 주말에는 진행하지 않는다. 요일은 표시하지 않는다(가상 달력)
+    calendarMonths() { const out = []; const n = this.rules.endless ? 12 : Math.min(12, this.rules.months); for (let m = 1; m <= n; m++) { const cal = this.calMonth(m), sm = this.seasonMods(m); out.push({ m, cal, icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1, events: (sm.events || []).map(e => ({ id: e.id, turns: e.turns })) }); } return out; }
+    // ----- 시간 -----
+    // 1턴 = 하루(영업일). 월~토 엿새 뒤 일요일 휴무. 한 사이클 = 2주 = 12영업일.
+    // 기한·보관 기간은 영업일 기준이라 일요일에는 진행하지 않는다.
     yearOf(m) { m = m || this.month || 1; const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return this.year + Math.floor((start - 1 + m - 1) / 12); }
-    monthDays(m) { return D.MONTH_DAYS[this.calMonth(m)] || 30; }
-    // t번째 영업 턴이 덮는 이틀
-    turnDays(t) { t = t || this.turn || 1; const a = (t - 1) * 2 + 1 + 2 * Math.floor((t - 1) / 2); return [a, a + 1]; }
+    weekOf(t) { return Math.floor(((t || this.turn || 1) - 1) / D.TURNS_PER_WEEK) + 1; }
+    // 요일: 0 월 … 5 토 (일요일은 턴이 아니다)
+    dowOf(t) { return ((t || this.turn || 1) - 1) % D.TURNS_PER_WEEK; }
+    dowName(t) { return (T('fmt.dows') || '').split(',')[this.dowOf(t)] || ''; }
     isWeekendAfter(t) { return D.WEEKEND_AFTER.indexOf(t || this.turn) >= 0; }
-    weekendDays(t) { const b = this.turnDays(t)[1]; return [b + 1, b + 2]; }
-    // 월말 정산이 먹는 꼬리 날짜 (2월은 28일에 딱 끝나 없음)
-    monthEndDays(m) { const last = this.monthDays(m), from = this.turnDays(D.TURNS_PER_MONTH)[1] + 1; return from > last ? null : [from, last]; }
-    dateLabel(t, m) { const d = this.turnDays(t); return T('fmt.date', { cal: this.calMonth(m), a: d[0], b: d[1] }); }
+    dateLabel(t, m) { return T('fmt.date', { cal: this.calMonth(m), t: t || this.turn || 1 }); }
+    dateDowLabel(t, m) { return T('fmt.dateDow', { cal: this.calMonth(m), t: t || this.turn || 1, dow: this.dowName(t) }); }
     returnGraceFor(p) { const R = this.rules; return Math.max(1, (this._attrs(p).includes('cold') ? R.returnGraceFresh : R.returnGrace) + (this.seasonMods().returnGraceDelta || 0)); }
     season(m) { const R = this.rules; if (R.season) return R.season; const c = this.calMonth(m); return c >= 3 && c <= 5 ? 'spring' : c >= 6 && c <= 8 ? 'summer' : c >= 9 && c <= 11 ? 'autumn' : 'winter'; }
     _genWeather(m) {
@@ -860,7 +860,7 @@
       let note = '';
       const wx = this.weatherNow(); if (wx !== 'sunny') note = ` ${M.WEATHER[wx].icon}${M.WEATHER[wx].name}`;
       if (this.heatTurns.includes(this.turn)) note = MSG('log.heatAlert');
-      for (const ev of this.eventsAt()) if (ev.turns[0] === this.turn) this.say('log.calEvent', { name: MSG('cal.event.' + ev.id), a: this.turnDays(ev.turns[0])[0], b: this.turnDays(ev.turns[1])[1] });
+      for (const ev of this.eventsAt()) if (ev.turns[0] === this.turn) this.say('log.calEvent', { name: MSG('cal.event.' + ev.id), a: ev.turns[0], b: ev.turns[1] });
       if (this.isOffTurn()) note = MSG('log.holidayOff');
       this.say('log.arrive', { date: this.dateLabel(), list: arrived.map(p => D.PARCEL_TYPES[p.type].short + p.size).join(', '), usage: Math.round(this.usage() * 100), note });
     }
@@ -1112,8 +1112,8 @@
         this.emit('penalty', { amount: pen, reasons });
       } else if (reasons.length) this.say(reasons.join(', '));
       if (this.stress >= this.rules.gameoverStress) return this._gameOver(MSG('over.stress'));
-      if (this.turn >= D.TURNS_PER_MONTH) return this._endMonth();
       if (this.isWeekendAfter(this.turn)) return this._startWeekend();
+      if (this.turn >= D.TURNS_PER_MONTH) return this._endMonth();
       this._startTurn();
     }
 
@@ -1121,8 +1121,7 @@
     // 턴이 아니다: 입고·호출·기한 진행 없음(기한은 영업일 기준). 마당에 둔 건 이틀 더 밖에 있으니 도난만 한 번 더 돈다
     _startWeekend() {
       this.phase = 'weekend';
-      const d = this.weekendDays(this.turn);
-      this.weekend = { after: this.turn, days: d, outdoor: this.outdoorVolume(), last: this.turn === D.WEEKEND_AFTER[D.WEEKEND_AFTER.length - 1] };
+      this.weekend = { after: this.turn, week: this.weekOf(this.turn), outdoor: this.outdoorVolume(), last: this.turn >= D.TURNS_PER_MONTH };
       this.emit('weekendStart', { weekend: this.weekend });
       return true;
     }
@@ -1139,7 +1138,7 @@
       if (!def) return { ok: false, msg: T('err.cannotCallNow') };
       const opt = this.weekendChoices().find(c => c.id === id);
       if (!opt.ok) return { ok: false, msg: T(opt.cost && this.cash < opt.cost ? 'err.noCash' : 'err.noOutdoor') };
-      const days = this.weekend.days;
+      const week = this.weekend.week, last = this.weekend.last;
       if (opt.cost) { this.cash -= opt.cost; this.monthStats.spent += opt.cost; this.run.spent += opt.cost; }
       if (def.stress) this.stress = Math.max(0, this.stress + def.stress);
       if (def.self) this.weekendBonus = { self: def.self };
@@ -1147,11 +1146,12 @@
       const pen = def.noTheft ? 0 : this._theftRoll(reasons);
       if (pen > 0) { this.stress += pen; this.monthStats.penalty += pen; }
       this._assignCold();
-      this.say('log.weekend', { a: days[0], b: days[1], choice: T('wk.' + id + '.done'), extra: reasons.length ? ' — ' + reasons.join(', ') : '' });
+      this.say('log.weekend', { w: week, choice: T('wk.' + id + '.done'), extra: reasons.length ? ' — ' + reasons.join(', ') : '' });
       this.emit('weekendEnd', { choice: id, pen });
       this.weekend = null;
       this.phase = 'play';
       if (this.stress >= this.rules.gameoverStress) return this._gameOver(MSG('over.stress'));
+      if (last) { this._endMonth(); return { ok: true, pen }; }   // 넷째 일요일 다음은 월말 정산
       this._startTurn();
       return { ok: true, pen };
     }

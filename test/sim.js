@@ -122,7 +122,7 @@ function report(label, N, strat, cfg) {
   for (let s = 1; s <= N; s++) {
     const g = runOne(s, strat, cfg);
     if (g.phase === 'win') wins++;
-    cash += g.cash; calls += g.run.calls; waits += g.run.waits; stress += g.stress; rev += g.run.revenue; months += (g.stats.monthsDone || 0) + (g.phase === 'win' ? 0 : g.turn / 10);
+    cash += g.cash; calls += g.run.calls; waits += g.run.waits; stress += g.stress; rev += g.run.revenue; months += (g.stats.monthsDone || 0) + (g.phase === 'win' ? 0 : g.turn / D.TURNS_PER_MONTH);
   }
   const mo = months / N;
   console.log(`${label.padEnd(14)} 생존 ${String(Math.round(wins / N * 100)).padStart(3)}%  평균개월 ${mo.toFixed(1)}  현금 ${(cash / N).toFixed(0).padStart(5)}  월호출 ${(calls / N / mo).toFixed(1)}  월대기 ${(waits / N / mo).toFixed(1)}  스트레스 ${(stress / N).toFixed(1)}  수익 ${(rev / N).toFixed(0)}`);
@@ -141,7 +141,7 @@ else for (const strat of Object.keys(STRATS)) {
     if (g.month >= 2) m2++; if (g.month >= 3) m3++;
     cash += g.cash; calls += g.run.calls; waits += g.run.waits; stress += g.stress; rev += g.run.revenue;
   }
-  const months = (calls + waits) / N / 10;
+  const months = (calls + waits) / N / D.TURNS_PER_MONTH;
   console.log(`${strat.padEnd(9)} 생존3개월 ${(wins / N * 100).toFixed(0)}%  2개월도달 ${(m2 / N * 100).toFixed(0)}%  3개월도달 ${(m3 / N * 100).toFixed(0)}%  평균현금 ${(cash / N).toFixed(0)}  월평균호출 ${(calls / N / months).toFixed(1)}  월평균대기 ${(waits / N / months).toFixed(1)}  평균스트레스 ${(stress / N).toFixed(1)}  총수익 ${(rev / N).toFixed(0)}`);
 }
 }

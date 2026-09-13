@@ -98,8 +98,10 @@
     { id: 'deadline1', months: [1, 2, 3], kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1 && !(p.customs > 0)), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'usage76', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.76, pages: [{ expr: 'worry', hl: '#bar-usage' }, { expr: 'neutral', hl: '#upcoming' }] },
     { id: 'usage91', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.91, pages: [{ expr: 'shock', hl: '#bar-usage' }] },
-    // 첫 주말: 왜 차를 못 부르는지, 마당을 왜 비워야 하는지 한 번만 짚는다
-    { id: 'weekend', months: [1, 2], kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '#modal .wkopts' }] },
+    // 첫 일요일: 왜 차를 못 부르는지, 마당을 왜 비워야 하는지. 마지막 페이지에서 직접 고르게 한다
+    { id: 'weekend', months: [1, 2], kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
+    // 마당에 물건이 나가 있는 채로 맞는 일요일 — 알바를 쓸지 결정하는 자리
+    { id: 'weekendYard', months: [1, 2, 3], kind: 'weekend', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'worry', hl: '.wkopts .wkc:nth-child(3)' }] },
     { id: 'summary1', months: [1], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
     { id: 'market1', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }, { expr: 'neutral' }] },
     // ----- 4월 (2개월차): 고객과 돈 -----
