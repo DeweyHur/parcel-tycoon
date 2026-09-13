@@ -64,6 +64,8 @@
   const gating = ['cold', 'fragile', 'customs', 'frozen'];
   const handleable = (g, p) => g.contracts.some(c => c && g.eligibleParcels(c).some(x => x.id === p.id));
   const bestReadySlot = g => { let best = -1, bestFill = 0; g.contracts.forEach((c, i) => { if (!c || !g.canCall(c)) return; const vol = g.eligibleParcels(c).reduce((s, p) => s + p.size, 0), fill = vol / g.vehicleCap(c); if (fill > bestFill) { bestFill = fill; best = i; } }); return { slot: best, fill: bestFill }; };
+  // 고객이 붙은 택배 하나 (없으면 아무거나) — 상세 팝업으로 안내할 대상
+  const namedParcel = g => g.parcels.find(p => p.customer && p.customer !== 'anon') || g.parcels[0] || null;
   const hasEvent = (ctx, types) => (ctx.events || []).some(e => types.includes(e.type));
 
   const BEATS = [
@@ -77,13 +79,17 @@
     { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#pick-list' }, { expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
+    // 안내가 끝났다는 걸 말로 못 박아 준다. 이게 없으면 언제까지 시키는 대로 해야 하는지 알 수 없다.
+    { id: 'handOff', months: [1], kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile' }] },
     { id: 'deadline1', months: [1, 2, 3], kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1 && !(p.customs > 0)), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'usage76', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.76, pages: [{ expr: 'worry', hl: '#bar-usage' }, { expr: 'neutral', hl: '#upcoming' }] },
     { id: 'usage91', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.91, pages: [{ expr: 'shock', hl: '#bar-usage' }] },
     { id: 'summary1', months: [1], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
     { id: 'market1', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }, { expr: 'neutral' }] },
     // ----- 4월 (2개월차): 고객과 돈 -----
-    { id: 'm2', months: [2], kind: 'turn', when: g => g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: '#parcels' }] },
+    // 고객 설명은 말로 하면 안 들어온다. 택배를 직접 누르게 하고 상세 팝업에서 짚는다.
+    { id: 'm2', months: [2], kind: 'turn', when: g => g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: g => { const p = namedParcel(g); return p ? `#parcels .parcel[data-id="${p.id}"]` : '#parcels'; }, gate: g => !!namedParcel(g) }] },
+    { id: 'm2Detail', months: [2, 3], kind: 'modal', modal: 'parcel', when: g => g.story.seen.includes('m2'), pages: [{ expr: 'neutral' }, { expr: 'neutral' }] },
     { id: 'special', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => attrsOf(g, p).some(a => gating.includes(a))), pages: [{ expr: 'neutral', hl: '#parcels', k: g => { const p = g.parcels.find(x => attrsOf(g, x).some(a => gating.includes(a))); const a = attrsOf(g, p).find(x => gating.includes(x)); return 'story.special.' + a; } }] },
     { id: 'noContract', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => !(p.customs > 0) && attrsOf(g, p).some(a => gating.includes(a)) && !handleable(g, p)), pages: [{ expr: 'worry' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
     // 대기 팝업 안 (noContract 다음): 직접 배송할 택배 하나 → 대기 버튼

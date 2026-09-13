@@ -248,9 +248,11 @@
     if (!c) return T('coach.noContract');
     const name = g.contractName(c), cap = g.vehicleCap(c);
     const vol = g.eligibleParcels(c).reduce((s2, p) => s2 + p.size, 0);
+    // handOff("나머지는 자네가 해봐") 전에는 시키는 말투, 그 뒤로는 상태만 알려준다
+    const q = g.story.seen.includes('handOff') ? 'Quiet' : '';
     if (g.usage() >= 0.9) return T('coach.full');
-    if (b.slot >= 0 && b.fill >= 0.8) return T('coach.ready', { name, pct: Math.round(b.fill * 100) });
-    return T('coach.wait', { vol, cap, name });
+    if (b.slot >= 0 && b.fill >= 0.8) return T('coach.ready' + q, { name, pct: Math.round(b.fill * 100) });
+    return T('coach.wait' + q, { vol, cap, name });
   }
   function renderCoach() {
     const el = $('#coach'), g = game;
@@ -306,6 +308,7 @@
       ${attrRows}
       <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('pd.contracts')}</div><div class="ttrack">${rows || `<div class="d">${T('pd.noContract')}</div>`}<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">${T('pd.selfRow')} ${selfOk ? T('pd.selfCost', { cost: g.selfCost(p) }) : `<span style="color:var(--dim)">${esc(selfWhy || T('pd.no'))}</span>`}</span><span class="st">${selfOk ? T('pd.ok') : '—'}</span></div></div>`;
     modal(`${t.name} ${T('fmt.cells', { n: p.size })}`, body, [{ label: T('btn.close'), onClick: closeModal }]);
+    storyCheck({ kind: 'modal', modal: 'parcel', parcel: p });
   }
   function renderOffer() {
     const g = game, o = g.offer, el = $('#offer');
