@@ -630,32 +630,43 @@
   function showSummary() {
     const s = game.summary, R = game.rules;
     if (R.endless || game.month < R.months) BGM.stinger('fanfare', 0.9); // 마지막 달은 결과 화면의 팡파레 하나만
-    const body = `<div class="kv">
+    // 정산 화면이 답해야 하는 질문은 하나다: 이번 달 흑자야 적자야, 얼마야.
+    // 그동안은 +2395 / -477 / -522 / -42 를 늘어놓고 덧셈은 플레이어에게 맡겼다.
+    const net = s.net != null ? s.net : 0;
+    const head = `<div class="sumnet ${net >= 0 ? 'good' : 'bad'}"><span class="lbl">${T('sum.net')}</span><span class="amt">${net >= 0 ? '+' : ''}${net}c</span>
+      <span class="flow">${T('sum.netFlow', { from: s.cashStart != null ? s.cashStart : s.cash, to: s.cash })}${R.winCash ? ` · ${T('sum.goal', { n: R.winCash })}` : ''}</span></div>`;
+    const sec = k => `<div class="sumsec">${T('sum.sec' + k)}</div>`;
+    const income = `${sec('Income')}<div class="kv">
       <span>${T('sum.revenue')}</span><span class="v good">+${s.revenue}</span>
+      ${s.storageIncome ? `<span>${T('sum.storageIncome')}</span><span class="v good">+${s.storageIncome}</span>` : ''}
+      ${s.closing ? `<span>${T('sum.closing')}</span><span class="v good">+${s.closing}</span>` : ''}
+      ${s.loan && s.loan.borrowed ? `<span>${T('sum.loan')}</span><span class="v" style="color:var(--orange)">+${s.loan.borrowed}</span><span class="sub" style="grid-column:1/-1;white-space:normal;color:var(--orange)">${T('sum.loanNote', { debt: s.loan.debt, interest: Math.ceil(s.loan.debt * D.LOAN.interest), limit: D.LOAN.limit })}</span>` : ''}</div>`;
+    const cost = `${sec('Cost')}<div class="kv">
       <span>${T('sum.opCost')}</span><span class="v bad">-${s.opCost}</span>
       ${s.opCostDetail ? `<span class="sub" style="grid-column:1/-1;font-size:11px;color:var(--dim);margin-top:-4px">${T('sum.opCostDetail', s.opCostDetail)}</span>` : ''}
       <span>${T('sum.fees')}</span><span class="v ${s.fees ? 'bad' : ''}">-${s.fees || 0}</span>
-      ${s.loan && s.loan.repaid ? `<span>${T('sum.loanRepaid')}</span><span class="v bad">-${s.loan.repaid + s.loan.interest} <small>${T('sum.loanInterest', { n: s.loan.interest })}</small></span>` : ''}
-      ${s.loan && s.loan.borrowed ? `<span>${T('sum.loan')}</span><span class="v" style="color:var(--orange)">+${s.loan.borrowed}</span><span class="sub" style="grid-column:1/-1;white-space:normal;color:var(--orange)">${T('sum.loanNote', { debt: s.loan.debt, interest: Math.ceil(s.loan.debt * D.LOAN.interest), limit: D.LOAN.limit })}</span>` : ''}
-      ${s.closing ? `<span>${T('sum.closing')}</span><span class="v good">+${s.closing}</span>` : ''}
+      ${s.selfCost ? `<span>${T('sum.selfCost')}</span><span class="v bad">-${s.selfCost}</span>` : ''}
+      ${game.insurer !== 'none' ? `<span>${T('sum.premium', { name: esc(M.INSURERS[game.insurer].name) })}</span><span class="v ${s.premium ? 'bad' : ''}">-${s.premium || 0}</span><span class="sub" style="grid-column:1/-1;white-space:normal">${T('sum.claimsNext', { n: s.insClaims || 0, next: s.nextPremium })}${s.noClaimBonus ? ` · ${T('sum.noClaimBonus')}` : ''}</span>` : ''}
+      ${s.loan && s.loan.repaid ? `<span>${T('sum.loanRepaid')}</span><span class="v bad">-${s.loan.repaid + s.loan.interest} <small>${T('sum.loanInterest', { n: s.loan.interest })}</small></span>` : ''}</div>`;
+    // 사고가 하나도 없으면 0 네 줄을 늘어놓지 않는다 — 좋은 소식은 한 줄이면 된다
+    const bad = (s.penalty || 0) + (s.returned || 0) + (s.stolen || 0) + (s.broken || 0) + (s.claims || 0) + (s.discarded || 0);
+    const incident = bad === 0 ? `${sec('Incident')}<div class="d" style="color:var(--green)">${T('sum.noIncident')}</div>` : `${sec('Incident')}<div class="kv">
+      ${s.penalty ? `<span>${T('sum.penalty')}</span><span class="v bad">+${s.penalty}</span>` : ''}
+      ${s.returned || s.stolen || s.broken ? `<span>${T('sum.rsb')}</span><span class="v bad">${s.returned || 0} / ${s.stolen || 0} / ${s.broken || 0}</span>` : ''}
+      ${s.claims ? `<span>${T('sum.claims')}</span><span class="v bad">-${s.claims}${s.covered ? ` <small style="color:var(--green)">${T('sum.covered', { n: s.covered })}</small>` : ''}</span>` : ''}
+      ${s.discarded ? `<span>${T('sum.discarded')}</span><span class="v bad">${T('fmt.count', { n: s.discarded })}${R.winMaxDiscard != null ? ` ${T('sum.runDiscard', { n: game.run.discarded, max: R.winMaxDiscard })}` : ''}</span>` : ''}</div>`;
+    const state = `${sec('State')}<div class="kv">
       <span>${T('sum.callsWaits')}</span><span class="v">${T('fmt.calls', { n: s.calls })} / ${T('fmt.calls', { n: s.waits })}</span>
       <span>${T('sum.delivered')}</span><span class="v">${T('fmt.count', { n: s.delivered })}</span>
-      <span>${T('sum.penalty')}</span><span class="v ${s.penalty ? 'bad' : ''}">+${s.penalty}</span>
-      <span>${T('sum.rsb')}</span><span class="v ${s.returned || s.stolen || s.broken ? 'bad' : ''}">${s.returned || 0} / ${s.stolen || 0} / ${s.broken || 0}</span>
-      <span>${T('sum.claims')}</span><span class="v ${s.claims ? 'bad' : ''}">-${s.claims || 0}${s.covered ? ` <small style="color:var(--green)">${T('sum.covered', { n: s.covered })}</small>` : ''}</span>
-      ${game.insurer !== 'none' ? `<span>${T('sum.premium', { name: esc(M.INSURERS[game.insurer].name) })}</span><span class="v ${s.premium ? 'bad' : ''}">-${s.premium || 0}</span><span class="sub" style="grid-column:1/-1;white-space:normal">${T('sum.claimsNext', { n: s.insClaims || 0, next: s.nextPremium })}${s.noClaimBonus ? ` · ${T('sum.noClaimBonus')}` : ''}</span>` : ''}
-      ${s.selfCost ? `<span>${T('sum.selfCost')}</span><span class="v bad">-${s.selfCost}</span>` : ''}
-      ${s.storageIncome ? `<span>${T('sum.storageIncome')}</span><span class="v">+${s.storageIncome}</span>` : ''}
-      <span>${T('sum.overdueVol')}</span><span class="v ${s.overdueVol ? 'bad' : ''}">${T('fmt.cells', { n: s.overdueVol })}</span>
-      <span>${T('sum.discarded')}</span><span class="v ${s.discarded ? 'bad' : ''}">${T('fmt.count', { n: s.discarded })}${R.winMaxDiscard != null ? ` ${T('sum.runDiscard', { n: game.run.discarded, max: R.winMaxDiscard })}` : ''}</span>
-      <hr style="grid-column:1/-1">
-      <span>${T('sum.cash')}</span><span class="v">${s.cash}c${R.winCash ? ` ${T('sum.goal', { n: R.winCash })}` : ''}</span>
       <span>${T('sum.stress')}</span><span class="v ${s.stress >= 11 ? 'bad' : ''}">${s.stress}/${game.rules.gameoverStress} (${game.stressState()})</span>
       <span>${T('sum.usage')}</span><span class="v">${T('sum.usageVal', { pct: s.usage, n: s.left })}</span>
+      ${s.overdueVol ? `<span>${T('sum.overdueVol')}</span><span class="v bad">${T('fmt.cells', { n: s.overdueVol })}</span>` : ''}
+      ${bad === 0 && R.winMaxDiscard != null ? `<span>${T('sum.discarded')}</span><span class="v">${T('sum.runDiscard', { n: game.run.discarded, max: R.winMaxDiscard })}</span>` : ''}
       ${R.winDelivered ? `<span>${T('sum.deliverGoal')}</span><span class="v">${game.run.delivered}/${T('fmt.count', { n: R.winDelivered })}</span>` : ''}
       ${R.winStorage ? `<span>${T('sum.storageGoal')}</span><span class="v">${game.stats.storageDone}/${T('fmt.cases', { n: R.winStorage })}</span>` : ''}
-      ${R.winBigCustomer && game.bigCustomer ? `<span>${T('sum.bigCustomer')}</span><span class="v">${M.CUSTOMERS[game.bigCustomer].icon} ${esc(M.CUSTOMERS[game.bigCustomer].name)} ${T('common.trust')} ${game.customerLevel(game.bigCustomer)}/3</span>` : ''}</div>
-      ${s.customers ? `<hr><div style="font-size:12px;color:var(--dim);margin-bottom:4px">${T('company.customers')}</div>` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${T('common.trust')} ${c.month.lvStart}→${c.level}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : ''}`;
+      ${R.winBigCustomer && game.bigCustomer ? `<span>${T('sum.bigCustomer')}</span><span class="v">${M.CUSTOMERS[game.bigCustomer].icon} ${esc(M.CUSTOMERS[game.bigCustomer].name)} ${T('common.trust')} ${game.customerLevel(game.bigCustomer)}/3</span>` : ''}</div>`;
+    const custs = s.customers ? `${sec('Cust')}` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${T('common.trust')} ${c.month.lvStart}→${c.level}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : '';
+    const body = head + income + cost + incident + state + custs;
     const last = !R.endless && game.month >= R.months;
     modal(T('sum.title', { n: s.month }), body, [{ label: last ? T('sum.final') : T('sum.toMarket'), cls: 'primary', onClick: () => { closeModal(); game.closeSummary(); saveGame(); checkPhase(); } }]);
     storyCheck({ kind: 'summary' });

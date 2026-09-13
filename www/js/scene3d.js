@@ -236,6 +236,9 @@ window.Scene3D = (function () {
       for (const p of game.parcels) items.push(p);
       for (const p of items) { if (!p.storage) p.baseSizeVis = this._visSize(p); (p.outdoor ? yard : ((p.inCold || p.inFrozen) ? cold : main)).push(p); }
       const pos = new Map([...this._pack(cold, COLD), ...this._pack(main, MAIN), ...this._pack(yard, YARD)]);
+      // 지금 비가 오거나 예보에 비·눈이 있으면 마당에 나가 있는 것들은 젖는다
+      let wetRisk = false;
+      try { const w = game.weatherNow && game.weatherNow(); wetRisk = ['rain', 'snow', 'storm'].includes(w) || (game.upcoming && game.upcoming().some(u => ['rain', 'snow', 'storm'].includes(u.weather))); } catch (e) { }
       const seen = new Set();
       for (const p of items) {
         seen.add(p.id);
@@ -264,7 +267,10 @@ window.Scene3D = (function () {
         if (p.wet) base.multiplyScalar(0.7);
         m.color.copy(base);
         b.userData.overdue = p.overdue || (p.type === 'fresh' && p.fresh <= 1) || false;
+        // 아직 늦지는 않았지만 이번 턴이 마지막인 것 — 3D에서 이걸 못 보면 창고를 보는 의미가 없다
+        b.userData.urgent = !b.userData.overdue && !p.storage && !(p.customs > 0) && p.deadline <= 1;
         b.userData.warm = p.type === 'fresh' && !p.inCold;
+        b.userData.exposed = !!p.outdoor && wetRisk;
       }
       for (const [id, b] of this.boxes) if (!seen.has(id) && !b.userData.locked) { this.scene.remove(b); this.boxes.delete(id); }
     }
@@ -316,7 +322,9 @@ window.Scene3D = (function () {
       const pulse = (Math.sin(this.time * 8) + 1) / 2;
       for (const b of this.boxes.values()) {
         const m = b.material;
-        if (b.userData.overdue) m.emissive.setRGB(0.5 * pulse, 0.05, 0.05); else m.emissive.setRGB(0, 0, 0);
+        if (b.userData.overdue) m.emissive.setRGB(0.5 * pulse, 0.05, 0.05);
+        else if (b.userData.urgent) m.emissive.setRGB(0.42 * pulse, 0.26 * pulse, 0.02);
+        else if (b.userData.exposed) m.emissive.setRGB(0.05, 0.18 * pulse, 0.34 * pulse); else m.emissive.setRGB(0, 0, 0);
         if (b.userData.warm && !b.userData.locked) b.rotation.y = Math.sin(this.time * 6 + b.userData.id) * 0.06; else b.rotation.y = 0;
       }
       this._tickWeather(dt);
