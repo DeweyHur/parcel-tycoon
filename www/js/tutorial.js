@@ -10,10 +10,10 @@
 
   const TUTORIAL = {
     SEED: 20260313,   // 대본 밖(파손·도난·통관 지연 굴림)도 매번 같게
-    MONTHS: 3,        // 이 개월차까지만 대본
+    CYCLES: 6,        // 인수인계 = 6사이클(3개월). 대본은 각 달 '전반' 사이클에만 붙고 후반은 무작위다
 
     months: {
-      // ----- 1개월차 (3월): 쌓았다가 꽉 채워 보낸다. 3턴에 딱 한 대(6칸), 8턴에 딱 두 대(12칸) -----
+      // ----- 1사이클 = 3월 전반: 쌓았다가 꽉 채워 보낸다. 3턴에 딱 한 대(6칸), 8턴에 딱 두 대(12칸) -----
       1: {
         weather: ['sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny'],
         turns: turns([
@@ -35,8 +35,8 @@
         market: { contracts: [], enh: ['limit1'], fac: ['expand1'] },
       },
 
-      // ----- 2개월차 (4월): 고객과 특수 품목. ⚠ 3개 vs 시작 배차 2대 → 배차가 떨어진다 -----
-      2: {
+      // ----- 3사이클 = 4월 전반: 고객과 특수 품목. ⚠ 3개 vs 시작 배차 2대 → 배차가 떨어진다 -----
+      3: {
         weather: ['sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'rain'],
         turns: turns([
           ['normal 2 mart', 'fresh 2 dawn'],
@@ -57,8 +57,8 @@
         market: { contracts: ['fragile1'], enh: ['limit2'], fac: ['cold1'] },
       },
 
-      // ----- 3개월차 (5월): 가정의 달 ⚠. 창고가 차고, 비가 오고, 배차를 관리해야 한다 -----
-      3: {
+      // ----- 5사이클 = 5월 전반: 가정의 달 ⚠. 창고가 차고, 비가 오고, 배차를 관리해야 한다 -----
+      5: {
         weather: ['sunny', 'sunny', 'rain', 'rain', 'sunny', 'rain', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny'],
         turns: turns([
           ['normal 2 mart', 'fragile 2 glass'],

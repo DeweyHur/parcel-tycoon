@@ -160,9 +160,9 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
     await page.click('.foot .btn.primary', { force: true }); await page.waitForTimeout(900); await settle();
   }
   cur = await st();
-  ok('2개월차 시작', cur.m === 2 && cur.phase === 'play', JSON.stringify(cur));
+  ok('다음 사이클 시작', cur.m === 2 && cur.phase === 'play', JSON.stringify(cur));
   const hud2 = await page.evaluate(() => document.querySelector('#hud-month').textContent);
-  ok('2개월차 HUD는 4월', /4월/.test(hud2), hud2.trim());
+  ok('두 번째 사이클은 3월 후반(13일차부터)', /3월/.test(hud2), hud2.trim());
 
   // ---------- 10. 달력 화면 ----------
   await page.click('#hud-month', { force: true }); await page.waitForTimeout(400);
@@ -185,7 +185,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('이어하기 버튼', !!cont);
   if (cont) {
     const label = await cont.textContent();
-    ok('이어하기 라벨이 개월차/진행도', /개월차/.test(label) && /\/12/.test(label), label.replace(/\s+/g, ' ').trim());
+    ok('이어하기 라벨에 진행도', /\/12/.test(label), label.replace(/\s+/g, ' ').trim());
     await cont.click({ force: true }); await page.waitForTimeout(900); await settle();
     const after = await st();
     ok('세이브 복원', after.m === beforeReload.m && after.t === beforeReload.t, `${beforeReload.m}-${beforeReload.t} → ${after.m}-${after.t}`);

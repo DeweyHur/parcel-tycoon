@@ -61,7 +61,7 @@ const fs = require('fs');
   while (guard++ < 500) {
     const st = await page.evaluate(() => ({ phase: PT.game.phase, m: PT.game.month, t: PT.game.turn, seen: PT.game.story.seen.slice() }));
     if (st.phase === 'over' || st.phase === 'win') { console.log('run ended', st.phase, st.m); break; }
-    if (st.m > 3) { console.log('3개월차 완료 → 4개월차 진입'); break; }
+    if (st.m > 6 || st.phase === 'win') { console.log('인수인계(분기 6사이클) 완료'); break; }
     await readBeat();
     if (await passGate()) continue;
     if (st.phase === 'weekend') { await page.click('.wkopts .wkc:not([disabled])', { force: true }); await page.waitForTimeout(600); await readBeat(); continue; }

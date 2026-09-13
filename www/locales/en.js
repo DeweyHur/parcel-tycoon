@@ -198,7 +198,7 @@
     'title.sub': 'Let them pile up, then send one full truck',
     'title.goal': 'Take over in March, survive to next February',
     'title.continue': 'Continue',
-    'fmt.monthTurn': 'Month {m} · day {t}/{max}',
+    'fmt.monthTurn': '{m} · day {t}/{max}',
     'title.new': 'New Run',
     'title.codex': 'Codex',
     'title.codexSub': '{a}/{b} unlocked · achievements {c}/{d}',
@@ -278,6 +278,9 @@
     'fmt.date': 'M{cal} day {t}',
     'fmt.dateDow': 'M{cal} day {t} ({dow})',
     'fmt.dayN': 'D{n}',
+    'fmt.cycle': 'M{cal} {half}',
+    'fmt.half1': '1st half',
+    'fmt.half2': '2nd half',
     'fmt.dows': 'Mon,Tue,Wed,Thu,Fri,Sat',
     
     'log.weekend': '🛌 Sunday, week {w} — {choice}{extra}',
@@ -711,7 +714,7 @@
     'sum.bigCustomer': 'Big-contract customer',
     'common.trust': 'trust',
     'sum.custClaim': 'damages -{n}c',
-    'sum.title': 'Month {n} Settlement',
+    'sum.title': '{n} Settlement',
     'sum.final': 'Final result',
     'sum.toMarket': 'To market',
     'mk.capCalls': '{cap}/call · max {calls} calls',
@@ -731,8 +734,8 @@
     'mk.refresh': 'Refresh market ({cost})',
     'mk.free': 'free',
     'mk.prepTitle': 'Prep Market',
-    'mk.title': 'Month {n} Market',
-    'mk.startMonth': 'Start month {n}',
+    'mk.title': '{n} Market',
+    'mk.startMonth': 'Start {n}',
     'toast.strike': '✊ {name} on strike this month — cannot call',
     'mk.priceMult': 'prices ×{n}',
     'slot.pickReplace': 'Pick a slot to replace. Remaining trucks and upgrades are lost; carrier trust stays.',
@@ -1666,6 +1669,18 @@
       }
     },
     "SCENARIOS": {
+      "quarter": {
+        "name": "Quarter (3 months)",
+        "desc": "Take over in the March moving season and run to May. A cycle is two weeks; six of them is one spring. The short run.",
+        "win": "Survive 6 cycles (3 months)",
+        "recommend": "Corner Courier"
+      },
+      "halfyear": {
+        "name": "Half year (6 months)",
+        "desc": "March through the monsoon and the heat to August. You will need cold storage to clear summer.",
+        "win": "Survive 12 cycles (6 months) (score x1.25)",
+        "recommend": "Dawn Logistics"
+      },
       "standard": {
         "name": "One Year (12 months)",
         "desc": "The main run on the Korean calendar: starts in the March moving season and runs through monsoon, heat, Chuseok, the shopping festival and year-end to next February's Seollal. Customer trust doubles volume, and costs grow with it",

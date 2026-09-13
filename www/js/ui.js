@@ -5,8 +5,12 @@
   const SAVE_KEY = 'save_v2', OPT_KEY = 'opts_v1';
   let game = null, scene = null, busy = false;
   if (typeof window !== 'undefined') Object.defineProperty(window, '__game', { get: () => game });
-  const BUILD = Object.assign({ demo: false, demoMonths: 3, iap: null, store: {} }, window.BUILD || {});
-  const demoMonths = () => BUILD.demoMonths || 3;
+  const BUILD = Object.assign({ demo: false, demoMonths: 6, iap: null, store: {} }, window.BUILD || {});   // 사이클 수 (6 = 3개월)
+  const demoMonths = () => BUILD.demoMonths || 6;
+  const demoMonthsLabel = () => Math.round(demoMonths() / D.CYCLES_PER_MONTH);   // 화면엔 개월로
+  // 사이클 번호 → '3월 후반' (세이브 라벨·결과·기록처럼 game 이 없을 수도 있는 곳에서 쓴다)
+  const cycleName = c => { const cy = D.CYCLES_PER_MONTH, mi = Math.ceil(c / cy), half = (c - 1) % cy + 1;
+    const cal = ((D.START_MONTH - 1 + mi - 1) % 12) + 1; return T('fmt.cycle', { cal, half: T('fmt.half' + half) }); };
   const demoLocked = () => !!BUILD.demo && !Profile.hasFull();   // 데모 빌드 + 본편 미구매
   const opts = Object.assign({ sound: true, music: true, musicVol: 0.6, sms: true }, Store.get(OPT_KEY) || {});
   SFX.setEnabled(opts.sound); BGM.setEnabled(opts.music); BGM.setVolume(opts.musicVol);
@@ -58,8 +62,8 @@
     const nUnlocked = P.unlocked.companies.length + P.unlocked.perks.length + P.unlocked.scenarios.length;
     const nTotal = Object.keys(M.COMPANIES).length + Object.keys(M.PERKS).length + Object.keys(M.SCENARIOS).length;
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div><div class="goal">${T('title.goal')}</div>
-      ${save ? `<button class="btn primary" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(save.story ? T('title.story') : M.SCENARIOS[save.cfg.scenario] ? M.SCENARIOS[save.cfg.scenario].name : save.cfg.scenario)} · ${T('fmt.monthTurn', { m: save.month, t: save.turn , max: D.TURNS_PER_MONTH })})</small></button>` : ''}
-      <button class="btn ${P.story && P.story.seen ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${demoLocked() ? T('demo.storySub', { n: demoMonths() }) : T('title.storySub')}</small></button>
+      ${save ? `<button class="btn primary" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(save.story ? T('title.story') : M.SCENARIOS[save.cfg.scenario] ? M.SCENARIOS[save.cfg.scenario].name : save.cfg.scenario)} · ${T('fmt.monthTurn', { m: cycleName(save.month), t: save.turn , max: D.TURNS_PER_MONTH })})</small></button>` : ''}
+      <button class="btn ${P.story && P.story.seen ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${demoLocked() ? T('demo.storySub', { n: demoMonthsLabel() }) : T('title.storySub')}</small></button>
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
       <button class="btn ${P.story && P.story.seen && !demoLocked() ? 'gold' : ''}" id="t-new">${demoLocked() ? '🔒 ' : ''}${T('title.new')}${demoLocked() ? ` <small style="color:var(--dim)">${T('demo.fullOnly')}</small>` : P.story && P.story.seen ? '' : ` <small style="color:var(--dim)">${T('title.newHint')}</small>`}</button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).length, d: Object.keys(M.ACHIEVEMENTS).length })}</small></button>
@@ -120,7 +124,7 @@
   function showStoryStart() {
     const diffRow = `<div class="diffrow">${['rookie', 'normal'].map(id => { const d = M.DIFFICULTIES[id]; return `<button class="btn small ${storyDiff === id ? 'on' : ''}" data-diff="${id}" title="${esc(d.desc)}">${d.icon} ${d.name}</button>`; }).join('')}</div><div class="d" style="font-size:11px;color:var(--dim);margin-bottom:6px">${esc(M.DIFFICULTIES[storyDiff].desc)}</div>`;
     const face = `<img src="${Story.SPRITES.smile}" style="width:64px;height:64px;image-rendering:pixelated;float:left;margin:0 10px 6px 0;border:3px solid var(--line);background:#3a3555">`;
-    const m = modal(T('story.startTitle'), `<p>${face}${T('story.startBody')}</p><div style="clear:both"></div><div class="perk-count">${T('story.diffAsk')}</div>${diffRow}`, [{ label: T('btn.back'), onClick: showTitle }, { label: T('story.start'), cls: 'primary', onClick: () => withHowTo(() => { game = new Game({ scenario: 'standard', company: 'local', perks: [], insurer: 'none', difficulty: storyDiff, story: true, scripted: true, prep: false, demoMonths: demoLocked() ? demoMonths() : 0 }); closeModal(); startPlay(); }) }]);
+    const m = modal(T('story.startTitle'), `<p>${face}${T('story.startBody')}</p><div style="clear:both"></div><div class="perk-count">${T('story.diffAsk')}</div>${diffRow}`, [{ label: T('btn.back'), onClick: showTitle }, { label: T('story.start'), cls: 'primary', onClick: () => withHowTo(() => { game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: storyDiff, story: true, scripted: true, prep: false, demoMonths: demoLocked() ? demoMonths() : 0 }); closeModal(); startPlay(); }) }]);
     m.querySelectorAll('[data-diff]').forEach(el => el.onclick = () => { SFX.select(); storyDiff = el.dataset.diff; showStoryStart(); });
   }
 
@@ -223,7 +227,7 @@
     const g = game, R = g.rules;
     updateMusic();
     $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { y: g.yearOf(), cal: g.calMonth(), n: g.month })}`;
-    $('#hud-turn').textContent = T('hud.turn', { t: g.turn, dow: g.dowName(g.turn), w: g.weekOf(g.turn) });
+    $('#hud-turn').textContent = T('hud.turn', { t: g.dayOfMonth(g.turn), dow: g.dowName(g.turn), w: g.weekOf(g.turn) });
     // 자금은 월말 정산 후 예상 잔액으로 보여준다 (사이클 중엔 모든 지출이 어음 — 자금 때문에 막히는 일이 없다)
     const pj = g.projectedCash(); const hc = $('#hud-cash'); const inPlay = g.phase === 'play';
     hc.textContent = inPlay ? pj.total : g.cash; hc.style.color = inPlay && pj.total < 0 ? 'var(--red)' : '';
@@ -249,7 +253,7 @@
     let sawEnd = false;   // 월말 정산 칩이 두 번 세 번 반복되면 줄만 길어진다 — 한 번만
     // 기획서대로 앞 2턴만 — 3턴 뒤 입고는 지금 결정에 쓰이지 않는데 줄만 세 줄로 늘어난다
     $('#upcoming').innerHTML = `<span>${T('hud.upcoming')}</span>` + up.slice(0, 2).map(u => {
-      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${T('fmt.dayN', { n: u.turn })}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}</span>`;
+      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${T('fmt.dayN', { n: g.dayOfMonth(u.turn) })}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}</span>`;
       const end = u.turn > D.TURNS_PER_MONTH;
       if (end && sawEnd) return '';
       if (end) sawEnd = true;
@@ -257,7 +261,7 @@
     }).join('');
     if (g.isWeekendAfter(g.turn)) $('#upcoming').innerHTML += `<span class="chip none">🛌 ${T('hud.weekend')}</span>`;
     const wxNow = g.weatherNow(), W = M.WEATHER[wxNow];
-    const fc = up.filter(u => u.weather && u.turn > g.turn).map(u => `${T('fmt.dayN', { n: u.turn })} ${M.WEATHER[u.weather].icon}`).join(' · ');
+    const fc = up.filter(u => u.weather && u.turn > g.turn).map(u => `${T('fmt.dayN', { n: g.dayOfMonth(u.turn) })} ${M.WEATHER[u.weather].icon}`).join(' · ');
     $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.desc)}">${W.icon} ${W.name}${fc ? ` <small style="color:var(--dim)">→ ${fc}</small>` : ''}</span>` + $('#upcoming').innerHTML;
     $('#upcoming').querySelectorAll('.chip.wx').forEach(el => el.onclick = () => { SFX.click(); showWeatherInfo(); });
     $('#upcoming').querySelectorAll('.chip.up').forEach(el => el.onclick = () => { SFX.click(); showUpcomingInfo(+el.dataset.turn); });
@@ -333,7 +337,7 @@
   }
   function showWeatherInfo() {
     const g = game, now = g.weatherNow();
-    const known = []; for (let t = 1; t <= D.TURNS_PER_MONTH; t++) { const k = t <= g.turn ? 'past' : t <= g.turn + g.rules.forecastTurns ? 'known' : 'unknown'; known.push(`<span class="chip wx ${k === 'unknown' ? '' : g.weatherAt(t)} ${t === g.turn ? 'now' : ''}" style="${k === 'past' ? 'opacity:.5' : ''}">${T('fmt.dayN', { n: t })} ${k === 'unknown' ? '?' : M.WEATHER[g.weatherAt(t)].icon}</span>`); }
+    const known = []; for (let t = 1; t <= D.TURNS_PER_MONTH; t++) { const k = t <= g.turn ? 'past' : t <= g.turn + g.rules.forecastTurns ? 'known' : 'unknown'; known.push(`<span class="chip wx ${k === 'unknown' ? '' : g.weatherAt(t)} ${t === g.turn ? 'now' : ''}" style="${k === 'past' ? 'opacity:.5' : ''}">${T('fmt.dayN', { n: g.dayOfMonth(t) })} ${k === 'unknown' ? '?' : M.WEATHER[g.weatherAt(t)].icon}</span>`); }
     const rows = Object.keys(M.WEATHER).map(k => { const W = M.WEATHER[k]; return `<div class="ttrow ${k === now ? 'on' : ''}"><span class="lv">${W.icon}</span><span class="ef"><b>${esc(W.name)}</b>${W.desc ? ' — ' + esc(W.desc) : ' — ' + T('weather.noEffect')}</span></div>`; }).join('');
     const season = T('season.' + g.season());
     modal(T('weather.title'), `<div class="d">${T('weather.head', { season: `<b>${season}</b>`, n: g.rules.forecastTurns })}${g.rules.tent ? ` · ${T('weather.tent')}` : ''}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">${known.join('')}</div><div class="ttrack">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">${T('weather.note')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]);
@@ -705,7 +709,7 @@
     const custs = s.customers ? `${sec('Cust')}` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${T('common.trust')} ${c.month.lvStart}→${c.level}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : '';
     const body = head + income + cost + incident + state + custs;
     const last = !R.endless && game.month >= R.months;
-    modal(T('sum.title', { n: s.month }), body, [{ label: last ? T('sum.final') : T('sum.toMarket'), cls: 'primary', onClick: () => { closeModal(); game.closeSummary(); saveGame(); checkPhase(); } }]);
+    modal(T('sum.title', { n: game.cycleLabel(s.month) }), body, [{ label: last ? T('sum.final') : T('sum.toMarket'), cls: 'primary', onClick: () => { closeModal(); game.closeSummary(); saveGame(); checkPhase(); } }]);
     storyCheck({ kind: 'summary' });
   }
 
@@ -748,7 +752,7 @@
       const fcLine = `<div class="d"><a class="hl" id="mk-fctoggle">${T('mk.forecastSum', { m: nm, min: fcTot.min, max: fcTot.max })} ${fcOpen ? '▴' : '▾'}</a></div>${fcOpen ? `<div class="d fcline">${fcRows}</div>` : ''}${seasonLine}`;
       const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span><span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>${whLine}${contracts}${fcLine}${prepLine}${items}
         ${R.noRefresh ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('err.noRefresh')}</div>` : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
-      const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: mk.month }), body, [{ label: T('mk.startMonth', { n: mk.month + 1 }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(6, Math.max(1, mk.month))] * R.itemPriceMult * R.priceMult).toFixed(2) }));
+      const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), body, [{ label: T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(6, Math.max(1, mk.month))] * R.itemPriceMult * R.priceMult).toFixed(2) }));
       const ft = m.querySelector('#mk-fctoggle'); if (ft) ft.onclick = () => { SFX.click(); fcOpen = !fcOpen; render(); };
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
       storyCheck({ kind: 'market', bought: mk.bought });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
@@ -850,7 +854,7 @@
     const got = (r.got || []).map(a => `<div class="card" style="cursor:default"><div class="t">🏆 ${esc(a.name)}</div>${a.unlocks.map(u => `<div class="d" style="color:var(--green)">${T('res.unlocked', { name: esc(u.name) })}</div>`).join('')}</div>`).join('');
     const demoNote = r.demo ? `<div class="card gold" style="cursor:default"><div class="t">🔒 ${T('demo.resultHead')}</div><div class="d">${T('demo.resultBody', { n: r.monthsDone })}</div></div>` : '';
     const body = `<p style="text-align:center">${esc(I18n.text(r.reason))}</p>${demoNote}<div class="big-num">${T('fmt.pts', { n: r.score })}${rec && r.score >= rec.bestScore && r.score > 0 ? ` ${T('res.best')}` : ''}</div>${got}
-      <div class="kv"><span>${T('res.scenarioCompany')}</span><span class="v">${esc(M.SCENARIOS[r.scenario].name)}${r.difficulty && r.difficulty !== 'normal' ? ` (${esc(M.DIFFICULTIES[r.difficulty].name)})` : ''} / ${esc(M.COMPANIES[r.company].name)}</span><span>${T('res.reached')}</span><span class="v">${T('fmt.monthTurn', { m: r.month, t: r.turn , max: D.TURNS_PER_MONTH })}</span><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.cash')}</span><span class="v">${r.cash}c</span><span>${T('sum.rep')}</span><span class="v">${r.rep} <small>${esc(T('rep.tier.' + (r.repTier || 'unknown')))}</small></span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${r.perks.map(p => M.PERKS[p].name).join(', ') || T('common.none')}</span>${r.variants.length ? `<span>${T('prep.variants')}</span><span class="v">${r.variants.map(v => M.DAILY_VARIANTS[v].name).join(', ')}</span>` : ''}<span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
+      <div class="kv"><span>${T('res.scenarioCompany')}</span><span class="v">${esc(M.SCENARIOS[r.scenario].name)}${r.difficulty && r.difficulty !== 'normal' ? ` (${esc(M.DIFFICULTIES[r.difficulty].name)})` : ''} / ${esc(M.COMPANIES[r.company].name)}</span><span>${T('res.reached')}</span><span class="v">${T('fmt.monthTurn', { m: cycleName(r.month), t: r.turn , max: D.TURNS_PER_MONTH })}</span><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.cash')}</span><span class="v">${r.cash}c</span><span>${T('sum.rep')}</span><span class="v">${r.rep} <small>${esc(T('rep.tier.' + (r.repTier || 'unknown')))}</small></span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${r.perks.map(p => M.PERKS[p].name).join(', ') || T('common.none')}</span>${r.variants.length ? `<span>${T('prep.variants')}</span><span class="v">${r.variants.map(v => M.DAILY_VARIANTS[v].name).join(', ')}</span>` : ''}<span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
     const again = r.scenario === 'daily' ? { label: T('res.toTitle'), cls: 'primary', onClick: () => { closeModal(); game = null; showTitle(); } } : { label: T('res.again'), cls: 'primary', onClick: () => { closeModal(); const cfg = game.cfg; game = new Game({ scenario: cfg.scenario, company: cfg.company, perks: cfg.perks, insurer: cfg.insurer, difficulty: cfg.difficulty, prep: true }); startPlay(); } };
     modal(r.demo ? T('demo.resultTitle') : r.win ? T('res.win') : T('res.over'), body, [{ label: T('res.toTitle'), onClick: () => { closeModal(); game = null; showTitle(); } }, r.demo ? { label: T('demo.cta'), cls: 'gold', onClick: () => showDemoGate(showResult) } : again]);
   }
@@ -861,7 +865,7 @@
     const links = names.length
       ? `<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">${names.map(([k, nm]) => `<a class="btn gold" href="${esc(BUILD.store[k])}" target="_blank" rel="noopener">${nm}</a>`).join('')}</div>`
       : `<div class="d" style="margin-top:8px">${T('demo.soon')}</div>`;
-    const body = `<p>${T('demo.gateBody', { n: demoMonths() })}</p>
+    const body = `<p>${T('demo.gateBody', { n: demoMonthsLabel() })}</p>
       <div class="kv"><span>${T('demo.rowMonths')}</span><span class="v">${T('fmt.months', { n: M.SCENARIOS.standard.months })}</span>
       <span>${T('demo.rowScenarios')}</span><span class="v">${T('fmt.count', { n: nSc })}</span>
       <span>${T('demo.rowCompanies')}</span><span class="v">${T('fmt.count', { n: nCo })}</span>
@@ -873,7 +877,7 @@
   function showRecords(back) {
     const P = Profile.get();
     const recs = Object.keys(P.records).map(sc => `<div style="margin-top:6px"><b>${esc(M.SCENARIOS[sc] ? M.SCENARIOS[sc].name : sc)}</b>: ${Object.keys(P.records[sc]).map(co => `${esc(M.COMPANIES[co].name)} ${T('fmt.pts', { n: P.records[sc][co].bestScore })}`).join(' · ')}</div>`).join('');
-    const body = `<div class="records"><p>${T('rec.head', { best: P.stats.bestScore, runs: P.stats.runs, clears: P.stats.clears })}${P.stats.dailyStreak ? ` · ${T('rec.dailyStreak', { n: P.stats.dailyStreak })}` : ''}</p>${recs}<hr>${P.recentRuns.length ? P.recentRuns.map(r => `<div>${r.date} · <b>${T('fmt.pts', { n: r.score })}</b> · ${r.win ? T('rec.win') : T('rec.lose')} · ${esc(M.SCENARIOS[r.scenario] ? M.SCENARIOS[r.scenario].name : r.scenario)} / ${esc(M.COMPANIES[r.company] ? M.COMPANIES[r.company].name : r.company)} (${T('fmt.monthTurn', { m: r.month, t: r.turn , max: D.TURNS_PER_MONTH })})</div>`).join('') : `<p>${T('rec.empty')}</p>`}</div>`;
+    const body = `<div class="records"><p>${T('rec.head', { best: P.stats.bestScore, runs: P.stats.runs, clears: P.stats.clears })}${P.stats.dailyStreak ? ` · ${T('rec.dailyStreak', { n: P.stats.dailyStreak })}` : ''}</p>${recs}<hr>${P.recentRuns.length ? P.recentRuns.map(r => `<div>${r.date} · <b>${T('fmt.pts', { n: r.score })}</b> · ${r.win ? T('rec.win') : T('rec.lose')} · ${esc(M.SCENARIOS[r.scenario] ? M.SCENARIOS[r.scenario].name : r.scenario)} / ${esc(M.COMPANIES[r.company] ? M.COMPANIES[r.company].name : r.company)} (${T('fmt.monthTurn', { m: cycleName(r.month), t: r.turn , max: D.TURNS_PER_MONTH })})</div>`).join('') : `<p>${T('rec.empty')}</p>`}</div>`;
     modal(T('rec.title'), body, [{ label: T('btn.close'), onClick: back }]);
   }
 
@@ -968,14 +972,14 @@
   // 창고장 노트: 이 런에서 들은 비트 전문
   function showNotes(back) {
     const notes = game && game.story && game.story.notes ? game.story.notes : [];
-    const body = notes.length ? notes.map(n => `<div class="card" style="cursor:default"><div class="t"><span>${T('story.name')}</span><span class="price">${T('fmt.monthTurn', { m: n.month, t: n.turn , max: D.TURNS_PER_MONTH })}</span></div><div class="d">${n.text.join('<br><br>')}</div></div>`).join('') : `<p style="color:var(--dim)">${T('help.notesEmpty')}</p>`;
+    const body = notes.length ? notes.map(n => `<div class="card" style="cursor:default"><div class="t"><span>${T('story.name')}</span><span class="price">${T('fmt.monthTurn', { m: cycleName(n.month), t: n.turn , max: D.TURNS_PER_MONTH })}</span></div><div class="d">${n.text.join('<br><br>')}</div></div>`).join('') : `<p style="color:var(--dim)">${T('help.notesEmpty')}</p>`;
     modal(T('help.notes'), body, [{ label: T('btn.close'), onClick: back }]);
   }
   // ---------- 달력 (한 해 · 이벤트) ----------
   function showCalendar(back) {
     const g = game; if (!g) return;
     const cells = g.calendarMonths().map(x => {
-      const evs = x.events.map(e => `<div class="ev">${esc(T('cal.event.' + e.id).split(' — ')[0])} <small>${T('cal.eventTurns', { a: e.turns[0], b: e.turns[1] })}</small></div>`).join('');
+      const evs = x.events.map(e => `<div class="ev">${esc(T('cal.event.' + e.id).split(' — ')[0])} <small>${T('cal.eventTurns', { a: e.days ? e.days[0] : e.turns[0], b: e.days ? e.days[1] : e.turns[1] })}</small></div>`).join('');
       const pct = Math.round((x.arrivalsMult - 1) * 100); const vol = pct ? (pct > 0 ? '+' : '') + pct + '%' : '±0';
       return `<div class="cm ${x.m === g.month ? 'now' : x.m < g.month ? 'past' : ''}"><div class="t">${x.icon} <b>${T('fmt.calOnly', { cal: x.cal })}</b> ${esc(T(`cal.${g.rules.calendar}.${x.cal}.label`))}${x.m === g.month ? ` <small style="color:var(--gold)">${T('cal.thisMonth')}</small>` : ''}</div><div style="color:var(--dim)">${T('cal.arrivals', { pct: vol })}</div>${evs}</div>`;
     }).join('');

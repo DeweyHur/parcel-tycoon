@@ -134,7 +134,7 @@
     { id: 'rainReorder', months: [1, 2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('rain') && ctx.outdoor > 0, pages: [{ expr: 'neutral', hl: '#wm-reorder', gate: true }] },
     { id: 'win', months: [3], kind: 'turn', when: g => g.turn >= 5, pages: [{ expr: 'neutral' }, { expr: 'smile' }, { expr: 'think' }] },
     { id: 'summary3', months: [3], kind: 'summary', when: () => true, pages: [{ expr: g => (g.summary && g.summary.cash > 0 ? 'laugh' : 'worry'), k: g => 'story.summary3.' + (g.summary && g.summary.cash > 0 ? 'good' : 'bad') }] },
-    { id: 'farewell', months: [4], kind: 'turn', when: g => g.turn === 1, calendar: true, pages: [{ expr: 'smile' }, { expr: 'neutral' }, { expr: 'laugh' }] },
+    { id: 'farewell', months: [3, 4], kind: 'summary', when: g => g.monthIndex() >= 3 && g.half() === 2, calendar: true, pages: [{ expr: 'smile' }, { expr: 'neutral' }, { expr: 'laugh' }] },
   ];
 
   // 마켓 비트 자리표시자 — 대본 마켓이라 가격까지 말해 줄 수 있다
@@ -166,7 +166,7 @@
     const kind = ctx.kind || 'turn';
     for (const b of BEATS) {
       if (g.story.seen.includes(b.id)) continue;
-      if (b.months && !b.months.includes(g.month)) continue;
+      if (b.months && !b.months.includes(g.monthIndex())) continue;   // 비트의 months 는 개월차(사이클 2개)
       if (b.kind === 'turn' ? !['turn', 'call'].includes(kind) : b.kind !== 'any' && b.kind !== kind) continue;
       if (b.kind === 'any' && !['turn', 'call'].includes(kind)) continue;
       if (b.kind === 'modal' && b.modal !== ctx.modal) continue;
@@ -191,9 +191,9 @@
   }
   // 6월 이후 월초 문자: 그 달력 달의 한 줄 예고. 스토리 모드가 아니어도 옵션이 켜져 있으면 나온다
   function sms(g) {
-    if (!g || g.turn !== 1) return null;
+    if (!g || g.turn !== 1 || g.half() !== 1) return null;   // 달에 한 번, 전반 사이클 첫날
     const key = `cal.${g.rules.calendar || 'kr'}.${g.calMonth()}.sms`;
-    const s = root.I18n.t(key); if (s === key) return null;
+    const s = root.I18n.t(key); if (!s || s === key) return null;
     return s;
   }
   function done(g) { return !!(g && g.story && g.story.seen.includes('farewell')); }

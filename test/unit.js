@@ -130,7 +130,7 @@ t('저장/불러오기 후 결정적 진행', () => {
 });
 t('평판 0 → 게임오버(아무도 안 맡긴다)', () => { const g = EMPTY(1); g.rep = 1; g.warehouse.cap = 0; g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2)]; g._assignCold(); adv(g); assert.equal(g.phase, 'over'); });
 t('회사별 시작 상태', () => { for (const id in M.COMPANIES) { const g = new Game({ seed: 2, company: id }); assert.ok(g.cash > 0, id); assert.ok(g.contracts.filter(Boolean).length >= 2, id); } const q = new Game({ seed: 2, company: 'quick' }); assert.equal(q.selfCount(), 2); const th = new Game({ seed: 2, company: 'thrifty' }); assert.equal(th.rules.feeMult, 0.8); const po = new Game({ seed: 2, company: 'postal' }); assert.equal(po.truckFee(po.contracts[1]), 35); });
-t('시나리오 규칙', () => { const g = new Game({ seed: 1, scenario: 'cashcrunch' }); assert.equal(g.cash, 225); assert.ok(g.rules.noRefresh); const p = new Game({ seed: 1, scenario: 'peak' }); assert.equal(p.rules.months, 2); });
+t('시나리오 규칙', () => { const g = new Game({ seed: 1, scenario: 'cashcrunch' }); assert.equal(g.cash, 225); assert.ok(g.rules.noRefresh); const p = new Game({ seed: 1, scenario: 'peak' }); assert.equal(p.rules.months, 4); });   // months = 사이클 수 (2주 × 4 = 2개월)
 t('데일리 설정은 날짜에 결정적', () => { const a = dailyConfig('2026-09-05'), b = dailyConfig('2026-09-05'); assert.deepEqual(a, b); assert.equal(a.variants.length, 2); });
 t('직접 배송: 대기 턴에 1개, 보상 그대로 + 배송비 20c', () => {
   const g = EMPTY(8); for (let i = 0; i < 3; i++) g.parcels.push(P(900 + i, 'normal', 1));
@@ -210,7 +210,11 @@ t('시간: 1턴 = 하루, 월~토 엿새 뒤 일요일 휴무, 한 사이클 = 2
   assert.equal(g.weekOf(1), 1); assert.equal(g.weekOf(6), 1); assert.equal(g.weekOf(7), 2); assert.equal(g.weekOf(12), 2);
   assert.equal(g.dowOf(1), 0); assert.equal(g.dowOf(6), 5); assert.equal(g.dowOf(7), 0);   // 월…토, 다시 월
   assert.ok(g.isWeekendAfter(6) && g.isWeekendAfter(12) && !g.isWeekendAfter(5) && !g.isWeekendAfter(7));
-  assert.equal(g.yearOf(1), g.year); assert.equal(g.yearOf(11), g.year + 1); // 1월이면 해가 바뀐다
+  assert.equal(D.CYCLES_PER_MONTH, 2);
+  assert.equal(g.monthIndex(1), 1); assert.equal(g.monthIndex(2), 1); assert.equal(g.monthIndex(3), 2);  // 사이클 2개 = 한 달
+  assert.equal(g.half(1), 1); assert.equal(g.half(2), 2);                                               // 전반·후반
+  assert.equal(g.calMonth(1), 3); assert.equal(g.calMonth(2), 3); assert.equal(g.calMonth(3), 4);
+  assert.equal(g.yearOf(1), g.year); assert.equal(g.yearOf(21), g.year + 1);  // 21사이클 = 11개월차 = 1월
   assert.equal(g.dateLabel(4, 1), '3월 4일차');
 });
 t('주말: 턴이 아니다 — 기한·입고는 멈추고 야외 도난만 한 번 더', () => {
@@ -234,8 +238,8 @@ t('주말: 턴이 아니다 — 기한·입고는 멈추고 야외 도난만 한
   assert.equal(h.phase, 'summary');
 });
 t('달력: 한국 3월 시작, 9월·2월 명절 = 폭주 3~5일차 + 연휴 6~7일차(호출 불가, 입고는 계속)', () => {
-  const g = NG(7); assert.equal(g.calMonth(1), 3); assert.equal(g.calMonth(12), 2);
-  g.month = 6; g._startMonth(7); assert.equal(g.calMonth(), 9);
+  const g = NG(7); assert.equal(g.calMonth(1), 3); assert.equal(g.calMonth(24), 2);
+  g.month = 12; g._startMonth(14); assert.equal(g.calMonth(), 9); assert.equal(g.half(), 2);   // 9월 후반 사이클에 명절
   assert.ok(g.isRushTurn(3) && g.isRushTurn(5) && !g.isRushTurn(1)); assert.ok(g.isOffTurn(6) && g.isOffTurn(7) && !g.isOffTurn(8));
   // 현실: 연휴에 멈추는 건 배송이지 창고가 아니다 — 입고는 그대로 들어오고 차만 못 부른다
   assert.ok(g.schedule[5].length > 0 && g.schedule[6].length > 0);
@@ -250,9 +254,9 @@ t('달력: 시나리오 컷은 startMonth로 시작 달을 정한다 (성수기 
   const g = NG(3); assert.equal(g.calendarMonths().length, 12); assert.equal(g.calendarMonths()[6].cal, 9);
 });
 t('달력: 1월은 인플레 한 단계를 건너뛴다, 12월은 반송 유예 -1', () => {
-  const g = NG(3); assert.ok(Math.abs(g.inflation(11) - Math.pow(D.OPCOST_INFLATION, 10)) < 1e-9); // 1월(11개월차)까지 10단계
-  assert.ok(Math.abs(g.inflation(12) - Math.pow(D.OPCOST_INFLATION, 10)) < 1e-9); // 2월: 1월이 한 단계를 건너뛰어 그대로 10단계
-  g.month = 10; assert.equal(g.calMonth(), 12); assert.equal(g.returnGraceFor(P(1, 'normal', 1)), D.RETURN_GRACE - 1);
+  const g = NG(3); assert.ok(Math.abs(g.inflation(21) - Math.pow(D.OPCOST_INFLATION, 10)) < 1e-9); // 1월(11개월차)까지 10단계
+  assert.ok(Math.abs(g.inflation(23) - Math.pow(D.OPCOST_INFLATION, 10)) < 1e-9); // 2월: 1월이 한 단계를 건너뛰어 그대로 10단계
+  g.month = 20; assert.equal(g.calMonth(), 12); assert.equal(g.returnGraceFor(P(1, 'normal', 1)), D.RETURN_GRACE - 1);
 });
 const Story = require('../www/js/story.js'); globalThis.I18n = I18n; globalThis.DATA = D;
 // ----- 튜토리얼 대본 (docs/STORY_TUTORIAL_DESIGN.md 부록 I) -----
@@ -283,7 +287,7 @@ t('대본 마켓: 1개월차는 충전·한도 강화·창고 확장만(계약 �
   const m1 = g._genMarketItems();
   assert.ok(m1.some(it => it.kind === 'refill') && m1.some(it => it.kind === 'enh' && it.enh === 'limit1') && m1.some(it => it.kind === 'fac' && it.fac === 'expand1'));
   assert.ok(!m1.some(it => it.kind === 'contract'), '1개월차엔 계약 카드 없음');
-  g.month = 2;
+  g.month = 3;
   const m2 = g._genMarketItems();
   const sw = m2.find(it => it.kind === 'contract');
   assert.ok(sw && sw.carrier === 'fragile1' && sw.switchFrom, '⚠ 상위 센터 갈아타기 카드');
@@ -308,9 +312,10 @@ t('스토리: cfg.story 가 있어야 비트가 나오고, 1개월차 1턴 시�
 });
 t('스토리: 달마다 다른 비트, 6월(4개월차) 1턴 작별에 달력 카드, 그 뒤엔 문자만', () => {
   const g = NG(2, { story: true }); g.story.seen = Story.BEATS.filter(b => b.id !== 'farewell' && b.id !== 'win').map(b => b.id);
-  g.month = 3; g.turn = 6; const w = Story.check(g, { kind: 'turn' }); assert.equal(w.id, 'win'); assert.ok(/3월/.test(w.pages[0].text) && /2월/.test(w.pages[0].text), w.pages[0].text);
-  g.month = 4; g.turn = 1; const f = Story.check(g, { kind: 'turn' }); assert.equal(f.id, 'farewell'); assert.ok(f.calendar); assert.ok(Story.done(g)); assert.ok(!Story.active(g));
-  g.month = 5; g.turn = 1; assert.equal(Story.check(g, { kind: 'turn' }), null); assert.ok(/폭염/.test(Story.sms(g))); g.turn = 2; assert.equal(Story.sms(g), null);
+  g.month = 6; g.turn = 6; const w = Story.check(g, { kind: 'turn' }); assert.equal(w.id, 'win'); assert.ok(/3월/.test(w.pages[0].text) && /2월/.test(w.pages[0].text), w.pages[0].text);
+  g.month = 6; g.turn = 12; const f = Story.check(g, { kind: 'summary' }); assert.equal(f.id, 'farewell'); assert.ok(f.calendar); assert.ok(Story.done(g)); assert.ok(!Story.active(g));
+  g.month = 9; g.turn = 1; assert.equal(Story.check(g, { kind: 'turn' }), null); assert.ok(/폭염/.test(Story.sms(g))); g.turn = 2; assert.equal(Story.sms(g), null);
+  g.month = 10; g.turn = 1; assert.equal(Story.sms(g), null); // 후반 사이클엔 문자 없음
   g.month = 1; assert.equal(Story.sms(g), null); // 3월은 문자 없음
 });
 t('스토리: 끄면 안 나오고, 세이브에 진행 상태가 남는다', () => {
@@ -329,7 +334,7 @@ t('스토리: 팝업 비트는 kind modal + modal 이름이 맞을 때만, 선�
   const drain = () => { let x, ids = []; while ((x = Story.check(g, { kind: 'turn' }))) ids.push(x.id); return ids; };
   g.weatherNow = () => 'rain'; assert.ok(!drain().includes('rain')); // 마당이 비어 있으면 비가 와도 rain 은 안 나온다
   // 대기 팝업: noContract 를 본 뒤에만 waitSelf → waitGo
-  g.month = 2; g.story.seen.push('noContract');
+  g.month = 3; g.story.seen.push('noContract');
   const w = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 2, outdoor: 0 }); assert.ok(w && w.id === 'waitSelf' && w.pages[0].hl === '#modal .zone .parcel');
   const w2 = Story.check(g, { kind: 'modal', modal: 'wait', picked: 1, elig: 2, outdoor: 0 }); assert.ok(w2 && w2.id === 'waitGo');
   // 비: 마당에 택배 + 비일 때만. 그 뒤 대기 팝업에서 적재 정리 버튼
@@ -384,8 +389,8 @@ t('데모: demoMonths 개월 정산이 끝나면 데모 종료(승리도 패배�
 });
 t('데모: 컷이 시나리오 길이보다 길거나 같으면 데모 컷은 동작하지 않는다(1개월 시나리오 등)', () => {
   const g = EMPTY(8, { scenario: 'blackfriday', demoMonths: 3 });
-  assert.equal(g.rules.months, 1);
-  g.turn = D.TURNS_PER_MONTH; g.cash = 5000; g.run.delivered = 99; g._endMonth();
+  assert.equal(g.rules.months, 2);
+  g.month = g.rules.months; g.turn = D.TURNS_PER_MONTH; g.cash = 5000; g.run.delivered = 99; g._endMonth();
   g.closeSummary();
   assert.ok(g.phase === 'win' || g.phase === 'over', g.phase);
   assert.ok(!g.result.demo, '데모 컷이 아니라 시나리오 승패로 끝난다');

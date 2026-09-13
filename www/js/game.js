@@ -393,31 +393,37 @@
 
     // ----- 날씨 (4.4장) -----
     // 물가: 임대·인건비·배차비가 매달 D.OPCOST_INFLATION씩 오른다 (수입이 커지는 만큼 지출 폭도 커진다)
-    inflation(m) { m = m || this.month; let k = 0; for (let i = 1; i < m; i++) if (!this.seasonMods(i).noInflation) k++; return Math.pow(D.OPCOST_INFLATION, k); }
+    inflation(c) { const mi = this.monthIndex(c); let k = 0; for (let i = 1; i < mi; i++) if (!this.seasonMods(i * D.CYCLES_PER_MONTH).noInflation) k++; return Math.pow(D.OPCOST_INFLATION, k); }
     // 달력 월(1~12): 런은 D.START_MONTH(3월)에 시작
     // 나라별 달력 (docs/STORY_TUTORIAL_DESIGN.md 5장): 달마다 입고 배수·품목 이동·날씨·이벤트
     calendar() { return M.CALENDARS[this.rules.calendar] || M.CALENDARS.kr; }
-    calMonth(m) { m = m || this.month; const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return ((start - 1 + m - 1) % 12) + 1; }
+    // this.month 는 이제 '사이클'(2주) 번호다. 달력 한 달 = 전반·후반 두 사이클
+    monthIndex(c) { return Math.ceil((c || this.month || 1) / D.CYCLES_PER_MONTH); }        // 몇 개월차
+    half(c) { return ((c || this.month || 1) - 1) % D.CYCLES_PER_MONTH + 1; }               // 1 전반 · 2 후반
+    calMonth(c) { const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return ((start - 1 + this.monthIndex(c) - 1) % 12) + 1; }
     seasonMods(m) { return this.calendar().months[this.calMonth(m)] || { arrivalsMult: 1, typeShift: {} }; }
     // 이번 달(개월차 m)의 달력 이벤트 목록 [{ id, turns: [a, b], ... }]
-    monthEvents(m) { return (this.seasonMods(m).events || []).slice(); }
+    monthEvents(c) { const h = this.half(c); return (this.seasonMods(c).events || []).filter(e => !e.half || e.half === h); }
     // 특정 턴에 걸린 이벤트들
     eventsAt(turn, m) { turn = turn || this.turn; return this.monthEvents(m).filter(e => turn >= e.turns[0] && turn <= e.turns[1]); }
     isOffTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.noCalls); }
     isRushTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.arrivalsMult && e.arrivalsMult > 1); }
     // 런 전체의 달력: 개월차 순서대로 [{ m, cal, icon, events }]
-    calendarMonths() { const out = []; const n = this.rules.endless ? 12 : Math.min(12, this.rules.months); for (let m = 1; m <= n; m++) { const cal = this.calMonth(m), sm = this.seasonMods(m); out.push({ m, cal, icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1, events: (sm.events || []).map(e => ({ id: e.id, turns: e.turns })) }); } return out; }
+    calendarMonths() { const out = []; const n = this.rules.endless ? 12 : Math.min(12, Math.ceil(this.rules.months / D.CYCLES_PER_MONTH)); for (let i = 1; i <= n; i++) { const c = i * D.CYCLES_PER_MONTH, cal = this.calMonth(c), sm = this.seasonMods(c); out.push({ m: i, cal, icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1, events: (sm.events || []).map(e => ({ id: e.id, turns: e.turns, half: e.half || 0, days: [((e.half || 1) - 1) * D.TURNS_PER_MONTH + e.turns[0], ((e.half || 1) - 1) * D.TURNS_PER_MONTH + e.turns[1]] })) }); } return out; }
     // ----- 시간 -----
     // 1턴 = 하루(영업일). 월~토 엿새 뒤 일요일 휴무. 한 사이클 = 2주 = 12영업일.
     // 기한·보관 기간은 영업일 기준이라 일요일에는 진행하지 않는다.
-    yearOf(m) { m = m || this.month || 1; const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return this.year + Math.floor((start - 1 + m - 1) / 12); }
+    yearOf(c) { const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return this.year + Math.floor((start - 1 + this.monthIndex(c) - 1) / 12); }
     weekOf(t) { return Math.floor(((t || this.turn || 1) - 1) / D.TURNS_PER_WEEK) + 1; }
     // 요일: 0 월 … 5 토 (일요일은 턴이 아니다)
     dowOf(t) { return ((t || this.turn || 1) - 1) % D.TURNS_PER_WEEK; }
     dowName(t) { return (T('fmt.dows') || '').split(',')[this.dowOf(t)] || ''; }
     isWeekendAfter(t) { return D.WEEKEND_AFTER.indexOf(t || this.turn) >= 0; }
-    dateLabel(t, m) { return T('fmt.date', { cal: this.calMonth(m), t: t || this.turn || 1 }); }
-    dateDowLabel(t, m) { return T('fmt.dateDow', { cal: this.calMonth(m), t: t || this.turn || 1, dow: this.dowName(t) }); }
+    // 달 전체 기준 영업일차: 전반 1~12, 후반 13~24. 화면엔 '전반/후반' 대신 이 숫자만 보여 준다
+    dayOfMonth(t, c) { return (this.half(c) - 1) * D.TURNS_PER_MONTH + (t || this.turn || 1); }
+    cycleLabel(c) { return T('fmt.cycle', { cal: this.calMonth(c), half: T('fmt.half' + this.half(c)) }); }
+    dateLabel(t, m) { return T('fmt.date', { cal: this.calMonth(m), t: this.dayOfMonth(t, m) }); }
+    dateDowLabel(t, m) { return T('fmt.dateDow', { cal: this.calMonth(m), t: this.dayOfMonth(t, m), dow: this.dowName(t) }); }
     returnGraceFor(p) { const R = this.rules; return Math.max(1, (this._attrs(p).includes('cold') ? R.returnGraceFresh : R.returnGrace) + (this.seasonMods().returnGraceDelta || 0)); }
     season(m) { const R = this.rules; if (R.season) return R.season; const c = this.calMonth(m); return c >= 3 && c <= 5 ? 'spring' : c >= 6 && c <= 8 ? 'summer' : c >= 9 && c <= 11 ? 'autumn' : 'winter'; }
     _genWeather(m) {
@@ -665,7 +671,13 @@
     }
     returnIn(p) { return p.overdue ? Math.max(0, this.returnGraceFor(p) - (p.overdueTurns || 0)) : null; }
     // ----- 평판 -----
-    repCap() { const t = D.REP_TIERS[Math.min(this.repTier, D.REP_TIERS.length - 1)]; return this.repTier === 0 ? this.rules.gameoverStress : t.cap; }
+    repTierDef() { return D.REP_TIERS[Math.min(this.repTier, D.REP_TIERS.length - 1)]; }
+    repCap() { return this.repTier === 0 ? this.rules.gameoverStress : this.repTierDef().cap; }
+    // 등급은 난이도 스케일러: 소문이 나면 물량이 늘고 규모가 커져 운영비도 는다
+    repScaleArrivals() { return this.repTierDef().arrivals || 1; }
+    repScaleOpCost() { return this.repTierDef().opCost || 1; }
+    // 이 등급부터 들어오기 시작하는 품목 (그 전에는 일반으로 돌린다)
+    repUnlocked(type) { return (this.repTierDef().unlock || []).indexOf(type) >= 0; }
     repTierId() { return D.REP_TIERS[Math.min(this.repTier, D.REP_TIERS.length - 1)].id; }
     repTierName() { return T('rep.tier.' + this.repTierId()); }
     // 평판 증감. 사고는 깎고(pen 양수 = 깎임), 잘한 일은 올린다. 상한을 넘지 않고, 0 이하면 런이 끝난다
@@ -685,7 +697,7 @@
     // 고객 신뢰 단계에 따른 추가 입고: 단계가 오를수록 물량이 배 이상으로 는다
     _customerExtra() { let n = 0; for (const id in this.customers) { const c = this.customers[id]; if (id === 'anon' || c.suspended) continue; n += (M.CUSTOMER_EXTRA[this.customerLevel(id)] || 0) * (c.slots || 1); } return n; }
     // 달력 컷 시나리오(성수기·폭염·데일리)는 monthOffset 만큼 뒤 개월차의 표(입고·품목·등급·가격)를 쓴다 — 11월 컷이 1개월차 물량으로 시작하면 싱겁다
-    tableMonth(m) { return (m || this.month) + (this.rules.monthOffset || 0); }
+    tableMonth(c) { return this.monthIndex(c) + (this.rules.monthOffset || 0); }
     // 튜토리얼 대본(1~3개월차). 「인수인계」로 시작한 런에서만 (docs/STORY_TUTORIAL_DESIGN.md 부록 I)
     script(m) { if (!this.cfg.scripted || !TUT) return null; return TUT.months[m || this.month] || null; }
     scripted() { return !!this.script(); }
@@ -697,6 +709,9 @@
       const sm = this.seasonMods(sm0).typeShift; for (const t in sm) base[t] = Math.max(0, (base[t] || 0) + sm[t]);
       if (R.typeOverride) base = { ...R.typeOverride };
       if (R.typeShift) for (const t in R.typeShift) base[t] = Math.max(0, (base[t] || 0) + R.typeShift[t]);
+      // 🛃 통관 · ❆ 냉동은 평판 등급이 열어 준다 — 아직이면 그 몫은 일반으로 (달력이 아니라 내가 키워서 여는 것).
+      // 시나리오가 그 품목을 주제로 삼은 경우(typeOverride·보장 업체)는 건드리지 않는다
+      if (!R.typeOverride) for (const t of ['intl', 'frozen']) if (base[t] && !this.repUnlocked(t)) { base.normal = (base.normal || 0) + base[t]; base[t] = 0; }
       return base;
     }
     _gradeProb(m) {
@@ -726,7 +741,7 @@
       rent += R.opCostDelta;
       if (R.lateOpCost && m >= R.lateOpCost.from) rent += R.lateOpCost.delta;
       if (R.endless && m >= 12) rent += (m - 11) * 10;
-      rent = Math.max(0, Math.round(rent * this.inflation(m)));
+      rent = Math.max(0, Math.round(rent * this.inflation(m) * this.repScaleOpCost()));
       const contracts = this.contracts.filter(Boolean).reduce((s, c) => s + (D.OPCOST_CONTRACT[c.grade] != null ? D.OPCOST_CONTRACT[c.grade] : D.OPCOST_CONTRACT.normal), 0);
       let facilities = 0; for (const f of Object.keys(D.FACILITIES)) if (this.warehouse[f]) facilities += D.FACILITIES[f].upkeep || 0;
       const arrivals = this.schedule ? this.schedule.reduce((s, t) => s + t.length, 0) : 0;
@@ -782,7 +797,7 @@
       const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
       const gen = () => this._genParcelSpec(ratio, m, cw);
       for (let t = 0; t < turns; t++) sched[t].push(gen());
-      let extra = Math.round(this._extraArrivals(m) * this.repArrivalMult() * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0));
+      let extra = Math.round(this._extraArrivals(m) * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0));
       const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
       for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
       this.burstTurns = [];
@@ -874,7 +889,7 @@
       let note = '';
       const wx = this.weatherNow(); if (wx !== 'sunny') note = ` ${M.WEATHER[wx].icon}${M.WEATHER[wx].name}`;
       if (this.heatTurns.includes(this.turn)) note = MSG('log.heatAlert');
-      for (const ev of this.eventsAt()) if (ev.turns[0] === this.turn) this.say('log.calEvent', { name: MSG('cal.event.' + ev.id), a: ev.turns[0], b: ev.turns[1] });
+      for (const ev of this.eventsAt()) if (ev.turns[0] === this.turn) this.say('log.calEvent', { name: MSG('cal.event.' + ev.id), a: this.dayOfMonth(ev.turns[0]), b: this.dayOfMonth(ev.turns[1]) });
       if (this.isOffTurn()) note = MSG('log.holidayOff');
       this.say('log.arrive', { date: this.dateLabel(), list: arrived.map(p => D.PARCEL_TYPES[p.type].short + p.size).join(', '), usage: Math.round(this.usage() * 100), note });
     }
