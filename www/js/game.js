@@ -265,7 +265,7 @@
     customerForecast(m) {
       m = m || this.month + (this.phase === 'market' && !(this.market && this.market.prep) ? 1 : 0);
       const R = this.rules;
-      const total = Math.round((D.TURNS_PER_MONTH + this._extraArrivals(Math.min(m, 6)) * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0)) * (R.burstTurns ? 1 : 1)) + (R.burstTurns || 0);
+      const total = Math.round((this.turns() + this._extraArrivals(Math.min(m, 6)) * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0)) * (R.burstTurns ? 1 : 1)) + (R.burstTurns || 0);
       const w = this._customerWeightsFor(m); const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
       const ratio = this._typeRatio(m);
       return Object.keys(w).map(id => {
@@ -409,31 +409,52 @@
     isOffTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.noCalls); }
     isRushTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.arrivalsMult && e.arrivalsMult > 1); }
     // 런 전체의 달력: 개월차 순서대로 [{ m, cal, icon, events }]
-    calendarMonths() { const out = []; const n = this.rules.endless ? 12 : Math.min(12, Math.ceil(this.rules.months / D.CYCLES_PER_MONTH)); for (let i = 1; i <= n; i++) { const c = i * D.CYCLES_PER_MONTH, cal = this.calMonth(c), sm = this.seasonMods(c); out.push({ m: i, cal, icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1, events: (sm.events || []).map(e => ({ id: e.id, turns: e.turns, half: e.half || 0, days: [((e.half || 1) - 1) * D.TURNS_PER_MONTH + e.turns[0], ((e.half || 1) - 1) * D.TURNS_PER_MONTH + e.turns[1]] })) }); } return out; }
-    // ----- 시간 -----
-    // 1턴 = 하루(영업일). 월~토 엿새 뒤 일요일 휴무. 한 사이클 = 2주 = 12영업일.
-    // 기한·보관 기간은 영업일 기준이라 일요일에는 진행하지 않는다.
+    calendarMonths() { const out = []; const n = this.rules.endless ? 12 : Math.min(12, Math.ceil(this.rules.months / D.CYCLES_PER_MONTH)); for (let i = 1; i <= n; i++) { const c = i * D.CYCLES_PER_MONTH, cal = this.calMonth(c), sm = this.seasonMods(c); out.push({ m: i, cal, icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1, events: (sm.events || []).map(e => ({ id: e.id, turns: e.turns, half: e.half || 0, days: [this.dateOf(e.turns[0], (i - 1) * D.CYCLES_PER_MONTH + (e.half || 1)), this.dateOf(e.turns[1], (i - 1) * D.CYCLES_PER_MONTH + (e.half || 1))] })) }); } return out; }
+    // ----- 시간 · 달력 -----
+    // 1턴 = 하루(영업일). 월~토 엿새 뒤 일요일 휴무. 달력은 진짜 — 달마다 길이가 다르고, 정산은 반월 두 번.
+    // 요일은 게임 달력으로 고정: 런 첫날(시작 달 1일)이 언제나 월요일. 연도가 달라도 같은 판이 나온다.
+    monthIndex(c) { return Math.ceil((c || this.month || 1) / D.CYCLES_PER_MONTH); }   // 몇 개월차
+    half(c) { return ((c || this.month || 1) - 1) % D.CYCLES_PER_MONTH + 1; }          // 1 전반 · 2 후반
+    calMonth(c) { const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return ((start - 1 + this.monthIndex(c) - 1) % 12) + 1; }
     yearOf(c) { const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return this.year + Math.floor((start - 1 + this.monthIndex(c) - 1) / 12); }
-    weekOf(t) { return Math.floor(((t || this.turn || 1) - 1) / D.TURNS_PER_WEEK) + 1; }
-    // 요일: 0 월 … 5 토 (일요일은 턴이 아니다)
-    dowOf(t) { return ((t || this.turn || 1) - 1) % D.TURNS_PER_WEEK; }
-    dowName(t) { return (T('fmt.dows') || '').split(',')[this.dowOf(t)] || ''; }
-    isWeekendAfter(t) { return D.WEEKEND_AFTER.indexOf(t || this.turn) >= 0; }
-    // 달 전체 기준 영업일차: 전반 1~12, 후반 13~24. 화면엔 '전반/후반' 대신 이 숫자만 보여 준다
-    dayOfMonth(t, c) { return (this.half(c) - 1) * D.TURNS_PER_MONTH + (t || this.turn || 1); }
+    monthLen(c) { return D.MONTH_DAYS[this.calMonth(c)] || 30; }
+    // 런 첫날부터 센 절대 일수 (그 달 1일까지)
+    _absMonthStart(c) { let n = 0; const mi = this.monthIndex(c); for (let i = 1; i < mi; i++) n += D.MONTH_DAYS[this.calMonth(i * D.CYCLES_PER_MONTH)] || 30; return n; }
+    // 요일: 0 월 … 6 일
+    dowOfDate(c, day) { return (this._absMonthStart(c) + day - 1) % 7; }
+    dowName(t, c) { return (T('fmt.dows') || '').split(',')[this.dowOfDate(c, this.dateOf(t, c))] || ''; }
+    // 이 사이클이 덮는 날짜 창 (전반 1~15, 후반 16~말일)
+    cycleWindow(c) { const h = this.half(c), last = this.monthLen(c); return h === 1 ? [1, Math.min(D.HALF_SPLIT, last)] : [D.HALF_SPLIT + 1, last]; }
+    // 그 창의 영업일(일요일 제외) 날짜 목록 — 턴 하나가 하루다
+    businessDays(c) {
+      c = c || this.month || 1;
+      if (this._bdCache && this._bdCache.c === c) return this._bdCache.days;
+      const [a, b] = this.cycleWindow(c), days = [];
+      for (let d = a; d <= b; d++) if (this.dowOfDate(c, d) !== 6) days.push(d);
+      this._bdCache = { c, days };
+      return days;
+    }
+    turns(c) { return this.businessDays(c).length; }
+    dateOf(t, c) { const days = this.businessDays(c); return days[(t || this.turn || 1) - 1] || days[days.length - 1] || 1; }
+    // 이 턴이 끝나면 일요일이 오는가 (사이클 마지막 턴은 정산으로 넘어간다)
+    isWeekendAfter(t, c) {
+      t = t || this.turn; const days = this.businessDays(c);
+      if (t >= days.length) return false;
+      return days[t] > days[t - 1] + 1;      // 다음 영업일이 하루 건너뛰었다 = 사이에 일요일
+    }
+    weekOf(t, c) { return Math.floor((this.dateOf(t, c) - 1) / 7) + 1; }
     cycleLabel(c) { return T('fmt.cycle', { cal: this.calMonth(c), half: T('fmt.half' + this.half(c)) }); }
-    dateLabel(t, m) { return T('fmt.date', { cal: this.calMonth(m), t: this.dayOfMonth(t, m) }); }
-    dateDowLabel(t, m) { return T('fmt.dateDow', { cal: this.calMonth(m), t: this.dayOfMonth(t, m), dow: this.dowName(t) }); }
+    dateLabel(t, m) { return T('fmt.date', { cal: this.calMonth(m), d: this.dateOf(t, m) }); }
+    dateDowLabel(t, m) { return T('fmt.dateDow', { cal: this.calMonth(m), d: this.dateOf(t, m), dow: this.dowName(t, m) }); }
     returnGraceFor(p) { const R = this.rules; return Math.max(1, (this._attrs(p).includes('cold') ? R.returnGraceFresh : R.returnGrace) + (this.seasonMods().returnGraceDelta || 0)); }
     season(m) { const R = this.rules; if (R.season) return R.season; const c = this.calMonth(m); return c >= 3 && c <= 5 ? 'spring' : c >= 6 && c <= 8 ? 'summer' : c >= 9 && c <= 11 ? 'autumn' : 'winter'; }
     _genWeather(m) {
-      const sc = this.script(m); if (sc && sc.weather) return sc.weather.slice();
+      const sc = this.script(m); if (sc && sc.weather) { const w0 = sc.weather.slice(); while (w0.length < this.turns(m)) w0.push('sunny'); return w0.slice(0, this.turns(m)); }
       const R = this.rules, w = Object.assign({}, M.WEATHER_BY_SEASON[this.season(m)]);
       const cw = this.seasonMods(m).weather || {}; for (const k in cw) w[k] = (w[k] || (cw[k] > 1 ? 10 : 0)) * cw[k];
       for (const k in R.weatherWeights) w[k] = (w[k] || (R.weatherWeights[k] > 1 ? 10 : 0)) * R.weatherWeights[k];
       const out = []; let storm = false;
-      for (let t = 0; t < D.TURNS_PER_MONTH; t++) { let k = this.rng.weighted(w); if (k === 'storm' && (storm || t >= D.TURNS_PER_MONTH - 1 || t === 0)) k = 'sunny'; if (k === 'storm') storm = true; out.push(k); }
-      for (const t of this.heatTurns) out[t - 1] = 'heat';
+      for (let t = 0; t < this.turns(m); t++) { let k = this.rng.weighted(w); if (k === 'storm' && (storm || t >= this.turns(m) - 1)) k = 'rain'; if (k === 'storm') storm = true; out.push(k); }
       return out;
     }
     weatherAt(turn) { return (this.weather && this.weather[turn - 1]) || 'sunny'; }
@@ -757,7 +778,7 @@
     // ----- flow -----
     _startMonth(m) {
       const R = this.rules;
-      this.month = m; this.turn = 0;
+      this.month = m; this.turn = 0; this._bdCache = null;
       if (this.customers) for (const id in this.customers) { const c = this.customers[id]; if (c.suspended && m > 1) { c.suspended = false; c.xp = 0; this.say('log.custResume', { name: M.CUSTOMERS[id].name }); } c.month = this._emptyCustMonth(); c.month.lvStart = this.customerLevel(id); }
       this.monthStats = { repStart: this.rep, revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false, cashStart: this.cash };
       // 월 배차 한도 리셋 (계약은 만료되지 않는다 — 마켓은 업그레이드·새 업체용)
@@ -765,7 +786,7 @@
       for (const c of this.contracts) if (c) { c.successCalls = 0; c.freeUsedMonth = false; }
       this.monthStats.insClaims = 0; this.monthStats.covered = 0; this.monthStats.premium = 0; this.monthStats.storageIncome = 0; this.monthStats.fees = 0;
       const heatN = R.heatAlerts + (this.seasonMods(m).heatAlerts || 0);
-      this.heatTurns = heatN ? this.rng.shuffle([...Array(D.TURNS_PER_MONTH).keys()].map(i => i + 1)).slice(0, heatN).sort((a, b) => a - b) : [];
+      this.heatTurns = heatN ? this.rng.shuffle([...Array(this.turns(m)).keys()].map(i => i + 1)).slice(0, heatN).sort((a, b) => a - b) : [];
       this.weather = this._genWeather(m);
       this.schedule = this._makeSchedule(m);
       if (m > 1 && this.insurer !== 'none') for (const id of M.INSURERS[this.insurer].fans) if (this.customers[id]) this._custXp(id, 1, MSG('why.fanInsurer'));
@@ -790,9 +811,9 @@
       this._startTurn();
     }
     _makeSchedule(m) {
-      const R = this.rules, turns = D.TURNS_PER_MONTH;
+      const R = this.rules, turns = this.turns(m);
       const sc = this.script(m);
-      if (sc) { this.burstTurns = []; return sc.turns.map(t => t.map(x => ({ ...x }))); }
+      if (sc) { this.burstTurns = []; const rows = sc.turns.map(t => t.map(x => ({ ...x }))); while (rows.length < turns) rows.push([]); return rows.slice(0, turns); }
       const sched = Array.from({ length: turns }, () => []);
       const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
       const gen = () => this._genParcelSpec(ratio, m, cw);
@@ -889,7 +910,7 @@
       let note = '';
       const wx = this.weatherNow(); if (wx !== 'sunny') note = ` ${M.WEATHER[wx].icon}${M.WEATHER[wx].name}`;
       if (this.heatTurns.includes(this.turn)) note = MSG('log.heatAlert');
-      for (const ev of this.eventsAt()) if (ev.turns[0] === this.turn) this.say('log.calEvent', { name: MSG('cal.event.' + ev.id), a: this.dayOfMonth(ev.turns[0]), b: this.dayOfMonth(ev.turns[1]) });
+      for (const ev of this.eventsAt()) if (ev.turns[0] === this.turn) this.say('log.calEvent', { name: MSG('cal.event.' + ev.id), a: this.dateOf(ev.turns[0]), b: this.dateOf(ev.turns[1]) });
       if (this.isOffTurn()) note = MSG('log.holidayOff');
       this.say('log.arrive', { date: this.dateLabel(), list: arrived.map(p => D.PARCEL_TYPES[p.type].short + p.size).join(', '), usage: Math.round(this.usage() * 100), note });
     }
@@ -897,7 +918,7 @@
       const out = [];
       for (let i = 0; i < this.rules.upcomingTurns; i++) {
         const t = this.turn + i;
-        if (t < D.TURNS_PER_MONTH) out.push({ turn: t + 1, specs: this.schedule[t], heat: this.weatherAt(t + 1) === 'heat', burst: this.burstTurns.includes(t + 1) || this.isRushTurn(t + 1), off: this.isOffTurn(t + 1), events: this.eventsAt(t + 1).map(e => e.id), weather: i < this.rules.forecastTurns ? this.weatherAt(t + 1) : null });
+        if (t < this.turns()) out.push({ turn: t + 1, specs: this.schedule[t], heat: this.weatherAt(t + 1) === 'heat', burst: this.burstTurns.includes(t + 1) || this.isRushTurn(t + 1), off: this.isOffTurn(t + 1), events: this.eventsAt(t + 1).map(e => e.id), weather: i < this.rules.forecastTurns ? this.weatherAt(t + 1) : null });
         else out.push({ turn: t + 1, specs: null, weather: null });
       }
       return out;
@@ -1142,7 +1163,7 @@
       } else if (reasons.length) this.say(reasons.join(', '));
       if (this.rep <= 0) return this._gameOver(MSG('over.rep'));
       if (this.isWeekendAfter(this.turn)) return this._startWeekend();
-      if (this.turn >= D.TURNS_PER_MONTH) return this._endMonth();
+      if (this.turn >= this.turns()) return this._endMonth();
       this._startTurn();
     }
 
@@ -1150,7 +1171,7 @@
     // 턴이 아니다: 입고·호출·기한 진행 없음(기한은 영업일 기준). 마당에 둔 건 이틀 더 밖에 있으니 도난만 한 번 더 돈다
     _startWeekend() {
       this.phase = 'weekend';
-      this.weekend = { after: this.turn, week: this.weekOf(this.turn), outdoor: this.outdoorVolume(), last: this.turn >= D.TURNS_PER_MONTH };
+      this.weekend = { after: this.turn, week: this.weekOf(this.turn), date: this.dateOf(this.turn) + 1, outdoor: this.outdoorVolume(), last: this.turn >= this.turns() };
       this.emit('weekendStart', { weekend: this.weekend });
       return true;
     }
@@ -1516,7 +1537,7 @@
       if (g.monthStats && g.monthStats.claims == null) g.monthStats.claims = 0;
       if (g.bigCustomer === undefined) g.bigCustomer = null;
       if (!g.storage) { g.storage = []; g.offer = null; g.outdoorPref = []; g.insurer = 'none'; g.premMult = 1; g.noClaimMonths = 0; g.coverHalf = false; g.items = { transitCert: 0, yardIns: 0, customsBond: 0 }; }
-      if (!g.weather || !g.weather.length) g.weather = Array(D.TURNS_PER_MONTH).fill('sunny').map((w, i) => g.heatTurns && g.heatTurns.includes(i + 1) ? 'heat' : w);
+      if (!g.weather || !g.weather.length) g.weather = Array(g.turns()).fill('sunny').map((w, i) => g.heatTurns && g.heatTurns.includes(i + 1) ? 'heat' : w);
       if (g.monthStats) for (const k of ['insClaims', 'covered', 'premium', 'storageIncome']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
       g._assignCold();
       return g;

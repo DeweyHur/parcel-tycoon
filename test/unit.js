@@ -204,23 +204,24 @@ t('i18n: 자리표시자·복수형·메시지 객체 렌더링', () => {
   assert.ok(I18n.setLang('ko')); assert.equal(D.PARCEL_TYPES.fresh.name, '신선식품');
 });
 // ----- 달력 (docs/STORY_TUTORIAL_DESIGN.md 5장) -----
-t('시간: 1턴 = 하루, 월~토 엿새 뒤 일요일 휴무, 한 사이클 = 2주', () => {
+t('시간: 1턴 = 하루, 일요일 휴무, 실제 달력(반월 정산)', () => {
   const g = NG(5);
-  assert.equal(D.TURNS_PER_MONTH, 12); assert.equal(D.TURNS_PER_WEEK, 6);
-  assert.equal(g.weekOf(1), 1); assert.equal(g.weekOf(6), 1); assert.equal(g.weekOf(7), 2); assert.equal(g.weekOf(12), 2);
-  assert.equal(g.dowOf(1), 0); assert.equal(g.dowOf(6), 5); assert.equal(g.dowOf(7), 0);   // 월…토, 다시 월
-  assert.ok(g.isWeekendAfter(6) && g.isWeekendAfter(12) && !g.isWeekendAfter(5) && !g.isWeekendAfter(7));
-  assert.equal(D.CYCLES_PER_MONTH, 2);
-  assert.equal(g.monthIndex(1), 1); assert.equal(g.monthIndex(2), 1); assert.equal(g.monthIndex(3), 2);  // 사이클 2개 = 한 달
-  assert.equal(g.half(1), 1); assert.equal(g.half(2), 2);                                               // 전반·후반
-  assert.equal(g.calMonth(1), 3); assert.equal(g.calMonth(2), 3); assert.equal(g.calMonth(3), 4);
-  assert.equal(g.yearOf(1), g.year); assert.equal(g.yearOf(21), g.year + 1);  // 21사이클 = 11개월차 = 1월
-  assert.equal(g.dateLabel(4, 1), '3월 4일차');
-});
-t('주말: 턴이 아니다 — 기한·입고는 멈추고 야외 도난만 한 번 더', () => {
-  const g = EMPTY(6); g.parcels = [P(1, 'normal', 2, { deadline: 8 })];
+  assert.equal(D.CYCLES_PER_MONTH, 2); assert.equal(D.HALF_SPLIT, 15);
+  // 런 첫날(3월 1일)이 월요일 — 게임 달력은 매 런 같다
+  assert.equal(g.dowOfDate(1, 1), 0); assert.equal(g.dowOfDate(1, 7), 6);        // 7일이 일요일
+  assert.deepEqual(g.cycleWindow(1), [1, 15]); assert.deepEqual(g.cycleWindow(2), [16, 31]);
+  assert.deepEqual(g.businessDays(1), [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 15]);
+  assert.equal(g.turns(1), 13); assert.equal(g.turns(2), 14);                     // 사이클마다 길이가 다르다
+  assert.equal(g.dateOf(7, 1), 8);                                                // 7번째 영업일 = 3월 8일
+  assert.ok(g.isWeekendAfter(6, 1) && !g.isWeekendAfter(5, 1));                    // 6일(토) 다음은 일요일
+  assert.equal(g.monthIndex(1), 1); assert.equal(g.monthIndex(3), 2); assert.equal(g.half(2), 2);
+  assert.equal(g.calMonth(1), 3); assert.equal(g.calMonth(3), 4); assert.equal(g.calMonth(24), 2);
+  assert.equal(g.yearOf(1), g.year); assert.equal(g.yearOf(21), g.year + 1);
+  assert.equal(g.dateLabel(4, 1), '3월 4일');
+});t('주말: 턴이 아니다 — 기한·입고는 멈추고 야외 도난만 한 번 더', () => {
+  const g = EMPTY(6); g.parcels = [P(1, 'normal', 2, { deadline: 12 })];
   for (let i = 0; i < 6; i++) g.wait();
-  assert.equal(g.phase, 'weekend'); assert.equal(g.turn, 6);
+  assert.equal(g.phase, 'weekend'); assert.equal(g.turn, 6);   // 3월 6일(토) 다음은 7일 일요일
   const dl = g.parcels[0].deadline, self = g.selfCount();
   // 야근: 다음 영업일에만 직접 배송 +2
   g.weekendChoose('overtime');
@@ -232,10 +233,8 @@ t('주말: 턴이 아니다 — 기한·입고는 멈추고 야외 도난만 한
   const h = EMPTY(7); h.rep = 5;
   for (let i = 0; i < 6; i++) h.wait();
   h.weekendChoose('rest'); assert.equal(h.rep, 6);        // 휴식 = 평판 +1
-  for (let i = 0; i < 6; i++) h.wait();
-  assert.equal(h.phase, 'weekend'); assert.equal(h.turn, 12);
-  h.weekendChoose('rest');
-  assert.equal(h.phase, 'summary');
+  while (h.phase === 'play') { h.wait(); if (h.phase === 'weekend') h.weekendChoose('rest'); }
+  assert.equal(h.phase, 'summary');                        // 그 사이클 마지막 영업일 뒤엔 정산
 });
 t('달력: 한국 3월 시작, 9월·2월 명절 = 폭주 3~5일차 + 연휴 6~7일차(호출 불가, 입고는 계속)', () => {
   const g = NG(7); assert.equal(g.calMonth(1), 3); assert.equal(g.calMonth(24), 2);

@@ -57,7 +57,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const hud = await page.evaluate(() => ({ month: document.querySelector('#hud-month').textContent, turn: document.querySelector('#hud-turn').textContent, yrPx: getComputedStyle(document.querySelector('#hud-month .yr')).fontSize, rep: document.querySelector('#stress-label').textContent + ' ' + document.querySelector('#stress-num').textContent }));
   const year = new Date().getFullYear();
   ok('HUD에 연도', hud.month.includes(String(year)), hud.month.trim());
-  ok('HUD에 일차·요일', /1일차\s*월/.test(hud.turn), hud.turn.trim());
+  ok('HUD에 실제 날짜·요일', /^1일\s*월$/.test(hud.turn.trim()), hud.turn.trim());
   ok('연도 글자 크기 = 11px (픽셀 폰트 원본)', hud.yrPx === '11px', hud.yrPx);
   ok('HUD 게이지가 평판', /평판/.test(hud.rep) && /20\/20/.test(hud.rep), hud.rep.replace(/\s+/g, ' ').trim());
   const oneLine = await page.evaluate(() => { const el = document.querySelector('#hud-left'); return el.getBoundingClientRect().height < 60; });
@@ -88,12 +88,12 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
     const w = await page.$('.foot .btn.primary'); if (w) await w.click({ force: true });
     await page.waitForTimeout(700); await settle(); s = await st();
   }
-  ok('일요일은 엿새마다 (6·12일차 뒤)', s.phase !== 'weekend' || s.t === 6 || s.t === 12, `t=${s.t}`);
+  ok('토요일 다음에 일요일이 온다', s.phase !== 'weekend' || s.t === 6, `t=${s.t}`);
   ok('엿새 뒤 일요일이 뜬다', s.phase === 'weekend', JSON.stringify(s));
   if (s.phase === 'weekend') {
     await shot('05-weekend');
     const wk = await page.evaluate(() => ({ head: document.querySelector('#modal h2').textContent, body: document.querySelector('#modal .body').textContent, opts: [...document.querySelectorAll('.wkopts .wkc')].map(b => ({ t: b.textContent, off: b.disabled })) }));
-    ok('일요일 카드 제목', /1주차 일요일/.test(wk.head), wk.head.trim());
+    ok('일요일 카드 제목이 실제 날짜', /3월 7일 일요일/.test(wk.head), wk.head.trim());
     ok('선택지 3개', wk.opts.length === 3, wk.opts.map(o => o.t.split('\n')[0]).join(' / '));
     const yard = await page.evaluate(() => PT.game.outdoorVolume());
     ok('마당이 비면 알바는 선택 불가', wk.opts[2].off === (yard === 0), `야외 ${yard}칸 · 알바 disabled=${wk.opts[2].off}`);
@@ -162,12 +162,12 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   cur = await st();
   ok('다음 사이클 시작', cur.m === 2 && cur.phase === 'play', JSON.stringify(cur));
   const hud2 = await page.evaluate(() => document.querySelector('#hud-month').textContent);
-  ok('두 번째 사이클은 3월 후반(13일차부터)', /3월/.test(hud2), hud2.trim());
+  ok('두 번째 사이클은 3월 후반', /3월/.test(hud2), hud2.trim());
 
   // ---------- 10. 달력 화면 ----------
   await page.click('#hud-month', { force: true }); await page.waitForTimeout(400);
   const cal = await page.evaluate(() => document.querySelector('#modal').textContent);
-  ok('달력 이벤트 기간이 일차', /\d+~\d+일차/.test(cal) && !/\d턴/.test(cal), (cal.match(/\d+~\d+일차/) || [''])[0]);
+  ok('달력 이벤트 기간이 날짜', /\d+~\d+일/.test(cal) && !/\d턴/.test(cal), (cal.match(/\d+~\d+일/) || [''])[0]);
   await shot('08-calendar');
   await page.click('.foot .btn', { force: true }); await page.waitForTimeout(300);
 
@@ -185,7 +185,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('이어하기 버튼', !!cont);
   if (cont) {
     const label = await cont.textContent();
-    ok('이어하기 라벨에 진행도', /\/12/.test(label), label.replace(/\s+/g, ' ').trim());
+    ok('이어하기 라벨에 진행도', /\d+\/\d+/.test(label), label.replace(/\s+/g, ' ').trim());
     await cont.click({ force: true }); await page.waitForTimeout(900); await settle();
     const after = await st();
     ok('세이브 복원', after.m === beforeReload.m && after.t === beforeReload.t, `${beforeReload.m}-${beforeReload.t} → ${after.m}-${after.t}`);
@@ -197,7 +197,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.evaluate(() => { I18n.setLang('en'); PT.renderAll(); });
   await page.waitForTimeout(400);
   const en = await page.evaluate(() => ({ hud: document.querySelector('#hud-month').textContent + ' ' + document.querySelector('#hud-turn').textContent, parcels: document.querySelector('#parcels').textContent }));
-  ok('영어 HUD', /M\d/.test(en.hud) && /D\d/.test(en.hud), en.hud.trim());
+  ok('영어 HUD', /M\d/.test(en.hud), en.hud.trim());
   ok('영어 기한 표기', /⏳/.test(en.parcels) || true, (en.parcels.match(/⏳\s*\S+/) || [''])[0]);
   await shot('09-en');
   await page.evaluate(() => { I18n.setLang('ko'); PT.renderAll(); });

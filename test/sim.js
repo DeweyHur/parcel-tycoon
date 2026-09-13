@@ -85,7 +85,7 @@ function marketBot(g) {
     break;
   }
   // 3) 창고: 턴당 입고(2턴치)를 못 받으면 확장
-  const perTurn = parcels / D.TURNS_PER_MONTH * 1.7;
+  const perTurn = parcels / (g.turns() || D.TURNS_PER_MONTH) * 1.7;
   while (g.warehouse.cap < perTurn * 3) { const i = idx(it => it.kind === 'fac' && it.fac && /^expand/.test(it.fac) && can(it.price)); if (i < 0 || !g.buy(i, null).ok) break; }
   // 4) 여유 자금: 시설 → 업그레이드 → 강화
   items.forEach((it, i) => { if (!it.sold && it.kind === 'fac' && it.fac && g.cash - it.price > reserve + 200 && g.market.bought < g.rules.marketMaxBuy) g.buy(i, null); });
@@ -141,7 +141,7 @@ else for (const strat of Object.keys(STRATS)) {
     if (g.month >= 2) m2++; if (g.month >= 3) m3++;
     cash += g.cash; calls += g.run.calls; waits += g.run.waits; stress += g.rep; rev += g.run.revenue;
   }
-  const months = (calls + waits) / N / D.TURNS_PER_MONTH;
+  const months = (calls + waits) / N / D.TURNS_PER_MONTH;  // 사이클 길이는 12~14, 근사치
   console.log(`${strat.padEnd(9)} 생존3개월 ${(wins / N * 100).toFixed(0)}%  2개월도달 ${(m2 / N * 100).toFixed(0)}%  3개월도달 ${(m3 / N * 100).toFixed(0)}%  평균현금 ${(cash / N).toFixed(0)}  월평균호출 ${(calls / N / months).toFixed(1)}  월평균대기 ${(waits / N / months).toFixed(1)}  평균평판 ${(stress / N).toFixed(1)}  총수익 ${(rev / N).toFixed(0)}`);
 }
 }
