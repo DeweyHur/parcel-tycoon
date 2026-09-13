@@ -52,7 +52,7 @@ let guard = 0;
 while (g.month <= 3 && guard++ < 200) {
   if (g.phase === 'summary') {
     const s = g.summary;
-    console.log(`— ${g.month}개월차 정산: 순익 ${s.net >= 0 ? '+' : ''}${s.net}c · 자금 ${g.cash}c · 스트레스 ${g.stress} · 반송 ${g.stats.returned} 도난 ${g.stats.stolen} 파손 ${g.stats.broken} 폐기 ${g.stats.discarded}`);
+    console.log(`— ${g.month}개월차 정산: 순익 ${s.net >= 0 ? '+' : ''}${s.net}c · 자금 ${g.cash}c · 평판 ${g.rep}/${g.repCap()} · 반송 ${g.stats.returned} 도난 ${g.stats.stolen} 파손 ${g.stats.broken} 폐기 ${g.stats.discarded}`);
     beats({ kind: 'summary' }); g.closeSummary(); continue;
   }
   if (g.phase === 'market') { beats({ kind: 'market' }); market(); beats({ kind: 'turn' }); continue; }
@@ -87,4 +87,4 @@ while (g.month <= 3 && guard++ < 200) {
 }
 console.log('\n상황 발생:', Object.keys(hit).filter(k => !k.startsWith('beat:')).join(', ') || '없음');
 console.log('나온 비트:', Object.keys(hit).filter(k => k.startsWith('beat:')).map(k => k.slice(5)).join(' '));
-console.log(`끝: ${g.month}개월차 ${g.turn}턴 · phase ${g.phase} · 자금 ${g.cash}c · 스트레스 ${g.stress} · 반송 ${g.stats.returned} 폐기 ${g.stats.discarded}`);
+console.log(`끝: ${g.month}개월차 ${g.turn}턴 · phase ${g.phase} · 자금 ${g.cash}c · 평판 ${g.rep}/${g.repCap()} · 반송 ${g.stats.returned} 폐기 ${g.stats.discarded}`);

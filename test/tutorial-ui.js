@@ -110,9 +110,9 @@ const fs = require('fs');
       const go = await page.$('.foot .btn.primary:not([disabled])'); if (go) { await go.click(); await page.waitForTimeout(700); } }
     await readBeat();
   }
-  const st = await page.evaluate(() => ({ m: PT.game.month, t: PT.game.turn, cash: PT.game.cash, stress: PT.game.stress, seen: PT.game.story.seen, ret: PT.game.stats.returned }));
+  const st = await page.evaluate(() => ({ m: PT.game.month, t: PT.game.turn, cash: PT.game.cash, rep: PT.game.rep, seen: PT.game.story.seen, ret: PT.game.stats.returned }));
   await page.screenshot({ path: 'shots/t-end.png' });
-  console.log('\n끝:', st.m + '개월차 ' + st.t + '턴 · 자금 ' + st.cash + 'c · 스트레스 ' + st.stress + ' · 반송 ' + st.ret);
+  console.log('\n끝:', st.m + '개월차 ' + st.t + '턴 · 자금 ' + st.cash + 'c · 평판 ' + st.rep + ' · 반송 ' + st.ret);
   console.log('본 비트:', st.seen.join(' '));
   for (const need of ['intro', 'callReady', 'trucks2', 'marketRefill', 'marketLimit']) console.log((st.seen.includes(need) ? '  ✔ ' : '  ✘ ') + need);
   console.log('에러:', errors.length ? errors.slice(0, 5) : '없음');
