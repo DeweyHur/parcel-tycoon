@@ -11,6 +11,13 @@ window.Scene3D = (function () {
     snow:  { hemi: 0xe8f0ff, hemiI: 0.95, sunI: 0.7, clear: [0xdfe8f0, 0.45], rain: 0, snow: 320 },
     storm: { hemi: 0x6a7090, hemiI: 0.55, sunI: 0.3, clear: [0x2e3348, 0.7], rain: 700, snow: 0 },
   };
+  // 구역 표지용 도트 아이콘 (픽셀 UI와 결 맞추기 — 이모지 대신 직접 찍는다)
+  const SIGN_ICONS = {
+    cold: ['X..X..X', '.X.X.X.', '..XXX..', 'XXXXXXX', '..XXX..', '.X.X.X.', 'X..X..X'],
+    frozen: ['X..X..X', '.XXXXX.', '.XXXXX.', 'XXXXXXX', '.XXXXX.', '.XXXXX.', 'X..X..X'],   // 두툼한 얼음 결정 (냉장의 가는 눈송이와 구분)
+    rain: ['...XXX...', '.XXXXXXX.', 'XXXXXXXXX', 'XXXXXXXXX', '.........', '..X..X..X', '.X..X..X.', 'X..X..X..'],
+  };
+  const SIGN = { bg: '#2a2740', line: '#0f0e1a', hi: '#3d3a5c', alt: '#eef6ff', unit: 0.036, scale: 2 };
   const FOOT = { 1: [1, 1, 0.5], 2: [2, 1, 0.6], 4: [2, 2, 0.95], 7: [3, 2, 1.5] }; // [w, d, h]
   const TRUCK_PARK = 12, TRUCK_DOCK = 6.7, TRUCK_GONE = 17;
 
@@ -35,6 +42,8 @@ window.Scene3D = (function () {
       this._buildWeather();
       this.weather = 'sunny';
       this.resize();
+      // 픽셀 폰트가 늦게 로드되면 간판을 다시 굽는다
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.signCache = null; if (this.tileCaps) this._buildTiles(...this.tileCaps); });
       window.addEventListener('resize', () => this.resize());
       this._loop();
     }
@@ -74,15 +83,15 @@ window.Scene3D = (function () {
       for (let i = 0; i < 3; i++) { const p = this._box(0.22, 3.1, 0.22, 0xb59a75); p.position.set(-4.9 + i * 4.7, 1.55, -1.45); s.add(p); }
       const right = this._box(0.25, 3.2, 2.0, 0xcdbd9e); right.position.set(4.5, 1.6, -0.7); s.add(right);
       // 냉장 구역 바닥 + 낮은 벽
-      const cf = this._box(COLD.cells * CELL + 0.2, 0.06, COLD.depth * CELL + 0.2, 0x8fd8e8); cf.position.set(COLD.x0 + COLD.cells * CELL / 2 - 0.1, 0.1, -1.3 + COLD.depth * CELL / 2); s.add(cf);
-      const cw = this._box(0.12, 0.5, COLD.depth * CELL + 0.2, 0x5fb8d0); cw.position.set(COLD.x0 + COLD.cells * CELL + 0.06, 0.3, cf.position.z); s.add(cw);
-      const cw2 = this._box(COLD.cells * CELL + 0.2, 0.5, 0.12, 0x5fb8d0); cw2.position.set(cf.position.x, 0.3, -1.3 + COLD.depth * CELL + 0.06); s.add(cw2);
+      const cf = this._box(COLD.cells * CELL + 0.2, 0.06, COLD.depth * CELL + 0.2, 0x6cabbd); cf.position.set(COLD.x0 + COLD.cells * CELL / 2 - 0.1, 0.1, -1.3 + COLD.depth * CELL / 2); s.add(cf);
+      const cw = this._box(0.12, 0.5, COLD.depth * CELL + 0.2, 0x47869a); cw.position.set(COLD.x0 + COLD.cells * CELL + 0.06, 0.3, cf.position.z); s.add(cw);
+      const cw2 = this._box(COLD.cells * CELL + 0.2, 0.5, 0.12, 0x47869a); cw2.position.set(cf.position.x, 0.3, -1.3 + COLD.depth * CELL + 0.06); s.add(cw2);
       // 냉장 표시등
       const lamp = this._box(0.3, 0.3, 0.3, 0x5ee0d8, { emissive: 0x2a8f8a }); lamp.position.set(COLD.x0 + 0.4, 2.9, -1.5); s.add(lamp);
       // 도크 라인 (오른쪽)
       const dock = this._box(0.4, 0.05, 3.0, 0xf0d060); dock.position.set(4.9, 0.08, 1.8); s.add(dock);
       // 앞마당 (야외 적재장)
-      const yard = this._box(YARD.cells * CELL + 0.3, 0.05, YARD.depth * CELL + 0.3, 0x86836f); yard.position.set(YARD.x0 + YARD.cells * CELL / 2 - 0.15, 0.09, YARD.z0 + YARD.depth * CELL / 2 - 0.05); s.add(yard);
+      const yard = this._box(YARD.cells * CELL + 0.3, 0.05, YARD.depth * CELL + 0.3, 0x85765b); yard.position.set(YARD.x0 + YARD.cells * CELL / 2 - 0.15, 0.09, YARD.z0 + YARD.depth * CELL / 2 - 0.05); s.add(yard);
       // 트럭
       this.truck = this._makeTruck(); this.truck.position.set(TRUCK_PARK, 0, 1.8); s.add(this.truck);
       // 도로
@@ -116,16 +125,20 @@ window.Scene3D = (function () {
       const g = new THREE.Group(); this.tiles = g; this.tileCaps = [cap, cold, frozen];
       const tile = (zone, i, color) => { const x = i % zone.cells, z = Math.floor(i / zone.cells); const m = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 0.08, CELL - 0.08), new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.55 })); m.rotation.x = -Math.PI / 2; m.position.set(zone.x0 + (x + 0.5) * CELL, zone === COLD ? 0.145 : 0.075, -1.3 + (z + 0.5) * CELL); m.receiveShadow = true; g.add(m); };
       for (let i = 0; i < Math.min(cap, MAIN.cells * MAIN.depth); i++) tile(MAIN, i, 0xb9b9c6);
-      for (let i = 0; i < Math.min(cold, COLD.cells * COLD.depth); i++) tile(COLD, i, 0xaee6f0);
-      for (let i = cold; i < Math.min(cold + frozen, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x4f7fe0);
+      for (let i = 0; i < Math.min(cold, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x8fd0dc);
+      for (let i = cold; i < Math.min(cold + frozen, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x6c8cff);
       // 냉장/냉동 경계선
-      if (frozen > 0 && cold > 0) { const row = Math.floor(cold / COLD.cells), col = cold % COLD.cells; const z = -1.3 + row * CELL; const mk = (x0, x1, zz) => { const w = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); w.position.set((x0 + x1) / 2, 0.2, zz); g.add(w); }; if (col > 0) { mk(COLD.x0 + col * CELL, COLD.x0 + COLD.cells * CELL, z); mk(COLD.x0, COLD.x0 + col * CELL, z + CELL); const v = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, CELL), new THREE.MeshLambertMaterial({ color: 0x2b4a9a })); v.position.set(COLD.x0 + col * CELL, 0.2, z + CELL / 2); g.add(v); } else mk(COLD.x0, COLD.x0 + COLD.cells * CELL, z); }
-      // 구역 표지: ❄ 냉장, ❆ 냉동, 🌧 야외 (카메라를 보는 스프라이트)
-      const sign = (icon, label, bg, x, z, y) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._signTexture(icon, label, bg), transparent: true, depthTest: false })); sp.scale.set(1.5, 0.75, 1); sp.position.set(x, y || 0.9, z); g.add(sp); };
+      if (frozen > 0 && cold > 0) { const row = Math.floor(cold / COLD.cells), col = cold % COLD.cells; const z = -1.3 + row * CELL; const mk = (x0, x1, zz) => { const w = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x3a4a8c })); w.position.set((x0 + x1) / 2, 0.2, zz); g.add(w); }; if (col > 0) { mk(COLD.x0 + col * CELL, COLD.x0 + COLD.cells * CELL, z); mk(COLD.x0, COLD.x0 + col * CELL, z + CELL); const v = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, CELL), new THREE.MeshLambertMaterial({ color: 0x3a4a8c })); v.position.set(COLD.x0 + col * CELL, 0.2, z + CELL / 2); g.add(v); } else mk(COLD.x0, COLD.x0 + COLD.cells * CELL, z); }
+      // 구역 표지: 냉장 / 냉동 / 야외 (카메라를 보는 픽셀 간판 스프라이트)
+      const sign = (iconKey, label, accent, x, z, y) => {
+        const t = this._signTexture(iconKey, label, accent);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t.tex, transparent: true, depthTest: false }));
+        sp.scale.set(t.vw * SIGN.unit, t.vh * SIGN.unit, 1); sp.position.set(x, y || 0.9, z); g.add(sp);
+      };
       const A = window.DATA.ATTRS, OUT = window.I18n ? window.I18n.t('hud.outdoorLabel') : '';
-      if (cold > 0) sign(A.cold.icon, A.cold.name, '#1f8fb0', COLD.x0 + 0.9, -1.2, 1.7);
-      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign(A.frozen.icon, A.frozen.name, '#2b4ab8', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, -1.3 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
-      sign('🌧', OUT, '#7a5a2a', YARD.x0 + 0.9, YARD.z0 + 0.6);
+      if (cold > 0) sign('cold', A.cold.name, '#5ee0d8', COLD.x0 + 0.9, -1.2, 1.7);
+      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('frozen', A.frozen.name, '#9ad7ff', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, -1.3 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
+      sign('rain', OUT, '#c9a06c', YARD.x0 + 0.9, YARD.z0 + 0.6);
       this.scene.add(g);
     }
     relabel() { if (this.tileCaps) this._buildTiles(...this.tileCaps); }
@@ -138,17 +151,35 @@ window.Scene3D = (function () {
       ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(icon, 32, 36);
       const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; this.iconCache[icon] = tex; return tex;
     }
-    // 구역 표지: 색 배경 + 아이콘 + 한글 라벨 (시인성)
-    _signTexture(icon, label, bg) {
-      this.signCache = this.signCache || {}; const key = icon + label;
+    // 구역 표지: 픽셀 간판 (UI와 같은 각진 테두리 + 오프셋 그림자 + Galmuri 도트 폰트)
+    _signTexture(iconKey, label, accent) {
+      this.signCache = this.signCache || {}; const key = iconKey + '|' + label + '|' + accent;
       if (this.signCache[key]) return this.signCache[key];
-      const c = document.createElement('canvas'); c.width = 256; c.height = 128; const ctx = c.getContext('2d');
-      ctx.fillStyle = bg; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 8;
-      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(8, 8, 240, 112, 22) : ctx.rect(8, 8, 240, 112); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.font = '64px sans-serif'; ctx.fillText(icon, 62, 66);
-      ctx.font = 'bold 60px sans-serif'; ctx.fillText(label, 170, 66);
-      const tex = new THREE.CanvasTexture(c); this.signCache[key] = tex; return tex;
+      const F = "11px 'Galmuri11', monospace";
+      const ico = SIGN_ICONS[iconKey] || SIGN_ICONS.cold, iw = ico[0].length, ih = ico.length;
+      const probe = document.createElement('canvas').getContext('2d'); probe.font = F;
+      const tw = Math.ceil(probe.measureText(label).width);
+      const vw = 2 + 3 + iw + 3 + tw + 3 + 2, vh = 20;          // 도트 단위 크기 (테두리 2 + 여백 3)
+      // 1배 캔버스에 도트로 그린 뒤 정수배로만 확대 → 안티앨리어싱 없는 픽셀 간판
+      const s1 = document.createElement('canvas'); s1.width = vw + 2; s1.height = vh + 2;
+      const x1 = s1.getContext('2d');
+      const px = (x, y, w, h, col) => { x1.fillStyle = col; x1.fillRect(x, y, w, h); };
+      px(2, 2, vw, vh, SIGN.line);                               // 오프셋 그림자
+      px(0, 0, vw, vh, SIGN.line);                               // 테두리
+      px(2, 2, vw - 4, vh - 4, SIGN.bg);                         // 패널
+      px(2, 2, vw - 4, 1, SIGN.hi);                              // 윗면 하이라이트
+      const ix = 5, iy = Math.round((vh - ih) / 2);
+      for (let y = 0; y < ih; y++) for (let x = 0; x < iw; x++) { const ch = ico[y][x]; if (ch !== '.') px(ix + x, iy + y, 1, 1, ch === '#' ? SIGN.alt : accent); }
+      x1.font = F; x1.textBaseline = 'middle'; x1.textAlign = 'left';
+      x1.fillStyle = SIGN.line; x1.fillText(label, ix + iw + 4, vh / 2 + 1);   // 도트 그림자
+      x1.fillStyle = accent; x1.fillText(label, ix + iw + 3, vh / 2);
+      const S = SIGN.scale;
+      const c = document.createElement('canvas'); c.width = s1.width * S; c.height = s1.height * S;
+      const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(s1, 0, 0, c.width, c.height);
+      const tex = new THREE.CanvasTexture(c);
+      tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+      const out = { tex, vw: s1.width, vh: s1.height };
+      this.signCache[key] = out; return out;
     }
     _iconMark(icon, w, h, d) {
       const size = Math.min(0.42, Math.max(0.26, w * CELL * 0.45));
