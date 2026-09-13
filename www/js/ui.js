@@ -140,9 +140,12 @@
     m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (lock) { SFX.click(); showDemoGate(showScenarioSelect); return; } if (!P.unlocked.scenarios.includes(id)) { toast(unlockText(M.SCENARIOS[id].unlock), 2500); return; } SFX.select(); prep.scenario = id; showScenarioSelect(); });
     m.querySelectorAll('[data-diff]').forEach(el => el.onclick = () => { const id = el.dataset.diff; if (!diffUn(id)) { toast(unlockText(M.DIFFICULTIES[id].unlock), 2500); return; } SFX.select(); prep.difficulty = id; showScenarioSelect(); });
   }
+  // 회사 시작 계약은 계열 이름(bulk…)으로 적혀 있다 → Game.resolveCenter 와 같은 규칙으로 센터 id 를 찾는다
+  const GRADE_TIER = g => Math.max(0, ['normal', 'trusted', 'expert', 'master'].indexOf(g || 'normal'));
+  function startCenter(c) { return D.CARRIERS[c.carrier] ? c.carrier : (D.centerFor(c.carrier, GRADE_TIER(c.grade)) || null); }
   function companyInfo(co, id) {
     const wh = co.warehouse ? T('prep.warehouse', { cap: co.warehouse.cap, cold: co.warehouse.cold, xl: co.warehouse.xl }) : T('prep.warehouseRandom');
-    const ct = co.contracts ? co.contracts.map(c => `${D.CARRIERS[c.carrier].short}${c.grade === 'trusted' ? '★' : ''} ${T('fmt.trucks', { n: c.calls != null ? c.calls : D.CARRIERS[c.carrier].trucks + (D.GRADES[c.grade || 'normal'].calls || 0) })}`).join(', ') : T('prep.contractsRandom');
+    const ct = co.contracts ? co.contracts.map(c => { const k = startCenter(c); const car = k && D.CARRIERS[k]; if (!car) return String(c.carrier); return `${car.short || car.name || k}${c.grade === 'trusted' ? '★' : ''} ${T('fmt.trucks', { n: c.calls != null ? c.calls : car.trucks + ((D.GRADES[c.grade || 'normal'] || {}).calls || 0) })}`; }).join(', ') : T('prep.contractsRandom');
     return `<div class="d">${wh} · ${T('hud.cash')} ${co.cash}<br>${T('prep.contracts')}: ${esc(ct)}</div><div class="d" style="color:var(--green)">＋ ${esc(co.passive)}</div><div class="d" style="color:var(--orange)">－ ${esc(co.weakness)}</div>`;
   }
   function showCompanySelect() {

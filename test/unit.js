@@ -319,4 +319,13 @@ t('데모: 문구 키가 ko/en 에 모두 있다', () => {
     'stat.export', 'stat.import', 'stat.exportHelp', 'stat.importHelp', 'stat.importOk', 'stat.importFail', 'stat.copy', 'stat.copied', 'stat.copyFail', 'stat.importBtn', 'stat.transferNote'])
     assert.ok(KO.ui[k] && EN.ui[k], k);
 });
+t('회사 선택 화면: 시작 계약(계열 이름)이 모두 실제 센터로 풀린다 — ui.companyInfo 회귀', () => {
+  const tier = g => Math.max(0, ['normal', 'trusted', 'expert', 'master'].indexOf(g || 'normal'));
+  for (const id in M.COMPANIES) for (const c of M.COMPANIES[id].contracts || []) {
+    const k = D.CARRIERS[c.carrier] ? c.carrier : D.centerFor(c.carrier, tier(c.grade));
+    assert.ok(k && D.CARRIERS[k], id + ' ' + c.carrier + ' → 센터 없음');
+    assert.ok(D.CARRIERS[k].short, id + ' ' + c.carrier + ' → short 없음');
+    assert.ok(D.CARRIERS[k].trucks > 0, id + ' ' + c.carrier + ' → trucks 없음');
+  }
+});
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);
