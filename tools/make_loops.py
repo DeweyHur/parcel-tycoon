@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Suno 원본(audio-src/*.mp3) → 게임용 루프/원샷 (www/audio/*.mp3)
+"""Suno 원본(audio-src/*.wav 또는 *.mp3) → 게임용 루프/원샷 (www/audio/*.mp3)
+- 원본은 wav 를 우선으로 찾는다 (Suno 는 유료 플랜에서 무손실 wav 를 준다 — 재인코딩 손실을 한 번 아낀다)
 - 루프 곡: 시작 1초 이후 구간과 파형 상관이 가장 높은 지점을 루프 끝으로 골라 크로스페이드로 이음 (심리스)
 - 라우드니스 정규화 (loudnorm), mp3 160k
 사용: python3 tools/make_loops.py
@@ -8,6 +9,14 @@ import subprocess, numpy as np, os, sys, json
 SR = 44100
 ROOT = os.path.join(os.path.dirname(__file__), '..', 'www', 'audio')
 SRC = os.path.join(os.path.dirname(__file__), '..', 'audio-src')
+
+def src_path(name):
+    """audio-src/<name>.wav 가 있으면 그걸, 없으면 .mp3 를 쓴다"""
+    for ext in ('.wav', '.mp3'):
+        p = os.path.join(SRC, name + ext)
+        if os.path.exists(p):
+            return p
+    raise SystemExit(f'원본을 찾을 수 없습니다: {os.path.join(SRC, name)}.wav|.mp3')
 
 def load(path):
     raw = subprocess.check_output(['ffmpeg', '-v', 'error', '-i', path, '-ac', '2', '-ar', str(SR), '-f', 'f32le', '-'])
@@ -47,7 +56,7 @@ def best_loop_end(a, start_s, min_end_s, max_end_s):
 OVERRIDE = {'warehouse': 33.2, 'market': 23.1}  # 루프 끝 지점을 직접 지정 (초, ±50ms 안에서 위상 정렬). 이음새가 어색하면 여기서 조정
 
 def make_loop(name, start_s, min_end_s, max_end_s, lufs=-16, xf_ms=40):
-    a = load(os.path.join(SRC, name + '.mp3'))
+    a = load(src_path(name))
     if name in OVERRIDE: end_s, corr = best_loop_end(a, start_s, OVERRIDE[name] - 0.05, OVERRIDE[name] + 0.05)
     else: end_s, corr = best_loop_end(a, start_s, min_end_s, max_end_s)
     s, e, xf = int(start_s * SR), int(end_s * SR), int(xf_ms / 1000 * SR)
@@ -59,7 +68,7 @@ def make_loop(name, start_s, min_end_s, max_end_s, lufs=-16, xf_ms=40):
     print(f'{name}: loop {start_s:.2f}s → {end_s:.3f}s ({end_s - start_s:.1f}s, corr {corr:.2f})')
 
 def make_oneshot(name, end_s=None, fade_s=0, lufs=-16):
-    a = load(os.path.join(SRC, name + '.mp3'))
+    a = load(src_path(name))
     if end_s: a = a[:int(end_s * SR)].copy()
     if fade_s:
         n = int(fade_s * SR); a[-n:] *= np.linspace(1, 0, n)[:, None]
