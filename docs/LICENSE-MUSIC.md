@@ -7,7 +7,7 @@
 
 - 곡: 칩튠 BGM 6곡 (`title` / `warehouse` / `overflow` / `market` / `fanfare` / `gameover`)
 - 생성 도구: Suno (`chirp-fenix-t4`), 2026-09-04 생성
-- 원본 재다운로드: 2026-09-13, **Pro 플랜 구독 중**, 무손실 WAV (`audio-src/*.wav`)
+- 원본 재다운로드: 2026-09-13, **Pro 구독 기간(2026-08-19~09-19) 중**, 무손실 WAV (`audio-src/*.wav`)
 - 권리 근거: Suno 약관(2026-09-03 발효)은 상업권을 생성 시점이 아니라 *허용된 다운로드*에 붙인다 —
   "You may commercially exploit Output ... provided you have obtained a permitted download of that Output."
   무료 티어 다운로드는 개인·비상업용.
@@ -62,15 +62,30 @@
 - **카드사·은행 명세서** — 가맹점명·금액·날짜. 제3자 기록이라 증거력이 있다
 - **Stripe 영수증 메일** — 받은편지함에서 `Suno` 또는 `receipt` 검색
 
-## 3. 보관 목록 (`docs/licenses/`, git 제외)
+## 3. 확인된 사슬
 
-- [ ] `suno-invoice-*.pdf` — Stripe 인보이스. 플랜명(Pro)과 결제 기간이 보이는 것
-- [ ] `suno-terms-2026-09-13.pdf` — 다운로드 시점의 약관 스냅샷. 약관은 2026-09-03에 개정됐으므로
-      `web.archive.org` 스냅샷을 PDF로 받아 둘 것
-- [ ] `suno-account-plan.png` — 계정 화면(Current Plan: Pro / Next Billing Date)
-- [ ] `audio-src/*.wav` 백업 — 자격증명이 살아 있는 원본
-- [ ] 이 파일과 `docs/MUSIC_MANIFEST.md`
+세 조각이 맞물려 닫힌다.
 
+| 무엇 | 언제 | 근거 |
+|---|---|---|
+| Suno Pro 구독 기간 | **2026-08-19 ~ 09-19** | Stripe 인보이스 `H3MR40FW-0002` · 영수증 `2016-0713-4661` ($10.00, Visa -1256, 계정 `digitzetre@gmail.com`) |
+| 곡 생성 | 2026-09-04 | 각 WAV의 C2PA 매니페스트 `createdAt` |
+| WAV 다운로드 | 2026-09-13 | 각 WAV의 `created=` 주석 + C2PA 서명의 DigiCert 타임스탬프 |
+
+생성일과 다운로드일이 **모두 구독 기간 안**이다. 약관을 "생성 시점" 기준으로 읽든 "다운로드 시점"
+기준으로 읽든 결과가 같다 — 해석 다툼의 여지가 없다.
+
+### 보관 목록 (`docs/licenses/`, git 제외)
+
+- [x] `suno-receipt-2026-08-20.pdf` — 지불 완료 영수증. **분쟁 시 먼저 내미는 건 이쪽**(인보이스는 청구서)
+- [x] `suno-invoice-2026-08-20.pdf` — 인보이스. 구독 기간(Aug 19–Sep 19)이 찍혀 있다
+- [ ] `suno-terms-2026-09-13.pdf` — 약관. 현행 약관의 발효일(2026-09-03)이 다운로드일(09-13)보다
+      앞서므로 **지금 suno.com/terms-of-service 를 브라우저에서 PDF로 인쇄하면 그게 적용 버전**이다.
+      과거 스냅샷을 찾을 필요가 없다
+- [ ] `audio-src/*.wav` 백업 — 자격증명이 살아 있는 원본 (레포 밖에도 한 벌)
+- [x] 이 파일과 `docs/MUSIC_MANIFEST.md` (git 에 커밋돼 있음)
+
+두 PDF에는 집 주소와 카드 끝 4자리가 들어 있어 git 에 올리지 않는다(`docs/licenses/.gitignore`).
 곡 페이지 URL이 필요하면 위 표의 `contentId` 로 라이브러리에서 찾을 수 있다.
 
 ## 4. 남은 리스크
