@@ -104,6 +104,8 @@
     { id: 'weekendYard', months: [1, 2, 3], kind: 'weekend', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'worry', hl: '.wkopts .wkc:nth-child(3)' }] },
     // 평판: 처음 깎였을 때 한 번. 이 게임이 왜 끝나는지를 말해 주는 자리다
     { id: 'rep', months: [1, 2, 3], kind: 'turn', when: g => g.rep < g.repCap(), pages: [{ expr: 'worry', hl: '#hud-right' }, { expr: 'neutral', hl: '#hud-right' }] },
+    // 등급이 처음 오른 정산 — 평판을 키우면 뭐가 열리는지 여기서 말한다
+    { id: 'repUp', months: [1, 2, 3], kind: 'summary', when: g => !!(g.summary && g.summary.repTierUp), pages: [{ expr: 'laugh' }, { expr: 'smile' }] },
     { id: 'summary1', months: [1], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
     { id: 'market1', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }, { expr: 'neutral' }] },
     // ----- 4월 (2개월차): 고객과 돈 -----
@@ -154,7 +156,7 @@
     return { name: bulk ? g.contractName(bulk) : '', cap, fee, per: Math.round(fee / Math.max(1, cap)), ready: c ? g.contractName(c) : '', readyCap: c ? g.vehicleCap(c) : cap,
       openName: oc ? g.contractName(oc) : '', openCap: oc ? g.vehicleCap(oc) : cap, openFee: oc ? g.truckFee(oc) : fee,
       openVol: oc ? g.eligibleParcels(oc).reduce((s2, p) => s2 + p.size, 0) : 0, openSimul: oc ? g.simulMax(oc) : 1, openCalls: oc ? oc.calls : 0,
-      cash: g.cash, projected: g.projectedCash().total, outdoor: g.outdoorVolume(), rent: g.opCostBreakdown(g.month).rent, months: g.rules.months, cal: g.calMonth(), startCal: g.calMonth(1), lastCal: g.calMonth(g.rules.months),
+      cash: g.cash, repTier: g.repTierName(), rep: g.rep, repCap: g.repCap(), projected: g.projectedCash().total, outdoor: g.outdoorVolume(), rent: g.opCostBreakdown(g.month).rent, months: g.rules.months, cal: g.calMonth(), startCal: g.calMonth(1), lastCal: g.calMonth(g.rules.months),
       delivered: g.run.delivered, returned: g.stats.returned + g.stats.stolen + g.stats.broken, full: g.stats.fullTrucks, fee2: fee, interest: Math.round(root.DATA.LOAN.interest * 100),
       trucks: (ctx && ctx.trucks) || 1, vol: (ctx && ctx.vol) || 0, callFee: oc ? g.callFee(oc, (ctx && ctx.trucks) || 1) : fee,
       ...refillParams(g), ...limitParams(g), ...switchParams(g), outName: (outOfCalls(g) && g.contractName(outOfCalls(g))) || '' };

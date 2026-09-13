@@ -700,6 +700,10 @@
     repScaleOpCost() { return this.repTierDef().opCost || 1; }
     // 이 등급부터 들어오기 시작하는 품목 (그 전에는 일반으로 돌린다)
     repUnlocked(type) { return (this.repTierDef().unlock || []).indexOf(type) >= 0; }
+    // 지금 평판 등급에서 찾아올 수 있는 고객 (아직 거래 안 하는 고객 중)
+    openCustomers() { return Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !this.customers[k] && (M.CUSTOMERS[k].repTier || 0) <= this.repTier); }
+    // 이 등급에서 새로 열린 고객 (등급이 막 올랐을 때 알려 주려고)
+    customersAtTier(tier) { return Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && (M.CUSTOMERS[k].repTier || 0) === tier); }
     repTierId() { return D.REP_TIERS[Math.min(this.repTier, D.REP_TIERS.length - 1)].id; }
     repTierName() { return T('rep.tier.' + this.repTierId()); }
     // 평판 증감. 사고는 깎고(pen 양수 = 깎임), 잘한 일은 올린다. 상한을 넘지 않고, 0 이하면 런이 끝난다
@@ -1224,7 +1228,9 @@
       if (this.rep >= this.repCap() && this.repTier < D.REP_TIERS.length - 1) {
         this.repTier++; repTierUp = this.repTierId();
         this.say('log.repTierUp', { name: this.repTierName(), cap: this.repCap() });
-        this.emit('repTier', { tier: repTierUp, cap: this.repCap() });
+        const opened = this.customersAtTier(this.repTier).filter(k => !this.customers[k]);
+        if (opened.length) this.say('log.repCustomers', { list: opened.map(k => M.CUSTOMERS[k].icon + M.CUSTOMERS[k].name).join(', ') });
+        this.emit('repTier', { tier: repTierUp, cap: this.repCap(), customers: opened });
       }
       // 통계
       this.stats.monthsDone = this.month;
@@ -1399,7 +1405,7 @@
         items.push({ kind: 'fac', fac: f, price: facPrice(f), name: D.FACILITIES[f].name, sold: false });
       } else if (!nextExpand) items.push({ kind: 'fac', fac: null, price: 0, name: T('market.facSoldOut'), sold: true });
       if (Object.keys(vehW).length && this.rng.next() < 0.5) { const f = this.rng.weighted(vehW); items.push({ kind: 'fac', fac: f, price: Math.round(D.FACILITIES[f].price * mult * R.facilityPriceMult), name: D.FACILITIES[f].name, sold: false }); }
-      if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3) { const cands = Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !this.customers[k]); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: T('market.newCustomer', { name: M.CUSTOMERS[k].name }), sold: false }); } }
+      if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3 + this.repTier * 0.12) { const cands = this.openCustomers(); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: T('market.newCustomer', { name: M.CUSTOMERS[k].name }), sold: false }); } }
       if (this.rng.next() < 0.6) { const k = this.rng.pick(Object.keys(M.INS_ITEMS)); items.push({ kind: 'item', item: k, price: Math.round(M.INS_ITEMS[k].price * mult), name: M.INS_ITEMS[k].name, sold: false }); }
       return items;
     }

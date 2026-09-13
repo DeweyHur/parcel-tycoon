@@ -167,6 +167,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
     const sum = await page.evaluate(() => document.querySelector('#modal').textContent);
     ok('정산에 이번 달 순익 헤드라인', /순익/.test(sum));
     ok('정산에 평판 줄', /평판/.test(sum) && !/스트레스/.test(sum));
+    ok('무사고 정산이면 등급 상승 표시', !/등급이 올랐습니다/.test(sum) || /⭐/.test(sum), (sum.match(/⭐[^·]{0,30}/) || ['(등급 상승 없음)'])[0].trim());
     ok('정산에 턴 표기 없음', !/\d턴/.test(sum));
     await page.click('.foot .btn.primary', { force: true }); await page.waitForTimeout(800);
   }
@@ -181,6 +182,14 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('다음 사이클 시작', cur.m === 2 && cur.phase === 'play', JSON.stringify(cur));
   const hud2 = await page.evaluate(() => document.querySelector('#hud-month').textContent);
   ok('두 번째 사이클은 3월 후반', /3월/.test(hud2), hud2.trim());
+
+  // ---------- 9.5 고객 화면: 평판 등급으로 열리는 고객 ----------
+  await page.click('#cust-btn', { force: true }); await page.waitForTimeout(400);
+  const cust = await page.evaluate(() => document.querySelector('#modal').textContent);
+  ok('고객 화면에 아직 안 온 고객', /아직 오지 않은 고객/.test(cust));
+  ok('잠긴 고객에 필요한 등급 표시', /(동네 소문|구내 유명|시내 최고) 등급부터/.test(cust), (cust.match(/[^·\n]{2,10} 등급부터/) || [''])[0].trim());
+  await shot('09-customers');
+  await page.click('.foot .btn', { force: true }); await page.waitForTimeout(300);
 
   // ---------- 10. 달력 화면 ----------
   await page.click('#hud-month', { force: true }); await page.waitForTimeout(400);

@@ -702,7 +702,7 @@
     const state = `${sec('State')}<div class="kv">
       <span>${T('sum.callsWaits')}</span><span class="v">${T('fmt.calls', { n: s.calls })} / ${T('fmt.calls', { n: s.waits })}</span>
       <span>${T('sum.delivered')}</span><span class="v">${T('fmt.count', { n: s.delivered })}</span>
-      <span>${T('sum.rep')}</span><span class="v ${s.rep <= s.repCap * 0.45 ? 'bad' : ''}">${s.rep}/${s.repCap} <small>${esc(T('rep.tier.' + s.repTier))}${s.repDelta ? ` · ${s.repDelta > 0 ? '+' : ''}${s.repDelta}` : ''}</small></span>
+      <span>${T('sum.rep')}</span><span class="v ${s.rep <= s.repCap * 0.45 ? 'bad' : ''}">${s.rep}/${s.repCap} <small>${esc(T('rep.tier.' + s.repTier))}${s.repDelta ? ` · ${s.repDelta > 0 ? '+' : ''}${s.repDelta}` : ''}</small>${s.repTierUp ? `<br><small style="color:var(--gold)">${T('sum.repTierUp')}</small>` : ''}</span>
       <span>${T('sum.usage')}</span><span class="v">${T('sum.usageVal', { pct: s.usage, n: s.left })}</span>
       ${s.overdueVol ? `<span>${T('sum.overdueVol')}</span><span class="v bad">${T('fmt.cells', { n: s.overdueVol })}</span>` : ''}
       ${bad === 0 && R.winMaxDiscard != null ? `<span>${T('sum.discarded')}</span><span class="v">${T('sum.runDiscard', { n: game.run.discarded, max: R.winMaxDiscard })}</span>` : ''}
@@ -902,8 +902,17 @@
     m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.ins; if (id === g.insurer) return; if (g.phase !== 'market') { toast(T('ins.marketOnly')); return; } if (g.rules.noInsurance && g.month < 2) { toast(T('err.startupNoInsurance'), 2500); return; } askConfirm(T('ins.confirm', { name: M.INSURERS[id].name, fee: g.premiumBase(id) }), () => { const r = g.setInsurer(id); if (!r.ok) toast(r.msg); else { SFX.buy(); saveGame(); } showInsurance(back); }, T('ins.join'), () => showInsurance(back)); });
   }
   function showCustomers(back) {
-    const list = game.customerSummary();
-    const body = `<div class="perk-count">${T('cust.rules')}</div>` + list.map(customerCard).join('');
+    const g = game, list = g.customerSummary();
+    // 아직 안 온 고객은 '어느 등급부터 찾아오는지'를 보여 준다 — 평판을 키울 이유가 눈에 보여야 한다
+    const have = list.map(c => c.id);
+    const soon = Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !have.includes(k))
+      .map(k => ({ k, tier: M.CUSTOMERS[k].repTier || 0 }))
+      .sort((a, b) => a.tier - b.tier || a.k.localeCompare(b.k));
+    const soonRows = soon.length ? `<div class="perk-count" style="margin-top:10px">${T('cust.locked')}</div>` + soon.map(({ k, tier }) => {
+      const cu = M.CUSTOMERS[k], open = tier <= g.repTier;
+      return `<div class="d" style="opacity:${open ? 1 : 0.55}">${cu.icon} ${esc(cu.name)} — ${open ? T('cust.openNow') : T('cust.needTier', { name: T('rep.tier.' + D.REP_TIERS[tier].id) })}</div>`;
+    }).join('') : '';
+    const body = `<div class="perk-count">${T('cust.rules')}</div>` + list.map(customerCard).join('') + soonRows;
     modal(T('company.customers'), body, [{ label: T('btn.close'), onClick: back }]);
   }
 

@@ -11,31 +11,31 @@
   const CUSTOMER_BONUS = [0, 5, 10, 15, 20, 25];
   const CUSTOMERS = {
     anon:    { icon: '📦', items: null, sizeBias: null, rule: null, claimMult: 1.0, perks: {} },
-    dawn:    { icon: '🌙', items: { fresh: 70, normal: 30 }, sizeBias: 'small', claimMult: 1.5,
+    dawn:    { repTier: 1, icon: '🌙', items: { fresh: 70, normal: 30 }, sizeBias: 'small', claimMult: 1.5,
       rule: { kind: 'sameTurn', bonus: 20 },
       perks: { 2: { cold: 2 }, 3: { deadlineDelta: 1 } } },
-    mart:    { icon: '🛒', items: { normal: 60, fresh: 20, fragile: 20 }, sizeBias: null, claimMult: 1.0,
+    mart:    { repTier: 0, icon: '🛒', items: { normal: 60, fresh: 20, fragile: 20 }, sizeBias: null, claimMult: 1.0,
       rule: { kind: 'bundle', min: 3, mult: 1.1 },
       perks: { 2: { carrierCap: { bulk: 1 } }, 3: { rewardDelta: 5 } } },
-    glass:   { icon: '🏺', items: { fragile: 80, normal: 20 }, sizeBias: 'mid', claimMult: 2.0,
+    glass:   { repTier: 0, icon: '🏺', items: { fragile: 80, normal: 20 }, sizeBias: 'mid', claimMult: 2.0,
       rule: { kind: 'streak', n: 5, bonus: 30 },
       perks: { 2: { breakMult: 0.5 }, 3: { bonusDelta: 10 } } },
-    import:  { icon: '🛃', items: { intl: 70, fragile: 15, large: 15 }, sizeBias: null, claimMult: 1.2,
+    import:  { repTier: 2, icon: '🛃', items: { intl: 70, fragile: 15, large: 15 }, sizeBias: null, claimMult: 1.2,
       rule: { kind: 'customsFast', delta: -1 },
       perks: { 2: { marketWeight: { intl: 2 } }, 3: { bonusDelta: 15 } } },
-    factory: { icon: '🪑', items: { large: 80, normal: 20 }, sizeBias: 'big', claimMult: 1.3,
+    factory: { repTier: 2, icon: '🪑', items: { large: 80, normal: 20 }, sizeBias: 'big', claimMult: 1.3,
       rule: { kind: 'sameArrival', bonus: 25 },
       perks: { 2: { xl: 1 }, 3: { bigSizeDelta: -1 } } },
-    ice:     { icon: '❆', items: { frozen: 90, fresh: 10 }, sizeBias: null, claimMult: 1.8,
+    ice:     { repTier: 2, icon: '❆', items: { frozen: 90, fresh: 10 }, sizeBias: null, claimMult: 1.8,
       rule: { kind: 'frozenSafe', bonus: 15 },
       perks: { 2: { facilityPrice: { freezer1: 0.5 } }, 3: { deadlineDelta: 2 } } },
-    luxury:  { icon: '💎', items: { intl: 50, intlfragile: 50 }, sizeBias: 'small', claimMult: 2.0,
+    luxury:  { repTier: 3, icon: '💎', items: { intl: 50, intlfragile: 50 }, sizeBias: 'small', claimMult: 2.0,
       rule: { kind: 'secure', bonus: 20 },
       perks: { 2: { marketWeight: { air: 2 } }, 3: { customsDelta: -1 } } },
-    farm:    { icon: '🌾', items: { produce: 80, normal: 20 }, sizeBias: null, claimMult: 1.2,
+    farm:    { repTier: 1, icon: '🌾', items: { produce: 80, normal: 20 }, sizeBias: null, claimMult: 1.2,
       rule: { kind: 'harvest', bonus: 15 },
       perks: { 2: { facilityPrice: { vent: 0.5 } }, 3: { deadlineDelta: 1 } } },
-    mover:   { icon: '🚚', items: null, storage: true, sizeBias: null, claimMult: 2.0, rule: null, perks: { 2: { storageFee: 0.2 }, 3: { storageVolDelta: -2 } } },
+    mover:   { repTier: 1, icon: '🚚', items: null, storage: true, sizeBias: null, claimMult: 2.0, rule: null, perks: { 2: { storageFee: 0.2 }, 3: { storageVolDelta: -2 } } },
   };
   // 보관 계약 종류 (docs/CUSTOMER_DESIGN.md 3장)
   const STORAGE_KINDS = {
@@ -76,6 +76,7 @@
   // 복합 품목: 종류 + 추가 속성
   const CUSTOMER_ITEMS = { intlfragile: { type: 'intl', attrs: ['customs', 'fragile'], sizes: [1, 2] } };
   const CUSTOMER_SLOTS = 4; // 익명 제외 고객 최대 수
+  // repTier: 이 평판 등급부터 마켓에 찾아온다 (0 무명 · 1 동네 소문 · 2 구내 유명 · 3 시내 최고)
   // 난이도 (docs/CARRIER_CAPABILITY_DESIGN.md 4장): 시나리오 규칙 위에 곱해지는 얇은 층
   const DIFFICULTIES = {
     rookie:  { icon: '🌱', mods: { arrivalsMult: 0.85, opCostDelta: -20, feeMult: 0.8, itemPriceMult: 0.9, contractPriceMult: 0.9, facilityPriceMult: 0.9, theftMult: 0.5, breakMult: 0.5, claimMult: 0.5, upcomingTurns: 3, gameoverStress: 24, scoreMult: 0.7, noDualAttrs: true }, unlock: null },
