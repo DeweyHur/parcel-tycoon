@@ -229,7 +229,7 @@
       const caps = g.contractCaps(c), fee = g.truckFee(c), simul = g.simulMax(c), eligVol = elig.reduce((s, p) => s + p.size, 0);
       const pd = g.trustPerk(c.carrier, 'delay'), delay = pd != null ? pd : (car.delay || 0);
       btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${caps.length ? ` <small>${attrIcons(caps)}</small>` : ''}</span><span class="calls ${c.calls === 0 ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : spare ? T('hud.spare') : T('fmt.trucks', { n: c.calls })}</span></div>
-        <div class="sub">${T('hud.contractSub', { cap: vcap, fee, elig: elig.length, vol: eligVol })}${simul > 1 ? ` · ×${simul}` : ''}${delay ? ` · ⏱${delay}` : ''}${c.enh.regular && !c.freeUsedMonth ? ` · ${T('hud.regular')}` : ''} ${trustBar(g, c.carrier)}</div>`;
+        <div class="sub">${T('hud.contractSub', { cap: vcap, fee, elig: elig.length, vol: Math.min(eligVol, vcap), more: eligVol > vcap ? '+' : '' })}${simul > 1 ? ` · ×${simul}` : ''}${delay ? ` · ⏱${delay}` : ''}${c.enh.regular && !c.freeUsedMonth ? ` · ${T('hud.regular')}` : ''} ${trustBar(g, c.carrier)}</div>`;
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
     const f = g.forecast();
