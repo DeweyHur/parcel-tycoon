@@ -1,6 +1,8 @@
 // 인수인계(대본) UI 스모크: 타이틀 → 새 런 권유 → 인수인계 → 3개월차까지 진행.
 // 게이트·마켓 안내(충전/한도/갈아타기)·2대 동시 호출 비트가 실제 화면에서 나오는지 확인한다.
 // node test/tutorial-ui.js  (http://localhost:8765 필요)
+// 6사이클(72턴)을 UI로 끝까지 돌면 10분쯤 걸린다. 빠르게 볼 때는 CYCLES=2 node test/tutorial-ui.js
+const CYCLES = +process.env.CYCLES || 6;
 const { chromium } = require('playwright');
 const fs = require('fs');
 (async () => {
@@ -61,7 +63,7 @@ const fs = require('fs');
   while (guard++ < 500) {
     const st = await page.evaluate(() => ({ phase: PT.game.phase, m: PT.game.month, t: PT.game.turn, seen: PT.game.story.seen.slice() }));
     if (st.phase === 'over' || st.phase === 'win') { console.log('run ended', st.phase, st.m); break; }
-    if (st.m > 6 || st.phase === 'win') { console.log('인수인계(분기 6사이클) 완료'); break; }
+    if (st.m > CYCLES || st.phase === 'win') { console.log(`인수인계 ${CYCLES}사이클 완료`); break; }
     await readBeat();
     if (await passGate()) continue;
     if (st.phase === 'weekend') { await page.click('.wkopts .wkc:not([disabled])', { force: true }); await page.waitForTimeout(600); await readBeat(); continue; }
