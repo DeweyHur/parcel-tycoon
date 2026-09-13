@@ -8,3 +8,7 @@ push.log
 
 # Claude 데스크톱이 대화 파일을 떨구는 폴더
 Claude outputs/
+
+# Suno wav 원본(라이선스 증빙용 마스터) — 용량이 커서 git 에는 두지 않는다.
+# 지문은 docs/MUSIC_MANIFEST.md 에 남고, 파일은 로컬·백업에 보관한다.
+audio-src/*.wav
