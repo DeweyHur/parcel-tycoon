@@ -197,7 +197,7 @@
     'title.sub': 'Let them pile up, then send one full truck',
     'title.goal': 'Take over in March, survive to next February',
     'title.continue': 'Continue',
-    'fmt.monthTurn': 'Month {m}, turn {t}',
+    'fmt.monthTurn': 'Month {m} · day {t}/{max}',
     'title.new': 'New Run',
     'title.codex': 'Codex',
     'title.codexSub': '{a}/{b} unlocked · achievements {c}/{d}',

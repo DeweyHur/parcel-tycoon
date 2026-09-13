@@ -198,7 +198,7 @@
     'title.sub': '쌓아뒀다가, 트럭을 꽉 채워 보낸다',
     'title.goal': '3월에 인수해서 내년 2월까지 · 1년 버티기',
     'title.continue': '이어하기',
-    'fmt.monthTurn': '{m}개월차 · {t}/10',
+    'fmt.monthTurn': '{m}개월차 · {t}/{max}',
     'title.new': '새 런 시작',
     'title.codex': '도감',
     'title.codexSub': '{a}/{b} 해금 · 도전과제 {c}/{d}',
