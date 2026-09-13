@@ -67,6 +67,16 @@
   // 고객이 붙은 택배 하나 (없으면 아무거나) — 상세 팝업으로 안내할 대상
   const namedParcel = g => g.parcels.find(p => p.customer && p.customer !== 'anon') || g.parcels[0] || null;
   const hasEvent = (ctx, types) => (ctx.events || []).some(e => types.includes(e.type));
+  // 마켓 카드 id (ui.js 가 같은 키로 카드에 id 를 붙인다) — 대본 마켓이라 무엇이 나올지 알고 짚어 줄 수 있다
+  const mkKey = it => it.kind + '-' + (it.carrier || it.enh || it.fac || it.item || it.customer || '');
+  const mkItem = (g, f) => ((g.market && g.market.items) || []).find(it => !it.sold && f(it));
+  const cardSel = (g, f) => { const it = mkItem(g, f); return it ? '#mk-card-' + mkKey(it) : null; };
+  // 충전 카드가 나와 있는 계약 중 배차가 가장 적게 남은 것
+  const refillSlot = g => { let best = null; (g.contracts || []).forEach((c, slot) => { if (!c || !mkItem(g, x => x.kind === 'refill' && x.contractId === c.id)) return; if (!best || c.calls < best.c.calls) best = { c, slot }; }); return best; };
+  const limitItem = g => mkItem(g, it => it.kind === 'enh' && /^limit/.test(it.enh));
+  const switchItem = g => mkItem(g, it => it.kind === 'contract' && it.switchFrom);
+  // 배차가 바닥난 계약(보낼 택배는 있는데 차를 못 부르는 상태)
+  const outOfCalls = g => (g.contracts || []).find(c => c && c.calls === 0 && g.eligibleParcels(c).length > 0);
 
   const BEATS = [
     // ----- 3월 (1개월차): 창고 -----
@@ -77,10 +87,14 @@
     { id: 'callReady', months: [1], kind: 'turn', when: g => g.turn >= 3 || bestReadySlot(g).fill >= 0.8, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     // 호출 팝업 안: 자동 선택 버튼 → 호출 버튼. 팝업이 다시 그려질 때마다 ctx.sel(선택 수)로 확인한다
     { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
+    // 차가 두 대 붙는 첫 순간. 자동으로 붙는 거라 설명이 없으면 배차가 왜 2대 줄었는지 모른다 (대본 1개월차 8턴에 정확히 12칸이 온다)
+    { id: 'trucks2', months: [1, 2, 3], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'smile', hl: '#modal .truckgauge' }] },
     { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#pick-list' }, { expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
     // 안내가 끝났다는 걸 말로 못 박아 준다. 이게 없으면 언제까지 시키는 대로 해야 하는지 알 수 없다.
     { id: 'handOff', months: [1], kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile' }] },
+    // 배차 소진: 이 게임에서 제일 많이 막히는 지점 — 배차는 월초에 안 채워진다
+    { id: 'callsOut', months: [1, 2, 3], kind: 'turn', when: g => !!outOfCalls(g), pages: [{ expr: 'worry', hl: '#actions' }, { expr: 'neutral' }] },
     { id: 'deadline1', months: [1, 2, 3], kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1 && !(p.customs > 0)), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'usage76', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.76, pages: [{ expr: 'worry', hl: '#bar-usage' }, { expr: 'neutral', hl: '#upcoming' }] },
     { id: 'usage91', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.91, pages: [{ expr: 'shock', hl: '#bar-usage' }] },
@@ -99,6 +113,10 @@
     { id: 'cash', months: [2, 3], kind: 'turn', when: g => g.projectedCash().total < 0 || g.debt > 0, pages: [{ expr: 'think', hl: '#hud-left' }, { expr: 'worry' }] },
     { id: 'summary2', months: [2], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }] },
     { id: 'market2', months: [2], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
+    // ----- 마켓: 배차를 늘리는 세 가지 (충전 · 한도 강화 · 상위 센터) -----
+    { id: 'marketRefill', months: [1, 2, 3], kind: 'market', when: g => !!refillSlot(g), pages: [{ expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; } }, { expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; }, gate: g => { const r = refillSlot(g); return !!r && r.c.calls === 0; } }] },
+    { id: 'marketLimit', months: [1, 2, 3], kind: 'market', when: g => !!limitItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'enh' && /^limit/.test(it.enh)) }] },
+    { id: 'marketSwitch', months: [2, 3], kind: 'market', when: g => !!switchItem(g), pages: [{ expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'contract' && it.switchFrom) }, { expr: 'think' }] },
     // ----- 5월 (3개월차): 손실, 승리, 작별 -----
     { id: 'm3', months: [3], kind: 'turn', when: g => g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'fragileRisk', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => attrsOf(g, p).includes('fragile')) && !g.contracts.some(c => c && g.contractCaps(c).includes('fragile')), pages: [{ expr: 'neutral', hl: '#parcels' }] },
@@ -113,6 +131,14 @@
     { id: 'farewell', months: [4], kind: 'turn', when: g => g.turn === 1, calendar: true, pages: [{ expr: 'smile' }, { expr: 'neutral' }, { expr: 'laugh' }] },
   ];
 
+  // 마켓 비트 자리표시자 — 대본 마켓이라 가격까지 말해 줄 수 있다
+  function refillParams(g) { const r = refillSlot(g); if (!r) return { refillName: '', refillPrice: 0, refillMax: 0, refillLeft: 0 }; const it = mkItem(g, x => x.kind === 'refill' && x.contractId === r.c.id); return { refillName: g.contractName(r.c), refillPrice: it ? it.price : 0, refillMax: r.c.maxCalls, refillLeft: r.c.calls }; }
+  function limitParams(g) { const it = limitItem(g); if (!it) return { limitName: '', limitPrice: 0, limitN: 0 }; return { limitName: it.name, limitPrice: it.price, limitN: root.DATA.ENHANCEMENTS[it.enh].value }; }
+  function switchParams(g) {
+    const it = switchItem(g); if (!it) return { switchName: '', switchPrice: 0, switchFrom: '', switchTrucks: 0, switchCap: 0 };
+    const from = g.contracts.find(c => c && c.id === it.switchFrom), car = root.DATA.CARRIERS[it.carrier];
+    return { switchName: it.name, switchPrice: g.contractPrice(it), switchFrom: from ? g.contractName(from) : '', switchTrucks: car.trucks, switchCap: car.cap, switchLeft: from ? from.calls : 0 };
+  }
   // 문구 자리표시자
   function params(g, ctx) {
     const bulk = g.contracts.find(c => c && (root.DATA.CARRIERS[c.carrier].onlyPlain)) || g.contracts.find(Boolean);
@@ -123,7 +149,9 @@
       openName: oc ? g.contractName(oc) : '', openCap: oc ? g.vehicleCap(oc) : cap, openFee: oc ? g.truckFee(oc) : fee,
       openVol: oc ? g.eligibleParcels(oc).reduce((s2, p) => s2 + p.size, 0) : 0, openSimul: oc ? g.simulMax(oc) : 1, openCalls: oc ? oc.calls : 0,
       cash: g.cash, projected: g.projectedCash().total, outdoor: g.outdoorVolume(), rent: g.opCostBreakdown(g.month).rent, months: g.rules.months, cal: g.calMonth(), startCal: g.calMonth(1), lastCal: g.calMonth(g.rules.months),
-      delivered: g.run.delivered, returned: g.stats.returned + g.stats.stolen + g.stats.broken, full: g.stats.fullTrucks, fee2: fee, interest: Math.round(root.DATA.LOAN.interest * 100) };
+      delivered: g.run.delivered, returned: g.stats.returned + g.stats.stolen + g.stats.broken, full: g.stats.fullTrucks, fee2: fee, interest: Math.round(root.DATA.LOAN.interest * 100),
+      trucks: (ctx && ctx.trucks) || 1, vol: (ctx && ctx.vol) || 0, callFee: oc ? g.callFee(oc, (ctx && ctx.trucks) || 1) : fee,
+      ...refillParams(g), ...limitParams(g), ...switchParams(g), outName: (outOfCalls(g) && g.contractName(outOfCalls(g))) || '' };
   }
 
   // 지금 보여줄 비트. ctx = { kind, events?, result? }. 되돌리지 않는다: 반환한 비트는 seen 에 기록된다
@@ -165,6 +193,6 @@
   function done(g) { return !!(g && g.story && g.story.seen.includes('farewell')); }
   function active(g) { return !!(g && g.story && !g.story.off && !done(g)); }
 
-  const Story = { BEATS, SPRITES, REPS, CHARACTER, check, sms, done, active, sprite, repOf, repName, greet, bestSlot: bestReadySlot };
+  const Story = { BEATS, SPRITES, REPS, CHARACTER, check, sms, done, active, sprite, repOf, repName, greet, bestSlot: bestReadySlot, mkKey };
   if (typeof module !== 'undefined') module.exports = Story; else root.Story = Story;
 })(typeof window !== 'undefined' ? window : globalThis);

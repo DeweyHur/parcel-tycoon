@@ -37,13 +37,37 @@
     }
   }
 
+  // 조사 자동 선택: 문자열 안에 '{name}은/는' 처럼 써 두면 값의 받침에 맞춰 고른다.
+  // 계약·업체 이름이 데이터/번역에 따라 바뀌므로 '{name}은' 처럼 박아 두면 틀린다(한길 물류'은').
+  const JOSA = { '은/는': ['은', '는'], '이/가': ['이', '가'], '을/를': ['을', '를'], '과/와': ['과', '와'], '으로/로': ['으로', '로'] };
+  function hasBatchim(str) {
+    const s = String(str).replace(/<\/?[^<>]*>/g, '').replace(/[)\]}'"\s]+$/, '');
+    const c = s.charCodeAt(s.length - 1);
+    if (c >= 0xac00 && c <= 0xd7a3) return (c - 0xac00) % 28 !== 0;     // 한글: 종성 유무
+    if (c >= 48 && c <= 57) return '2459'.indexOf(s[s.length - 1]) < 0; // 숫자: 이·사·오·구만 받침 없음
+    return true;                                                        // 그 밖(영문·기호)은 받침 있는 쪽으로
+  }
+  function pickJosa(pair, v) {
+    const f = JOSA[pair];
+    if (!f) return pair;
+    if (pair === '으로/로') {              // ㄹ 받침은 '로' (철도로, 서울로)
+      const s = String(v);
+      const c = s.charCodeAt(s.length - 1);
+      const jong = (c >= 0xac00 && c <= 0xd7a3) ? (c - 0xac00) % 28 : -1;
+      return (jong === 0 || jong === 8) ? '로' : '으로';
+    }
+    return hasBatchim(v) ? f[0] : f[1];
+  }
+
   function format(str, p) {
     if (!p) return str;
-    return str.replace(/\{(\w+)(?::([^{}|]*)\|([^{}]*))?\}/g, (m, key, one, other) => {
+    return str.replace(/\{(\w+)(?::([^{}|]*)\|([^{}]*))?\}(은\/는|이\/가|을\/를|과\/와|으로\/로)?/g, (m, key, one, other, josa) => {
       const v = p[key];
-      if (one !== undefined) return (v === 1 ? one : other).replace('#', v);
-      if (v === undefined || v === null) return m;
-      return typeof v === 'object' ? text(v) : String(v);
+      let out;
+      if (one !== undefined) out = (v === 1 ? one : other).replace('#', v);
+      else if (v === undefined || v === null) return m;
+      else out = typeof v === 'object' ? text(v) : String(v);
+      return josa ? out + pickJosa(josa, out) : out;
     });
   }
 

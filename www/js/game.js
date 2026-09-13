@@ -4,6 +4,7 @@
   const D = typeof module !== 'undefined' ? require('./data.js') : root.DATA;
   const M = typeof module !== 'undefined' ? require('./meta.js') : root.META;
   const I18n = typeof module !== 'undefined' ? require('./i18n.js').init(D, M) : root.I18n;
+  const TUT = typeof module !== 'undefined' ? require('./tutorial.js') : root.TUTORIAL;
   const T = I18n.t, MSG = I18n.msg; // T: 즉시 문자열, MSG: 로그용 메시지 객체 {k, p} (표시 시점에 번역)
 
   // ---------- RNG ----------
@@ -93,6 +94,8 @@
     constructor(cfg) {
       cfg = Object.assign({ scenario: 'standard', company: 'local', perks: [], variants: [], difficulty: 'normal' }, cfg || {});
       if (cfg.scenario === 'daily') cfg.difficulty = 'normal';
+      // 인수인계(대본) 런은 시드까지 고정 — 대본 밖 굴림(파손·도난·통관)도 매번 같아야 같은 환경이 재현된다
+      if (cfg.scripted && TUT) cfg.seed = TUT.SEED;
       if (cfg.seed == null) cfg.seed = Date.now() % 2147483647;
       this.cfg = cfg;
       this.seed = cfg.seed;
@@ -317,6 +320,19 @@
     // ----- 보관 계약 (3장) -----
     storageVol(s) { const d = M.CUSTOMERS[s.customer] && this.customerPerk(s.customer, 'storageVolDelta') || 0; return Math.max(1, s.vol + d); }
     storageVolume() { return this.storage.reduce((v, s) => v + this.storageVol(s), 0); }
+    // 대본 보관 제안: 종류·부피·기간이 고정 (무작위 제안은 대본 개월차에 나오지 않는다)
+    _scriptOffer(o) {
+      const R = this.rules, K = M.STORAGE_KINDS[o.kind];
+      if (this.offer || !K || this.storage.length >= R.storageMax) return;
+      const feeMult = R.storageFeeMult * (this.seasonMods().storageFeeMult || 1);
+      let fee = 0, perTurn = 0;
+      if (K.perVolTurn) fee = Math.round(o.vol * o.turns * K.perVolTurn * feeMult);
+      else if (K.perTurn) perTurn = Math.round(K.perTurn * feeMult);
+      else fee = Math.round(K.fee * feeMult);
+      this.offer = { id: this.nextId++, kind: o.kind, vol: o.vol, turns: o.turns, fee, perTurn, customer: o.customer || 'anon', expires: this.totalTurn + 1 };
+      this.say('log.storageOffer', { name: M.CUSTOMERS[this.offer.customer].name, kind: K.name, vol: o.vol, turns: o.turns, pay: fee ? MSG('log.storagePrepaid', { fee }) : MSG('log.storagePerTurn', { perTurn }) });
+      this.emit('offer', { offer: this.offer });
+    }
     _maybeOffer(force) {
       const R = this.rules;
       if (this.offer || this.storage.length >= R.storageMax) return;
@@ -390,6 +406,7 @@
     returnGraceFor(p) { const R = this.rules; return Math.max(1, (this._attrs(p).includes('cold') ? R.returnGraceFresh : R.returnGrace) + (this.seasonMods().returnGraceDelta || 0)); }
     season(m) { const R = this.rules; if (R.season) return R.season; const c = this.calMonth(m); return c >= 3 && c <= 5 ? 'spring' : c >= 6 && c <= 8 ? 'summer' : c >= 9 && c <= 11 ? 'autumn' : 'winter'; }
     _genWeather(m) {
+      const sc = this.script(m); if (sc && sc.weather) return sc.weather.slice();
       const R = this.rules, w = Object.assign({}, M.WEATHER_BY_SEASON[this.season(m)]);
       const cw = this.seasonMods(m).weather || {}; for (const k in cw) w[k] = (w[k] || (cw[k] > 1 ? 10 : 0)) * cw[k];
       for (const k in R.weatherWeights) w[k] = (w[k] || (R.weatherWeights[k] > 1 ? 10 : 0)) * R.weatherWeights[k];
@@ -640,6 +657,9 @@
     _customerExtra() { let n = 0; for (const id in this.customers) { const c = this.customers[id]; if (id === 'anon' || c.suspended) continue; n += (M.CUSTOMER_EXTRA[this.customerLevel(id)] || 0) * (c.slots || 1); } return n; }
     // 달력 컷 시나리오(성수기·폭염·데일리)는 monthOffset 만큼 뒤 개월차의 표(입고·품목·등급·가격)를 쓴다 — 11월 컷이 1개월차 물량으로 시작하면 싱겁다
     tableMonth(m) { return (m || this.month) + (this.rules.monthOffset || 0); }
+    // 튜토리얼 대본(1~3개월차). 「인수인계」로 시작한 런에서만 (docs/STORY_TUTORIAL_DESIGN.md 부록 I)
+    script(m) { if (!this.cfg.scripted || !TUT) return null; return TUT.months[m || this.month] || null; }
+    scripted() { return !!this.script(); }
     _extraArrivals(m) { const tm = this.tableMonth(m); return Math.round((tm <= 6 ? D.EXTRA_ARRIVALS[tm] : D.EXTRA_ARRIVALS[6] + (tm - 6) * 2) * this.seasonMods(m).arrivalsMult) + this._customerExtra(); }
     _typeRatio(m) {
       const R = this.rules, sm0 = m; m = this.tableMonth(m);
@@ -728,6 +748,8 @@
     }
     _makeSchedule(m) {
       const R = this.rules, turns = D.TURNS_PER_MONTH;
+      const sc = this.script(m);
+      if (sc) { this.burstTurns = []; return sc.turns.map(t => t.map(x => ({ ...x }))); }
       const sched = Array.from({ length: turns }, () => []);
       const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
       const gen = () => this._genParcelSpec(ratio, m, cw);
@@ -818,7 +840,9 @@
       this._assignCold();
       const xl = this.parcels.filter(p => p.baseSize >= 7).length; this.stats.maxXlSimul = Math.max(this.stats.maxXlSimul, xl);
       if (this.offer && this.offer.expires < this.totalTurn) { this.say('log.offerExpired'); this.offer = null; }
-      if (this.rules.storageOfferEvery && !this.offer && this.storage.length < this.rules.storageMax && (this.turn - 1) % this.rules.storageOfferEvery === 0) this._maybeOffer(true); else this._maybeOffer();
+      const _sc = this.script();
+      if (_sc) { const o = _sc.offer; if (o && this.turn === o.turn) this._scriptOffer(o); }
+      else if (this.rules.storageOfferEvery && !this.offer && this.storage.length < this.rules.storageMax && (this.turn - 1) % this.rules.storageOfferEvery === 0) this._maybeOffer(true); else this._maybeOffer();
       let note = '';
       const wx = this.weatherNow(); if (wx !== 'sunny') note = ` ${M.WEATHER[wx].icon}${M.WEATHER[wx].name}`;
       if (this.heatTurns.includes(this.turn)) note = MSG('log.heatAlert');
@@ -1171,8 +1195,39 @@
       for (const p of pseudo) { if (covers.some(c => this.canHandle(c, p) && this.breakProb(c, p) === 0)) continue; const a = acc[p.type] || (acc[p.type] = { type: p.type, volume: 0, count: 0, maxSize: 0 }); a.volume += p.size; a.count++; a.maxSize = Math.max(a.maxSize, p.size); }
       return Object.values(acc).sort((a, b) => b.volume - a.volume);
     }
+    // 계약마다 '가득 충전' 상시 카드 (배차는 소모품 — 정액이라 다 쓰고 충전하는 게 이득)
+    _refillItems() {
+      const items = [];
+      for (const c of this.contracts) if (c && c.calls < c.maxCalls) items.push({ kind: 'refill', contractId: c.id, carrier: c.carrier, standing: true, sold: false, price: this.refillPrice(c), name: T('market.refillName', { name: this.contractName(c) }) });
+      return items;
+    }
+    // 대본 마켓: 무엇이 나올지까지 고정한다 — 배차를 늘리는 세 가지(충전·한도 강화·상위 센터)를 한 화면에서 보여 주기 위해
+    _scriptedMarketItems(spec) {
+      const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(m))] * R.itemPriceMult * R.priceMult;
+      const items = [];
+      for (const carrier of spec.contracts || []) {
+        const car = D.CARRIERS[carrier];
+        if (!car || this.contracts.some(c => c && c.carrier === carrier)) continue;
+        const own = this.contracts.find(c => c && FAM(c.carrier) === car.family);
+        if (own && D.CARRIERS[own.carrier].tier >= car.tier) continue;   // 이미 같거나 더 위면 안 내놓는다
+        items.push({ kind: 'contract', carrier, grade: car.grade, price: Math.round(car.price * R.priceMult), name: car.name, sold: false,
+          hint: own ? T('market.switchHint', { name: D.CARRIERS[own.carrier].name }) : null, switchFrom: own ? own.id : null });
+      }
+      items.push(...this._refillItems());
+      for (const e of spec.enh || []) if (D.ENHANCEMENTS[e]) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });
+      for (const f of spec.fac || []) {
+        const F = D.FACILITIES[f]; if (!F || this.warehouse[f]) continue;
+        if (F.requires && !this.warehouse[F.requires]) continue;
+        items.push({ kind: 'fac', fac: f, standing: true, price: Math.round(F.price * mult * R.facilityPriceMult), name: F.name, sold: false });
+      }
+      for (const k of spec.item || []) if (M.INS_ITEMS[k]) items.push({ kind: 'item', item: k, price: Math.round(M.INS_ITEMS[k].price * mult), name: M.INS_ITEMS[k].name, sold: false });
+      for (const k of spec.customer || []) if (M.CUSTOMERS[k] && !this.customers[k]) items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: T('market.newCustomer', { name: M.CUSTOMERS[k].name }), sold: false });
+      return items;
+    }
     _genMarketItems() {
       const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(m))] * R.itemPriceMult * R.priceMult;
+      const sc = this.script(m);
+      if (sc && sc.market) return this._scriptedMarketItems(sc.market);
       const items = [];
       const gp = this._gradeProb(m);
       const weights = this._carrierWeights(); // 계열 가중치
@@ -1208,7 +1263,7 @@
         items.push({ kind: 'contract', carrier, grade, price: Math.round(car.price * R.priceMult), name: car.name, sold: false, hint: f && f.hint || (own ? T('market.switchHint', { name: D.CARRIERS[own.carrier].name }) : null), switchFrom: own ? own.id : null });
       }
       // 상시 배차 충전: 배차가 빈 계약마다 '가득 충전' 카드. 정액이라 다 쓰지 않고 충전하면 그만큼 손해
-      for (const c of this.contracts) if (c && c.calls < c.maxCalls) items.push({ kind: 'refill', contractId: c.id, carrier: c.carrier, standing: true, sold: false, price: this.refillPrice(c), name: T('market.refillName', { name: this.contractName(c) }) });
+      items.push(...this._refillItems());
       const enhW = {}; for (const k of Object.keys(D.ENHANCEMENTS)) enhW[k] = R.marketWeight[k] || 1;
       const picked = []; for (let i = 0; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }
       for (const e of picked) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });

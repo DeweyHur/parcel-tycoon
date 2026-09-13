@@ -61,7 +61,7 @@
       ${save ? `<button class="btn primary" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(save.story ? T('title.story') : M.SCENARIOS[save.cfg.scenario] ? M.SCENARIOS[save.cfg.scenario].name : save.cfg.scenario)} · ${T('fmt.monthTurn', { m: save.month, t: save.turn })})</small></button>` : ''}
       <button class="btn ${P.story && P.story.seen ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${demoLocked() ? T('demo.storySub', { n: demoMonths() }) : T('title.storySub')}</small></button>
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
-      <button class="btn ${P.story && P.story.seen && !demoLocked() ? 'gold' : ''}" id="t-new">${demoLocked() ? '🔒 ' : ''}${T('title.new')}${demoLocked() ? ` <small style="color:var(--dim)">${T('demo.fullOnly')}</small>` : ''}</button>
+      <button class="btn ${P.story && P.story.seen && !demoLocked() ? 'gold' : ''}" id="t-new">${demoLocked() ? '🔒 ' : ''}${T('title.new')}${demoLocked() ? ` <small style="color:var(--dim)">${T('demo.fullOnly')}</small>` : P.story && P.story.seen ? '' : ` <small style="color:var(--dim)">${T('title.newHint')}</small>`}</button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).length, d: Object.keys(M.ACHIEVEMENTS).length })}</small></button>
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
       <button class="btn" id="t-help">${T('title.help')}</button>
@@ -69,7 +69,7 @@
       <button class="btn" id="t-lang">${T('opt.lang')}: ${I18n.languages().map(l => l.id === I18n.lang ? `<b>${esc(l.name)}</b>` : esc(l.name)).join(' / ')}</button></div>`;
     const m = modal(T('title.modal'), body, null, 'v0.3 meta');
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
-    m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort')); return; } showScenarioSelect(); };
+    m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort')); return; } if (!(P.story && P.story.seen)) { suggestStory(); return; } showScenarioSelect(); };
     m.querySelector('#t-story').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-story').click(); }, T('title.newShort')); return; } showStoryStart(); };
     const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex('companies', showTitle); };
@@ -110,11 +110,17 @@
   }
 
   // ---------- 인수인계 (스토리 모드): 표준 한 해 · 동네 택배 · 퍽 없음 · 난이도만 고른다 ----------
+  // 인수인계를 한 번도 안 해 본 프로필이 '새 런'을 누르면: 막지는 않되 인수인계를 먼저 권한다
+  function suggestStory() {
+    const face = `<img src="${Story.SPRITES.smile}" width="64" height="64" style="image-rendering:pixelated;float:left;margin:0 10px 6px 0">`;
+    modal(T('title.tutorAsk'), `<p>${face}${T('title.tutorBody')}</p><div style="clear:both"></div>`,
+      [{ label: T('title.tutorSkip'), onClick: () => showScenarioSelect() }, { label: T('title.tutorGo'), cls: 'primary', onClick: () => showStoryStart() }]);
+  }
   let storyDiff = 'rookie';
   function showStoryStart() {
     const diffRow = `<div class="diffrow">${['rookie', 'normal'].map(id => { const d = M.DIFFICULTIES[id]; return `<button class="btn small ${storyDiff === id ? 'on' : ''}" data-diff="${id}" title="${esc(d.desc)}">${d.icon} ${d.name}</button>`; }).join('')}</div><div class="d" style="font-size:11px;color:var(--dim);margin-bottom:6px">${esc(M.DIFFICULTIES[storyDiff].desc)}</div>`;
     const face = `<img src="${Story.SPRITES.smile}" style="width:64px;height:64px;image-rendering:pixelated;float:left;margin:0 10px 6px 0;border:3px solid var(--line);background:#3a3555">`;
-    const m = modal(T('story.startTitle'), `<p>${face}${T('story.startBody')}</p><div style="clear:both"></div><div class="perk-count">${T('story.diffAsk')}</div>${diffRow}`, [{ label: T('btn.back'), onClick: showTitle }, { label: T('story.start'), cls: 'primary', onClick: () => withHowTo(() => { game = new Game({ scenario: 'standard', company: 'local', perks: [], insurer: 'none', difficulty: storyDiff, story: true, prep: false, demoMonths: demoLocked() ? demoMonths() : 0 }); closeModal(); startPlay(); }) }]);
+    const m = modal(T('story.startTitle'), `<p>${face}${T('story.startBody')}</p><div style="clear:both"></div><div class="perk-count">${T('story.diffAsk')}</div>${diffRow}`, [{ label: T('btn.back'), onClick: showTitle }, { label: T('story.start'), cls: 'primary', onClick: () => withHowTo(() => { game = new Game({ scenario: 'standard', company: 'local', perks: [], insurer: 'none', difficulty: storyDiff, story: true, scripted: true, prep: false, demoMonths: demoLocked() ? demoMonths() : 0 }); closeModal(); startPlay(); }) }]);
     m.querySelectorAll('[data-diff]').forEach(el => el.onclick = () => { SFX.select(); storyDiff = el.dataset.diff; showStoryStart(); });
   }
 
@@ -538,7 +544,7 @@
         SFX.select(); render();
       };
       m.querySelector('#pick-clear').onclick = () => { sel.clear(); autoTrimmed = false; SFX.cancel(); render(); };
-      storyCheck({ kind: 'modal', modal: 'call', sel: sel.size, elig: elig.length, slot: i });
+      storyCheck({ kind: 'modal', modal: 'call', sel: sel.size, elig: elig.length, slot: i, trucks, vol });
     };
     render();
   }
@@ -686,7 +692,7 @@
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
         else if (it.kind === 'fac') { const F = it.fac && D.FACILITIES[it.fac]; let prev = ''; if (F) { if (F.cap) prev = `${T('common.warehouse')} ${game.warehouse.cap} → ${game.warehouse.cap + Math.round(F.cap * R.facilityCapMult)}`; else if (F.cold) prev = `${D.ATTRS.cold.name} ${game.warehouse.cold} → ${Math.min(R.coldCapMax == null ? 99 : R.coldCapMax, game.warehouse.cold + F.cold)}`; else if (F.xl) prev = `${T('common.xl')} ${game.warehouse.xl} → ${game.warehouse.xl + F.xl}`; else if (F.frozen) prev = `${D.ATTRS.frozen.name} ${game.warehouse.frozen || 0} → ${(game.warehouse.frozen || 0) + F.frozen}`; } desc = F ? F.desc + (prev ? `<br><span style="color:var(--green)">${T('mk.afterBuy')} ${prev}</span>` : '') : T('mk.allFacilities'); }
-        return `<div class="card ${it.sold ? 'sold' : ''}" data-i="${i}"><div class="t"><span>${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
+        return `<div class="card ${it.sold ? 'sold' : ''}" id="mk-card-${Story.mkKey(it)}" data-i="${i}"><div class="t"><span>${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
       });
       // 종류별로 묶어 준다 — 12장이 한 줄로 늘어서면 뭘 비교하는지 알 수 없다
       const ORDER = ['contract', 'enh', 'fac', 'customer', 'item'];
@@ -696,7 +702,7 @@
         if (!c) return `<div class="card dis" style="cursor:default"><div class="t">${T('my.slot', { n: si + 1 })} · ${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>`;
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
         return `<div class="card" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${T('my.remain', { calls: c.calls, max: c.maxCalls })}</span></div>
-          <div class="crow"><span class="d">${T('fmt.cells', { n: game.baseCapacity(c) })} ${trustBar(game, c.carrier)}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
+          <div class="crow"><span class="d">${T('fmt.cells', { n: game.baseCapacity(c) })} ${trustBar(game, c.carrier)}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
       }).join('') + '<hr>';
       const rc = game.refreshCost();
       const wh = game.warehouse, used = game.usedVolume(), outd = game.outdoorVolume();
@@ -714,7 +720,7 @@
       const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: mk.month }), body, [{ label: T('mk.startMonth', { n: mk.month + 1 }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(6, Math.max(1, mk.month))] * R.itemPriceMult * R.priceMult).toFixed(2) }));
       const ft = m.querySelector('#mk-fctoggle'); if (ft) ft.onclick = () => { SFX.click(); fcOpen = !fcOpen; render(); };
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
-      if (!mk.storyShown) { mk.storyShown = true; storyCheck({ kind: 'market' }); }
+      storyCheck({ kind: 'market', bought: mk.bought });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
       m.querySelector('#mk-mine').onclick = () => { SFX.click(); showMyContracts(render); };
       m.querySelector('#mk-cust').onclick = () => { SFX.click(); showCustomers(render); };
       m.querySelector('#mk-ins').onclick = () => { SFX.click(); showInsurance(render); };
@@ -954,7 +960,7 @@
     if (!game || !window.Story || storyBusy) return;
     const beat = Story.check(game, ctx || { kind: 'turn' });
     if (!beat) return;
-    if (beat.id === 'intro') { const P = Profile.get(); P.story = Object.assign({}, P.story, { seen: true }); Profile.save(); }
+    if (beat.id === 'intro' || beat.id === 'farewell') { const P = Profile.get(); P.story = Object.assign({}, P.story, beat.id === 'farewell' ? { seen: true, done: true } : { seen: true }); Profile.save(); }
     saveGame();
     showStoryBeat(beat, () => { if ((depth || 0) < 1) storyCheck(ctx, (depth || 0) + 1); });
   }

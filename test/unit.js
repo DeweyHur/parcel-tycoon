@@ -220,8 +220,50 @@ t('달력: 1월은 인플레 한 단계를 건너뛴다, 12월은 반송 유예 
   assert.ok(Math.abs(g.inflation(12) - Math.pow(D.OPCOST_INFLATION, 10)) < 1e-9); // 2월: 1월이 한 단계를 건너뛰어 그대로 10단계
   g.month = 10; assert.equal(g.calMonth(), 12); assert.equal(g.returnGraceFor(P(1, 'normal', 1)), D.RETURN_GRACE - 1);
 });
-// ----- 스토리 모드 (docs/STORY_TUTORIAL_DESIGN.md 3·4장) -----
 const Story = require('../www/js/story.js'); globalThis.I18n = I18n; globalThis.DATA = D;
+// ----- 튜토리얼 대본 (docs/STORY_TUTORIAL_DESIGN.md 부록 I) -----
+const TUT = require('../www/js/tutorial.js');
+const TG = extra => new Game(Object.assign({ scenario: 'standard', company: 'local', perks: [], insurer: 'none', story: true, scripted: true }, extra || {}));
+t('대본: 인수인계 런은 시드가 고정이고 1~3개월차 입고·날씨가 대본 그대로', () => {
+  const g = TG(), g2 = TG({ difficulty: 'normal' });
+  assert.equal(g.seed, TUT.SEED); assert.equal(g2.seed, TUT.SEED);
+  const flat = x => x.map(t2 => t2.map(sp => sp.type + sp.size + sp.customer).join()).join('|');
+  assert.equal(flat(g.schedule), flat(TUT.months[1].turns));
+  assert.deepEqual(g.weather, TUT.months[1].weather);
+  assert.equal(flat(g.schedule), flat(g2.schedule), '난이도가 달라도 물류는 같다');
+});
+t('대본: 4개월차부터는 대본이 없다(무작위로 돌아간다)', () => {
+  const g = TG();
+  assert.ok(g.script(1) && g.script(3)); assert.equal(g.script(4), null);
+  const a = g._makeSchedule(4), b = g._makeSchedule(4);
+  assert.notDeepEqual(a.map(t2 => t2.length), TUT.months[1].turns.map(t2 => t2.length));
+  assert.ok(a.flat().length > 0 && b.flat().length > 0);
+});
+t('대본: 일반 런(인수인계가 아닌 안내 토글)은 대본을 쓰지 않는다', () => {
+  const g = new Game({ seed: 7, story: true });
+  assert.equal(g.script(1), null);
+});
+t('대본 마켓: 1개월차는 충전·한도 강화·창고 확장만(계약 카드 없음), 2개월차는 갈아타기 카드', () => {
+  const g = TG();
+  g.month = 1; g.contracts[0].calls = 2;
+  const m1 = g._genMarketItems();
+  assert.ok(m1.some(it => it.kind === 'refill') && m1.some(it => it.kind === 'enh' && it.enh === 'limit1') && m1.some(it => it.kind === 'fac' && it.fac === 'expand1'));
+  assert.ok(!m1.some(it => it.kind === 'contract'), '1개월차엔 계약 카드 없음');
+  g.month = 2;
+  const m2 = g._genMarketItems();
+  const sw = m2.find(it => it.kind === 'contract');
+  assert.ok(sw && sw.carrier === 'fragile1' && sw.switchFrom, '⚠ 상위 센터 갈아타기 카드');
+});
+t('대본: 배차 0 + 보낼 택배가 있으면 callsOut 비트', () => {
+  const g = TG();
+  const i = slot(g, 'fragile'), c = g.contracts[i];
+  g.story.seen = Story.BEATS.filter(b => !['callsOut'].includes(b.id)).map(b => b.id);
+  g.parcels = [P(90, 'fragile', 2)]; c.calls = 0;
+  const b = Story.check(g, { kind: 'turn' });
+  assert.ok(b && b.id === 'callsOut', b && b.id);
+  assert.ok(/조심조심|배차/.test(b.pages[0].text));
+});
+// ----- 스토리 모드 (docs/STORY_TUTORIAL_DESIGN.md 3·4장) -----
 t('스토리: cfg.story 가 있어야 비트가 나오고, 1개월차 1턴 시작에 intro, 같은 상황을 다시 물어도 한 번만', () => {
   assert.equal(Story.check(NG(1), { kind: 'start' }), null);
   const g = NG(1, { story: true }); const b = Story.check(g, { kind: 'start' });
