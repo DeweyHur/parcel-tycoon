@@ -20,7 +20,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
     else if (m.type() === 'error' && !/audio|font|mp3|woff|404|Failed to load resource/i.test(t)) errors.push('CONSOLE ' + t);
   });
   const shot = n => page.screenshot({ path: `${OUT}/${n}.png` });
-  const st = () => page.evaluate(() => PT.game ? { phase: PT.game.phase, m: PT.game.month, t: PT.game.turn, stress: PT.game.stress, cash: PT.game.cash, self: PT.game.selfCount() } : null);
+  const st = () => page.evaluate(() => PT.game ? { phase: PT.game.phase, m: PT.game.month, t: PT.game.turn, rep: PT.game.rep, cap: PT.game.repCap(), cash: PT.game.cash, self: PT.game.selfCount() } : null);
   const settle = async () => { await page.waitForFunction(() => !PT.busy, null, { timeout: 20000 }); await page.waitForTimeout(150); };
 
   // ---------- 1. 타이틀 ----------
@@ -54,11 +54,12 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await shot('03-play-m1t1');
 
   // ---------- 4. HUD 날짜·연도 ----------
-  const hud = await page.evaluate(() => ({ month: document.querySelector('#hud-month').textContent, turn: document.querySelector('#hud-turn').textContent, yrPx: getComputedStyle(document.querySelector('#hud-month .yr')).fontSize }));
+  const hud = await page.evaluate(() => ({ month: document.querySelector('#hud-month').textContent, turn: document.querySelector('#hud-turn').textContent, yrPx: getComputedStyle(document.querySelector('#hud-month .yr')).fontSize, rep: document.querySelector('#stress-label').textContent + ' ' + document.querySelector('#stress-num').textContent }));
   const year = new Date().getFullYear();
   ok('HUD에 연도', hud.month.includes(String(year)), hud.month.trim());
   ok('HUD에 일차·요일', /1일차\s*월/.test(hud.turn), hud.turn.trim());
   ok('연도 글자 크기 = 11px (픽셀 폰트 원본)', hud.yrPx === '11px', hud.yrPx);
+  ok('HUD 게이지가 평판', /평판/.test(hud.rep) && /20\/20/.test(hud.rep), hud.rep.replace(/\s+/g, ' ').trim());
   const oneLine = await page.evaluate(() => { const el = document.querySelector('#hud-left'); return el.getBoundingClientRect().height < 60; });
   ok('HUD가 줄바꿈 없이 들어간다', oneLine);
 
@@ -101,7 +102,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
     await page.click('.wkopts .wkc', { force: true }); await page.waitForTimeout(800); await settle();
     const after = await st();
     ok('휴식으로 다음 영업일 진행', after.phase === 'play' && after.t === before.t + 1, `t ${before.t}→${after.t}`);
-    ok('주말엔 스트레스가 늘지 않는다', after.stress <= before.stress, `${before.stress}→${after.stress}`);
+    ok('휴식은 평판을 올린다(상한이면 유지)', after.rep >= before.rep, `${before.rep}→${after.rep}`);
   }
 
   // ---------- 8. 대기 + 직접 배송, 야근 ----------
@@ -147,6 +148,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
     await shot('06-summary');
     const sum = await page.evaluate(() => document.querySelector('#modal').textContent);
     ok('정산에 이번 달 순익 헤드라인', /순익/.test(sum));
+    ok('정산에 평판 줄', /평판/.test(sum) && !/스트레스/.test(sum));
     ok('정산에 턴 표기 없음', !/\d턴/.test(sum));
     await page.click('.foot .btn.primary', { force: true }); await page.waitForTimeout(800);
   }

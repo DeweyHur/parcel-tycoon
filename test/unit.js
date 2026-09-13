@@ -88,11 +88,11 @@ t('계약 교체(갈아타기): 같은 계열 상위 센터로 바꾸면 잔여 
   const b = slot(g, 'bulk'); assert.ok(g.buy(g.market.items.length - 1, b).ok); assert.equal(g.contracts[b].carrier, 'bulk1'); assert.equal(g.trust.bulk0, 5); assert.equal(g.trustLevel('bulk1'), 0);
 });
 t('공간 최적화: 크기 -1 (최소 1)', () => { const g = NG(2, { perks: ['compact', 'insure'] }); for (const p of g.parcels) assert.equal(p.size, Math.max(1, p.baseSize - 1)); });
-t('창고 초과 페널티', () => { const g = NG(11); g.warehouse.cap = 0; for (let i = 0; i < 4; i++) g.parcels.push(P(700 + i, 'normal', 2)); const s0 = g.stress; adv(g); assert.ok(g.stress > s0); });
+t('창고 초과 페널티', () => { const g = NG(11); g.warehouse.cap = 0; for (let i = 0; i < 4; i++) g.parcels.push(P(700 + i, 'normal', 2)); const s0 = g.rep; adv(g); assert.ok(g.rep < s0); });
 t('신선: 냉장 안이면 기한만 진행, 밖이면 1턴 뒤 폐기(+2)', () => {
   const g = EMPTY(4, { perks: ['skip', 'longdeal'] }); g.warehouse.cold = 2;
   g.parcels = [P(900, 'fresh', 2), P(901, 'fresh', 2)]; g._assignCold(); assert.ok(g.parcels[0].inCold && !g.parcels[1].inCold);
-  const s0 = g.stress; adv(g); assert.equal(g.parcels.length, 1); assert.equal(g.parcels[0].deadline, 2); assert.equal(g.stress, s0 + 2); assert.equal(g.stats.discarded, 1);
+  const s0 = g.rep; adv(g); assert.equal(g.parcels.length, 1); assert.equal(g.parcels[0].deadline, 2); assert.equal(g.rep, s0 - 2); assert.equal(g.stats.discarded, 1);
 });
 t('통관: 대기 중 기한 정지·일반 업체 불가, 통관 대행은 가능', () => {
   const g = EMPTY(4, { perks: ['skip', 'longdeal'] });
@@ -104,7 +104,7 @@ t('통관: 대기 중 기한 정지·일반 업체 불가, 통관 대행은 가�
 t('통관 대행 신뢰 1단계: 통관 대기 -1', () => { const g = EMPTY(4); g.contracts[3] = g._makeContract('intl', 'normal'); g.trust.intl0 = 3; g.rules.customsDelayProb = 0; const p = g._spawnParcel({ type: 'intl', size: 4 }); assert.equal(p.customs, 1); });
 t('냉동: 냉동 구역 없으면 즉시 폐기, 냉동 물류만 처리, 구역보다 큰 냉동은 오지 않음', () => {
   const g = EMPTY(4, { perks: ['skip', 'longdeal'] }); g.warehouse.frozen = 2; g.schedule[g.turn] = [{ type: 'frozen', size: 2 }, { type: 'frozen', size: 2 }];
-  const s0 = g.stress; adv(g); assert.equal(g.parcels.filter(p => p.type === 'frozen').length, 1); assert.equal(g.stress, s0 + 2);
+  const s0 = g.rep; adv(g); assert.equal(g.parcels.filter(p => p.type === 'frozen').length, 1); assert.equal(g.rep, s0 - 2);
   const p = g.parcels.find(p => p.type === 'frozen'); assert.ok(!g.canHandle(g.contracts[slot(g, 'cold')], p)); g.contracts[3] = g._makeContract('frozen', 'normal'); assert.ok(g.canHandle(g.contracts[3], p));
   const h = new Game({ seed: 3, company: 'fresh' }); for (const sp of h.schedule.flat()) if (sp.type === 'frozen') assert.ok(sp.size <= h.warehouse.frozen);
 });
@@ -128,7 +128,7 @@ t('저장/불러오기 후 결정적 진행', () => {
   const a = NG(21); for (let i = 0; i < 3 && a.phase === 'play'; i++) adv(a); const json = JSON.stringify(a.toJSON()); const b = Game.fromJSON(JSON.parse(json));
   for (let i = 0; i < 4; i++) { if (a.phase === 'play') adv(a); if (b.phase === 'play') adv(b); } a.takeEvents(); b.takeEvents(); assert.equal(JSON.stringify(a.toJSON()), JSON.stringify(b.toJSON()));
 });
-t('스트레스 한계 → 게임오버', () => { const g = EMPTY(1); g.stress = g.rules.gameoverStress - 1; g.warehouse.cap = 0; g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2)]; g._assignCold(); adv(g); assert.equal(g.phase, 'over'); });
+t('평판 0 → 게임오버(아무도 안 맡긴다)', () => { const g = EMPTY(1); g.rep = 1; g.warehouse.cap = 0; g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2)]; g._assignCold(); adv(g); assert.equal(g.phase, 'over'); });
 t('회사별 시작 상태', () => { for (const id in M.COMPANIES) { const g = new Game({ seed: 2, company: id }); assert.ok(g.cash > 0, id); assert.ok(g.contracts.filter(Boolean).length >= 2, id); } const q = new Game({ seed: 2, company: 'quick' }); assert.equal(q.selfCount(), 2); const th = new Game({ seed: 2, company: 'thrifty' }); assert.equal(th.rules.feeMult, 0.8); const po = new Game({ seed: 2, company: 'postal' }); assert.equal(po.truckFee(po.contracts[1]), 35); });
 t('시나리오 규칙', () => { const g = new Game({ seed: 1, scenario: 'cashcrunch' }); assert.equal(g.cash, 225); assert.ok(g.rules.noRefresh); const p = new Game({ seed: 1, scenario: 'peak' }); assert.equal(p.rules.months, 2); });
 t('데일리 설정은 날짜에 결정적', () => { const a = dailyConfig('2026-09-05'), b = dailyConfig('2026-09-05'); assert.deepEqual(a, b); assert.equal(a.variants.length, 2); });
@@ -163,7 +163,7 @@ t('날씨: 폭설이면 야외 신선 안 썩고 도난 절반, 태풍 턴 입�
 t('보험: 든든화재 50% 보장, 프리미어 반송 스트레스 면제, 마켓에서 갈아타기', () => {
   const g = EMPTY(3, { insurer: 'sturdy', perks: ['skip', 'longdeal'] }); assert.equal(g.premium(), 60); g.parcels = [P(6, 'fragile', 2, { deadline: 1, customer: 'glass' })]; const cash = g.cash; adv(g); adv(g); adv(g);
   assert.equal(cash - g.cash, 60); assert.equal(g.monthStats.insClaims, 1);
-  const h = EMPTY(3, { insurer: 'premier', perks: ['skip', 'longdeal'] }); h.parcels = [P(6, 'normal', 1, { deadline: 1 })]; adv(h); adv(h); adv(h); assert.equal(h.stats.returned, 1); assert.equal(h.stress, 0); // 기한 초과 자체는 스트레스 0, 프리미어는 반송 +2 면제
+  const h = EMPTY(3, { insurer: 'premier', perks: ['skip', 'longdeal'] }); h.parcels = [P(6, 'normal', 1, { deadline: 1 })]; adv(h); adv(h); adv(h); assert.equal(h.stats.returned, 1); assert.equal(h.rep, h.rules.gameoverStress); // 기한 초과 자체는 감점 0, 프리미어는 반송 −2 면제
   while (h.phase === 'play') adv(h); h.closeSummary(); assert.ok(h.setInsurer('coldguard').ok); assert.equal(h.insurer, 'coldguard');
 });
 t('보관 계약: 수락 → 점유 → 회수 xp +2, 조기 반환 위약금', () => {
@@ -196,7 +196,7 @@ t('i18n: 자리표시자·복수형·메시지 객체 렌더링', () => {
   assert.equal(I18n.t('log.monthStart', { m: 2, y: 2026, cal: 4 }), '── 2026년 4월 · 2개월차 시작 ──');
   assert.equal(I18n.t('ps.deadline', { n: 4 }), '⏳ <b>4</b>일');                       // 1턴 = 하루
   assert.equal(I18n.t('story.intro.3', { name: '한길 물류', fee: 38 }).slice(0, 60).includes('한길 물류는'), true); // 조사 자동 선택
-  assert.equal(I18n.text({ k: 'log.penalty', p: { pen: 2, reasons: [{ k: 'r.overdue', p: { short: '일반' } }, { k: 'r.stolenInsured' }], stress: 5 } }), '페널티 +2: 기한 초과 일반, 도난 (보험 적용) (스트레스 5)');
+  assert.equal(I18n.text({ k: 'log.penalty', p: { pen: 2, reasons: [{ k: 'r.overdue', p: { short: '일반' } }, { k: 'r.stolenInsured' }], rep: 5 } }), '평판 −2: 기한 초과 일반, 도난 (보험 적용) (평판 5)');
   assert.equal(I18n.text('옛 세이브 문자열'), '옛 세이브 문자열');
   assert.ok(I18n.setLang('en'));
   assert.equal(I18n.t('fmt.calls', { n: 1 }), '1 call'); assert.equal(I18n.t('fmt.calls', { n: 3 }), '3 calls');
@@ -225,9 +225,9 @@ t('주말: 턴이 아니다 — 기한·입고는 멈추고 야외 도난만 한
   assert.equal(g.selfCount(), self + 2);
   g.wait(); assert.equal(g.selfCount(), self);             // 하루만
   // 둘째 일요일(12턴) 다음은 월말 정산
-  const h = EMPTY(7); h.stress = 5;
+  const h = EMPTY(7); h.rep = 5;
   for (let i = 0; i < 6; i++) h.wait();
-  h.weekendChoose('rest'); assert.equal(h.stress, 4);      // 휴식 -1
+  h.weekendChoose('rest'); assert.equal(h.rep, 6);        // 휴식 = 평판 +1
   for (let i = 0; i < 6; i++) h.wait();
   assert.equal(h.phase, 'weekend'); assert.equal(h.turn, 12);
   h.weekendChoose('rest');

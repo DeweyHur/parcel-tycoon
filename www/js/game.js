@@ -108,7 +108,7 @@
       // 런을 시작한 해를 찍어 세이브에 고정한다 (3월 시작 → 1·2월은 이듬해). 나중에 열어도 숫자가 안 바뀐다
       this.year = cfg.year || new Date().getFullYear();
       this.weekend = null; this.weekendBonus = null;
-      this.stress = 0;
+      this.rep = 0; this.repTier = 0;   // 평판(키우는 지표) — _buildRules 뒤에 상한만큼 채워 시작한다
       this.parcels = [];
       this.schedule = [];
       this.log = [];
@@ -126,6 +126,7 @@
       this.story = cfg.story ? { seen: [], notes: [] } : null; // 창고장 안내(스토리 모드) 진행 상태 — 본 비트 id
       this.trust = {}; // 업체별 신뢰도 경험치 (런 내 유지)
       for (const k of Object.keys(D.CARRIERS)) this.trust[k] = (famVal(this.rules.carrierStartTrust, k) || 0) + this.rules.allStartTrust;
+      this.rep = this.rules.gameoverStress;   // 전임 창고장이 물려준 평판에서 시작한다
       this._initCompany();
       this._initCustomers();
       this.insurer = this.rules.noInsurance ? 'none' : (cfg.insurer && M.INSURERS[cfg.insurer] ? cfg.insurer : 'none');
@@ -215,7 +216,7 @@
       c.xp += delta;
       if (c.xp < 0) { c.xp = 0; if (!c.suspended) { c.suspended = true; this.say('log.custSuspend', { name: M.CUSTOMERS[id].name, why }); this.emit('custSuspend', { customer: id }); } }
       const after = this.customerLevel(id);
-      if (after !== before) { this._applyCustomerPerks(id); this._assignCold(); if (after > before) { this.say('log.custLevel', { name: M.CUSTOMERS[id].name, level: after }); this.emit('custLevel', { customer: id, level: after }); if (after >= 3) this.stats.customerL3++; } }
+      if (after !== before) { this._applyCustomerPerks(id); this._assignCold(); if (after > before) { this.addRep(D.REP_GAIN.custLevel, MSG('why.repCust')); this.say('log.custLevel', { name: M.CUSTOMERS[id].name, level: after }); this.emit('custLevel', { customer: id, level: after }); if (after >= 3) this.stats.customerL3++; } }
     }
     // 폐기 시 손해배상 (부패·반송·도난·파손 공통)
     _claim(p, why, kind) {
@@ -663,7 +664,21 @@
       return 0;
     }
     returnIn(p) { return p.overdue ? Math.max(0, this.returnGraceFor(p) - (p.overdueTurns || 0)) : null; }
-    stressState() { for (const [max, id] of D.STRESS_STATES) if (this.stress <= max) return D.STRESS_NAMES[id]; return D.STRESS_NAMES.gameover; }
+    // ----- 평판 -----
+    repCap() { const t = D.REP_TIERS[Math.min(this.repTier, D.REP_TIERS.length - 1)]; return this.repTier === 0 ? this.rules.gameoverStress : t.cap; }
+    repTierId() { return D.REP_TIERS[Math.min(this.repTier, D.REP_TIERS.length - 1)].id; }
+    repTierName() { return T('rep.tier.' + this.repTierId()); }
+    // 평판 증감. 사고는 깎고(pen 양수 = 깎임), 잘한 일은 올린다. 상한을 넘지 않고, 0 이하면 런이 끝난다
+    addRep(n, why) {
+      if (!n) return 0;
+      const before = this.rep;
+      this.rep = Math.max(0, Math.min(this.repCap(), this.rep + n));
+      const d = this.rep - before;
+      if (d) this.emit('rep', { delta: d, why, rep: this.rep });
+      return d;
+    }
+    // 평판이 낮으면 개인 고객이 안 맡긴다 — 상한까지 채우면 1.0배(기준), 바닥이면 0.55배
+    repArrivalMult() { const c = this.repCap(); return 0.55 + 0.45 * (c ? Math.min(1, this.rep / c) : 1); }
     monthsTotal() { return this.rules.endless ? Infinity : this.rules.months; }
 
     // ----- 월별 테이블 (무한 모드 확장 포함) -----
@@ -729,7 +744,7 @@
       const R = this.rules;
       this.month = m; this.turn = 0;
       if (this.customers) for (const id in this.customers) { const c = this.customers[id]; if (c.suspended && m > 1) { c.suspended = false; c.xp = 0; this.say('log.custResume', { name: M.CUSTOMERS[id].name }); } c.month = this._emptyCustMonth(); c.month.lvStart = this.customerLevel(id); }
-      this.monthStats = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false, cashStart: this.cash };
+      this.monthStats = { repStart: this.rep, revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false, cashStart: this.cash };
       // 월 배차 한도 리셋 (계약은 만료되지 않는다 — 마켓은 업그레이드·새 업체용)
       // v1.5: 배차는 소모품 — 월초 리셋 없음. 마켓의 '가득 충전'으로만 채운다
       for (const c of this.contracts) if (c) { c.successCalls = 0; c.freeUsedMonth = false; }
@@ -746,8 +761,7 @@
         if (this.strikeCarrier) this.say('log.strike', { name: D.CARRIERS[this.strikeCarrier].name });
       }
       if (m > 1) {
-        if (R.monthlyStress) this.stress = Math.max(0, this.stress + R.monthlyStress);
-        const relief = R.stressRelief || D.MONTH_RELIEF; if (relief && this.stress >= relief.min) this.stress = Math.max(0, this.stress - relief.amount);
+        if (R.monthlyStress) this.addRep(-R.monthlyStress, MSG('why.repMonthly'));
       }
       // 준비 마켓: 1개월차 첫 턴 전에 시작 자금으로 계약·시설·보험을 갖출 수 있다 (입고 예정이 보인다)
       if (m === 1 && this.cfg.prep && !this.prepDone) {
@@ -768,7 +782,7 @@
       const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
       const gen = () => this._genParcelSpec(ratio, m, cw);
       for (let t = 0; t < turns; t++) sched[t].push(gen());
-      let extra = Math.round(this._extraArrivals(m) * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0));
+      let extra = Math.round(this._extraArrivals(m) * this.repArrivalMult() * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0));
       const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
       for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
       this.burstTurns = [];
@@ -911,7 +925,7 @@
       this.feesDue += fee; this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
       if (c.enh.regular && !c.freeUsedMonth) c.freeUsedMonth = true;
       const fill = volume / (vcap * trucks);
-      if (fill >= 0.8) this.stats.fullTrucks++;
+      if (fill >= 0.8) { this.stats.fullTrucks++; this.addRep(D.REP_GAIN.fullTruck, MSG('why.repFull')); }
 
       const lv = this.trustLevel(c);
       const specialistAll = false;
@@ -1024,13 +1038,13 @@
       if (this.contracts.some(c => c && c.grade === 'master')) this.stats.masterOwned = true;
     }
 
-    _discardParcel(p, why, stress, evt) {
+    _discardParcel(p, why, pen0, evt) {
       const R = this.rules, i = this.parcels.indexOf(p); if (i < 0) return;
       this.parcels.splice(i, 1);
       this.monthStats.discarded++; this.run.discarded++; this.stats.discarded++;
-      let pen = stress, insured = false;
+      let pen = pen0, insured = false;
       if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; pen = 0; insured = true; why = MSG('why.insured', { why }); }
-      if (pen) { this.stress += pen; this.monthStats.penalty += pen; }
+      if (pen) { this.addRep(-pen, why); this.monthStats.penalty += pen; }
       this.say('log.discard', { short: D.PARCEL_TYPES[p.type].short, size: p.size, why, pen: pen ? ` +${pen}` : '' });
       this.emit(evt || 'discard', { parcel: p, why });
       if (!insured) this._claim(p, why, evt === 'broken' ? 'broken' : 'discard');
@@ -1107,11 +1121,11 @@
       else if (over > 0) reasons.push(MSG('r.overflowGrace', { over }));
       if (usageBefore >= 1 && pen === 0) this.stats.fullNoPenalty = true;
       if (pen > 0) {
-        this.stress += pen; this.monthStats.penalty += pen;
-        this.say('log.penalty', { pen, reasons, stress: this.stress });
+        this.addRep(-pen, MSG('why.repPenalty')); this.monthStats.penalty += pen;
+        this.say('log.penalty', { pen, reasons, rep: this.rep });
         this.emit('penalty', { amount: pen, reasons });
       } else if (reasons.length) this.say(reasons.join(', '));
-      if (this.stress >= this.rules.gameoverStress) return this._gameOver(MSG('over.stress'));
+      if (this.rep <= 0) return this._gameOver(MSG('over.rep'));
       if (this.isWeekendAfter(this.turn)) return this._startWeekend();
       if (this.turn >= D.TURNS_PER_MONTH) return this._endMonth();
       this._startTurn();
@@ -1140,17 +1154,17 @@
       if (!opt.ok) return { ok: false, msg: T(opt.cost && this.cash < opt.cost ? 'err.noCash' : 'err.noOutdoor') };
       const week = this.weekend.week, last = this.weekend.last;
       if (opt.cost) { this.cash -= opt.cost; this.monthStats.spent += opt.cost; this.run.spent += opt.cost; }
-      if (def.stress) this.stress = Math.max(0, this.stress + def.stress);
+      if (def.stress) this.addRep(-def.stress, T('wk.' + id));
       if (def.self) this.weekendBonus = { self: def.self };
       const reasons = [];
       const pen = def.noTheft ? 0 : this._theftRoll(reasons);
-      if (pen > 0) { this.stress += pen; this.monthStats.penalty += pen; }
+      if (pen > 0) { this.addRep(-pen, MSG('why.repPenalty')); this.monthStats.penalty += pen; }
       this._assignCold();
       this.say('log.weekend', { w: week, choice: T('wk.' + id + '.done'), extra: reasons.length ? ' — ' + reasons.join(', ') : '' });
       this.emit('weekendEnd', { choice: id, pen });
       this.weekend = null;
       this.phase = 'play';
-      if (this.stress >= this.rules.gameoverStress) return this._gameOver(MSG('over.stress'));
+      if (this.rep <= 0) return this._gameOver(MSG('over.rep'));
       if (last) { this._endMonth(); return { ok: true, pen }; }   // 넷째 일요일 다음은 월말 정산
       this._startTurn();
       return { ok: true, pen };
@@ -1167,6 +1181,14 @@
       let closing = 0;
       if (R.closingBonus && this.usage() <= R.closingBonus.usage) { closing = R.closingBonus.amount; this.cash += closing; }
             if (R.erosion) { const cands = this.contracts.filter(c => c && this.startContractIds.includes(c.id) && c.maxCalls > 1); if (cands.length) { const c = this.rng.pick(cands); c.maxCalls--; c.calls = Math.min(c.calls, c.maxCalls); this.say('log.erosion', { name: this.contractName(c) }); } }
+      // 평판: 사고 없이 넘긴 정산은 소문이 좋아지고, 상한까지 채운 채로 넘기면 등급이 오른다
+      let repClean = 0, repTierUp = null;
+      if (ms.penalty === 0) repClean = this.addRep(D.REP_GAIN.cleanMonth, MSG('why.repClean'));
+      if (this.rep >= this.repCap() && this.repTier < D.REP_TIERS.length - 1) {
+        this.repTier++; repTierUp = this.repTierId();
+        this.say('log.repTierUp', { name: this.repTierName(), cap: this.repCap() });
+        this.emit('repTier', { tier: repTierUp, cap: this.repCap() });
+      }
       // 통계
       this.stats.monthsDone = this.month;
       this.stats.maxMonthDelivered = Math.max(this.stats.maxMonthDelivered, ms.delivered);
@@ -1177,7 +1199,7 @@
       this.summary = { month: this.month, revenue: ms.revenue, opCost, opCostDetail: this._lastOpCost, calls: ms.calls, waits: ms.waits,
         delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, selfCost: ms.selfCost || 0, fees: ms.fees || 0, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, customers: this.customerSummary(),
         cash: this.cash, cashStart: ms.cashStart != null ? ms.cashStart : this.cash, net: this.cash - (ms.cashStart != null ? ms.cashStart : this.cash),
-        stress: this.stress, usage: Math.round(this.usage() * 100), left: this.parcels.length };
+        rep: this.rep, repCap: this.repCap(), repTier: this.repTierId(), repClean, repTierUp, repDelta: this.rep - (ms.repStart != null ? ms.repStart : this.rep), usage: Math.round(this.usage() * 100), left: this.parcels.length };
       // 단기 금융: 지난달 차입 상환(원금+이자) → 그래도 음수면 새로 차입해 0으로 맞춤
       const loan = { interest: 0, repaid: 0, borrowed: 0, debt: 0 };
       if (this.debt > 0) { loan.interest = Math.ceil(this.debt * D.LOAN.interest); loan.repaid = this.debt; this.cash -= this.debt + loan.interest; this.run.spent += loan.interest; this.stats.interestPaid += loan.interest; this.debt = 0; }
@@ -1230,8 +1252,8 @@
       const monthsDone = monthsDoneArg != null ? monthsDoneArg : win ? this.rules.months : this.month - 1;
       this.stats.monthsDone = monthsDone;
       this.stats.distinctCarriersAtEnd = new Set(this.contracts.filter(Boolean).map(c => c.carrier)).size;
-      const score = Math.round(Math.max(0, this.run.revenue + Math.max(0, this.cash) + monthsDone * (this.rules.endless ? 300 : 200) - this.stress * 10) * this.rules.scoreMult);
-      return { win, demo: false, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, stress: this.stress, seed: this.seed,
+      const score = Math.round(Math.max(0, this.run.revenue + Math.max(0, this.cash) + monthsDone * (this.rules.endless ? 300 : 200) + this.rep * 20) * this.rules.scoreMult);
+      return { win, demo: false, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
         scenario: this.cfg.scenario, company: this.cfg.company, difficulty: this.cfg.difficulty || 'normal', perks: this.perks.slice(), variants: (this.cfg.variants || []).slice(), date: this.cfg.date || null, ...this.run };
     }
 

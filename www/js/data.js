@@ -15,7 +15,17 @@
       { id: 'parttime', cost: 50, noTheft: true, needOutdoor: true }, // 알바: 야적 지킴 — 이번 주말 도난 없음
     ],
     START_CASH: 450,
-    GAMEOVER_STRESS: 20,
+    GAMEOVER_STRESS: 20,   // (구) 스트레스 한계 → 지금은 1단계 평판 상한. rules.gameoverStress 로 난이도가 얹힌다
+    // 평판: 키우는 지표. 0 이 되면 아무도 맡기지 않는다 = 런 종료.
+    // 사고(반송·도난·파손·폐기·창고 초과)는 깎고, 꽉 채운 호출·무사고 정산·고객 신뢰 상승은 올린다.
+    // 상한까지 채운 채로 정산을 넘기면 등급이 오르고 상한도 오른다 — 그게 '키우는 맛'이다.
+    REP_TIERS: [
+      { id: 'unknown', cap: 20 },   // 무명 — 동네 사람들만 안다
+      { id: 'local',   cap: 35 },   // 동네 소문
+      { id: 'ward',    cap: 50 },   // 구내 유명
+      { id: 'city',    cap: 70 },   // 시내 최고
+    ],
+    REP_GAIN: { fullTruck: 1, cleanMonth: 2, custLevel: 2 },
     OPERATING_COST: 120,   // 월 기본 임대(창고·인건비). 여기에 계약 유지비 + 시설 유지비가 더해진다
     OPCOST_CONTRACT: { normal: 10, trusted: 30, expert: 60, master: 100 },   // 계약 등급별 월 유지비 — 프리미엄은 수입도 지출도 크다
     // 배차비·배송비는 후불: 월중에 쌓였다가 월말 정산에서 빠진다. 정산 후 자금이 음수면 단기 차입으로 메우고

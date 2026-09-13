@@ -102,6 +102,8 @@
     { id: 'weekend', months: [1, 2], kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
     // 마당에 물건이 나가 있는 채로 맞는 일요일 — 알바를 쓸지 결정하는 자리
     { id: 'weekendYard', months: [1, 2, 3], kind: 'weekend', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'worry', hl: '.wkopts .wkc:nth-child(3)' }] },
+    // 평판: 처음 깎였을 때 한 번. 이 게임이 왜 끝나는지를 말해 주는 자리다
+    { id: 'rep', months: [1, 2, 3], kind: 'turn', when: g => g.rep < g.repCap(), pages: [{ expr: 'worry', hl: '#hud-right' }, { expr: 'neutral', hl: '#hud-right' }] },
     { id: 'summary1', months: [1], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
     { id: 'market1', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }, { expr: 'neutral' }] },
     // ----- 4월 (2개월차): 고객과 돈 -----
