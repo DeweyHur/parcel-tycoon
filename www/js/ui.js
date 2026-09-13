@@ -314,6 +314,8 @@
     const vol = g.eligibleParcels(c).reduce((s2, p) => s2 + p.size, 0);
     // handOff("나머지는 자네가 해봐") 전에는 시키는 말투, 그 뒤로는 상태만 알려준다
     const q = g.story.seen.includes('handOff') ? 'Quiet' : '';
+    const stuck = g.unhandled().filter(p => !(p.customs > 0));
+    if (stuck.length) return T('coach.stuck', { n: stuck.length, list: [...new Set(stuck.map(p => D.PARCEL_TYPES[p.type].short))].join('') });
     if (g.usage() >= 0.9) return T('coach.full');
     if (b.slot >= 0 && b.fill >= 0.8) return T('coach.ready' + q, { name, pct: Math.min(100, Math.round(b.fill * 100)) });
     return T('coach.wait' + q, { vol, cap, name });
@@ -371,6 +373,7 @@
       <div class="d">${T('company.customers')} <b>${cu.icon} ${esc(cu.name)}</b>${p.customer !== 'anon' ? ` · ${T('cust.trustLv', { n: lv })} ${T('pd.perPiece', { n: M.CUSTOMER_BONUS[lv] })}` : ''}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}</div>
       <div class="d">${T('pd.claim', { claim })}${p.arrivalTurn ? ` · ${T('pd.arrivedAgo', { n: p.age })}` : ''}${p.wet ? ` · ${T('pd.wet')}` : ''}${p.outdoor ? ` · ${T('pd.outdoor')}` : ''}</div>
       ${attrRows}
+      ${g.contracts.some(c => c && g.canHandle(c, p) && g.breakProb(c, p) === 0) || selfOk ? '' : `<div class="d" style="color:var(--orange);margin-top:6px">${famNames(p) ? T('pd.needFamily', { list: famNames(p) }) : T('pd.needNothing')}</div>`}
       <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('pd.contracts')}</div><div class="ttrack">${rows || `<div class="d">${T('pd.noContract')}</div>`}<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">${T('pd.selfRow')} ${selfOk ? T('pd.selfCost', { cost: g.selfCost(p) }) : `<span style="color:var(--dim)">${esc(selfWhy || T('pd.no'))}</span>`}</span><span class="st">${selfOk ? T('pd.ok') : '—'}</span></div></div>`;
     modal(`${t.name} ${T('fmt.cells', { n: p.size })}`, body, [{ label: T('btn.close'), onClick: closeModal }]);
     storyCheck({ kind: 'modal', modal: 'parcel', parcel: p });
@@ -457,6 +460,8 @@
     if (p.customs > 0) { parts.push(`<b style="color:var(--blue)">${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })}</b>`); parts.push(`⏳ ${T('fmt.turns', { n: p.deadline })}`); if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`); return parts.join(' · '); }
     if (p.overdue) { const ri = game ? game.returnIn(p) : null; parts.push(`<b style="color:var(--red)">${T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' })}</b>`); } else parts.push(T('ps.deadline', { n: p.deadline }));
     if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`);
+    // 어떤 계약으로도 못 싣고 직접 배송도 안 되는 택배 — 반송 말고는 길이 없으니 눈에 띄어야 한다
+    if (game && game.phase === 'play' && !(p.customs > 0) && !game.contracts.some(c => c && game.canHandle(c, p) && game.breakProb(c, p) === 0) && !game.selfCan(p)) parts.unshift(`<b style="color:var(--red)">${T('ps.noCarrier')}</b>`);
     return parts.join(' · ');
   }
   function urgDot(p) { const u = urgencyOf(p); return `<span class="urg ${u <= 0 ? 'r' : u <= 1 ? 'r' : u <= 2 ? 'o' : u <= 3 ? 'y' : 'g'}"></span>`; }
@@ -725,7 +730,7 @@
       const cards = mk.items.map((it, i) => {
         if (it.kind === 'refill') return ''; // 충전은 위 '현재 계약' 칸에서
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract') { const o = offerSpec(it); desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${T('mk.capLine', { vehicle: esc(o.vehicle), cap: o.cap, trucks: o.trucks, total: o.total, fee: o.fee, per: o.per })}<br>${o.badge}${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
+        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}${T('mk.capLine', { vehicle: esc(o.vehicle), cap: o.cap, trucks: o.trucks, total: o.total, fee: o.fee, per: o.per })}<br>${o.badge}${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
@@ -794,6 +799,22 @@
   }
   // 계약 상세: 차량·능력·배차비·배차·신뢰 특성·강화·담당자
   // 마켓에 나온 계약(아직 안 산 것)의 실효 수치. 사기 전에 필요한 건 "월에 몇 칸을, 칸당 얼마에" 다.
+  // 이 계약을 사면 '지금은 못 하던' 무엇이 되는가 — 마켓 카드에서 기존 계약과의 차이를 한 줄로
+  function newlyHandles(it) {
+    const g = game, car = D.CARRIERS[it.carrier], have = g.contracts.filter(Boolean).filter(c => c.id !== it.switchFrom);
+    const gains = [];
+    for (const a of D.GATING_ATTRS) {
+      const pp = { type: 'normal', size: Math.max(car.sizeMin, 1), attrs: [a], customs: a === 'customs' ? 1 : 0 };
+      const mineOk = have.some(c => g.canHandle(c, pp) && g.breakProb(c, pp) === 0);
+      const itsOk = g._carrierAccepts(car, pp) && (a !== 'fragile' || car.caps.includes('fragile'));
+      if (!mineOk && itsOk) gains.push(`${D.ATTRS[a].icon}${D.ATTRS[a].name}`);
+    }
+    for (let sz = 1; sz <= 7; sz++) {
+      const pp = { type: 'normal', size: sz, attrs: [], customs: 0 };
+      if (!have.some(c => g.canHandle(c, pp)) && g._carrierAccepts(car, pp)) { gains.push(T('mk.newSize', { n: sz })); break; }
+    }
+    return gains.length ? gains.join(' · ') : '';
+  }
   function offerSpec(it) {
     const R = game.rules, car = D.CARRIERS[it.carrier];
     const cap = car.cap + (R.carrierCapDelta[car.family] || 0);
@@ -807,6 +828,7 @@
     const o = offerSpec(it), car = o.car, base = D.FAMILIES[car.family], rep = Story.repOf(it.carrier);
     const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d"><b>${esc(car.name)}</b>${gradeBadge(it.grade)}<br>${T('cd.rep', { name: esc(Story.repName(rep, it.carrier)) })}<br>${T('cd.family', { name: esc(base.name), tier: esc(D.GRADES[it.grade].name) })}</div></div>
       <div class="d" style="margin-top:8px">${esc(car.desc)}</div>
+      <div class="d" style="color:var(--dim)">${blockLine({ carrier: it.carrier, enh: {} })}</div>
       <div class="kv" style="margin-top:6px"><span>${T('call.caps')}</span><span class="v">${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}</span>
       <span>${esc(o.vehicle)}</span><span class="v">${T('fmt.cells', { n: o.cap })}</span>
       <span>${T('sum.fees')}</span><span class="v">${o.fee}c${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}</span>
@@ -814,6 +836,17 @@
       ${car.tier > 0 ? `<div class="d" style="color:var(--gold)">${T('mk.tierVs', { cap0: base.cap, cap1: car.cap, t0: base.trucks, t1: car.trucks, f0: Math.round(base.fee * game.rules.feeMult), f1: Math.round(car.fee * game.rules.feeMult) })}</div>` : ''}
       ${trustTrack(it.carrier, 0)}`;
     modal(esc(it.name), body, [{ label: T('btn.close'), onClick: back }]);
+  }
+  // 이 계약이 못 받는 것 — 계약 카드·상세에 한 줄로. "왜 이 택배가 여기 안 실리지?"에 대한 답
+  function blockLine(c) {
+    const b = game.contractBlocks(c), parts = [];
+    if (b.attrs.length) parts.push(b.attrs.map(a => `${D.ATTRS[a].icon}${D.ATTRS[a].name}`).join(' '));
+    parts.push(T('cd.sizeOnly', { min: b.sizeMin, max: b.sizeMax }));
+    return T('cd.blocks', { list: parts.join(' · ') });
+  }
+  // 이 택배를 받아 주는 계열 이름들 (지금 계약이 없을 때 뭘 사야 하는지)
+  function famNames(p) {
+    return game.familiesFor(p).map(f => esc(D.FAMILIES[f].name || f)).join(' · ');
   }
   function showContractDetail(c, back) {
     const g = game, car = D.CARRIERS[c.carrier], fam = D.FAMILIES[car.family];

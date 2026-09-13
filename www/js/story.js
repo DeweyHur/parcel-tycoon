@@ -61,7 +61,7 @@
 
   const attrsOf = (g, p) => p.attrs || root.DATA.PARCEL_TYPES[p.type].attrs;
   const usage = g => g.usedVolume() / g.warehouse.cap;
-  const gating = ['cold', 'fragile', 'customs', 'frozen'];
+  const gating = ['cold', 'fragile', 'customs', 'frozen', 'produce'];
   const handleable = (g, p) => g.contracts.some(c => c && g.eligibleParcels(c).some(x => x.id === p.id));
   const bestReadySlot = g => { let best = -1, bestFill = 0; g.contracts.forEach((c, i) => { if (!c || !g.canCall(c)) return; const vol = g.eligibleParcels(c).reduce((s, p) => s + p.size, 0), fill = vol / g.vehicleCap(c); if (fill > bestFill) { bestFill = fill; best = i; } }); return { slot: best, fill: bestFill }; };
   // 고객이 붙은 택배 하나 (없으면 아무거나) — 상세 팝업으로 안내할 대상
@@ -112,7 +112,11 @@
     // 고객 설명은 말로 하면 안 들어온다. 택배를 직접 누르게 하고 상세 팝업에서 짚는다.
     { id: 'm2', months: [2], kind: 'turn', when: g => g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: g => { const p = namedParcel(g); return p ? `#parcels .parcel[data-id="${p.id}"]` : '#parcels'; }, gate: g => !!namedParcel(g) }] },
     { id: 'm2Detail', months: [2, 3], kind: 'modal', modal: 'parcel', when: g => g.story.seen.includes('m2'), pages: [{ expr: 'neutral' }, { expr: 'neutral' }] },
-    { id: 'special', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => attrsOf(g, p).some(a => gating.includes(a))), pages: [{ expr: 'neutral', hl: '#parcels', k: g => { const p = g.parcels.find(x => attrsOf(g, x).some(a => gating.includes(a))); const a = attrsOf(g, p).find(x => gating.includes(x)); return 'story.special.' + a; } }] },
+    { id: 'special', kind: 'turn', when: g => g.parcels.some(p => attrsOf(g, p).some(a => gating.includes(a))), pages: [{ expr: 'neutral', hl: '#parcels', k: g => { const p = g.parcels.find(x => attrsOf(g, x).some(a => gating.includes(a))); const a = attrsOf(g, p).find(x => gating.includes(x)); return 'story.special.' + a; } }] },
+    // 어떤 계약으로도 못 싣고 직접 배송도 안 되는 택배 — 반송 말고는 길이 없다. 마켓이 답이라는 걸 말해 준다
+    { id: 'cantHandle', kind: 'turn', when: g => g.unhandled().some(p => !(p.customs > 0)), pages: [{ expr: 'shock', hl: '#parcels' }, { expr: 'neutral' }] },
+    // 크기가 커서 못 싣는 경우 — 대형은 직접 배송도 안 된다
+    { id: 'bigParcel', kind: 'turn', when: g => g.parcels.some(p => p.size >= 4) && !g.contracts.some(c => c && g.contractSizeMax(c) >= 4), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'noContract', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => !(p.customs > 0) && attrsOf(g, p).some(a => gating.includes(a)) && !handleable(g, p)), pages: [{ expr: 'worry' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
     // 대기 팝업 안 (noContract 다음): 직접 배송할 택배 하나 → 대기 버튼
     { id: 'waitSelf', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('noContract') && ctx.picked === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .zone .parcel', gate: true }] },

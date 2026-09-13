@@ -628,6 +628,32 @@
     }
     isSpecialist(car, type) { return Array.isArray(car.specialist) ? car.specialist.includes(type) : car.specialist === type; }
     canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c)); }
+    // 이 택배를 (파손 없이) 받아 주는 계열들 — 지금 계약이 없을 때 "뭘 사면 되는지" 말해 주려고
+    familiesFor(p) {
+      const out = [];
+      for (const fam of Object.keys(D.FAMILIES)) {
+        const key = D.centerFor(fam, 0); if (!key) continue;
+        const car = D.CARRIERS[key];
+        const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs;
+        if (!this._carrierAccepts(car, p)) continue;
+        if (attrs.includes('fragile') && !car.caps.includes('fragile')) continue;   // 깨질 확률이 있으면 '처리된다'고 하지 않는다
+        out.push(fam);
+      }
+      return out;
+    }
+    // 지금 어떤 계약으로도(배차 유무와 무관) 안 되고 직접 배송도 막힌 택배
+    unhandled() { return this.parcels.filter(p => !this.contracts.some(c => c && this.canHandle(c, p) && this.breakProb(c, p) === 0) && !this.selfCan(p)); }
+    // 이 계약이 못 받는 것 — 계약 화면에서 보여 준다
+    contractBlocks(c) {
+      const car = D.CARRIERS[c.carrier], caps = this.contractCaps(c), max = this.contractSizeMax(c);
+      const attrs = [];
+      for (const a of D.GATING_ATTRS) {
+        const pp = { type: 'normal', size: Math.max(car.sizeMin, Math.min(2, max)), attrs: [a], customs: a === 'customs' ? 1 : 0 };
+        if (!this._carrierAccepts(car, pp, caps, max)) attrs.push(a);
+        else if (a === 'fragile' && !caps.includes('fragile')) attrs.push(a);
+      }
+      return { attrs, sizeMin: car.sizeMin, sizeMax: max };
+    }
     // ⚠ 파손 확률: 능력에 fragile이 없으면
     breakProb(c, p) { const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs; if (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile')) return 0; return Math.min(0.95, D.BREAK_PROB * this.rules.breakMult * (this.customerPerk(p.customer, 'breakMult') || 1)); }
     eligibleParcels(c) { return this.parcels.filter(p => this.canHandle(c, p)); }
@@ -1332,13 +1358,23 @@
     _scriptedMarketItems(spec) {
       const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(m))] * R.itemPriceMult * R.priceMult;
       const items = [];
-      for (const carrier of spec.contracts || []) {
+      // 대본이어도 '처리할 방법이 없는 택배'가 있으면 그 해결책은 반드시 판다 — 반송 말고는 길이 없는 상황을 만들지 않는다
+      const extra = (spec.contracts || []).slice();
+      for (const bt of this.blockedTypes()) {
+        const pp = { type: bt.type, size: bt.maxSize, customs: 0 };
+        const fam = this.familiesFor(pp)[0];
+        const key = fam && D.centerFor(fam, 0);
+        if (key && !extra.includes(key) && !this.contracts.some(c => c && c.carrier === key)) extra.unshift(key);
+        break;
+      }
+      for (const carrier of extra) {
         const car = D.CARRIERS[carrier];
         if (!car || this.contracts.some(c => c && c.carrier === carrier)) continue;
         const own = this.contracts.find(c => c && FAM(c.carrier) === car.family);
         if (own && D.CARRIERS[own.carrier].tier >= car.tier) continue;   // 이미 같거나 더 위면 안 내놓는다
+        const need = this.blockedTypes().find(bt => this.familiesFor({ type: bt.type, size: bt.maxSize, customs: 0 }).includes(car.family));
         items.push({ kind: 'contract', carrier, grade: car.grade, price: Math.round(car.price * R.priceMult), name: car.name, sold: false,
-          hint: own ? T('market.switchHint', { name: D.CARRIERS[own.carrier].name }) : null, switchFrom: own ? own.id : null });
+          hint: need ? T('market.hint', { short: D.PARCEL_TYPES[need.type].short, count: need.count }) : own ? T('market.switchHint', { name: D.CARRIERS[own.carrier].name }) : null, switchFrom: own ? own.id : null });
       }
       items.push(...this._refillItems());
       for (const e of spec.enh || []) if (D.ENHANCEMENTS[e]) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });

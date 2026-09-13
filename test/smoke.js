@@ -86,6 +86,23 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('기한이 하루 단위(4일 등)', !/⏳/.test(pt) || /⏳\s*[1-9]\d*일/.test(pt), (pt.match(/⏳\s*\S+/) || ['(기한 표시 없음)'])[0]);
   ok('택배 줄에 "턴"이 없다', !/\d턴/.test(pt));
 
+  // ---------- 5.5 처리할 수 없는 택배: 무엇이 필요한지 알려준다 ----------
+  await page.evaluate(() => {
+    const g = PT.game;
+    g.parcels.push({ id: 9999, type: 'large', size: 4, baseSize: 4, reward: 100, attrs: [], customer: 'anon', deadline: 6, overdue: false, age: 0, warm: 0, customs: 0, inCold: false, inFrozen: false });
+    g._assignCold(); PT.renderAll();
+  });
+  await page.waitForTimeout(250);
+  const stuckRows = await page.evaluate(() => document.querySelector('#parcels').textContent);
+  ok('실을 차 없는 택배에 경고', /실을 차 없음/.test(stuckRows));
+  await page.click('#parcels .parcel[data-id="9999"]', { force: true }); await page.waitForTimeout(350);
+  const pd = await page.evaluate(() => document.querySelector('#modal').textContent);
+  ok('택배 상세가 필요한 계열을 알려준다', /계열 계약이 있어야/.test(pd), (pd.match(/지금 계약으로는[^(]*/) || [''])[0].trim().slice(0, 60));
+  await shot('05b-stuck');
+  await page.click('.foot .btn', { force: true }); await page.waitForTimeout(250);
+  await page.evaluate(() => { const g = PT.game; g.parcels = g.parcels.filter(p => p.id !== 9999); g._assignCold(); PT.renderAll(); });
+  await page.waitForTimeout(200);
+
   // ---------- 6. 호출 ----------
   const slot = await page.evaluate(() => { const g = PT.game; let best = -1, bv = -1; g.contracts.forEach((c, i) => { if (!c || !g.canCall(c)) return; const v = g.eligibleParcels(c).reduce((s, p) => s + p.size, 0); if (v > bv) { bv = v; best = i; } }); return bv > 0 ? best : -1; });
   if (slot >= 0) {
