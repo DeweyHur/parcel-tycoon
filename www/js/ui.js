@@ -403,6 +403,7 @@
     const trustInfo = (vol, trucks) => { const g = game.trustGainPreview(c, vol, trucks), nx = game.trustNext(c.carrier); return `<div class="d" style="font-size:11px;margin-bottom:6px">${trustBar(game, c.carrier)} ${T('call.xpGain', { xp: g.xp, parts: g.parts.join(', ') })}${nx ? ` · ${T('call.nextLevel')}: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 1 ? ` · ${esc(D.trustEffectText(c.carrier, game.trustLevel(c.carrier)))}` : ''}<details><summary style="cursor:pointer;color:var(--dim)">${T('call.trackToggle')}</summary>${trustTrack(c.carrier, game.trustXp(c.carrier))}</details></div>`; };
     const sel = new Set();
     let extraTrucks = 0; // 사용자가 '한 대 더'로 늘린 대수
+    let autoTrimmed = false; // 급한 순 자동 선택이 반쯤 빈 차를 빼고 담았는지
     const render = () => {
       const selP = [...sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
       const vol = selP.reduce((s, p) => s + p.size, 0);
@@ -417,7 +418,8 @@
       const capsLine = `<div class="d" style="font-size:11px;color:var(--dim);margin-bottom:4px">${car.badge || ''} ${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</div>`;
       const after = `${T('fmt.trucks', { n: c.calls })} → ${T('fmt.trucks', { n: Math.max(0, c.calls - trucks) })}`;
       const body = `<p style="font-size:12px;color:var(--dim)">${esc(car.desc)} · ${T('fmt.vehicleCap', { vehicle: esc(car.vehicle || ''), cap: vcap })} · ${T('fmt.perTruck', { fee })}${notes.length ? `<br>${T('call.bonus')}: ${notes.join(', ')}` : ''}</p>${capsLine}${gauge}${money}<div class="pickinfo"><span>${T('call.selected', { n: sel.size, cap: elig.length })}</span><span>${T('call.remain')} <b>${after}</b></span></div>${riskLine}${trustInfo(vol, trucks)}<div id="pick-list" style="display:flex;flex-direction:column;gap:3px"></div>
-        <div style="margin-top:8px;display:flex;gap:6px"><button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button></div>`;
+        <div style="margin-top:8px;display:flex;gap:6px"><button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button></div>
+        ${autoTrimmed ? `<div class="d" style="font-size:11px;color:var(--dim);margin-top:4px">${T('call.autoTrim')}</div>` : ''}`;
       const m = modal(game.contractName(c), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: `${T('call.btn')} (${T('fmt.count', { n: sel.size })} · ${T('fmt.trucks', { n: trucks })} · -${callFee}c)`, cls: 'primary', disabled: sel.size === 0, onClick: () => { closeModal(); doCall(i, [...sel], trucks); } }]);
       const ta = m.querySelector('#truck-add'); if (ta) ta.onclick = () => { extraTrucks = trucks; SFX.select(); render(); };
       const td = m.querySelector('#truck-del'); if (td) td.onclick = () => { extraTrucks = Math.max(0, trucks - 2); SFX.cancel(); render(); };
@@ -425,6 +427,7 @@
       renderParcels(list, game.parcels, { sel, elig: new Set(elig.map(p => p.id)), risk: new Set(elig.filter(p => game.breakProb(c, p) > 0).map(p => p.id)) });
       list.querySelectorAll('.parcel').forEach(el => el.onclick = () => {
         const id = +el.dataset.id; if (!elig.some(p => p.id === id)) return;
+        autoTrimmed = false;
         if (sel.has(id)) { sel.delete(id); SFX.cancel(); }
         else { const p = elig.find(x => x.id === id); const v = [...sel].reduce((s, q) => s + (game.parcels.find(x => x.id === q) || { size: 0 }).size, 0) + p.size; const maxCap = vcap * Math.min(simul, Math.max(1, c.calls)); if (v > maxCap) { toast(T('call.maxSelect', { cap: maxCap })); return; } sel.add(id); SFX.select(); }
         render();
@@ -432,10 +435,12 @@
       m.querySelector('#pick-urgent').onclick = () => {
         sel.clear();
         const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
-        let v = 0; const maxCap = vcap * Math.min(simul, Math.max(1, c.calls)); for (const p of sorted) { if (v + p.size <= maxCap) { sel.add(p.id); v += p.size; } } SFX.select(); render();
+        const r = game.autoPick(c, sorted, Math.min(simul, Math.max(1, c.calls)));
+        autoTrimmed = r.trimmed; r.ids.forEach(id => sel.add(id));
+        SFX.select(); render();
       };
-      m.querySelector('#pick-clear').onclick = () => { sel.clear(); SFX.cancel(); render(); };
-      storyCheck({ kind: 'modal', modal: 'call', sel: sel.size, elig: elig.length });
+      m.querySelector('#pick-clear').onclick = () => { sel.clear(); autoTrimmed = false; SFX.cancel(); render(); };
+      storyCheck({ kind: 'modal', modal: 'call', sel: sel.size, elig: elig.length, slot: i });
     };
     render();
   }

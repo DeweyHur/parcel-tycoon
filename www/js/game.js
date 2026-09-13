@@ -571,6 +571,18 @@
     // ⚠ 파손 확률: 능력에 fragile이 없으면
     breakProb(c, p) { const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs; if (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile')) return 0; return Math.min(0.95, D.BREAK_PROB * this.rules.breakMult * (this.customerPerk(p.customer, 'breakMult') || 1)); }
     eligibleParcels(c) { return this.parcels.filter(p => this.canHandle(c, p)); }
+    // 급한 순 자동 선택. sorted 는 급한 순으로 정렬된 후보, maxTrucks 는 이번에 부를 수 있는 최대 대수.
+    // 급한 것부터 담되 "마지막 차가 본전선(적재 80%)도 못 채우면 그 차는 통째로 뺀다".
+    // 7칸 차에 10칸을 7+3 으로 나눠 보내면 두 번째 차는 배차비만 더 나간다.
+    // 그래도 보내야 하면 플레이어가 직접 고르거나, 대기 턴에 직접 배송하면 된다.
+    autoPick(c, sorted, maxTrucks) {
+      const vcap = this.vehicleCap(c), maxCap = vcap * Math.max(1, maxTrucks);
+      const take = []; let v = 0;
+      for (const p of sorted) if (v + p.size <= maxCap) { take.push(p); v += p.size; }
+      let trimmed = false;
+      while (take.length) { const tr = Math.ceil(v / vcap); if (tr <= 1 || v - (tr - 1) * vcap >= vcap * 0.8) break; v -= take.pop().size; trimmed = true; }
+      return { ids: take.map(p => p.id), vol: v, trucks: Math.max(1, Math.ceil(v / vcap)), trimmed };
+    }
     canCall(c) {
       if (!c || this.isStruck(c) || this.isOffTurn()) return false;
       if (c.calls <= 0 && !(this.rules.spareCall && !this.monthStats.spareUsed)) return false;

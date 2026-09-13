@@ -76,7 +76,7 @@
     { id: 'usage', months: [1], kind: 'turn', when: g => g.turn >= 2, pages: [{ expr: 'neutral', hl: '#bar-usage' }] },
     { id: 'callReady', months: [1], kind: 'turn', when: g => g.turn >= 3 || bestReadySlot(g).fill >= 0.8, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     // 호출 팝업 안: 자동 선택 버튼 → 호출 버튼. 팝업이 다시 그려질 때마다 ctx.sel(선택 수)로 확인한다
-    { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#pick-urgent', gate: true }] },
+    { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#pick-list' }, { expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
     // 안내가 끝났다는 걸 말로 못 박아 준다. 이게 없으면 언제까지 시키는 대로 해야 하는지 알 수 없다.
@@ -114,11 +114,14 @@
   ];
 
   // 문구 자리표시자
-  function params(g) {
+  function params(g, ctx) {
     const bulk = g.contracts.find(c => c && (root.DATA.CARRIERS[c.carrier].onlyPlain)) || g.contracts.find(Boolean);
     const cap = bulk ? g.vehicleCap(bulk) : 6, fee = bulk ? g.truckFee(bulk) : 35;
     const b = bestReadySlot(g); const c = b.slot >= 0 ? g.contracts[b.slot] : bulk;
+    const oc = ctx && ctx.slot != null ? g.contracts[ctx.slot] : null;   // 지금 열려 있는 호출 팝업의 계약
     return { name: bulk ? g.contractName(bulk) : '', cap, fee, per: Math.round(fee / Math.max(1, cap)), ready: c ? g.contractName(c) : '', readyCap: c ? g.vehicleCap(c) : cap,
+      openName: oc ? g.contractName(oc) : '', openCap: oc ? g.vehicleCap(oc) : cap, openFee: oc ? g.truckFee(oc) : fee,
+      openVol: oc ? g.eligibleParcels(oc).reduce((s2, p) => s2 + p.size, 0) : 0, openSimul: oc ? g.simulMax(oc) : 1, openCalls: oc ? oc.calls : 0,
       cash: g.cash, projected: g.projectedCash().total, outdoor: g.outdoorVolume(), rent: g.opCostBreakdown(g.month).rent, months: g.rules.months, cal: g.calMonth(), startCal: g.calMonth(1), lastCal: g.calMonth(g.rules.months),
       delivered: g.run.delivered, returned: g.stats.returned + g.stats.stolen + g.stats.broken, full: g.stats.fullTrucks, fee2: fee, interest: Math.round(root.DATA.LOAN.interest * 100) };
   }
@@ -137,12 +140,12 @@
       let ok = false; try { ok = !!b.when(g, ctx); } catch (e) { ok = false; }
       if (!ok) continue;
       g.story.seen.push(b.id);
-      return build(b, g);
+      return build(b, g, ctx);
     }
     return null;
   }
-  function build(b, g) {
-    const p = params(g);
+  function build(b, g, ctx) {
+    const p = params(g, ctx);
     const pages = b.pages.map((pg, i) => {
       const key = pg.k ? pg.k(g) : `story.${b.id}.${i + 1}`;
       const speaker = typeof pg.speaker === 'function' ? pg.speaker(g) : pg.speaker || 'park';

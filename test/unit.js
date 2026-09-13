@@ -247,8 +247,8 @@ t('스토리: 팝업 비트는 kind modal + modal 이름이 맞을 때만, 선�
   const wf = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 3, outdoor: 0 });
   assert.ok(wf && wf.id === 'waitFirst' && wf.pages[0].hl === '#modal .foot .btn.primary' && wf.pages[0].gate);
   assert.equal(Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 3, outdoor: 0 }), null);
-  const a = Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3 }); assert.ok(a && a.id === 'callModal' && a.pages[0].hl === '#pick-urgent' && a.pages[0].gate);
-  assert.equal(Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3 }), null);
+  const a = Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3, slot: 0 }); assert.ok(a && a.id === 'callModal' && a.pages.length === 3 && a.pages[2].hl === '#pick-urgent' && a.pages[2].gate && /칸/.test(a.pages[0].text));
+  assert.equal(Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3, slot: 0 }), null);
   const b = Story.check(g, { kind: 'modal', modal: 'call', sel: 2, elig: 3 }); assert.ok(b && b.id === 'callGo' && b.pages[1].hl === '#modal .foot .btn.primary' && b.pages[1].gate);
   const drain = () => { let x, ids = []; while ((x = Story.check(g, { kind: 'turn' }))) ids.push(x.id); return ids; };
   g.weatherNow = () => 'rain'; assert.ok(!drain().includes('rain')); // 마당이 비어 있으면 비가 와도 rain 은 안 나온다
@@ -260,6 +260,30 @@ t('스토리: 팝업 비트는 kind modal + modal 이름이 맞을 때만, 선�
   g.outdoorVolume = () => 3;
   let r; while ((r = Story.check(g, { kind: 'turn' })) && r.id !== 'rain'); assert.ok(r && /3칸/.test(r.pages[0].text) && r.pages[1].gate, JSON.stringify(g.story.seen));
   const rr = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 2, outdoor: 3 }); assert.ok(rr && rr.id === 'rainReorder' && rr.pages[0].hl === '#wm-reorder');
+});
+t('자동 선택: 마지막 차가 본전선(80%)도 못 채우면 그 차는 통째로 뺀다', () => {
+  const g = NG(9, { story: true });
+  const c = g.contracts.find(Boolean);
+  const vcap = g.vehicleCap(c);
+  const mk = (sizes) => sizes.map((size, i) => ({ id: 100 + i, size }));
+  // 7칸 차에 10칸 → 7+3 이 아니라 꽉 차는 한 대까지만
+  const ten = mk(Array(10).fill(1));
+  const r = g.autoPick(c, ten, 3);
+  assert.equal(r.vol, vcap, `한 대 분량만: ${r.vol} vs ${vcap}`);
+  assert.equal(r.trucks, 1);
+  assert.ok(r.trimmed);
+  // 두 대를 꽉 채울 만큼 있으면 두 대까지 담는다
+  const many = mk(Array(vcap * 2 + 1).fill(1));
+  const r2 = g.autoPick(c, many, 3);
+  assert.equal(r2.trucks, 2); assert.equal(r2.vol, vcap * 2); assert.ok(r2.trimmed);
+  // 한 대도 못 채우면 있는 만큼 담는다 (한 대 밑으로는 자르지 않는다)
+  const few = mk([1, 1]);
+  const r3 = g.autoPick(c, few, 3);
+  assert.equal(r3.vol, 2); assert.equal(r3.trucks, 1); assert.ok(!r3.trimmed);
+  // 마지막 차가 80% 이상이면 그대로 둔다
+  const edge = mk(Array(vcap + Math.ceil(vcap * 0.8)).fill(1));
+  const r4 = g.autoPick(c, edge, 3);
+  assert.equal(r4.trucks, 2); assert.ok(!r4.trimmed);
 });
 t('스토리: 비트 문구 키가 ko/en 에 모두 있다', () => {
   for (const b of Story.BEATS) b.pages.forEach((pg, i) => { if (pg.k) return; const k = `story.${b.id}.${i + 1}`; assert.ok(KO.ui[k] && EN.ui[k], k); });
