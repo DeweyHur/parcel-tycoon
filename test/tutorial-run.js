@@ -62,7 +62,7 @@ while (g.month <= 3 && guard++ < 200) {
     const o = g.weekendChoices().find(x => x.id === 'parttime');
     const pick = o && o.ok && g.cash > o.cost + 300 ? 'parttime' : 'rest';
     g.weekendChoose(pick);
-    console.log(`${g.month}-${w.after} 주말(${w.days[0]}~${w.days[1]}일) → ${pick}${w.outdoor ? ` · 야외 ${w.outdoor}칸` : ''}`);
+    console.log(`${g.month}-${w.after} 일요일(${w.week}주차) → ${pick}${w.outdoor ? ` · 야외 ${w.outdoor}칸` : ''}`);
     g.takeEvents(); continue;
   }
   if (g.phase !== 'play') break;
