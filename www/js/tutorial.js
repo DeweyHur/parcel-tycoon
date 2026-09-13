@@ -11,7 +11,7 @@
   const TUTORIAL = {
     YEAR: 2027,      // 대본은 해를 고정한다 — 2027년 3월 1일이 월요일이라 전반 13영업일이 대본과 딱 맞는다
     SEED: 20260313,   // 대본 밖(파손·도난·통관 지연 굴림)도 매번 같게
-    CYCLES: 6,        // 인수인계 = 6사이클(3개월). 대본은 각 달 '전반' 사이클에만 붙고 후반은 무작위다
+    CYCLES: 6,        // 인수인계 = 6사이클(3개월). 여섯 사이클 전부 대본이다 (해도 TUT.YEAR 로 고정)
 
     months: {
       // ----- 1사이클 = 3월 전반: 쌓았다가 꽉 채워 보낸다. 3턴에 딱 한 대(6칸), 8턴에 딱 두 대(12칸) -----
@@ -33,8 +33,31 @@
           ['normal 2 mart', 'normal 1 anon'],                   // 3월 15일, 전반 마지막 날
         ]),
         // 마켓(1개월차 정산 후): 배차를 늘리는 세 가지가 한 화면에 다 있어야 한다 — 충전(상시) · 한도 강화 · 상위 센터
-        // 1개월차 마켓: 배차를 늘리는 두 가지(충전 · 한도 강화)와 창고 확장만. 갈아타기는 신뢰가 쌓인 2·3개월차에 꺼낸다
-        market: { contracts: [], enh: ['limit1'], fac: ['expand1'] },
+        // 첫 마켓: 배차를 늘리는 두 가지(충전 · 한도 강화)만. 창고 확장은 실제로 넘쳐 본 뒤(5사이클)에 꺼낸다
+        market: { contracts: [], enh: ['limit1'], fac: [] },
+      },
+
+      // ----- 2사이클 = 3월 후반 (14영업일): 혼자 해 보기. 물량이 늘어 창고가 처음 4분의 3까지 찬다 -----
+      2: {
+        weather: ['sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny'],
+        turns: turns([
+          ['normal 2 mart'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart'],
+          ['normal 2 mart', 'normal 1 anon'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart'],                                     // 토요일
+          ['normal 2 mart', 'normal 2 anon', 'normal 2 mart'],    // 일요일 뒤 월요일 — 주말치가 한꺼번에
+          ['normal 2 mart', 'normal 1 anon'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart', 'normal 2 mart', 'normal 2 anon'],    // 여기서 창고 76% — usage76
+          ['normal 2 mart'],
+          ['normal 1 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart'],
+        ]),
+        // 아직 확장은 없다 — 배차로 버티는 법을 먼저
+        market: { contracts: [], enh: ['limit1'], fac: [] },
       },
 
       // ----- 3사이클 = 4월 전반: 고객과 특수 품목. ⚠ 3개 vs 시작 배차 2대 → 배차가 떨어진다 -----
@@ -60,18 +83,40 @@
         market: { contracts: ['fragile1'], enh: ['limit2'], fac: ['cold1'] },
       },
 
+      // ----- 4사이클 = 4월 후반 (13영업일): ❄ 신선과 냉장 구역. 냉장 6칸이 금방 찬다 -----
+      4: {
+        weather: ['sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny'],
+        turns: turns([
+          ['normal 2 mart', 'fresh 2 dawn'],                      // ❄ 첫 등장
+          ['normal 2 anon', 'normal 2 mart'],
+          ['fresh 2 dawn', 'normal 2 mart', 'normal 1 anon'],
+          ['normal 2 mart', 'fragile 2 glass'],
+          ['normal 2 mart', 'fresh 2 dawn', 'normal 2 anon'],     // 냉장 3개 = 6칸, 구역이 꽉 찬다
+          ['normal 2 mart'],
+          ['normal 2 anon', 'normal 2 mart', 'fresh 2 dawn'],
+          ['normal 2 mart', 'fragile 2 glass'],
+          ['normal 2 mart', 'normal 1 anon'],
+          ['fresh 2 dawn', 'normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart', 'fragile 2 glass'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart', 'fresh 2 dawn'],
+        ]),
+        market: { contracts: ['cold1'], enh: ['limit2'], fac: ['cold1'] },
+      },
+
       // ----- 5사이클 = 5월 전반: 가정의 달 ⚠. 창고가 차고, 비가 오고, 배차를 관리해야 한다 -----
       5: {
-        weather: ['sunny', 'sunny', 'rain', 'rain', 'sunny', 'rain', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'rain'],
+        weather: ['sunny', 'sunny', 'rain', 'rain', 'sunny', 'sunny', 'rain', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny'],
         turns: turns([
           ['normal 2 mart', 'fragile 2 glass'],
           ['normal 2 mart', 'fragile 2 glass', 'normal 1 anon'],
           ['normal 2 mart', 'normal 2 anon', 'fresh 2 dawn', 'fragile 4 glass', 'normal 2 anon'],
-          ['normal 2 mart', 'normal 2 anon', 'fragile 2 glass', 'normal 2 mart', 'normal 2 anon', 'normal 1 mart'], // 창고가 넘쳐 마당에 나간다 (같은 턴 비 예보)
-          ['normal 2 mart', 'fresh 2 dawn'],
-          ['normal 2 mart', 'normal 2 anon', 'fragile 2 glass'],
-          ['normal 2 mart', 'normal 1 anon'],
-          ['normal 2 mart', 'fresh 2 dawn'],
+          ['normal 2 mart', 'normal 2 anon', 'fragile 2 glass', 'normal 2 mart', 'normal 2 anon', 'normal 1 mart'],
+          ['normal 2 mart', 'fresh 2 dawn', 'normal 1 anon'],
+          // 가정의 달 폭주 — 한 번에 14칸. 어떻게 부르든 창고(24칸)를 넘겨 마당에 나간다
+          ['normal 2 mart', 'normal 2 anon', 'fragile 2 glass', 'normal 2 mart', 'normal 2 anon', 'normal 2 mart', 'fresh 2 dawn'],
+          ['normal 1 anon'],                                      // 토요일 · 비 — 마당에 둔 게 젖는다. 그대로 일요일로
+          ['normal 2 mart'],                                      // 밀린 걸 빼낼 이틀을 준다
           ['normal 2 mart', 'fragile 2 glass'],
           ['normal 2 mart'],
           ['normal 2 mart', 'normal 2 anon'],
@@ -79,6 +124,25 @@
           ['normal 2 mart', 'fresh 2 dawn'],
         ]),
         market: { contracts: ['bulk1'], enh: ['cap1'], fac: ['expand1'] },
+      },
+      // ----- 6사이클 = 5월 후반 (13영업일): 마무리. 물량이 완만해 사고 없이 끝낼 수 있다 — 평판 등급이 오르는 맛을 본다 -----
+      6: {
+        weather: ['sunny', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny', 'sunny'],
+        turns: turns([
+          ['normal 2 mart', 'normal 1 anon'],
+          ['normal 2 mart', 'fresh 2 dawn'],
+          ['normal 2 mart'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'fresh 2 dawn'],
+          ['normal 1 mart'],
+          ['normal 2 mart', 'normal 2 anon', 'fragile 2 glass'],
+          ['normal 2 mart'],
+          ['normal 2 mart', 'fresh 2 dawn'],
+          ['normal 2 mart', 'normal 1 anon'],
+          ['normal 2 mart', 'fragile 2 glass'],
+          ['normal 2 mart'],
+          ['normal 1 mart'],
+        ]),
       },
     },
   };

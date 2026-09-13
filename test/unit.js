@@ -278,27 +278,32 @@ t('대본: 인수인계 런은 시드가 고정이고 1~3개월차 입고·날�
   assert.deepEqual(g.weather, TUT.months[1].weather);
   assert.equal(flat(g.schedule), flat(g2.schedule), '난이도가 달라도 물류는 같다');
 });
-t('대본: 4개월차부터는 대본이 없다(무작위로 돌아간다)', () => {
+t('대본: 인수인계 6사이클은 전부 대본, 그 뒤부터는 무작위', () => {
   const g = TG();
-  assert.ok(g.script(1) && g.script(3)); assert.equal(g.script(4), null);
-  const a = g._makeSchedule(4), b = g._makeSchedule(4);
-  assert.notDeepEqual(a.map(t2 => t2.length), TUT.months[1].turns.map(t2 => t2.length));
-  assert.ok(a.flat().length > 0 && b.flat().length > 0);
+  for (let c = 1; c <= TUT.CYCLES; c++) assert.ok(g.script(c), c + '사이클 대본');
+  assert.equal(g.script(TUT.CYCLES + 1), null);
+  // 사이클마다 대본 길이가 그 사이클의 영업일 수와 맞는다 (짧으면 뒤가 빈 날이 된다)
+  for (let c = 1; c <= TUT.CYCLES; c++) assert.equal(TUT.months[c].turns.length, g.turns(c), c + '사이클 턴 수');
+  const a = g._makeSchedule(TUT.CYCLES + 1);
+  assert.ok(a.flat().length > 0);
 });
 t('대본: 일반 런(인수인계가 아닌 안내 토글)은 대본을 쓰지 않는다', () => {
   const g = new Game({ seed: 7, story: true });
   assert.equal(g.script(1), null);
 });
-t('대본 마켓: 1개월차는 충전·한도 강화·창고 확장만(계약 카드 없음), 2개월차는 갈아타기 카드', () => {
+t('대본 마켓: 첫 마켓은 충전·한도 강화만, 3사이클은 갈아타기 카드, 확장은 5사이클', () => {
   const g = TG();
   g.month = 1; g.contracts[0].calls = 2;
   const m1 = g._genMarketItems();
-  assert.ok(m1.some(it => it.kind === 'refill') && m1.some(it => it.kind === 'enh' && it.enh === 'limit1') && m1.some(it => it.kind === 'fac' && it.fac === 'expand1'));
-  assert.ok(!m1.some(it => it.kind === 'contract'), '1개월차엔 계약 카드 없음');
+  assert.ok(m1.some(it => it.kind === 'refill') && m1.some(it => it.kind === 'enh' && it.enh === 'limit1'));
+  assert.ok(!m1.some(it => it.kind === 'fac'), '창고 확장은 실제로 넘쳐 본 5사이클 마켓에서');
+  assert.ok(!m1.some(it => it.kind === 'contract'), '첫 마켓엔 계약 카드 없음');
   g.month = 3;
   const m2 = g._genMarketItems();
   const sw = m2.find(it => it.kind === 'contract');
   assert.ok(sw && sw.carrier === 'fragile1' && sw.switchFrom, '⚠ 상위 센터 갈아타기 카드');
+  g.month = 5;
+  assert.ok(g._genMarketItems().some(it => it.kind === 'fac' && it.fac === 'expand1'), '넘쳐 본 뒤에 창고 확장');
 });
 t('대본: 배차 0 + 보낼 택배가 있으면 callsOut 비트', () => {
   const g = TG();
