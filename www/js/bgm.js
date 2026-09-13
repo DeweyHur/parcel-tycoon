@@ -47,6 +47,36 @@ window.BGM = (function () {
   function preload(names) { for (const n of names) load(n).catch(() => { }); }
 
   // 루프 BGM 재생 (같은 곡이면 무시). fade: 초
+  //
+  // 주의: src.loop = true 를 쓰지 않는다.
+  // Chrome(48kHz 출력)에서 이 곡들처럼 긴 버퍼를 loop=true 로 돌리면 첫 루프 경계에서
+  // 재생 위치가 얼어붙어, 같은 128샘플(렌더 퀀텀)만 무한 반복하며 "삐-" 하는 순음이 된다
+  // (loopStart/loopEnd 를 명시해도 동일). 그래서 루프 대신 같은 버퍼를 샘플 단위로
+  // 정확히 이어붙여(back-to-back) 예약한다 — 이음매는 원본이 이미 크로스페이드돼 있어 그대로 매끄럽다.
+  const CHAIN_AHEAD = 12;   // 초. 이만큼 앞까지 미리 예약해 둔다
+  function _startTrack(name, buf, fade, loop) {
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(1, ctx.currentTime + fade);
+    gain.connect(duck);
+    const t = { name, gain, srcs: [], timer: null, dead: false, loop: !!loop };
+    t.nextSample = Math.round((ctx.currentTime + 0.05) * ctx.sampleRate);
+    const add = () => {
+      if (t.dead || !ctx) return;
+      let guard = 0;
+      while (t.nextSample / ctx.sampleRate < ctx.currentTime + CHAIN_AHEAD && guard++ < 8) {
+        const s = ctx.createBufferSource(); s.buffer = buf;
+        s.connect(gain); s.start(t.nextSample / ctx.sampleRate);
+        s.onended = () => { const i = t.srcs.indexOf(s); if (i >= 0) t.srcs.splice(i, 1); try { s.disconnect(); } catch (e) { } if (!t.loop && cur === t) cur = null; };
+        t.srcs.push(s);
+        t.nextSample += buf.length;
+        if (!t.loop) break;
+      }
+    };
+    add();
+    if (t.loop) t.timer = setInterval(add, 4000);
+    return t;
+  }
   function play(name, opts = {}) {
     if (!FILES[name]) return;
     init(); if (!ctx) return;
@@ -59,21 +89,19 @@ window.BGM = (function () {
       if (my !== gen) return;                        // 그 사이 다른 곡이 요청됨
       if (!ctx || ctx.state !== 'running') return;   // 그 사이 잠듦
       if (cur && cur.name === name) return;
-      const src = ctx.createBufferSource(); src.buffer = buf; src.loop = opts.loop !== false;
-      const gain = ctx.createGain(); gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(1, ctx.currentTime + fade);
-      src.connect(gain); gain.connect(duck); src.start();
+      const t = _startTrack(name, buf, fade, opts.loop !== false);
       _fadeOut(cur, fade);
-      cur = { name, src, gain };
-      if (!src.loop) src.onended = () => { if (cur && cur.src === src) cur = null; };
+      cur = t;
     }).catch(() => { });
   }
   function _fadeOut(t, fade) {
     if (!t) return;
+    t.dead = true; clearInterval(t.timer);
     const g = t.gain.gain; g.cancelScheduledValues(ctx.currentTime); g.setValueAtTime(Math.max(g.value, 0.0001), ctx.currentTime);
     g.exponentialRampToValueAtTime(0.0001, ctx.currentTime + fade);
-    try { t.src.stop(ctx.currentTime + fade + 0.05); } catch (e) { }
-    t.src.onended = () => { try { t.src.disconnect(); t.gain.disconnect(); } catch (e) { } };
+    const at = ctx.currentTime + fade + 0.05;
+    for (const s of t.srcs.slice()) { try { s.stop(at); } catch (e) { } }
+    setTimeout(() => { try { t.gain.disconnect(); } catch (e) { } }, (fade + 0.4) * 1000);
   }
   function stop(fade = 0.6) { gen++; want = null; if (cur) { _fadeOut(cur, fade); cur = null; } }
   // 원샷 (팡파레 등): BGM 위에 겹쳐 재생
