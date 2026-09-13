@@ -237,7 +237,30 @@
     if (f.overdue) warn.push(T('wait.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wait.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wait.frozenOver', { n: f.frozenOver }));
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
     wb.innerHTML = `${T('wait.btn')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ' · ' + warn.join(' ') : ''}</small>`;
+    renderCoach();
   }
+  // ---------- 스토리 모드 코치 한 줄 ----------
+  // 안내가 대사로만 나가면 "오늘은 기다려"가 그날 하루 얘기로 읽힌다.
+  // 차가 찰 때까지 매 턴 지금 뭘 해야 하는지 액션 버튼 위에 한 줄로 붙여 둔다 (스토리 모드에서만).
+  function coachHint(g) {
+    const b = Story.bestSlot(g);
+    const c = b.slot >= 0 ? g.contracts[b.slot] : g.contracts.find(Boolean);
+    if (!c) return T('coach.noContract');
+    const name = g.contractName(c), cap = g.vehicleCap(c);
+    const vol = g.eligibleParcels(c).reduce((s2, p) => s2 + p.size, 0);
+    if (g.usage() >= 0.9) return T('coach.full');
+    if (b.slot >= 0 && b.fill >= 0.8) return T('coach.ready', { name, pct: Math.round(b.fill * 100) });
+    return T('coach.wait', { vol, cap, name });
+  }
+  function renderCoach() {
+    const el = $('#coach'), g = game;
+    if (!g || !window.Story || !Story.active(g) || g.phase !== 'play') { el.hidden = true; return; }
+    let hint = null; try { hint = coachHint(g); } catch (e) { hint = null; }
+    if (!hint) { el.hidden = true; return; }
+    el.innerHTML = `<img src="${Story.sprite('park', 'neutral', false)}" alt=""><span>${hint}</span>`;
+    el.hidden = false;
+  }
+
   // ---------- HUD 팝업: 회사 · 날씨 · 입고 예정 ----------
   function showCompanyInfo() {
     const g = game, co = g.company;
@@ -384,7 +407,7 @@
       const cap = vcap * trucks, callFee = game.callFee(c, trucks), income = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
       const fill = vol / cap;
       const gauge = `<div class="truckgauge"><div class="tg"><i style="width:${Math.min(100, fill * 100)}%" class="${fill >= 0.8 ? 'good' : ''}"></i><span>${T('call.trucks', { n: trucks, vol, cap })}</span></div><div class="tbtn">${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : `<span class="d" style="color:var(--dim)">${T('call.simulMax', { n: Math.min(simul, Math.max(1, c.calls)) })}</span>`}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}</div></div>`;
-      const money = `<div class="pickinfo"><span>+${income}c − ${callFee}c = <b class="${income - callFee >= 0 ? '' : 'bad'}">${T('call.net', { net: income - callFee })}</b></span>${fill >= 0.8 && vol ? `<span style="color:var(--green)">${T('call.fillOk')}</span>` : ''}</div>`;
+      const money = `<div class="pickinfo"><span>+${income}c − ${callFee}c = <b class="${income - callFee >= 0 ? '' : 'bad'}">${T('call.net', { net: income - callFee })}</b></span>${fill >= 0.8 && vol ? `<span style="color:var(--green)">${T('call.fillOk')}</span>` : vol ? `<span style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</span>` : ''}</div>`;
       const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
       const riskLine = riskSel.length ? `<div class="d" style="font-size:12px;color:var(--orange);margin-bottom:6px">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
       const capsLine = `<div class="d" style="font-size:11px;color:var(--dim);margin-bottom:4px">${car.badge || ''} ${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</div>`;

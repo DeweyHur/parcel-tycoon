@@ -243,6 +243,9 @@ t('스토리: 끄면 안 나오고, 세이브에 진행 상태가 남는다', ()
 });
 t('스토리: 팝업 비트는 kind modal + modal 이름이 맞을 때만, 선택 수에 따라 자동선택 → 호출 순서. 비 비트는 마당에 택배가 있을 때만', () => {
   const g = NG(4, { story: true }); g.story.seen = ['intro', 'usage', 'callReady'];
+  // 1개월차 첫 대기 팝업: '그냥 대기' 에 게이트. 딱 한 번만.
+  const wf = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 3, outdoor: 0 });
+  assert.ok(wf && wf.id === 'waitFirst' && wf.pages[0].hl === '#modal .foot .btn.primary' && wf.pages[0].gate);
   assert.equal(Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 3, outdoor: 0 }), null);
   const a = Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3 }); assert.ok(a && a.id === 'callModal' && a.pages[0].hl === '#pick-urgent' && a.pages[0].gate);
   assert.equal(Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3 }), null);

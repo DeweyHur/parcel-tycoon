@@ -61,6 +61,10 @@ body { touch-action: manipulation; }
 .tag.cold { background: #1f4f55; color: var(--cyan); } .tag.warm { background: #553a1f; color: var(--orange); }
 #empty { color: var(--dim); text-align: center; padding: 14px; font-size: 13px; }
 
+/* 스토리 모드 코치 한 줄: 지금 뭘 해야 하는지 액션 버튼 바로 위에서 알려준다 */
+#coach { display: flex; align-items: center; gap: 6px; margin: 0 8px 4px; padding: 4px 6px; font-size: 12px; line-height: 1.35; color: var(--gold); background: rgba(0, 0, 0, .28); border-left: 3px solid var(--gold); }
+#coach img { width: 18px; height: 18px; flex: 0 0 auto; image-rendering: pixelated; }
+#coach[hidden] { display: none !important; }
 #actions { padding: 6px 8px 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--panel); border-top: 3px solid var(--line); }
 .btn { font-family: inherit; font-size: 13px; color: var(--ink); background: var(--panel2); border: 3px solid var(--line); box-shadow: 3px 3px 0 var(--shadow); padding: 6px 6px; text-align: left; cursor: pointer; line-height: 1.25; position: relative; }
 .btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--shadow); }
