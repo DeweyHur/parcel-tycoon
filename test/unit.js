@@ -265,4 +265,31 @@ t('스토리: 비트 문구 키가 ko/en 에 모두 있다', () => {
   for (let c = 1; c <= 12; c++) assert.ok(KO.ui[`cal.kr.${c}.note`] && KO.ui[`cal.kr.${c}.label`] && EN.ui[`cal.kr.${c}.note`], 'cal ' + c);
   for (const id of ['holiday_rush', 'holiday_off', 'gift', 'sale']) assert.ok(KO.ui['cal.event.' + id] && EN.ui['cal.event.' + id]);
 });
+t('데모: demoMonths 개월 정산이 끝나면 데모 종료(승리도 패배도 아님), 본편은 그대로 이어진다', () => {
+  const run3 = (extra) => { const g = EMPTY(7, extra); for (let m = 1; m <= 3; m++) { g.turn = D.TURNS_PER_MONTH; g.cash = 5000; g.feesDue = 0; g._endMonth(); assert.equal(g.phase, 'summary', 'month ' + m); if (m < 3) { g.closeSummary(); assert.equal(g.phase, 'market', 'market ' + m); g.closeMarket(); } } return g; };
+  const demo = run3({ demoMonths: 3 });
+  demo.closeSummary();
+  assert.equal(demo.phase, 'over');
+  assert.ok(demo.result.demo, 'result.demo');
+  assert.equal(demo.result.win, false);
+  assert.equal(demo.result.monthsDone, 3);          // 3개월을 채운 것으로 기록
+  assert.ok(demo.result.score > 0, 'score ' + demo.result.score);
+  const full = run3({});
+  full.closeSummary();
+  assert.equal(full.phase, 'market');               // 본편은 4개월차로 이어진다
+  full.closeMarket(); assert.equal(full.month, 4);
+});
+t('데모: 컷이 시나리오 길이보다 길거나 같으면 데모 컷은 동작하지 않는다(1개월 시나리오 등)', () => {
+  const g = EMPTY(8, { scenario: 'blackfriday', demoMonths: 3 });
+  assert.equal(g.rules.months, 1);
+  g.turn = D.TURNS_PER_MONTH; g.cash = 5000; g.run.delivered = 99; g._endMonth();
+  g.closeSummary();
+  assert.ok(g.phase === 'win' || g.phase === 'over', g.phase);
+  assert.ok(!g.result.demo, '데모 컷이 아니라 시나리오 승패로 끝난다');
+});
+t('데모: 문구 키가 ko/en 에 모두 있다', () => {
+  for (const k of ['demo.fullOnly', 'demo.cta', 'demo.gateTitle', 'demo.gateBody', 'demo.resultTitle', 'demo.resultHead', 'demo.resultBody', 'demo.endReason', 'demo.soon', 'demo.storySub',
+    'stat.export', 'stat.import', 'stat.exportHelp', 'stat.importHelp', 'stat.importOk', 'stat.importFail', 'stat.copy', 'stat.copied', 'stat.copyFail', 'stat.importBtn', 'stat.transferNote'])
+    assert.ok(KO.ui[k] && EN.ui[k], k);
+});
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);

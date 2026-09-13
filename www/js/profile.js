@@ -9,7 +9,7 @@ window.Profile = (function () {
       bigDelivered: 0, bestScore: 0, clearsByCompany: {}, clearsByCompanyStandard: {}, clearsByScenario: {}, dailyStreak: 0, lastDaily: null, dailyDone: {} };
   }
   function fresh() {
-    return { version: 1, unlocked: JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), achievements: {}, stats: emptyStats(), records: {}, recentRuns: [], createdAt: Date.now() };
+    return { version: 1, license: { full: false, source: 'demo' }, unlocked: JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), achievements: {}, stats: emptyStats(), records: {}, recentRuns: [], createdAt: Date.now() };
   }
   function load() {
     P = Store.get(KEY);
@@ -31,6 +31,7 @@ window.Profile = (function () {
     }
     // 새 필드 보정
     P.stats = Object.assign(emptyStats(), P.stats);
+    P.license = Object.assign({ full: false, source: 'demo' }, P.license);
     P.unlocked = Object.assign(JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), P.unlocked);
     for (const k of ['companies', 'perks', 'scenarios']) for (const d of M.DEFAULT_UNLOCK[k]) if (!P.unlocked[k].includes(d)) P.unlocked[k].push(d);
     evaluate(null, null); // 해금 조건이 바뀐 경우(누적·메타) 기존 기록으로 즉시 반영
@@ -43,6 +44,38 @@ window.Profile = (function () {
     r.bestScore = Math.max(r.bestScore, score); r.bestMonth = Math.max(r.bestMonth, months);
   }
   function isUnlocked(kind, id) { return P.unlocked[kind].includes(id); }
+  // 본편 접근권. 데모 빌드에서만 의미가 있다(BUILD.demo). 도전과제 해금과는 별개의 한 겹.
+  function hasFull() { return !!(P && P.license && P.license.full); }
+  function setFull(source) { P.license = { full: true, source: source || 'unknown', at: Date.now() }; save(); return P.license; }
+  // 프로필 이동(데모 → 본편, 모바일 → Steam): 코드 문자열로 내보내고 합친다
+  function exportCode() {
+    const payload = { v: 1, license: P.license, unlocked: P.unlocked, achievements: P.achievements, stats: P.stats, records: P.records, recentRuns: P.recentRuns.slice(0, 20) };
+    const json = JSON.stringify(payload);
+    const b64 = typeof btoa !== 'undefined' ? btoa(unescape(encodeURIComponent(json))) : Buffer.from(json, 'utf8').toString('base64');
+    return b64.replace(/=+$/, '');
+  }
+  function importCode(code) {
+    let o; try {
+      const b64 = String(code).replace(/\s+/g, '');
+      const json = typeof atob !== 'undefined' ? decodeURIComponent(escape(atob(b64))) : Buffer.from(b64, 'base64').toString('utf8');
+      o = JSON.parse(json);
+    } catch (e) { return { ok: false, reason: 'parse' }; }
+    if (!o || o.v !== 1 || !o.unlocked) return { ok: false, reason: 'shape' };
+    let added = 0;
+    for (const k of ['companies', 'perks', 'scenarios']) for (const id of o.unlocked[k] || []) if (!P.unlocked[k].includes(id)) { P.unlocked[k].push(id); added++; }
+    P.unlocked.perkSlots = Math.max(P.unlocked.perkSlots || 1, o.unlocked.perkSlots || 1);
+    for (const id in o.achievements || {}) if (!P.achievements[id]) { P.achievements[id] = o.achievements[id]; added++; }
+    for (const k in o.stats || {}) {
+      const a = P.stats[k], b = o.stats[k];
+      if (typeof a === 'number' && typeof b === 'number') P.stats[k] = Math.max(a, b);
+      else if (a && b && typeof a === 'object' && typeof b === 'object') for (const kk in b) if (typeof b[kk] === 'number') a[kk] = Math.max(a[kk] || 0, b[kk]);
+    }
+    for (const sc in o.records || {}) for (const co in o.records[sc]) setRecord(sc, co, o.records[sc][co].bestScore || 0, o.records[sc][co].bestMonth || 0);
+    // 접근권은 내려가지 않는다(본편 빌드에서 데모 코드를 넣어도 유지)
+    if (o.license && o.license.full && !hasFull()) P.license = Object.assign({}, o.license, { imported: true });
+    save(); evaluate(null, null); save();
+    return { ok: true, added };
+  }
   function perkSlots() { return P.unlocked.perkSlots || 1; }
 
   function grant(ach) {
@@ -111,7 +144,7 @@ window.Profile = (function () {
       // 오래된 데일리 기록 정리
       const keys = Object.keys(p.dailyDone).sort(); while (keys.length > 60) delete p.dailyDone[keys.shift()];
     }
-    P.recentRuns.unshift({ date: new Date().toISOString().slice(0, 10), score: result.score, win: result.win, month: result.month, turn: result.turn, cash: result.cash, scenario: result.scenario, company: result.company, difficulty: result.difficulty, perks: result.perks, reason: result.reason });
+    P.recentRuns.unshift({ date: new Date().toISOString().slice(0, 10), score: result.score, win: result.win, demo: !!result.demo, month: result.month, turn: result.turn, cash: result.cash, scenario: result.scenario, company: result.company, difficulty: result.difficulty, perks: result.perks, reason: result.reason });
     P.recentRuns = P.recentRuns.slice(0, 20);
     const got = evaluate(game, result);
     save();
@@ -119,5 +152,5 @@ window.Profile = (function () {
   }
   function dailyDoneToday(date) { return P.stats.dailyDone[date] != null; }
   function reset() { P = fresh(); save(); }
-  return { load, get, save, isUnlocked, perkSlots, evaluate, recordRun, dailyDoneToday, reset, KEY };
+  return { load, get, save, isUnlocked, perkSlots, evaluate, recordRun, dailyDoneToday, reset, hasFull, setFull, exportCode, importCode, KEY };
 })();

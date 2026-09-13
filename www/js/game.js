@@ -1092,6 +1092,8 @@
     }
     closeSummary() {
       if (this.phase !== 'summary') return false;
+      const dm = this.cfg.demoMonths || 0;
+      if (dm && this.month >= dm && this.month < this.rules.months) return this._finishDemo();
       if (!this.rules.endless && this.month >= this.rules.months) return this._finish();
       this._openMarket();
       return true;
@@ -1106,6 +1108,14 @@
       if (R.winBigCustomer && this.bigCustomer && this.customerLevel(this.bigCustomer) < 3) return this._gameOver(MSG('over.bigCustomer', { name: M.CUSTOMERS[this.bigCustomer].name, level: this.customerLevel(this.bigCustomer) })), true;
       return this._win();
     }
+    // 데모 종료: 승리도 패배도 아니다(win false, demo true). 본편에서 이어지는 지점.
+    _finishDemo() {
+      this.phase = 'over';
+      this.result = this._makeResult(false, MSG('demo.endReason', { n: this.month }), this.month);
+      this.result.demo = true;
+      this.say('demo.endReason', { n: this.month });
+      return true;
+    }
     _gameOver(reason) {
       this.phase = 'over';
       this.result = this._makeResult(false, reason);
@@ -1117,12 +1127,12 @@
       this.say(this.result.reason);
       return true;
     }
-    _makeResult(win, reason) {
-      const monthsDone = win ? this.rules.months : this.month - 1;
+    _makeResult(win, reason, monthsDoneArg) {
+      const monthsDone = monthsDoneArg != null ? monthsDoneArg : win ? this.rules.months : this.month - 1;
       this.stats.monthsDone = monthsDone;
       this.stats.distinctCarriersAtEnd = new Set(this.contracts.filter(Boolean).map(c => c.carrier)).size;
       const score = Math.round(Math.max(0, this.run.revenue + Math.max(0, this.cash) + monthsDone * (this.rules.endless ? 300 : 200) - this.stress * 10) * this.rules.scoreMult);
-      return { win, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, stress: this.stress, seed: this.seed,
+      return { win, demo: false, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, stress: this.stress, seed: this.seed,
         scenario: this.cfg.scenario, company: this.cfg.company, difficulty: this.cfg.difficulty || 'normal', perks: this.perks.slice(), variants: (this.cfg.variants || []).slice(), date: this.cfg.date || null, ...this.run };
     }
 

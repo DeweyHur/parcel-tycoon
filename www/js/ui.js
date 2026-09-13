@@ -5,6 +5,9 @@
   const SAVE_KEY = 'save_v2', OPT_KEY = 'opts_v1';
   let game = null, scene = null, busy = false;
   if (typeof window !== 'undefined') Object.defineProperty(window, '__game', { get: () => game });
+  const BUILD = Object.assign({ demo: false, demoMonths: 3, iap: null, store: {} }, window.BUILD || {});
+  const demoMonths = () => BUILD.demoMonths || 3;
+  const demoLocked = () => !!BUILD.demo && !Profile.hasFull();   // 데모 빌드 + 본편 미구매
   const opts = Object.assign({ sound: true, music: true, musicVol: 0.6, sms: true }, Store.get(OPT_KEY) || {});
   SFX.setEnabled(opts.sound); BGM.setEnabled(opts.music); BGM.setVolume(opts.musicVol);
   Profile.load();
@@ -56,8 +59,9 @@
     const nTotal = Object.keys(M.COMPANIES).length + Object.keys(M.PERKS).length + Object.keys(M.SCENARIOS).length;
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
       ${save ? `<button class="btn primary" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(save.story ? T('title.story') : M.SCENARIOS[save.cfg.scenario] ? M.SCENARIOS[save.cfg.scenario].name : save.cfg.scenario)} · ${T('fmt.monthTurn', { m: save.month, t: save.turn })})</small></button>` : ''}
-      <button class="btn ${P.story && P.story.seen ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${T('title.storySub')}</small></button>
-      <button class="btn ${P.story && P.story.seen ? 'gold' : ''}" id="t-new">${T('title.new')}</button>
+      <button class="btn ${P.story && P.story.seen ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${demoLocked() ? T('demo.storySub', { n: demoMonths() }) : T('title.storySub')}</small></button>
+      ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
+      <button class="btn ${P.story && P.story.seen && !demoLocked() ? 'gold' : ''}" id="t-new">${demoLocked() ? '🔒 ' : ''}${T('title.new')}${demoLocked() ? ` <small style="color:var(--dim)">${T('demo.fullOnly')}</small>` : ''}</button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).length, d: Object.keys(M.ACHIEVEMENTS).length })}</small></button>
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
       <button class="btn" id="t-help">${T('title.help')}</button>
@@ -67,6 +71,7 @@
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
     m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort')); return; } showScenarioSelect(); };
     m.querySelector('#t-story').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-story').click(); }, T('title.newShort')); return; } showStoryStart(); };
+    const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex('companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
@@ -81,7 +86,7 @@
   function showStoryStart() {
     const diffRow = `<div class="diffrow">${['rookie', 'normal'].map(id => { const d = M.DIFFICULTIES[id]; return `<button class="btn small ${storyDiff === id ? 'on' : ''}" data-diff="${id}" title="${esc(d.desc)}">${d.icon} ${d.name}</button>`; }).join('')}</div><div class="d" style="font-size:11px;color:var(--dim);margin-bottom:6px">${esc(M.DIFFICULTIES[storyDiff].desc)}</div>`;
     const face = `<img src="${Story.SPRITES.smile}" style="width:64px;height:64px;image-rendering:pixelated;float:left;margin:0 10px 6px 0;border:3px solid var(--line);background:#3a3555">`;
-    const m = modal(T('story.startTitle'), `<p>${face}${T('story.startBody')}</p><div style="clear:both"></div><div class="perk-count">${T('story.diffAsk')}</div>${diffRow}`, [{ label: T('btn.back'), onClick: showTitle }, { label: T('story.start'), cls: 'primary', onClick: () => { game = new Game({ scenario: 'standard', company: 'local', perks: [], insurer: 'none', difficulty: storyDiff, story: true, prep: false }); closeModal(); startPlay(); } }]);
+    const m = modal(T('story.startTitle'), `<p>${face}${T('story.startBody')}</p><div style="clear:both"></div><div class="perk-count">${T('story.diffAsk')}</div>${diffRow}`, [{ label: T('btn.back'), onClick: showTitle }, { label: T('story.start'), cls: 'primary', onClick: () => { game = new Game({ scenario: 'standard', company: 'local', perks: [], insurer: 'none', difficulty: storyDiff, story: true, prep: false, demoMonths: demoLocked() ? demoMonths() : 0 }); closeModal(); startPlay(); } }]);
     m.querySelectorAll('[data-diff]').forEach(el => el.onclick = () => { SFX.select(); storyDiff = el.dataset.diff; showStoryStart(); });
   }
 
@@ -90,21 +95,21 @@
   const TIER_NAMES = () => [T('tier.0'), T('tier.1'), T('tier.2'), T('tier.3')];
   const prep = { scenario: 'standard', company: 'local', perks: [], insurer: 'sturdy', difficulty: 'normal' };
   function showScenarioSelect() {
-    const P = Profile.get(), dc = Game.dailyConfig ? null : null;
+    const P = Profile.get(), lock = demoLocked();
     const daily = window.dailyConfig(today());
     const cards = Object.keys(M.SCENARIOS).map(id => {
-      const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id);
+      const s = M.SCENARIOS[id], un = !lock && P.unlocked.scenarios.includes(id);
       let extra = '';
       if (id === 'daily') extra = `<div class="d">${T('prep.today')}: ${T('fmt.calOnly', { cal: daily.startMonth })} · ${esc(M.COMPANIES[daily.company].name)} · ${daily.variants.map(v => esc(M.DAILY_VARIANTS[v].name)).join(' + ')}${Profile.dailyDoneToday(daily.date) ? ` · <b>${T('prep.dailyDone')}</b>` : ''}</div>`;
       const rec = P.records[id]; const best = rec ? Math.max(0, ...Object.values(rec).map(r => r.bestScore)) : 0;
       return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">${s.months >= 99 ? '∞' : T('fmt.months', { n: s.months })}</small></span><span class="price">${best ? T('fmt.pts', { n: best }) : ''}</span></div>
-        <div class="d">${esc(s.desc)}<br>${T('prep.win')}: ${esc(s.win)} · ${T('prep.recommend')}: ${esc(s.recommend)}</div>${un ? extra : `<div class="d">${esc(unlockText(s.unlock))}</div>`}</div>`;
+        <div class="d">${esc(s.desc)}<br>${T('prep.win')}: ${esc(s.win)} · ${T('prep.recommend')}: ${esc(s.recommend)}</div>${un ? extra : `<div class="d">${lock ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
     }).join('');
     const diffUn = id => !M.DIFFICULTIES[id].unlock || P.achievements[M.DIFFICULTIES[id].unlock];
     if (!diffUn(prep.difficulty)) prep.difficulty = 'normal';
     const diffRow = `<div class="diffrow">${Object.keys(M.DIFFICULTIES).map(id => { const d = M.DIFFICULTIES[id], un = diffUn(id); return `<button class="btn small ${prep.difficulty === id ? 'on' : ''} ${un ? '' : 'dis'}" data-diff="${id}" title="${esc(d.desc)}">${d.icon} ${d.name}</button>`; }).join('')}</div><div class="d" style="font-size:11px;color:var(--dim);margin-bottom:6px">${esc(M.DIFFICULTIES[prep.difficulty].desc)}${prep.scenario === 'daily' ? ` · ${T('prep.dailyNormal')}` : ''}</div>`;
-    const m = modal(T('prep.scenarioTitle'), `<div class="perk-count">${T('prep.step1')}</div>${diffRow}${cards}`, [{ label: T('btn.title'), onClick: showTitle }, { label: T('prep.nextCompany'), cls: 'primary', onClick: () => { if (prep.scenario === 'daily') { prep.company = daily.company; showPerkSelect(daily); } else showCompanySelect(); } }]);
-    m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (!P.unlocked.scenarios.includes(id)) { toast(unlockText(M.SCENARIOS[id].unlock), 2500); return; } SFX.select(); prep.scenario = id; showScenarioSelect(); });
+    const m = modal(T('prep.scenarioTitle'), `<div class="perk-count">${T('prep.step1')}</div>${diffRow}${cards}`, [{ label: T('btn.title'), onClick: showTitle }, { label: lock ? T('demo.cta') : T('prep.nextCompany'), cls: lock ? 'gold' : 'primary', onClick: () => { if (lock) return showDemoGate(showScenarioSelect); if (prep.scenario === 'daily') { prep.company = daily.company; showPerkSelect(daily); } else showCompanySelect(); } }]);
+    m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (lock) { SFX.click(); showDemoGate(showScenarioSelect); return; } if (!P.unlocked.scenarios.includes(id)) { toast(unlockText(M.SCENARIOS[id].unlock), 2500); return; } SFX.select(); prep.scenario = id; showScenarioSelect(); });
     m.querySelectorAll('[data-diff]').forEach(el => el.onclick = () => { const id = el.dataset.diff; if (!diffUn(id)) { toast(unlockText(M.DIFFICULTIES[id].unlock), 2500); return; } SFX.select(); prep.difficulty = id; showScenarioSelect(); });
   }
   function companyInfo(co, id) {
@@ -113,16 +118,16 @@
     return `<div class="d">${wh} · ${T('hud.cash')} ${co.cash}<br>${T('prep.contracts')}: ${esc(ct)}</div><div class="d" style="color:var(--green)">＋ ${esc(co.passive)}</div><div class="d" style="color:var(--orange)">－ ${esc(co.weakness)}</div>`;
   }
   function showCompanySelect() {
-    const P = Profile.get();
+    const P = Profile.get(), lock = demoLocked();
     if (!P.unlocked.companies.includes(prep.company)) prep.company = 'local';
     const cards = Object.keys(M.COMPANIES).sort((x, y) => (M.COMPANIES[x].tier || 0) - (M.COMPANIES[y].tier || 0)).map(id => {
-      const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id);
+      const co = M.COMPANIES[id], un = !lock && P.unlocked.companies.includes(id);
       const rec = (P.records[prep.scenario] || {})[id];
       return `<div class="card ${un ? '' : 'dis'} ${prep.company === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${co.icon} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${rec ? T('fmt.pts', { n: rec.bestScore }) : ''}</span></div>
-        ${un ? companyInfo(co, id) : `<div class="d">${esc(unlockText(co.unlock))}</div>`}</div>`;
+        ${un ? companyInfo(co, id) : `<div class="d">${lock ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(co.unlock))}</div>`}</div>`;
     }).join('');
-    const m = modal(T('prep.companyTitle'), `<div class="perk-count">${T('prep.step2')} — ${esc(M.SCENARIOS[prep.scenario].name)}</div>${cards}`, [{ label: T('btn.back'), onClick: showScenarioSelect }, { label: T('prep.nextPerk'), cls: 'primary', onClick: () => showPerkSelect(null) }]);
-    m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (!P.unlocked.companies.includes(id)) { toast(unlockText(M.COMPANIES[id].unlock), 2500); return; } SFX.select(); prep.company = id; showCompanySelect(); });
+    const m = modal(T('prep.companyTitle'), `<div class="perk-count">${T('prep.step2')} — ${esc(M.SCENARIOS[prep.scenario].name)}</div>${cards}`, [{ label: T('btn.back'), onClick: showScenarioSelect }, { label: lock ? T('demo.cta') : T('prep.nextPerk'), cls: lock ? 'gold' : 'primary', onClick: () => lock ? showDemoGate(showCompanySelect) : showPerkSelect(null) }]);
+    m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (lock) { SFX.click(); showDemoGate(showCompanySelect); return; } if (!P.unlocked.companies.includes(id)) { toast(unlockText(M.COMPANIES[id].unlock), 2500); return; } SFX.select(); prep.company = id; showCompanySelect(); });
   }
   function perkConflict(pid) {
     const perk = M.PERKS[pid], co = M.COMPANIES[prep.company];
@@ -155,7 +160,7 @@
     });
   }
   function startRun(daily) {
-    const cfg = { scenario: prep.scenario, company: prep.company, perks: prep.perks.slice(), variants: [], insurer: prep.insurer, difficulty: prep.difficulty, prep: true, story: !!prep.story };
+    const cfg = { scenario: prep.scenario, company: prep.company, perks: prep.perks.slice(), variants: [], insurer: prep.insurer, difficulty: prep.difficulty, prep: true, story: !!prep.story, demoMonths: demoLocked() ? demoMonths() : 0 };
     if (daily) { cfg.seed = daily.seed; cfg.variants = daily.variants; cfg.date = daily.date; cfg.company = daily.company; cfg.startMonth = daily.startMonth; }
     game = new Game(cfg);
     closeModal(); startPlay();
@@ -632,16 +637,33 @@
       r.got = Profile.recordRun(game, r);
       Store.remove(SAVE_KEY);
       BGM.stop(0.5);
-      if (r.win) { SFX.win(); BGM.oneShot('fanfare'); } else { SFX.over(); setTimeout(() => BGM.oneShot('gameover'), 300); }
+      if (r.win || r.demo) { SFX.win(); BGM.oneShot('fanfare'); } else { SFX.over(); setTimeout(() => BGM.oneShot('gameover'), 300); }
     }
     const P = Profile.get();
     const rec = (P.records[r.scenario] || {})[r.company];
     const got = (r.got || []).map(a => `<div class="card" style="cursor:default"><div class="t">🏆 ${esc(a.name)}</div>${a.unlocks.map(u => `<div class="d" style="color:var(--green)">${T('res.unlocked', { name: esc(u.name) })}</div>`).join('')}</div>`).join('');
-    const body = `<p style="text-align:center">${esc(I18n.text(r.reason))}</p><div class="big-num">${T('fmt.pts', { n: r.score })}${rec && r.score >= rec.bestScore && r.score > 0 ? ` ${T('res.best')}` : ''}</div>${got}
+    const demoNote = r.demo ? `<div class="card gold" style="cursor:default"><div class="t">🔒 ${T('demo.resultHead')}</div><div class="d">${T('demo.resultBody', { n: r.monthsDone })}</div></div>` : '';
+    const body = `<p style="text-align:center">${esc(I18n.text(r.reason))}</p>${demoNote}<div class="big-num">${T('fmt.pts', { n: r.score })}${rec && r.score >= rec.bestScore && r.score > 0 ? ` ${T('res.best')}` : ''}</div>${got}
       <div class="kv"><span>${T('res.scenarioCompany')}</span><span class="v">${esc(M.SCENARIOS[r.scenario].name)}${r.difficulty && r.difficulty !== 'normal' ? ` (${esc(M.DIFFICULTIES[r.difficulty].name)})` : ''} / ${esc(M.COMPANIES[r.company].name)}</span><span>${T('res.reached')}</span><span class="v">${T('fmt.monthTurn', { m: r.month, t: r.turn })}</span><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.cash')}</span><span class="v">${r.cash}c</span><span>${T('sum.stress')}</span><span class="v">${r.stress}</span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${r.perks.map(p => M.PERKS[p].name).join(', ') || T('common.none')}</span>${r.variants.length ? `<span>${T('prep.variants')}</span><span class="v">${r.variants.map(v => M.DAILY_VARIANTS[v].name).join(', ')}</span>` : ''}<span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
     const again = r.scenario === 'daily' ? { label: T('res.toTitle'), cls: 'primary', onClick: () => { closeModal(); game = null; showTitle(); } } : { label: T('res.again'), cls: 'primary', onClick: () => { closeModal(); const cfg = game.cfg; game = new Game({ scenario: cfg.scenario, company: cfg.company, perks: cfg.perks, insurer: cfg.insurer, difficulty: cfg.difficulty, prep: true }); startPlay(); } };
-    modal(r.win ? T('res.win') : T('res.over'), body, [{ label: T('res.toTitle'), onClick: () => { closeModal(); game = null; showTitle(); } }, again]);
+    modal(r.demo ? T('demo.resultTitle') : r.win ? T('res.win') : T('res.over'), body, [{ label: T('res.toTitle'), onClick: () => { closeModal(); game = null; showTitle(); } }, r.demo ? { label: T('demo.cta'), cls: 'gold', onClick: () => showDemoGate(showResult) } : again]);
   }
+  // ---------- 데모 안내: 본편에 무엇이 더 있는지 + 어디서 사는지 ----------
+  function showDemoGate(back) {
+    const nSc = Object.keys(M.SCENARIOS).length, nCo = Object.keys(M.COMPANIES).length, nPk = Object.keys(M.PERKS).length;
+    const names = [['itch', 'itch.io'], ['steam', 'Steam'], ['play', 'Google Play']].filter(([k]) => BUILD.store && BUILD.store[k]);
+    const links = names.length
+      ? `<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">${names.map(([k, nm]) => `<a class="btn gold" href="${esc(BUILD.store[k])}" target="_blank" rel="noopener">${nm}</a>`).join('')}</div>`
+      : `<div class="d" style="margin-top:8px">${T('demo.soon')}</div>`;
+    const body = `<p>${T('demo.gateBody', { n: demoMonths() })}</p>
+      <div class="kv"><span>${T('demo.rowMonths')}</span><span class="v">${T('fmt.months', { n: M.SCENARIOS.standard.months })}</span>
+      <span>${T('demo.rowScenarios')}</span><span class="v">${T('fmt.count', { n: nSc })}</span>
+      <span>${T('demo.rowCompanies')}</span><span class="v">${T('fmt.count', { n: nCo })}</span>
+      <span>${T('demo.rowPerks')}</span><span class="v">${T('fmt.count', { n: nPk })}</span></div>
+      <div class="d" style="margin-top:6px">${T('demo.keepProfile')}</div>${links}`;
+    modal(T('demo.gateTitle'), body, [{ label: T('btn.close'), onClick: back || closeModal }]);
+  }
+
   function showRecords(back) {
     const P = Profile.get();
     const recs = Object.keys(P.records).map(sc => `<div style="margin-top:6px"><b>${esc(M.SCENARIOS[sc] ? M.SCENARIOS[sc].name : sc)}</b>: ${Object.keys(P.records[sc]).map(co => `${esc(M.COMPANIES[co].name)} ${T('fmt.pts', { n: P.records[sc][co].bestScore })}`).join(' · ')}</div>`).join('');
@@ -702,11 +724,32 @@
     } else {
       const s = P.stats, dt = s.deliveredByType;
       body += `<div class="kv stats"><span>${T('stat.runsClears')}</span><span class="v">${s.runs} / ${s.clears}</span><span>${T('stat.best')}</span><span class="v">${s.bestScore}</span><span>${T('stat.delivered')}</span><span class="v">${T('fmt.count', { n: dt.normal + dt.fresh + dt.fragile + dt.intl + dt.large })}</span><span class="sub">　${D.PARCEL_TYPES.normal.short} / ${D.PARCEL_TYPES.fresh.short}</span><span class="v sub">${dt.normal} / ${dt.fresh}</span><span class="sub">　${D.PARCEL_TYPES.fragile.short} / ${D.PARCEL_TYPES.intl.short} / ${D.PARCEL_TYPES.large.short}</span><span class="v sub">${dt.fragile} / ${dt.intl} / ${dt.large}</span><span>${T('res.callsWaits')}</span><span class="v">${s.calls} / ${s.waits}</span><span>${T('stat.contracts')}</span><span class="v">${s.contractsBought}</span><span>${T('sum.discarded')}</span><span class="v">${s.discarded}</span><span>${T('stat.tidy')}</span><span class="v">${s.tidyMonths}</span><span>${T('stat.daily')}</span><span class="v">${T('fmt.days', { n: s.dailyStreak })}</span></div>
-        <hr><p style="font-size:12px;color:var(--dim)">${T('stat.profileNote')}</p><button class="btn small warn" id="cx-reset">${T('stat.reset')}</button>`;
+        <hr><p style="font-size:12px;color:var(--dim)">${T('stat.profileNote')}</p>
+        <div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn small" id="cx-export" style="flex:1">${T('stat.export')}</button><button class="btn small" id="cx-import" style="flex:1">${T('stat.import')}</button></div>
+        <p style="font-size:11px;color:var(--dim)">${T('stat.transferNote')}</p><button class="btn small warn" id="cx-reset">${T('stat.reset')}</button>`;
     }
     const m = modal(T('title.codex'), body, [{ label: T('btn.close'), onClick: back }]);
     m.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { SFX.click(); showCodex(b.dataset.tab, back); });
     const rs = m.querySelector('#cx-reset'); if (rs) rs.onclick = () => askConfirm(T('stat.resetConfirm'), () => { Profile.reset(); SFX.cancel(); showCodex('stats', back); }, T('stat.resetBtn'));
+    const ex = m.querySelector('#cx-export'); if (ex) ex.onclick = () => { SFX.click(); showTransfer('export', () => showCodex('stats', back)); };
+    const im = m.querySelector('#cx-import'); if (im) im.onclick = () => { SFX.click(); showTransfer('import', () => showCodex('stats', back)); };
+  }
+
+  // 프로필 이동 코드: 내보내기(복사) · 가져오기(붙여넣기)
+  function showTransfer(mode, back) {
+    if (mode === 'export') {
+      const code = Profile.exportCode();
+      const body = `<p style="font-size:12px">${T('stat.exportHelp')}</p><textarea id="tr-code" readonly style="width:100%;height:120px;font-family:inherit;font-size:10px;background:#241f3a;color:var(--fg);border:3px solid var(--line);padding:6px;word-break:break-all">${esc(code)}</textarea>`;
+      const m = modal(T('stat.export'), body, [{ label: T('btn.close'), onClick: back }, { label: T('stat.copy'), cls: 'primary', onClick: () => { const ta = m.querySelector('#tr-code'); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) { } if (!ok && navigator.clipboard) { navigator.clipboard.writeText(code).then(() => toast(T('stat.copied'))); return; } toast(T(ok ? 'stat.copied' : 'stat.copyFail'), 2200); } }]);
+      setTimeout(() => { const ta = m.querySelector('#tr-code'); if (ta) ta.focus(); }, 50);
+      return;
+    }
+    const body = `<p style="font-size:12px">${T('stat.importHelp')}</p><textarea id="tr-code" placeholder="..." style="width:100%;height:120px;font-family:inherit;font-size:10px;background:#241f3a;color:var(--fg);border:3px solid var(--line);padding:6px;word-break:break-all"></textarea>`;
+    const m = modal(T('stat.import'), body, [{ label: T('btn.cancel'), onClick: back }, { label: T('stat.importBtn'), cls: 'primary', onClick: () => {
+      const r = Profile.importCode(m.querySelector('#tr-code').value.trim());
+      if (!r.ok) { SFX.cancel(); toast(T('stat.importFail'), 2400); return; }
+      SFX.select(); toast(T('stat.importOk', { n: r.added }), 2600); back();
+    } }]);
   }
 
   function showLog(back) {
