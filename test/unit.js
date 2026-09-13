@@ -12,7 +12,7 @@ const slot = (g, fam) => g.contracts.findIndex(c => c && D.familyOf(c.carrier) =
 
 t('시작 상태: 자금 450, 계약 3개(대량·냉장·프래자일), 준비 없이 play', () => { const g = NG(1); assert.equal(g.cash, 450); assert.equal(g.contracts.filter(Boolean).length, 3); assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk0', 'cold0', 'fragile0']); assert.equal(g.phase, 'play'); assert.equal(g.month, 1); });
 t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.sizeDelta, -1); });
-t('월 입고량 = 영업일 수 + 12×달력 배수 + 고객 단계 추가 (1개월차 3월), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.equal(sp.length, D.TURNS_PER_MONTH + Math.round(12 * g.seasonMods(1).arrivalsMult) + g._customerExtra()); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
+t('월 입고량 = 영업일 수 + 12×달력 배수 + 고객 단계 추가 (1개월차 3월), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.equal(sp.length, g.turns() + Math.round(12 * g.seasonMods(1).arrivalsMult) + g._customerExtra()); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
 t('조커 업체 없음: 용달·긴급 삭제', () => { assert.ok(!D.CARRIERS.target && !D.CARRIERS.urgent); for (const id in M.COMPANIES) for (const c of M.COMPANIES[id].contracts || []) assert.ok(D.FAMILIES[c.carrier] || D.CARRIERS[c.carrier], id + ' ' + c.carrier); });
 t('대기는 배차를 차감하지 않음', () => { const g = NG(3); const calls = g.contracts.map(c => c && c.calls); adv(g); assert.deepEqual(g.contracts.map(c => c && c.calls), calls); assert.equal(g.turn, 2); });
 
@@ -204,21 +204,30 @@ t('i18n: 자리표시자·복수형·메시지 객체 렌더링', () => {
   assert.ok(I18n.setLang('ko')); assert.equal(D.PARCEL_TYPES.fresh.name, '신선식품');
 });
 // ----- 달력 (docs/STORY_TUTORIAL_DESIGN.md 5장) -----
-t('시간: 1턴 = 하루, 일요일 휴무, 실제 달력(반월 정산)', () => {
-  const g = NG(5);
+t('시간: 1턴 = 하루, 일요일 휴무, 진짜 달력(반월 정산)', () => {
+  const g = NG(5, { year: 2027 });   // 2027년 3월 1일은 월요일
   assert.equal(D.CYCLES_PER_MONTH, 2); assert.equal(D.HALF_SPLIT, 15);
-  // 런 첫날(3월 1일)이 월요일 — 게임 달력은 매 런 같다
-  assert.equal(g.dowOfDate(1, 1), 0); assert.equal(g.dowOfDate(1, 7), 6);        // 7일이 일요일
+  assert.equal(g.year, 2027);
+  assert.equal(g.dowOfDate(1, 1), 0); assert.equal(g.dowOfDate(1, 7), 6);        // 3월 7일이 일요일
   assert.deepEqual(g.cycleWindow(1), [1, 15]); assert.deepEqual(g.cycleWindow(2), [16, 31]);
   assert.deepEqual(g.businessDays(1), [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 15]);
-  assert.equal(g.turns(1), 13); assert.equal(g.turns(2), 14);                     // 사이클마다 길이가 다르다
-  assert.equal(g.dateOf(7, 1), 8);                                                // 7번째 영업일 = 3월 8일
-  assert.ok(g.isWeekendAfter(6, 1) && !g.isWeekendAfter(5, 1));                    // 6일(토) 다음은 일요일
+  assert.equal(g.turns(1), 13); assert.equal(g.turns(2), 14);
+  assert.equal(g.dateOf(7, 1), 8);
+  assert.ok(g.isWeekendAfter(6, 1) && !g.isWeekendAfter(5, 1));
   assert.equal(g.monthIndex(1), 1); assert.equal(g.monthIndex(3), 2); assert.equal(g.half(2), 2);
   assert.equal(g.calMonth(1), 3); assert.equal(g.calMonth(3), 4); assert.equal(g.calMonth(24), 2);
-  assert.equal(g.yearOf(1), g.year); assert.equal(g.yearOf(21), g.year + 1);
+  assert.equal(g.yearOf(1), 2027); assert.equal(g.yearOf(21), 2028);
   assert.equal(g.dateLabel(4, 1), '3월 4일');
-});t('주말: 턴이 아니다 — 기한·입고는 멈추고 야외 도난만 한 번 더', () => {
+  // 로그라이크: 해가 다르면 요일도 영업일 수도 다르다. 윤년의 2월은 29일
+  const h = NG(5, { year: 2026 });   // 2026년 3월 1일은 일요일
+  assert.equal(h.turns(1), 12); assert.notDeepEqual(h.businessDays(1), g.businessDays(1));
+  const leap = NG(5, { year: 2027 }); leap.month = 24;           // 12개월차 = 이듬해 2월(2028, 윤년)
+  assert.equal(leap.monthLen(24), 29);
+});
+t('대본 런은 해가 고정된다 (인수인계는 매번 같은 달력)', () => {
+  const a = new Game({ seed: 1, scripted: true, scenario: 'quarter', story: true });
+  assert.equal(a.year, require('../www/js/tutorial.js').YEAR); assert.equal(a.turns(1), a.schedule.length);
+});('주말: 턴이 아니다 — 기한·입고는 멈추고 야외 도난만 한 번 더', () => {
   const g = EMPTY(6); g.parcels = [P(1, 'normal', 2, { deadline: 12 })];
   for (let i = 0; i < 6; i++) g.wait();
   assert.equal(g.phase, 'weekend'); assert.equal(g.turn, 6);   // 3월 6일(토) 다음은 7일 일요일

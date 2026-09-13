@@ -213,6 +213,8 @@
     'title.newShort': 'Start new',
     'opt.on': 'On',
     'opt.off': 'Off',
+    'cal.kr.name': 'Korea',
+    'prep.calendar': '📅 {year} · {place} calendar',
     'prep.today': 'Today',
     'prep.dailyDone': 'Recorded today',
     'prep.win': 'Win',

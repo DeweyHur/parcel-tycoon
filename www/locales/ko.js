@@ -214,6 +214,8 @@
     'title.newShort': '새로 시작',
     'opt.on': '켜짐',
     'opt.off': '꺼짐',
+    'cal.kr.name': '한국',
+    'prep.calendar': '📅 {year}년 · {place} 달력',
     'prep.today': '오늘',
     'prep.dailyDone': '오늘 기록 완료',
     'prep.win': '승리',

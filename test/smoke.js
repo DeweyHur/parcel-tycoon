@@ -40,7 +40,25 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('게임 방법 카드에 "턴"이 없다', !/매 턴/.test(howText));
   await shot('02-howto');
   // 닫기
-  for (let i = 0; i < 4; i++) { const b = await page.$('.foot .btn.primary'); if (!b) break; await b.click({ force: true }); await page.waitForTimeout(250); if (await page.$('#t-new')) break; }
+  await page.evaluate(() => PT.showTitle());
+  await page.waitForTimeout(300);
+
+  // ---------- 2.5 시나리오 화면: 연도·지역 달력 ----------
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.btn')].find(x => /새 런 시작/.test(x.textContent)); if (b) b.click(); });
+  await page.waitForTimeout(400);
+  // 「인수인계 먼저 권장」 모달이 뜨면 '그래도 새 런' 으로 넘어간다
+  for (let i = 0; i < 3; i++) {
+    if (await page.evaluate(() => /분기|한 해/.test(document.querySelector('#modal').textContent))) break;
+    const clicked = await page.evaluate(() => { const b = [...document.querySelectorAll('.modal .btn')].find(x => /그래도/.test(x.textContent)); if (b) { b.click(); return true; } return false; });
+    if (!clicked) break;
+    await page.waitForTimeout(400);
+  }
+  const scen = await page.evaluate(() => document.querySelector('#modal').textContent);
+  ok('시나리오에 분기·반기·한 해', /분기/.test(scen) && /반기/.test(scen) && /한 해/.test(scen));
+  ok('시나리오 카드에 연도·지역 달력', new RegExp(`${new Date().getFullYear()}년 · 한국 달력`).test(scen), (scen.match(/📅[^·]*·[^·]*달력/) || [''])[0].trim());
+  await shot('02b-scenarios');
+  await page.evaluate(() => PT.showTitle());
+  await page.waitForTimeout(300);
 
   // ---------- 3. 새 런 (안내 끄고) ----------
   await page.evaluate(() => { PT.prep.story = false; PT.startRun(); });
@@ -57,7 +75,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const hud = await page.evaluate(() => ({ month: document.querySelector('#hud-month').textContent, turn: document.querySelector('#hud-turn').textContent, yrPx: getComputedStyle(document.querySelector('#hud-month .yr')).fontSize, rep: document.querySelector('#stress-label').textContent + ' ' + document.querySelector('#stress-num').textContent }));
   const year = new Date().getFullYear();
   ok('HUD에 연도', hud.month.includes(String(year)), hud.month.trim());
-  ok('HUD에 실제 날짜·요일', /^1일\s*월$/.test(hud.turn.trim()), hud.turn.trim());
+  ok('HUD에 실제 날짜·요일', /^\d+일\s*[월화수목금토]$/.test(hud.turn.trim()), hud.turn.trim());
   ok('연도 글자 크기 = 11px (픽셀 폰트 원본)', hud.yrPx === '11px', hud.yrPx);
   ok('HUD 게이지가 평판', /평판/.test(hud.rep) && /20\/20/.test(hud.rep), hud.rep.replace(/\s+/g, ' ').trim());
   const oneLine = await page.evaluate(() => { const el = document.querySelector('#hud-left'); return el.getBoundingClientRect().height < 60; });
@@ -65,7 +83,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
 
   // ---------- 5. 택배 기한이 '일' ----------
   const pt = await page.evaluate(() => document.querySelector('#parcels').textContent);
-  ok('기한이 하루 단위(4일 등)', /⏳\s*[1-9]일/.test(pt), (pt.match(/⏳\s*\d+일/) || [''])[0]);
+  ok('기한이 하루 단위(4일 등)', !/⏳/.test(pt) || /⏳\s*[1-9]\d*일/.test(pt), (pt.match(/⏳\s*\S+/) || ['(기한 표시 없음)'])[0]);
   ok('택배 줄에 "턴"이 없다', !/\d턴/.test(pt));
 
   // ---------- 6. 호출 ----------
@@ -88,12 +106,12 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
     const w = await page.$('.foot .btn.primary'); if (w) await w.click({ force: true });
     await page.waitForTimeout(700); await settle(); s = await st();
   }
-  ok('토요일 다음에 일요일이 온다', s.phase !== 'weekend' || s.t === 6, `t=${s.t}`);
+  ok('토요일 다음에 일요일이 온다', s.phase !== 'weekend' || /토/.test(await page.evaluate(() => PT.game.dowName(PT.game.turn))), `t=${s.t}`);
   ok('엿새 뒤 일요일이 뜬다', s.phase === 'weekend', JSON.stringify(s));
   if (s.phase === 'weekend') {
     await shot('05-weekend');
     const wk = await page.evaluate(() => ({ head: document.querySelector('#modal h2').textContent, body: document.querySelector('#modal .body').textContent, opts: [...document.querySelectorAll('.wkopts .wkc')].map(b => ({ t: b.textContent, off: b.disabled })) }));
-    ok('일요일 카드 제목이 실제 날짜', /3월 7일 일요일/.test(wk.head), wk.head.trim());
+    ok('일요일 카드 제목이 실제 날짜', /3월 \d+일 일요일/.test(wk.head), wk.head.trim());
     ok('선택지 3개', wk.opts.length === 3, wk.opts.map(o => o.t.split('\n')[0]).join(' / '));
     const yard = await page.evaluate(() => PT.game.outdoorVolume());
     ok('마당이 비면 알바는 선택 불가', wk.opts[2].off === (yard === 0), `야외 ${yard}칸 · 알바 disabled=${wk.opts[2].off}`);

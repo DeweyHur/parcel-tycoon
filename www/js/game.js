@@ -49,7 +49,7 @@
     storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, eventGoods: false, storageAnon: false,
     // 4단계: 난이도·시나리오 고객 규칙
     feeMult: 1, feeFixed: null, feeDelta: 0,
-    gameoverStress: D.GAMEOVER_STRESS, noDualAttrs: false, dualAttrBonus: 0, burstDeadlineDelta: 0, customerClaimMult: {}, storageOfferEvery: 0, winStorage: 0, bigCustomer: false, winBigCustomer: false,
+    gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, burstDeadlineDelta: 0, customerClaimMult: {}, storageOfferEvery: 0, winStorage: 0, bigCustomer: false, winBigCustomer: false,
   };
   const MULT_KEYS = ['theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
   const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'burstTurns', 'selfCapDelta', 'allStartTrust'];
@@ -105,8 +105,9 @@
       this.phase = 'play';           // play | summary | market | over | win
       this.perks = cfg.perks.slice();
       this.month = 0; this.turn = 0;
-      // 런을 시작한 해를 찍어 세이브에 고정한다 (3월 시작 → 1·2월은 이듬해). 나중에 열어도 숫자가 안 바뀐다
-      this.year = cfg.year || new Date().getFullYear();
+      // 런의 해. 시나리오(rules.year)나 cfg 가 지정하면 그 해, 아니면 시작한 해를 찍어 세이브에 고정한다.
+      // 로그라이크라 해마다 요일·영업일 수가 달라지는 건 그대로 받는다 — 인수인계(대본)만 해를 고정한다.
+      this.year = cfg.year || (cfg.scripted && TUT && TUT.YEAR) || new Date().getFullYear();
       this.weekend = null; this.weekendBonus = null;
       this.rep = 0; this.repTier = 0;   // 평판(키우는 지표) — _buildRules 뒤에 상한만큼 채워 시작한다
       this.parcels = [];
@@ -126,6 +127,7 @@
       this.story = cfg.story ? { seen: [], notes: [] } : null; // 창고장 안내(스토리 모드) 진행 상태 — 본 비트 id
       this.trust = {}; // 업체별 신뢰도 경험치 (런 내 유지)
       for (const k of Object.keys(D.CARRIERS)) this.trust[k] = (famVal(this.rules.carrierStartTrust, k) || 0) + this.rules.allStartTrust;
+      if (this.rules.year) this.year = this.rules.year;   // 시나리오가 해를 지정하면 그 해의 달력으로
       this.rep = this.rules.gameoverStress;   // 전임 창고장이 물려준 평판에서 시작한다
       this._initCompany();
       this._initCustomers();
@@ -417,11 +419,10 @@
     half(c) { return ((c || this.month || 1) - 1) % D.CYCLES_PER_MONTH + 1; }          // 1 전반 · 2 후반
     calMonth(c) { const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return ((start - 1 + this.monthIndex(c) - 1) % 12) + 1; }
     yearOf(c) { const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return this.year + Math.floor((start - 1 + this.monthIndex(c) - 1) / 12); }
-    monthLen(c) { return D.MONTH_DAYS[this.calMonth(c)] || 30; }
-    // 런 첫날부터 센 절대 일수 (그 달 1일까지)
-    _absMonthStart(c) { let n = 0; const mi = this.monthIndex(c); for (let i = 1; i < mi; i++) n += D.MONTH_DAYS[this.calMonth(i * D.CYCLES_PER_MONTH)] || 30; return n; }
-    // 요일: 0 월 … 6 일
-    dowOfDate(c, day) { return (this._absMonthStart(c) + day - 1) % 7; }
+    // 진짜 달력: 그 해 그 달의 실제 길이(윤년 포함)와 실제 요일을 쓴다
+    monthLen(c) { return new Date(Date.UTC(this.yearOf(c), this.calMonth(c), 0)).getUTCDate(); }
+    // 요일: 0 월 … 6 일 (Date 는 0 일요일이라 돌려 맞춘다)
+    dowOfDate(c, day) { return (new Date(Date.UTC(this.yearOf(c), this.calMonth(c) - 1, day)).getUTCDay() + 6) % 7; }
     dowName(t, c) { return (T('fmt.dows') || '').split(',')[this.dowOfDate(c, this.dateOf(t, c))] || ''; }
     // 이 사이클이 덮는 날짜 창 (전반 1~15, 후반 16~말일)
     cycleWindow(c) { const h = this.half(c), last = this.monthLen(c); return h === 1 ? [1, Math.min(D.HALF_SPLIT, last)] : [D.HALF_SPLIT + 1, last]; }
