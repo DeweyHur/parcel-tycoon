@@ -264,8 +264,24 @@
       return w;
     }
     // 다음 달 고객별 예상 물량 (대략): 총 입고 × 고객 가중치 비율. 특수 비중은 단계로
+    // 대본 런의 정확한 예상: 대본에 적힌 입고를 고객별로 세어 그대로 보여 준다 (min=max)
+    _scriptForecast(m) {
+      const sc = this.script(m); if (!sc) return null;
+      const by = {};
+      for (const row of sc.turns) for (const sp of row) {
+        const id = sp.customer || 'anon', f = by[id] || (by[id] = { id, level: this.customerLevel(id), n: 0, cnt: {} });
+        f.n++; f.cnt[sp.type] = (f.cnt[sp.type] || 0) + 1;
+      }
+      return Object.values(by).map(f => {
+        const types = Object.keys(f.cnt).filter(t => t !== 'normal'), range = {}, pct = {};
+        for (const t of Object.keys(f.cnt)) { range[t] = [f.cnt[t], f.cnt[t]]; pct[t] = f.cnt[t] / f.n; }
+        if (!range.normal) range.normal = [0, 0];
+        return { id: f.id, level: f.level, min: f.n, max: f.n, special: types.length ? 1 : 0, types, pct, range, scripted: true };
+      }).sort((a, b) => b.max - a.max);
+    }
     customerForecast(m) {
       m = m || this.month + (this.phase === 'market' && !(this.market && this.market.prep) ? 1 : 0);
+      const sf = this._scriptForecast(m); if (sf) return sf;
       const R = this.rules;
       const total = Math.round((this.turns() + this._extraArrivals(Math.min(m, 6)) * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0)) * (R.burstTurns ? 1 : 1)) + (R.burstTurns || 0);
       const w = this._customerWeightsFor(m); const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
@@ -1352,28 +1368,19 @@
       return Object.values(acc).sort((a, b) => b.volume - a.volume);
     }
     // 예상 물량 중 지금 계약(과 직접 배송)으로 못 받는 종류. 마켓에서 "이건 실을 차가 없다"를 미리 말해 주려고
+    // 이 종류를 지금 계약(또는 직접 배송)으로 받을 수 있나 — 크기 후보 중 하나라도 되면 된다
+    canTakeType(t) {
+      const T = D.PARCEL_TYPES[t]; if (!T) return true;
+      const covers = this.contracts.filter(Boolean);
+      return (T.sizes || [1, 2]).some(sz => { const p = { type: t, size: sz, customs: 0 }; return covers.some(c => this.canHandle(c, p) && this.breakProb(c, p) === 0) || this.selfCan(p); });
+    }
+    // 다음 사이클 예상 중 못 받는 종류. **화면에 뜬 예상 그대로** 판정한다 —
+    // 보이는 줄과 붉은 줄이 어긋나면 플레이어는 어느 쪽도 믿지 않는다
     forecastBlocked(m) {
       m = m || this.month + (this.phase === 'market' && !(this.market && this.market.prep) ? 1 : 0);
-      const covers = this.contracts.filter(Boolean), out = [];
-      const check = (t, sizes) => {
-        if (out.includes(t)) return;
-        const ok = sizes.some(sz => { const p = { type: t, size: sz, customs: 0 }; return covers.some(c => this.canHandle(c, p) && this.breakProb(c, p) === 0) || this.selfCan(p); });
-        if (!ok) out.push(t);
-      };
-      // 대본 런은 다음 사이클에 뭐가 오는지 정확히 안다 — 추정 대신 그걸 쓴다
-      const sc = this.script(m);
-      if (sc) {
-        const byType = {};
-        for (const row of sc.turns) for (const s of row) (byType[s.type] || (byType[s.type] = [])).push(Math.max(1, s.size + this.rules.sizeDelta + (s.size >= 4 ? this.rules.bigSizeDelta : 0)));
-        for (const t of Object.keys(byType)) check(t, byType[t]);
-        return out;
-      }
-      // 무작위 런: 예상 범위의 합이 3 이상(대략 기대 1.5개 이상)인 종류만.
-      // 범위가 ±1이라 거의 안 오는 것도 최대 2로 찍힌다 — 그걸로 경고하면 경고가 배경음이 된다
-      for (const f of this.customerForecast(m)) {
-        if (!(f.special > 0)) continue;
-        for (const t of f.types) if (f.range[t] && f.range[t][0] + f.range[t][1] >= 3) check(t, D.PARCEL_TYPES[t].sizes || [1, 2]);
-      }
+      const out = [];
+      for (const f of this.customerForecast(m)) for (const t of Object.keys(f.range))
+        if (!out.includes(t) && f.range[t][1] > 0 && !this.canTakeType(t)) out.push(t);
       return out;
     }
     // 평판: 지금 등급이 시작된 지점(이전 등급의 상한)과 다음 등급까지 남은 양

@@ -41,6 +41,7 @@
     'mk.forecastSum': "Next cycle ({m}) forecast: {min}-{max} parcels",
     'mk.forecastSumNow': "This cycle ({m}) forecast: {min}-{max} parcels",
     'mk.forecastBlocked': "⚠ Nothing you have can carry {list} — pick up a contract below that takes it",
+    'mk.cantTake': 'Nothing you have can carry this',
     'mk.forecast': "Expected volume, month {m} (approx.)",
     'log.monthStart': '── {cal}/{y} {half:1st half|2nd half} begins ──',
     'log.prepMarket': 'Prep market: buy before month 1 starts (1 free refresh)',

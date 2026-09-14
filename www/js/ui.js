@@ -776,7 +776,15 @@
       const whLine = `<div class="pickinfo whinfo"><span>${T('common.warehouse')} <b class="${used > wh.cap ? 'bad' : ''}">${used}/${wh.cap}</b></span><span>${D.ATTRS.cold.name} <b>${game.coldUsed()}/${wh.cold}</b></span>${wh.frozen || game.frozenUsed() ? `<span>${D.ATTRS.frozen.name} <b>${game.frozenUsed()}/${wh.frozen || 0}</b></span>` : ''}<span>${T('common.xl')} <b>${game.parcels.filter(p => p.baseSize >= 7).length}/${wh.xl}</b></span>${outd ? `<span class="bad">${T('hud.outdoorTag')} ${T('fmt.cells', { n: outd })}</span>` : ''}<button class="btn small" id="mk-ins">${T('kind.item')}</button><button class="btn small" id="mk-cust">${T('kind.customer')}</button><button class="btn small" id="mk-mine">${T('mk.mine')}</button></div>`;
       const up = mk.prep ? game.upcoming() : [];
       const prepLine = mk.prep ? `<div class="d" style="font-size:12px;color:var(--gold);margin-bottom:4px">${T('mk.prepNote')} ${T('hud.upcoming')}: ${up.filter(u => u.specs).map(u => `${T('fmt.turnN', { n: u.turn })} ${u.specs.map(s => `<i class="sw" style="display:inline-block;width:8px;height:8px;background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}`).join(' · ')} · ${T('weather.title')} ${up.filter(u => u.weather).map(u => M.WEATHER[u.weather].icon).join('')}</div>` : '';
-      const fcRows = game.customerForecast().map(f => { const cu = M.CUSTOMERS[f.id]; return `<span class="fc">${cu.icon} ${esc(cu.name)} <b>${f.min}~${f.max}</b> <small>${['normal', ...(f.special > 0 ? f.types : [])].map(t => `<i style="display:inline-block;width:7px;height:7px;background:${D.PARCEL_TYPES[t].css}"></i>${D.PARCEL_TYPES[t].short} ${f.range[t][0]}~${f.range[t][1]}`).join(' · ')}</small></span>`; }).join('');
+      // 못 받는 종류는 그 줄에서 바로 붉게 — 요약 경고만 있으면 '무엇이' 문제인지 눈으로 못 찾는다.
+      // 대본 런은 예상이 정확해서 min===max 라 범위 표기가 어색하다 → 한 숫자로, 0개인 종류는 아예 빼고
+      const rng = r => r[0] === r[1] ? `${r[0]}` : `${r[0]}~${r[1]}`;
+      const fcRows = game.customerForecast().map(f => { const cu = M.CUSTOMERS[f.id];
+        const parts = ['normal', ...(f.special > 0 ? f.types : [])].filter(t => f.range[t] && f.range[t][1] > 0).map(t => {
+          const bad = !game.canTakeType(t);
+          return `<span class="${bad ? 'fcwarn' : ''}"${bad ? ` title="${esc(T('mk.cantTake'))}"` : ''}><i style="display:inline-block;width:7px;height:7px;background:${D.PARCEL_TYPES[t].css}"></i>${D.PARCEL_TYPES[t].short} ${rng(f.range[t])}${bad ? ' ✖' : ''}</span>`;
+        });
+        return `<span class="fc">${cu.icon} ${esc(cu.name)} <b>${rng([f.min, f.max])}</b> <small>${parts.join(' · ')}</small></span>`; }).join('');
       const nm = mk.prep ? game.month : game.month + 1, cal = game.calMonth(nm);
       const seasonLine = nm <= game.monthsTotal() ? `<div class="d" style="color:var(--dim)">${T(mk.prep ? 'mk.seasonLineNow' : 'mk.seasonLine', { cal, season: T('season.' + game.season(nm)), note: T(`cal.${game.rules.calendar}.${cal}.note`) })}</div>` : '';
       const fcAll = game.customerForecast();

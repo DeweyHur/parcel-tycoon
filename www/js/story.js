@@ -114,6 +114,8 @@
     // 예상 물량: 접혀 있는 줄을 '눌러서 펼치게' 한 다음, 펼쳐진 내용을 보면서 설명한다
     { id: 'marketFc', months: [1], kind: 'market', when: (g, ctx) => !ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fctoggle', gate: true }] },
     { id: 'marketFcOpen', months: [1], kind: 'market', when: (g, ctx) => !!ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fc' }] },
+    // 다음 사이클에 못 싣는 게 온다 — 마켓이 마지막 기회다. 어느 달이든
+    { id: 'marketBlocked', kind: 'market', when: g => g.forecastBlocked().length > 0, pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
     { id: 'market1b', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
     // ----- 4월 (2개월차): 고객과 돈 -----
     // 고객 설명은 말로 하면 안 들어온다. 택배를 직접 누르게 하고 상세 팝업에서 짚는다.
@@ -134,8 +136,6 @@
     { id: 'market2', months: [2], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
     // ----- 마켓: 배차를 늘리는 세 가지 (충전 · 한도 강화 · 상위 센터) -----
     { id: 'marketRefill', months: [1, 2, 3], kind: 'market', when: g => !!refillSlot(g), pages: [{ expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; } }, { expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; }, gate: g => { const r = refillSlot(g); return !!r && r.c.calls === 0; } }] },
-    // 다음 사이클에 못 싣는 게 온다 — 마켓이 마지막 기회다. 어느 달이든
-    { id: 'marketBlocked', kind: 'market', when: g => g.forecastBlocked().length > 0, pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
     // 프리미엄: 실제 매물 카드를 짚고, 계열 표준 대비 무엇이 달라지는지 읽힌다
     { id: 'marketPremium', kind: 'market', when: g => !!premiumItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.CARRIERS[it.carrier] && root.DATA.CARRIERS[it.carrier].tier > 0) }] },
     { id: 'marketLimit', months: [1, 2, 3], kind: 'market', when: g => !!limitItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'enh' && /^limit/.test(it.enh)) }] },
