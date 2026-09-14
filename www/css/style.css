@@ -122,7 +122,7 @@ body { touch-action: manipulation; }
 .card .t .price { color: var(--gold); }
 .card .d { color: var(--dim); font-size: 12px; }
 .card.sold { opacity: .4; }
-.kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline; word-break: keep-all; }
 .kv .v { text-align: right; color: var(--gold); }
 .kv .v.bad { color: var(--red); } .kv .v.good { color: var(--green); }
 hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
@@ -163,6 +163,9 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 /* 통계 하위 줄 · 마켓 창고 정보 줄 */
 .kv .v { white-space: nowrap; }
 .kv .sub { color: var(--dim); font-size: 11px; }
+.fcwarn { color: var(--red); }
+/* 평판 게이지: 지금 등급이 시작된 지점을 눈금으로 — 20/35 의 20 이 '이미 반쯤 찬 것'이 아니라 '이 등급의 바닥'임을 보여 준다 */
+.gauge > u { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--dim); opacity: .9; }
 .pickinfo.whinfo { flex-wrap: wrap; gap: 4px 10px; }
 .pickinfo.whinfo .bad, .pickinfo .bad { color: var(--red); }
 .pickinfo.whinfo .btn.small { margin-left: auto; }

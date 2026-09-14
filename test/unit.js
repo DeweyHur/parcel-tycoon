@@ -20,20 +20,20 @@ t('차량: 부피 합으로 대수 결정, 배차비 즉시 차감, 대수만큼
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
   assert.equal(g.vehicleCap(c), 6 + 1); // 탑차 6 + 동네 택배 첫 호출 +1
   g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2)];
-  const cash = g.cash, trucks = c.calls, fee = g.truckFee(c); assert.equal(fee, 35);
-  const r = g.callCarrier(i, [1, 2, 3]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 1); assert.equal(r.fee, 35); assert.equal(c.calls, trucks - 1);
-  assert.equal(g.cash, cash + r.revenue); assert.equal(g.feesDue, 35); assert.equal(r.revenue, 35 * 3); assert.ok(r.fill >= 0.8);
+  const cash = g.cash, trucks = c.calls, fee = g.truckFee(c); assert.equal(fee, D.FAMILIES.bulk.fee);
+  const r = g.callCarrier(i, [1, 2, 3]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 1); assert.equal(r.fee, D.FAMILIES.bulk.fee); assert.equal(c.calls, trucks - 1);
+  assert.equal(g.cash, cash + r.revenue); assert.equal(g.feesDue, D.FAMILIES.bulk.fee); assert.equal(r.revenue, 35 * 3); assert.ok(r.fill >= 0.8);
 });
 t('차량: 용량을 넘기면 동시 대수 한도(기본 1)에서 거부, 신뢰 1단계 대량은 2대', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2), P(4, 'normal', 2)];
   let r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(!r.ok); // 8칸 > 7칸, 동시 1대
   g.trust.bulk0 = 3; assert.equal(g.simulMax(c), 2);
-  r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 2); assert.equal(r.fee, 70);
+  r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 2); assert.equal(r.fee, D.FAMILIES.bulk.fee * 2);
 });
 t('차량: 배차비는 후불이라 자금 0이어도 호출 가능, 남은 배차보다 많이 못 부름', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i]; g.parcels = [P(1, 'normal', 1)];
-  g.cash = 0; let r = g.callCarrier(i, [1]); assert.ok(r.ok); assert.equal(g.feesDue, 35);
+  g.cash = 0; let r = g.callCarrier(i, [1]); assert.ok(r.ok); assert.equal(g.feesDue, D.FAMILIES.bulk.fee);
   g.parcels = [P(2, 'normal', 1)]; c.calls = 0; r = g.callCarrier(i, [2]); assert.ok(!r.ok);
 });
 t('단기 금융: 정산 후 음수면 차입해 0, 다음 정산에 원금+이자 15% 상환, 한도 400 넘으면 부도', () => {
@@ -53,7 +53,7 @@ t('신뢰도: 적재 80% 이상이면 +1, 특성은 업체마다 다름(냉장 1
 });
 t('센터: 상위 tier 센터 = 다른 센터와 신규 계약 (배차 +2·용량 +1·배차비 -10%, 신뢰도는 센터별 새로 시작), 복합 능력', () => {
   const g = EMPTY(3); const c = g._makeContract('bulk', 'trusted'); g.contracts[3] = c;
-  assert.equal(c.carrier, 'bulk1'); assert.equal(c.grade, 'trusted'); assert.equal(g.trustLevel('bulk1'), 0); assert.equal(c.maxCalls, 7 + 2); assert.equal(g.vehicleCap(c), 6 + 1 + 1); assert.equal(g.truckFee(c), Math.round(35 * 0.9));
+  assert.equal(c.carrier, 'bulk1'); assert.equal(c.grade, 'trusted'); assert.equal(g.trustLevel('bulk1'), 0); assert.equal(c.maxCalls, 7 + 2); assert.equal(g.vehicleCap(c), 6 + 1 + 1); assert.equal(g.truckFee(c), Math.round(D.FAMILIES.bulk.fee * 0.9));
   assert.equal(D.CARRIERS.bulk1.name, '빠른손 익스프레스'); assert.equal(D.GRADES.trusted.name, '프리미엄');
   const e = g._makeContract('bulk2'); assert.ok(g.contractCaps(e).includes('fragile')); assert.equal(D.CARRIERS.bulk3.simul, 2); assert.equal(g.simulMax(g._makeContract('bulk3')), 2);
   assert.ok(g.contractCaps(g._makeContract('cold2')).includes('frozen')); assert.equal(D.CARRIERS.rail1.delay, 0);
@@ -120,7 +120,7 @@ t('지연 입금: 철도는 다음 턴, 신뢰 1단계면 즉시', () => {
 });
 t('월말 정산 → 마켓 → 다음 달, 배차비는 정산에', () => {
   const g = EMPTY(9); g.parcels = [P(1, 'normal', 1)]; g.callCarrier(slot(g, 'bulk'), [1]); while (g.phase === 'play') adv(g);
-  assert.equal(g.phase, 'summary'); assert.equal(g.summary.fees, 35); g.closeSummary(); assert.equal(g.phase, 'market'); g.closeMarket(); assert.equal(g.month, 2);
+  assert.equal(g.phase, 'summary'); assert.equal(g.summary.fees, D.FAMILIES.bulk.fee); g.closeSummary(); assert.equal(g.phase, 'market'); g.closeMarket(); assert.equal(g.month, 2);
   for (const c of g.contracts) if (c) assert.ok(c.calls <= c.maxCalls);
 });
 t('마켓 구매 5개 제한', () => { const g = EMPTY(9); while (g.phase === 'play') adv(g); g.closeSummary(); g.cash = 9999; let bought = 0; for (let i = 0; i < g.market.items.length && bought < 6; i++) { const it = g.market.items[i]; if (it.sold || it.kind === 'refill') continue; const r = g.buy(i, it.kind === 'contract' ? (it.switchFrom ? g.contracts.findIndex(c => c && c.id === it.switchFrom) : 0) : it.kind === 'enh' ? 0 : null); if (r.ok) bought++; else if (bought >= 5) { assert.ok(/5/.test(r.msg)); break; } } assert.ok(bought <= 5); });
@@ -421,6 +421,21 @@ t('회사 선택 화면: 시작 계약(계열 이름)이 모두 실제 센터로
     assert.ok(k && D.CARRIERS[k], id + ' ' + c.carrier + ' → 센터 없음');
     assert.ok(D.CARRIERS[k].short, id + ' ' + c.carrier + ' → short 없음');
     assert.ok(D.CARRIERS[k].trucks > 0, id + ' ' + c.carrier + ' → trucks 없음');
+  }
+});
+t('배차비 규칙: 차를 80% 채우면 똔똔 (fee ≈ 0.8 × 용량 × 칸당 보상)', () => {
+  // 계열이 싣는 종류들의 칸당 보상(전문 보너스 포함) 평균으로 기대 배차비를 다시 구해 본다.
+  // 보상표나 용량을 건드리면 여기서 걸린다 — "꽉 채워 보내라"가 수지로 성립하는지가 이 한 줄에 걸려 있다.
+  const carries = { bulk: ['normal'], cold: ['fresh', 'produce'], frozen: ['frozen'], fragile: ['fragile'],
+    intl: ['intl'], large: ['large', 'normal'], air: ['normal', 'fragile', 'intl'],
+    rail: ['normal', 'fresh', 'fragile', 'large'], sea: ['normal', 'intl', 'large', 'fragile'] };
+  for (const f of Object.keys(D.FAMILIES)) {
+    const F = D.FAMILIES[f]; let n2 = 0, sum = 0;
+    for (const t2 of carries[f]) { const T2 = D.PARCEL_TYPES[t2];
+      for (const sz of T2.sizes) { if (sz < F.sizeMin || sz > F.sizeMax) continue;
+        sum += (T2.reward[sz] + ([].concat(F.specialist || []).includes(t2) ? T2.bonus : 0)) / sz; n2++; } }
+    const want = Math.round(D.FILL_BREAKEVEN * F.cap * (n2 ? sum / n2 : 20));
+    assert.ok(Math.abs(F.fee - want) <= 2, `${f}: fee ${F.fee} ≠ ${want} (80% 적재 똔똔)`);
   }
 });
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);

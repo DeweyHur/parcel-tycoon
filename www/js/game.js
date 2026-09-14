@@ -109,7 +109,7 @@
       // 로그라이크라 해마다 요일·영업일 수가 달라지는 건 그대로 받는다 — 인수인계(대본)만 해를 고정한다.
       this.year = cfg.year || (cfg.scripted && TUT && TUT.YEAR) || new Date().getFullYear();
       this.weekend = null; this.weekendBonus = null;
-      this.rep = 0; this.repTier = 0;   // 평판(키우는 지표) — _buildRules 뒤에 상한만큼 채워 시작한다
+      this.rep = 0; this.repTier = 0; this.repDropped = false;   // 평판(키우는 지표) — _buildRules 뒤에 상한만큼 채워 시작한다
       this.parcels = [];
       this.schedule = [];
       this.log = [];
@@ -735,6 +735,7 @@
     // 평판 증감. 사고는 깎고(pen 양수 = 깎임), 잘한 일은 올린다. 상한을 넘지 않고, 0 이하면 런이 끝난다
     addRep(n, why) {
       if (!n) return 0;
+      if (n < 0) this.repDropped = true;
       const before = this.rep;
       this.rep = Math.max(0, Math.min(this.repCap(), this.rep + n));
       const d = this.rep - before;
@@ -1315,7 +1316,7 @@
     }
     _win() {
       this.phase = 'win';
-      this.result = this._makeResult(true, MSG(this.cfg.story ? 'over.winStory' : 'over.win', { months: this.runMonths(), cycles: this.rules.months }));
+      this.result = this._makeResult(true, MSG(this.cfg.scripted ? 'over.winStory' : 'over.win', { months: this.runMonths(), cycles: this.rules.months }));
       this.say(this.result.reason);
       return true;
     }
@@ -1324,7 +1325,7 @@
       this.stats.monthsDone = monthsDone;
       this.stats.distinctCarriersAtEnd = new Set(this.contracts.filter(Boolean).map(c => c.carrier)).size;
       const score = Math.round(Math.max(0, this.run.revenue + Math.max(0, this.cash) + monthsDone * (this.rules.endless ? 300 : 200) + this.rep * 20) * this.rules.scoreMult);
-      return { win, demo: false, story: !!this.cfg.story, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
+      return { win, demo: false, story: !!this.cfg.scripted, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
         scenario: this.cfg.scenario, company: this.cfg.company, difficulty: this.cfg.difficulty || 'normal', perks: this.perks.slice(), variants: (this.cfg.variants || []).slice(), date: this.cfg.date || null, ...this.run };
     }
 
@@ -1350,6 +1351,34 @@
       for (const p of pseudo) { if (covers.some(c => this.canHandle(c, p) && this.breakProb(c, p) === 0)) continue; const a = acc[p.type] || (acc[p.type] = { type: p.type, volume: 0, count: 0, maxSize: 0 }); a.volume += p.size; a.count++; a.maxSize = Math.max(a.maxSize, p.size); }
       return Object.values(acc).sort((a, b) => b.volume - a.volume);
     }
+    // 예상 물량 중 지금 계약(과 직접 배송)으로 못 받는 종류. 마켓에서 "이건 실을 차가 없다"를 미리 말해 주려고
+    forecastBlocked(m) {
+      m = m || this.month + (this.phase === 'market' && !(this.market && this.market.prep) ? 1 : 0);
+      const covers = this.contracts.filter(Boolean), out = [];
+      const check = (t, sizes) => {
+        if (out.includes(t)) return;
+        const ok = sizes.some(sz => { const p = { type: t, size: sz, customs: 0 }; return covers.some(c => this.canHandle(c, p) && this.breakProb(c, p) === 0) || this.selfCan(p); });
+        if (!ok) out.push(t);
+      };
+      // 대본 런은 다음 사이클에 뭐가 오는지 정확히 안다 — 추정 대신 그걸 쓴다
+      const sc = this.script(m);
+      if (sc) {
+        const byType = {};
+        for (const row of sc.turns) for (const s of row) (byType[s.type] || (byType[s.type] = [])).push(Math.max(1, s.size + this.rules.sizeDelta + (s.size >= 4 ? this.rules.bigSizeDelta : 0)));
+        for (const t of Object.keys(byType)) check(t, byType[t]);
+        return out;
+      }
+      // 무작위 런: 예상 범위의 합이 3 이상(대략 기대 1.5개 이상)인 종류만.
+      // 범위가 ±1이라 거의 안 오는 것도 최대 2로 찍힌다 — 그걸로 경고하면 경고가 배경음이 된다
+      for (const f of this.customerForecast(m)) {
+        if (!(f.special > 0)) continue;
+        for (const t of f.types) if (f.range[t] && f.range[t][0] + f.range[t][1] >= 3) check(t, D.PARCEL_TYPES[t].sizes || [1, 2]);
+      }
+      return out;
+    }
+    // 평판: 지금 등급이 시작된 지점(이전 등급의 상한)과 다음 등급까지 남은 양
+    repFloor() { return this.repTier > 0 ? D.REP_TIERS[this.repTier - 1].cap : 0; }
+    repToNext() { return this.repTier >= D.REP_TIERS.length - 1 ? 0 : Math.max(0, this.repCap() - this.rep); }
     // 계약마다 '가득 충전' 상시 카드 (배차는 소모품 — 정액이라 다 쓰고 충전하는 게 이득)
     _refillItems() {
       const items = [];

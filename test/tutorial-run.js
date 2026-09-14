@@ -11,7 +11,7 @@ const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 
 const hit = {};   // 창고장이 말해야 하는 상황이 실제로 왔는지
 const note = k => { hit[k] = (hit[k] || 0) + 1; };
 
-function beats(ctx) { let b, n = 0; while ((b = Story.check(g, ctx)) && n++ < 4) note('beat:' + b.id); }
+function beats(ctx) { let b, n = 0; while ((b = Story.check(g, ctx)) && n++ < 10) note('beat:' + b.id); }
 
 function bestCall() {
   let best = null;

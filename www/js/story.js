@@ -75,6 +75,8 @@
   const refillSlot = g => { let best = null; (g.contracts || []).forEach((c, slot) => { if (!c || !mkItem(g, x => x.kind === 'refill' && x.contractId === c.id)) return; if (!best || c.calls < best.c.calls) best = { c, slot }; }); return best; };
   const limitItem = g => mkItem(g, it => it.kind === 'enh' && /^limit/.test(it.enh));
   const switchItem = g => mkItem(g, it => it.kind === 'contract' && it.switchFrom);
+  // 프리미엄(상위 등급) 매물 — 말만 하지 말고 실제 카드를 짚는다
+  const premiumItem = g => mkItem(g, it => it.kind === 'contract' && root.DATA.CARRIERS[it.carrier] && root.DATA.CARRIERS[it.carrier].tier > 0);
   // 배차가 바닥난 계약(보낼 택배는 있는데 차를 못 부르는 상태)
   const outOfCalls = g => (g.contracts || []).find(c => c && c.calls === 0 && g.eligibleParcels(c).length > 0);
 
@@ -103,11 +105,16 @@
     // 마당에 물건이 나가 있는 채로 맞는 일요일 — 알바를 쓸지 결정하는 자리
     { id: 'weekendYard', months: [1, 2, 3], kind: 'weekend', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'worry', hl: '.wkopts .wkc:nth-child(3)' }] },
     // 평판: 처음 깎였을 때 한 번. 이 게임이 왜 끝나는지를 말해 주는 자리다
-    { id: 'rep', months: [1, 2, 3], kind: 'turn', when: g => g.rep < g.repCap(), pages: [{ expr: 'worry', hl: '#hud-right' }, { expr: 'neutral', hl: '#hud-right' }] },
+    // '방금 깎였지'는 진짜 깎였을 때만. 등급이 올라 상한이 늘어난 것뿐인데 깎였다고 하면 안 된다
+    { id: 'rep', months: [1, 2, 3], kind: 'turn', when: g => g.repDropped || g.rep < g.repCap(), pages: [{ expr: g => g.repDropped ? 'worry' : 'neutral', hl: '#hud-right', k: g => g.repDropped ? 'story.rep.1drop' : 'story.rep.1' }, { expr: 'neutral', hl: '#hud-right' }] },
     // 등급이 처음 오른 정산 — 평판을 키우면 뭐가 열리는지 여기서 말한다
     { id: 'repUp', months: [1, 2, 3], kind: 'summary', when: g => !!(g.summary && g.summary.repTierUp), pages: [{ expr: 'laugh' }, { expr: 'smile' }] },
     { id: 'summary1', months: [1], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
-    { id: 'market1', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }, { expr: 'neutral' }] },
+    { id: 'market1', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }] },
+    // 예상 물량: 접혀 있는 줄을 '눌러서 펼치게' 한 다음, 펼쳐진 내용을 보면서 설명한다
+    { id: 'marketFc', months: [1], kind: 'market', when: (g, ctx) => !ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fctoggle', gate: true }] },
+    { id: 'marketFcOpen', months: [1], kind: 'market', when: (g, ctx) => !!ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fc' }] },
+    { id: 'market1b', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
     // ----- 4월 (2개월차): 고객과 돈 -----
     // 고객 설명은 말로 하면 안 들어온다. 택배를 직접 누르게 하고 상세 팝업에서 짚는다.
     { id: 'm2', months: [2], kind: 'turn', when: g => g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: g => { const p = namedParcel(g); return p ? `#parcels .parcel[data-id="${p.id}"]` : '#parcels'; }, gate: g => !!namedParcel(g) }] },
@@ -127,6 +134,10 @@
     { id: 'market2', months: [2], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
     // ----- 마켓: 배차를 늘리는 세 가지 (충전 · 한도 강화 · 상위 센터) -----
     { id: 'marketRefill', months: [1, 2, 3], kind: 'market', when: g => !!refillSlot(g), pages: [{ expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; } }, { expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; }, gate: g => { const r = refillSlot(g); return !!r && r.c.calls === 0; } }] },
+    // 다음 사이클에 못 싣는 게 온다 — 마켓이 마지막 기회다. 어느 달이든
+    { id: 'marketBlocked', kind: 'market', when: g => g.forecastBlocked().length > 0, pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
+    // 프리미엄: 실제 매물 카드를 짚고, 계열 표준 대비 무엇이 달라지는지 읽힌다
+    { id: 'marketPremium', kind: 'market', when: g => !!premiumItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.CARRIERS[it.carrier] && root.DATA.CARRIERS[it.carrier].tier > 0) }] },
     { id: 'marketLimit', months: [1, 2, 3], kind: 'market', when: g => !!limitItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'enh' && /^limit/.test(it.enh)) }] },
     { id: 'marketSwitch', months: [2, 3], kind: 'market', when: g => !!switchItem(g), pages: [{ expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'contract' && it.switchFrom) }, { expr: 'think' }] },
     // ----- 5월 (3개월차): 손실, 승리, 작별 -----
@@ -146,6 +157,12 @@
   // 마켓 비트 자리표시자 — 대본 마켓이라 가격까지 말해 줄 수 있다
   function refillParams(g) { const r = refillSlot(g); if (!r) return { refillName: '', refillPrice: 0, refillMax: 0, refillLeft: 0 }; const it = mkItem(g, x => x.kind === 'refill' && x.contractId === r.c.id); return { refillName: g.contractName(r.c), refillPrice: it ? it.price : 0, refillMax: r.c.maxCalls, refillLeft: r.c.calls }; }
   function limitParams(g) { const it = limitItem(g); if (!it) return { limitName: '', limitPrice: 0, limitN: 0 }; return { limitName: it.name, limitPrice: it.price, limitN: root.DATA.ENHANCEMENTS[it.enh].value }; }
+  // 프리미엄 매물: 계열 표준 대비 무엇이 달라지는가 (카드의 '계열 표준 대비' 줄과 같은 값)
+  function premiumParams(g) {
+    const it = premiumItem(g); if (!it) return { premName: '', premPrice: 0, premCap0: 0, premCap1: 0, premTrucks0: 0, premTrucks1: 0 };
+    const car = root.DATA.CARRIERS[it.carrier], base = root.DATA.FAMILIES[car.family];
+    return { premName: it.name, premPrice: g.contractPrice(it), premCap0: base.cap, premCap1: car.cap, premTrucks0: base.trucks, premTrucks1: car.trucks };
+  }
   function switchParams(g) {
     const it = switchItem(g); if (!it) return { switchName: '', switchPrice: 0, switchFrom: '', switchTrucks: 0, switchCap: 0 };
     const from = g.contracts.find(c => c && c.id === it.switchFrom), car = root.DATA.CARRIERS[it.carrier];
@@ -166,7 +183,8 @@
       lastLabel: root.I18n.t(g.yearOf(g.rules.months) === g.yearOf(1) ? 'fmt.lastSameYear' : 'fmt.lastNextYear', { n: g.calMonth(g.rules.months) }),
       delivered: g.run.delivered, returned: g.stats.returned + g.stats.stolen + g.stats.broken, full: g.stats.fullTrucks, fee2: fee, interest: Math.round(root.DATA.LOAN.interest * 100),
       trucks: (ctx && ctx.trucks) || 1, vol: (ctx && ctx.vol) || 0, callFee: oc ? g.callFee(oc, (ctx && ctx.trucks) || 1) : fee,
-      ...refillParams(g), ...limitParams(g), ...switchParams(g), outName: (outOfCalls(g) && g.contractName(outOfCalls(g))) || '' };
+      ...refillParams(g), ...limitParams(g), ...switchParams(g), ...premiumParams(g),
+      fcBlocked: g.forecastBlocked().map(t => root.DATA.PARCEL_TYPES[t].short).join(' · '), outName: (outOfCalls(g) && g.contractName(outOfCalls(g))) || '' };
   }
 
   // 지금 보여줄 비트. ctx = { kind, events?, result? }. 되돌리지 않는다: 반환한 비트는 seen 에 기록된다

@@ -246,6 +246,11 @@
     $('#stress-label').textContent = g.repTier > 0 ? g.repTierName() : T('hud.rep');
     const gauge = $('#stress-gauge'); gauge.querySelector('i').style.width = Math.max(0, Math.min(100, ratio * 100)) + '%';
     gauge.className = 'gauge rep ' + (ratio <= 0.2 ? 'crisis' : ratio <= 0.45 ? 'danger' : ratio <= 0.7 ? 'warn' : '');
+    // 이 등급이 시작된 지점에 눈금 — 20/35 의 20 이 '이미 반쯤 찬 것'이 아니라 '이 등급의 바닥'이라는 걸 보여 준다
+    let notch = gauge.querySelector('u'); const fl = g.repFloor();
+    if (fl > 0 && rcap > fl) { if (!notch) { notch = document.createElement('u'); gauge.appendChild(notch); } notch.style.left = (fl / rcap * 100) + '%'; notch.hidden = false; }
+    else if (notch) notch.hidden = true;
+    $('#hud-right').onclick = () => { SFX.click(); showRepInfo(); };
     $('#hud-perks').innerHTML = [`<a class="hl" data-pop="company">${g.difficulty && (g.cfg.difficulty || 'normal') !== 'normal' ? g.difficulty.icon + esc(g.difficulty.name) + ' · ' : ''}${g.company.icon} ${esc(g.company.name)}</a>`, ...g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}">${esc(M.PERKS[p].name)}</a>`), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ') + (g.strikeCarrier ? ` · ✊${D.CARRIERS[g.strikeCarrier].short} ${T('hud.strike')}` : '');
     $('#hud-perks').querySelectorAll('[data-pop]').forEach(el => el.onclick = () => { SFX.click(); if (el.dataset.pop === 'company') showCompanyInfo(); else if (el.dataset.pop === 'insurer') showInsurance(closeModal); else { const pk = M.PERKS[el.dataset.id]; modal(pk.name, `<p>${esc(pk.desc)}</p><p style="color:var(--dim);font-size:12px">${esc(T('hud.familyPerk', { family: M.PERK_FAMILIES[pk.family] }))}</p>`, [{ label: T('btn.close'), onClick: closeModal }]); } });
     const used = g.usedVolume(), cap = g.warehouse.cap, pct = used / cap * 100;
@@ -329,6 +334,25 @@
     el.hidden = false;
   }
 
+  // ---------- 평판 상세: 지금 등급의 바닥~상한 사이 어디인지, 다음 등급까지 얼마인지 ----------
+  // HUD 게이지만으로는 "20/35" 의 20 이 시작값이라 뭘 채우는 중인지 보이지 않는다.
+  function showRepInfo() {
+    const g = game, floor = g.repFloor(), cap = g.repCap(), top = g.repTier >= D.REP_TIERS.length - 1;
+    const band = Math.max(1, cap - floor), inBand = Math.max(0, Math.min(band, g.rep - floor));
+    const next = top ? null : D.REP_TIERS[g.repTier + 1];
+    const newCust = top ? [] : g.customersAtTier(g.repTier + 1).filter(k => !g.customers[k]);
+    const bar = `<div class="gauge rep" style="width:100%;height:14px"><i style="width:${Math.round(inBand / band * 100)}%"></i></div>`;
+    const body = `<div class="kv"><span>${T('repi.tier')}</span><span class="v">${esc(g.repTierName())} ${g.rep}/${cap}</span></div>
+      ${bar}<div class="d">${top ? T('repi.top') : g.repToNext() === 0 ? T('repi.ready', { name: esc(T('rep.tier.' + next.id)) }) : T('repi.toNext', { n: g.repToNext(), name: esc(T('rep.tier.' + next.id)), from: floor, to: cap })}</div>
+      <div class="d" style="color:var(--green);margin-top:8px">${T('repi.up')}</div>
+      <div class="d" style="color:var(--red)">${T('repi.down')}</div>
+      ${top ? '' : `<div style="font-size:12px;color:var(--gold);margin:10px 0 3px">${T('repi.nextHead', { name: esc(T('rep.tier.' + next.id)) })}</div>
+        <div class="d">${T('repi.nextScale', { arr: Math.round((next.arrivals / g.repTierDef().arrivals - 1) * 100), op: Math.round((next.opCost / g.repTierDef().opCost - 1) * 100) })}</div>
+        ${newCust.length ? `<div class="d">${T('repi.nextCust', { list: newCust.map(k => M.CUSTOMERS[k].icon + esc(M.CUSTOMERS[k].name)).join(' · ') })}</div>` : ''}
+        ${(next.unlock || []).filter(t => !g.repUnlocked(t)).length ? `<div class="d">${T('repi.nextGoods', { list: (next.unlock || []).filter(t => !g.repUnlocked(t)).map(t => D.PARCEL_TYPES[t].short).join(' · ') })}</div>` : ''}`}
+      <div class="d" style="color:var(--dim);margin-top:8px">${T('repi.zero')}</div>`;
+    modal(T('hud.rep'), body, [{ label: T('btn.close'), onClick: closeModal }]);
+  }
   // ---------- HUD 팝업: 회사 · 날씨 · 입고 예정 ----------
   function showCompanyInfo() {
     const g = game, co = g.company;
@@ -707,7 +731,7 @@
     const state = `${sec('State')}<div class="kv">
       <span>${T('sum.callsWaits')}</span><span class="v">${T('fmt.calls', { n: s.calls })} / ${T('fmt.calls', { n: s.waits })}</span>
       <span>${T('sum.delivered')}</span><span class="v">${T('fmt.count', { n: s.delivered })}</span>
-      <span>${T('sum.rep')}</span><span class="v ${s.rep <= s.repCap * 0.45 ? 'bad' : ''}">${s.rep}/${s.repCap} <small>${esc(T('rep.tier.' + s.repTier))}${s.repDelta ? ` · ${s.repDelta > 0 ? '+' : ''}${s.repDelta}` : ''}</small>${s.repTierUp ? `<br><small style="color:var(--gold)">${T('sum.repTierUp')}</small>` : ''}</span>
+      <span>${T('sum.rep')}</span><span class="v ${s.rep <= s.repCap * 0.45 ? 'bad' : ''}">${s.rep}/${s.repCap} <small>${esc(T('rep.tier.' + s.repTier))}${s.repDelta ? ` · ${s.repDelta > 0 ? '+' : ''}${s.repDelta}` : ''}${!s.repTierUp && game.repToNext() ? `<br>${T('sum.repToNext', { n: game.repToNext() })}` : ''}</small>${s.repTierUp ? `<br><small style="color:var(--gold)">${T('sum.repTierUp')}</small>` : ''}</span>
       <span>${T('sum.usage')}</span><span class="v">${T('sum.usageVal', { pct: s.usage, n: s.left })}</span>
       ${s.overdueVol ? `<span>${T('sum.overdueVol')}</span><span class="v bad">${T('fmt.cells', { n: s.overdueVol })}</span>` : ''}
       ${bad === 0 && R.winMaxDiscard != null ? `<span>${T('sum.discarded')}</span><span class="v">${T('sum.runDiscard', { n: game.run.discarded, max: R.winMaxDiscard })}</span>` : ''}
@@ -757,13 +781,16 @@
       const seasonLine = nm <= game.monthsTotal() ? `<div class="d" style="color:var(--dim)">${T(mk.prep ? 'mk.seasonLineNow' : 'mk.seasonLine', { cal, season: T('season.' + game.season(nm)), note: T(`cal.${game.rules.calendar}.${cal}.note`) })}</div>` : '';
       const fcAll = game.customerForecast();
       const fcTot = fcAll.reduce((a, f) => ({ min: a.min + f.min, max: a.max + f.max }), { min: 0, max: 0 });
-      const fcLine = `<div class="d"><a class="hl" id="mk-fctoggle">${T('mk.forecastSum', { m: nm, min: fcTot.min, max: fcTot.max })} ${fcOpen ? '▴' : '▾'}</a></div>${fcOpen ? `<div class="d fcline">${fcRows}</div>` : ''}${seasonLine}`;
+      // 예상 물량 중 지금 계약으로 못 받는 종류 — 마켓이 그걸 사라고 말해 주는 자리다
+      const fcBlk = game.forecastBlocked(nm);
+      const fcWarn = fcBlk.length ? `<div class="d fcwarn" id="mk-fcwarn">${T('mk.forecastBlocked', { list: fcBlk.map(t => D.PARCEL_TYPES[t].short).join(' · ') })}</div>` : '';
+      const fcLine = `<div class="d"><a class="hl" id="mk-fctoggle">${T(mk.prep ? 'mk.forecastSumNow' : 'mk.forecastSum', { m: game.cycleLabel(nm), min: fcTot.min, max: fcTot.max })} ${fcOpen ? '▴' : '▾'}</a></div>${fcOpen ? `<div class="d fcline" id="mk-fc">${fcRows}</div>` : ''}${fcWarn}${seasonLine}`;
       const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span><span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>${whLine}${contracts}${fcLine}${prepLine}${items}
         ${R.noRefresh ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('err.noRefresh')}</div>` : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
       const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), body, [{ label: T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(6, Math.max(1, mk.month))] * R.itemPriceMult * R.priceMult).toFixed(2) }));
       const ft = m.querySelector('#mk-fctoggle'); if (ft) ft.onclick = () => { SFX.click(); fcOpen = !fcOpen; render(); };
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
-      storyCheck({ kind: 'market', bought: mk.bought });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
+      storyCheck({ kind: 'market', bought: mk.bought, fcOpen });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
       m.querySelector('#mk-mine').onclick = () => { SFX.click(); showMyContracts(render); };
       m.querySelector('#mk-cust').onclick = () => { SFX.click(); showCustomers(render); };
       m.querySelector('#mk-ins').onclick = () => { SFX.click(); showInsurance(render); };
@@ -801,7 +828,7 @@
   // 마켓에 나온 계약(아직 안 산 것)의 실효 수치. 사기 전에 필요한 건 "월에 몇 칸을, 칸당 얼마에" 다.
   // 이 계약을 사면 '지금은 못 하던' 무엇이 되는가 — 마켓 카드에서 기존 계약과의 차이를 한 줄로
   function newlyHandles(it) {
-    const g = game, car = D.CARRIERS[it.carrier], have = g.contracts.filter(Boolean).filter(c => c.id !== it.switchFrom);
+    const g = game, car = D.CARRIERS[it.carrier], have = g.contracts.filter(Boolean);
     const gains = [];
     for (const a of D.GATING_ATTRS) {
       const pp = { type: 'normal', size: Math.max(car.sizeMin, 1), attrs: [a], customs: a === 'customs' ? 1 : 0 };
