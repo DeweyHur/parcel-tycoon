@@ -99,21 +99,22 @@
     // 계열(family) = 하는 일(대량·냉장·냉동·파손·통관·대형·항공·철도·해상). 계열 기본값은 FAMILIES, 센터는 그 위에 tier별 보정.
     // 상위 tier는 "같은 센터 업그레이드"가 아니라 **다른 센터와 신규 계약**이다 — 배차가 많고, 차가 크고, 배차비가 싸고, 복합 능력(extraCaps)이 붙는다. 신뢰도는 센터별.
     // trucks = 배차 풀(소모품: 월초 리셋 없음, 마켓에서 '가득 충전'만). refill = 가득 충전 가격. rep = 담당자(스토리 캐릭터) id
-    // 배차비는 손으로 정한 값이 아니라 규칙이다: **차를 80% 채우면 똔똔**.
+    // 배차비는 손으로 정한 값이 아니라 규칙이다: **차를 절반 채우면 똔똔**.
     // fee ≈ FILL_BREAKEVEN × cap × (그 계열이 싣는 종류들의 칸당 보상 평균, 전문 보너스 포함).
-    // 그래서 80% 아래로 부르면 손해고, 이익은 그 위에서만 난다 — "꽉 채워 보내라"가 문구가 아니라 수지가 된다.
+    // 그래서 절반도 못 채우고 부르면 손해고, 이익은 그 위에서만 난다 — "꽉 채워 보내라"가 문구가 아니라 수지가 된다.
+    // 80%는 그보다 위, '적재 효율' 보너스(업체 신뢰 +1 · 평판 +1)가 붙는 선이다 — 본전 선과 보너스 선을 갈라 놓았다.
     // 보상표(PARCEL_TYPES.reward)나 용량(cap)을 바꾸면 fee 도 같이 바꿔야 한다. test/unit.js 가 검사한다.
-    FILL_BREAKEVEN: 0.8,
+    FILL_BREAKEVEN: 0.5,
     FAMILIES: {
-      bulk:    { badge: '🚚', cap: 6,  fee: 102, trucks: 7, price: 60,  caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2, rep: 'yeo' },
-      cold:    { badge: '🚚', cap: 4,  fee: 92, trucks: 4, price: 90, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'], rep: 'kang' },
-      frozen:  { badge: '🚚', cap: 4,  fee: 128, trucks: 4, price: 100, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true, rep: 'kang' },
-      fragile: { badge: '🚚', cap: 4,  fee: 110, trucks: 4, price: 90, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
-      intl:    { badge: '🚚', cap: 8,  fee: 188, trucks: 3, price: 110, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
-      large:   { badge: '🚚', cap: 10, fee: 227, trucks: 3, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true, rep: 'noh' },
-      air:     { badge: '✈', cap: 4,  fee: 77, trucks: 3, price: 120, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
-      rail:    { badge: '🚆', cap: 16, fee: 310, trucks: 2, price: 80, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true, rep: 'noh' },
-      sea:     { badge: '🚢', cap: 14, fee: 264, trucks: 2, price: 90, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
+      bulk:    { badge: '🚚', cap: 6,  fee: 64, trucks: 7, price: 60,  caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2, rep: 'yeo' },
+      cold:    { badge: '🚚', cap: 4,  fee: 58, trucks: 4, price: 90, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'], rep: 'kang' },
+      frozen:  { badge: '🚚', cap: 4,  fee: 80, trucks: 4, price: 100, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true, rep: 'kang' },
+      fragile: { badge: '🚚', cap: 4,  fee: 69, trucks: 4, price: 90, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
+      intl:    { badge: '🚚', cap: 8,  fee: 118, trucks: 3, price: 110, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
+      large:   { badge: '🚚', cap: 10, fee: 142, trucks: 3, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true, rep: 'noh' },
+      air:     { badge: '✈', cap: 4,  fee: 48, trucks: 3, price: 120, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
+      rail:    { badge: '🚆', cap: 16, fee: 194, trucks: 2, price: 80, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true, rep: 'noh' },
+      sea:     { badge: '🚢', cap: 14, fee: 165, trucks: 2, price: 90, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
     },
     // tier 공통 보정: 배차 +, 용량 +, 배차비 배율, 계약가 배율. 센터가 개별 값을 주면 그것이 우선
     TIERS: [
