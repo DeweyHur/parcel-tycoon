@@ -193,7 +193,8 @@ t('i18n: ko/en data·meta 텍스트 필드 모양이 일치', () => {
 });
 t('i18n: 자리표시자·복수형·메시지 객체 렌더링', () => {
   assert.equal(I18n.lang, 'ko');
-  assert.equal(I18n.t('log.monthStart', { m: 2, y: 2026, cal: 4 }), '── 2026년 4월 · 2개월차 시작 ──');
+  assert.equal(I18n.t('log.monthStart', { m: 2, y: 2026, cal: 4, half: 1 }), '── 2026년 4월 전반 시작 ──');
+  assert.equal(I18n.t('log.monthStart', { m: 2, y: 2026, cal: 4, half: 2 }), '── 2026년 4월 후반 시작 ──');
   assert.equal(I18n.t('ps.deadline', { n: 4 }), '⏳ <b>4</b>일');                       // 1턴 = 하루
   assert.equal(I18n.t('story.intro.3', { name: '한길 물류', fee: 38 }).slice(0, 60).includes('한길 물류는'), true); // 조사 자동 선택
   assert.equal(I18n.text({ k: 'log.penalty', p: { pen: 2, reasons: [{ k: 'r.overdue', p: { short: '일반' } }, { k: 'r.stolenInsured' }], rep: 5 } }), '평판 −2: 기한 초과 일반, 도난 (보험 적용) (평판 5)');

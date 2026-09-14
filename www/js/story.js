@@ -84,7 +84,7 @@
     // 첫 대기 팝업(1개월차): intro 가 '대기'를 누르랬으니, 낯선 팝업에서 어디를 눌러야 하는지까지 짚어 준다. 이 한 번만.
     { id: 'waitFirst', months: [1], kind: 'modal', modal: 'wait', when: g => g.story.seen.includes('intro'), pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'usage', months: [1], kind: 'turn', when: g => g.turn >= 2, pages: [{ expr: 'neutral', hl: '#bar-usage' }] },
-    { id: 'callReady', months: [1], kind: 'turn', when: g => g.turn >= 3 || bestReadySlot(g).fill >= 0.8, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
+    { id: 'callReady', months: [1], kind: 'turn', when: g => g.turn >= 3 || bestReadySlot(g).fill >= 0.8, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     // 호출 팝업 안: 자동 선택 버튼 → 호출 버튼. 팝업이 다시 그려질 때마다 ctx.sel(선택 수)로 확인한다
     { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     // 차가 두 대 붙는 첫 순간. 자동으로 붙는 거라 설명이 없으면 배차가 왜 2대 줄었는지 모른다 (대본 1개월차 8턴에 정확히 12칸이 온다)
@@ -158,9 +158,12 @@
     const b = bestReadySlot(g); const c = b.slot >= 0 ? g.contracts[b.slot] : bulk;
     const oc = ctx && ctx.slot != null ? g.contracts[ctx.slot] : null;   // 지금 열려 있는 호출 팝업의 계약
     return { name: bulk ? g.contractName(bulk) : '', cap, fee, per: Math.round(fee / Math.max(1, cap)), ready: c ? g.contractName(c) : '', readyCap: c ? g.vehicleCap(c) : cap,
+      readyVol: c ? g.eligibleParcels(c).reduce((s2, p) => s2 + p.size, 0) : 0, readyFee: c ? g.truckFee(c) : fee,
       openName: oc ? g.contractName(oc) : '', openCap: oc ? g.vehicleCap(oc) : cap, openFee: oc ? g.truckFee(oc) : fee,
       openVol: oc ? g.eligibleParcels(oc).reduce((s2, p) => s2 + p.size, 0) : 0, openSimul: oc ? g.simulMax(oc) : 1, openCalls: oc ? oc.calls : 0,
       cash: g.cash, repTier: g.repTierName(), rep: g.rep, repCap: g.repCap(), projected: g.projectedCash().total, outdoor: g.outdoorVolume(), rent: g.opCostBreakdown(g.month).rent, months: g.rules.months, cal: g.calMonth(), startCal: g.calMonth(1), lastCal: g.calMonth(g.rules.months),
+      runCycles: g.rules.months, runMonths: g.runMonths(),
+      lastLabel: root.I18n.t(g.yearOf(g.rules.months) === g.yearOf(1) ? 'fmt.lastSameYear' : 'fmt.lastNextYear', { n: g.calMonth(g.rules.months) }),
       delivered: g.run.delivered, returned: g.stats.returned + g.stats.stolen + g.stats.broken, full: g.stats.fullTrucks, fee2: fee, interest: Math.round(root.DATA.LOAN.interest * 100),
       trucks: (ctx && ctx.trucks) || 1, vol: (ctx && ctx.vol) || 0, callFee: oc ? g.callFee(oc, (ctx && ctx.trucks) || 1) : fee,
       ...refillParams(g), ...limitParams(g), ...switchParams(g), outName: (outOfCalls(g) && g.contractName(outOfCalls(g))) || '' };
@@ -205,6 +208,6 @@
   function done(g) { return !!(g && g.story && g.story.seen.includes('farewell')); }
   function active(g) { return !!(g && g.story && !g.story.off && !done(g)); }
 
-  const Story = { BEATS, SPRITES, REPS, CHARACTER, check, sms, done, active, sprite, repOf, repName, greet, bestSlot: bestReadySlot, mkKey };
+  const Story = { BEATS, SPRITES, REPS, CHARACTER, check, sms, done, active, sprite, repOf, repName, greet, bestSlot: bestReadySlot, mkKey, params };
   if (typeof module !== 'undefined') module.exports = Story; else root.Story = Story;
 })(typeof window !== 'undefined' ? window : globalThis);

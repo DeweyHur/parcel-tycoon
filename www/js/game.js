@@ -838,7 +838,7 @@
         return;
       }
       this.phase = 'play';
-      this.say('log.monthStart', { m, y: this.yearOf(m), cal: this.calMonth(m) });
+      this.say('log.monthStart', { m: this.monthIndex(m), y: this.yearOf(m), cal: this.calMonth(m), half: this.half(m) });
       this._startTurn();
     }
     _makeSchedule(m) {
@@ -1301,11 +1301,13 @@
     // 데모 종료: 승리도 패배도 아니다(win false, demo true). 본편에서 이어지는 지점.
     _finishDemo() {
       this.phase = 'over';
-      this.result = this._makeResult(false, MSG('demo.endReason', { n: this.month }), this.month);
+      this.result = this._makeResult(false, MSG('demo.endReason', { n: this.monthIndex() }), this.month);
       this.result.demo = true;
-      this.say('demo.endReason', { n: this.month });
+      this.say('demo.endReason', { n: this.monthIndex() });
       return true;
     }
+    // rules.months 는 사이클 수다. 사람에게 보일 '개월'은 여기로 환산한다
+    runMonths() { return Math.ceil(this.rules.months / D.CYCLES_PER_MONTH); }
     _gameOver(reason) {
       this.phase = 'over';
       this.result = this._makeResult(false, reason);
@@ -1313,7 +1315,7 @@
     }
     _win() {
       this.phase = 'win';
-      this.result = this._makeResult(true, MSG('over.win', { months: this.rules.months }));
+      this.result = this._makeResult(true, MSG(this.cfg.story ? 'over.winStory' : 'over.win', { months: this.runMonths(), cycles: this.rules.months }));
       this.say(this.result.reason);
       return true;
     }
@@ -1322,7 +1324,7 @@
       this.stats.monthsDone = monthsDone;
       this.stats.distinctCarriersAtEnd = new Set(this.contracts.filter(Boolean).map(c => c.carrier)).size;
       const score = Math.round(Math.max(0, this.run.revenue + Math.max(0, this.cash) + monthsDone * (this.rules.endless ? 300 : 200) + this.rep * 20) * this.rules.scoreMult);
-      return { win, demo: false, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
+      return { win, demo: false, story: !!this.cfg.story, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
         scenario: this.cfg.scenario, company: this.cfg.company, difficulty: this.cfg.difficulty || 'normal', perks: this.perks.slice(), variants: (this.cfg.variants || []).slice(), date: this.cfg.date || null, ...this.run };
     }
 
@@ -1545,7 +1547,7 @@
       if (this.phase !== 'market') return false;
       const prep = this.market.prep;
       this.market = null;
-      if (prep) { this.phase = 'play'; this.say('log.monthStart', { m: 1 }); this._startTurn(); return true; }
+      if (prep) { this.phase = 'play'; this.say('log.monthStart', { m: 1, y: this.yearOf(1), cal: this.calMonth(1), half: 1 }); this._startTurn(); return true; }
       this._startMonth(this.month + 1);
       return true;
     }

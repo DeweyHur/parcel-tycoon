@@ -36,7 +36,9 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.evaluate(() => { const b = [...document.querySelectorAll('.modal .btn')].find(x => /이건 이런 게임입니다/.test(x.textContent)); if (b) b.click(); });
   await page.waitForTimeout(300);
   const howText = await page.evaluate(() => document.querySelector('#modal') ? document.querySelector('#modal').textContent : '');
-  ok('게임 방법 카드: 구어체 수정 반영', /택배가 밖에 쌓이고/.test(howText) && /포화 상태/.test(howText) && /기다리는 것이/.test(howText), howText.slice(0, 0));
+  ok('게임 방법 카드: 구어체 수정 반영', /택배가 밖에 쌓이고/.test(howText) && /기다리는 것이/.test(howText), howText.slice(0, 0));
+  // 런 길이가 세 가지가 됐고, 끝나는 조건은 창고 포화가 아니라 평판이다
+  ok('게임 방법 카드: 런 길이·종료 조건 최신', /분기\(3개월\)/.test(howText) && /평판이 바닥나면/.test(howText) && !/포화 상태가 되면 끝/.test(howText));
   ok('게임 방법 카드에 "턴"이 없다', !/매 턴/.test(howText));
   await shot('02-howto');
   // 닫기
