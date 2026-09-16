@@ -83,18 +83,28 @@
   // ----- 레벨 1 전용 비트 (docs/STORY_TUTORIAL_DESIGN.md 부록 R) -----
   // 레벨 1 화면에는 계약 하나 · 고객 하나 · 맑음뿐이다. 설명할 것이 적으니 비트도 짧다 — 열두 개, 대부분 한 장.
   const BEATS_L1 = [
-    { id: 'l1intro', kind: 'start', when: () => true, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: '#parcels' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
+    // 서장 오프닝 — 인사 · 왜 이 창고를 넘겨받는가 · 한길 물류 담당자 인사. 규칙은 맨 마지막 한 장뿐이다
+    { id: 'l1intro', kind: 'start', when: () => true, pages: [
+      { expr: 'smile' }, { expr: 'neutral' }, { expr: 'think' },
+      { expr: 'neutral', hl: '#parcels' },
+      { speaker: 'yeo', expr: 'smile' },
+      { expr: 'neutral', hl: '#wait-btn', gate: true },
+    ] },
+    // 유일한 고객이 누구인지도 사람이 와서 말한다 (2일차)
+    { id: 'l1mart', kind: 'turn', when: g => g.turn >= 2 && g.story.seen.includes('l1intro'), pages: [
+      { speaker: 'rep', nameKey: 'story.name.mart', expr: 'neutral' }, { expr: 'smile' },
+    ] },
     { id: 'l1waitGo', kind: 'modal', modal: 'wait', when: g => g.story.seen.includes('l1intro'), pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 3, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
-    { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { expr: 'neutral' }] },
+    { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
     { id: 'l1deadline', kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'l1sunday', kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
     { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
     { id: 'l1usage', kind: 'turn', when: g => usage(g) >= 0.75, pages: [{ expr: 'worry', hl: '#bar-usage' }] },
-    { id: 'l1last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
+    { id: 'l1last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'think' }] },
   ];
 
   const BEATS = [
@@ -229,7 +239,7 @@
     const pages = b.pages.map((pg, i) => {
       const key = pg.k ? pg.k(g) : `story.${b.id}.${i + 1}`;
       const speaker = typeof pg.speaker === 'function' ? pg.speaker(g) : pg.speaker || 'park';
-      return { speaker, name: speaker === 'park' ? root.I18n.t(CHARACTER.nameKey) : repName(speaker), expr: typeof pg.expr === 'function' ? pg.expr(g) : pg.expr, hl: typeof pg.hl === 'function' ? pg.hl(g) : pg.hl || null, gate: typeof pg.gate === 'function' ? !!pg.gate(g) : !!pg.gate, text: root.I18n.t(key, p) };
+      return { speaker, name: pg.nameKey ? root.I18n.t(pg.nameKey) : speaker === 'park' ? root.I18n.t(CHARACTER.nameKey) : repName(speaker), expr: typeof pg.expr === 'function' ? pg.expr(g) : pg.expr, hl: typeof pg.hl === 'function' ? pg.hl(g) : pg.hl || null, gate: typeof pg.gate === 'function' ? !!pg.gate(g) : !!pg.gate, text: root.I18n.t(key, p) };
     });
     if (!g.story.notes) g.story.notes = [];
     g.story.notes.push({ id: b.id, month: g.month, turn: g.turn, text: pages.map(x => x.text) });
