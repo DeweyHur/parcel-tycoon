@@ -1108,8 +1108,11 @@
     modal(T('log.title'), `<div class="log-list">${game.log.map(l => `<div>${esc(I18n.text(l))}</div>`).join('')}</div>`, [{ label: T('btn.close'), onClick: back }]);
   }
   function showHelp(back) {
-    const body = T('help.body', { stress: D.GAMEOVER_STRESS });
-    modal(T('title.help'), body, [{ label: T('how.title'), onClick: () => showHowTo(null, () => showHelp(back)) }, { label: T('help.notes'), onClick: () => showNotes(() => showHelp(back)) }, { label: T('btn.close'), onClick: back }]);
+    // 아직 마켓도 안 열린 런(레벨 1)에 전체 설명서를 보여 주면 숨긴 보람이 없다 — 그 레벨에 있는 것만
+    const short = !!(game && !game.shows('market'));
+    const body = short ? T('help.l1') : T('help.body', { stress: D.GAMEOVER_STRESS });
+    const btns = short ? [] : [{ label: T('how.title'), onClick: () => showHowTo(null, () => showHelp(back)) }];
+    modal(T('title.help'), body, [...btns, { label: T('help.notes'), onClick: () => showNotes(() => showHelp(back)) }, { label: T('btn.close'), onClick: back }]);
   }
   // 창고장 노트: 이 런에서 들은 비트 전문
   function showNotes(back) {
@@ -1226,13 +1229,14 @@
   }
   function showMenu() {
     const g = game, R = g.rules;
-    const info = `<div class="d" style="font-size:12px;margin-bottom:6px">${esc(M.SCENARIOS[g.cfg.scenario].name)} · ${g.company.icon} ${esc(g.company.name)}<br><span style="color:var(--green)">＋ ${esc(g.company.passive)}</span><br><span style="color:var(--orange)">－ ${esc(g.company.weakness)}</span>${g.perks.length ? `<br>${T('company.perks')}: ` + g.perks.map(p => esc(M.PERKS[p].name + ' — ' + M.PERKS[p].desc)).join(`<br>${T('company.perks')}: `) : ''}${(g.cfg.variants || []).length ? `<br>${T('prep.variants')}: ` + g.cfg.variants.map(v => esc(M.DAILY_VARIANTS[v].name + ' — ' + M.DAILY_VARIANTS[v].desc)).join(', ') : ''}</div>`;
+    const info = !g.shows('perks') ? `<div class="d" style="font-size:12px;margin-bottom:6px">${g.company.icon} ${esc(g.companyName())}</div>`
+      : `<div class="d" style="font-size:12px;margin-bottom:6px">${esc(M.SCENARIOS[g.cfg.scenario].name)} · ${g.company.icon} ${esc(g.company.name)}<br><span style="color:var(--green)">＋ ${esc(g.company.passive)}</span><br><span style="color:var(--orange)">－ ${esc(g.company.weakness)}</span>${g.perks.length ? `<br>${T('company.perks')}: ` + g.perks.map(p => esc(M.PERKS[p].name + ' — ' + M.PERKS[p].desc)).join(`<br>${T('company.perks')}: `) : ''}${(g.cfg.variants || []).length ? `<br>${T('prep.variants')}: ` + g.cfg.variants.map(v => esc(M.DAILY_VARIANTS[v].name + ' — ' + M.DAILY_VARIANTS[v].desc)).join(', ') : ''}</div>`;
     const m = modal(T('menu.title'), `${info}<p style="font-size:12px;color:var(--dim)">${T('menu.autosave')}</p><label style="display:flex;align-items:center;gap:8px;font-size:12px">${T('menu.volume')} <input type="range" id="vol" min="0" max="1" step="0.05" value="${opts.musicVol}" style="flex:1"></label>`, [
       { label: T('menu.continue'), cls: 'primary', onClick: closeModal },
       { label: T('opt.sound', { v: T(opts.sound ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); closeModal(); } },
       { label: T('opt.music', { v: T(opts.music ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); closeModal(); } },
       { label: T('menu.story', { v: T(g.story && !g.story.off ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { if (!g.story) g.story = { seen: [], notes: [] }; g.story.off = !g.story.off; saveGame(); closeModal(); if (!g.story.off && g.phase === 'play') storyCheck({ kind: 'turn' }); } },
-      { label: T('menu.sms', { v: T(opts.sms ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.sms = !opts.sms; saveOpts(); closeModal(); } },
+      ...(g.shows('weather') ? [{ label: T('menu.sms', { v: T(opts.sms ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.sms = !opts.sms; saveOpts(); closeModal(); } }] : []),
       { label: T('menu.abandon'), cls: 'warn', onClick: () => askConfirm(T('menu.abandonConfirm'), () => { Store.remove(SAVE_KEY); game = null; showTitle(); }, T('menu.abandonBtn'), showMenu) },
     ]);
     m.querySelector('#vol').oninput = e => { opts.musicVol = +e.target.value; BGM.setVolume(opts.musicVol); saveOpts(); };

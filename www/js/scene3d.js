@@ -7,6 +7,7 @@ window.Scene3D = (function () {
   const YARD = { cells: 11, depth: 2 };               // 야외 적재 (창고 앞, 지붕 밖)
   const BACK_Z = -1.7, ROW_Z = -1.3, DOCK_X = 4.6;    // 뒷벽 · 첫 줄 시작 · 도크(오른쪽 끝)
   const FULL = { x0: -5.2, front: 3.35, width: 9.8 }; // 만재 기준(옛 고정 모델) — 카메라 보정의 기준점
+  const BARE = { cap: 16, cold: 0, frozen: 0 };       // 아무것도 안 붙은 맨 창고 (첫 프레임·타이틀)
   const WX = {
     sunny: { hemi: 0xdfefff, hemiI: 0.9, sunI: 1.1, clear: [0x000000, 0], rain: 0, snow: 0 },
     rain:  { hemi: 0x9fb0c8, hemiI: 0.7, sunI: 0.45, clear: [0x5d6b80, 0.5], rain: 420, snow: 0 },
@@ -42,9 +43,9 @@ window.Scene3D = (function () {
       this.tweens = []; this.boxes = new Map(); this.clock = new THREE.Clock(); this.time = 0;
       this.busy = 0;
       this.parts = {};                     // 착탈식 모듈: shell · cold · yard · van
-      this.Z = this._zonesFor({ cap: 24, cold: 6, frozen: 4 });   // 첫 프레임용 기본값 (sync 가 곧 덮는다)
+      this.Z = this._zonesFor(BARE);   // 첫 프레임: 냉장·냉동 없는 맨 창고 (sync 가 곧 진짜 창고로 덮는다)
       this._buildTerrain();
-      this._syncBuilding({ cap: 24, cold: 6, frozen: 4 });
+      this._syncBuilding(BARE);
       this._buildWeather();
       this.weather = 'sunny';
       this.resize();
@@ -62,7 +63,7 @@ window.Scene3D = (function () {
       // 넓은 화면(가로형)이면 카메라를 왼쪽으로 옮겨 냉장 구역이 잘리지 않게
       // 장면 가로 범위는 x -5.2(냉장 벽)~5.7(도크). 세로형(a<0.9)은 창고 중앙(2.6) 기준, 그 외는 가운데(0.3)를 보되 다 들어올 때까지 카메라를 뒤로
       // 건물이 작아지면 카메라도 같이 당겨 온다 (모델이 먼저 바뀌고, 카메라는 그것을 따라갈 뿐)
-      const Z = this.Z || this._zonesFor({ cap: 24, cold: 6, frozen: 4 });
+      const Z = this.Z || this._zonesFor(BARE);
       // 왼쪽(냉장실)이 없으면 그만큼 오른쪽으로, 건물이 작으면 그만큼 가깝게. 보는 높이(z)는 그대로 둔다
       const dx = (Z.x0 - FULL.x0) / 2;
       const spanX = (Z.x1 + 1.2 - Z.x0) / 11, spanZ = (Z.yardZ0 + Z.YARD.depth * CELL + 0.3 - BACK_Z) / 6.35;

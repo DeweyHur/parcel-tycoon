@@ -25,6 +25,9 @@ const say = m => { console.log(m); log.push(m); };
   const btns = await page.$$eval('#modal .btn', els => els.map(e => e.id).filter(Boolean));
   check(btns.includes('t-level'), '「시작하기」만 있다 — ' + btns.join(','));
   check(!btns.includes('t-new') && !btns.includes('t-codex'), '자유 런·도감·기록은 없다');
+  const sig0 = await page.evaluate(() => PT.scene.buildSig);
+  check(sig0 === '16/0/0/0', '첫 화면 모델에 냉장·냉동이 없다 — ' + sig0);
+  await scene('00s-title-scene');
 
   await page.click('#t-level'); await page.waitForTimeout(900);
 
@@ -68,6 +71,21 @@ const say = m => { console.log(m); log.push(m); };
   check(s0.sig === '16/0/0/0', '3D 건물이 16칸·냉장0 으로 지어졌다 — ' + s0.sig);
   const waitLabel = await page.$eval('#wait-btn', el => el.textContent.trim().split('\n')[0]);
   check(!/직접/.test(waitLabel), '대기 버튼에 직접 배송이 없다 — "' + waitLabel.slice(0, 20) + '"');
+
+  say('\n■ 레벨 1 도움말 · 메뉴');
+  await safeClick('#help-btn'); await page.waitForTimeout(350);
+  await shot('02-help');
+  const helpTxt = await page.$eval('#modal', el => el.textContent);
+  const helpBad = ['평판', '냉장', '냉동', '마켓', '보험', '고객', '통관'].filter(w => helpTxt.includes(w));
+  check(helpBad.length === 0, '도움말에 아직 안 연 것이 없다' + (helpBad.length ? ' — ' + helpBad.join(',') : ''));
+  const helpBtns = await page.$$eval('#modal .foot .btn', els => els.map(e => e.textContent.trim()));
+  check(!helpBtns.some(b => /게임 방법/.test(b)), '도움말에 「게임 방법」(런 길이·평판) 버튼이 없다 — ' + helpBtns.join(','));
+  await safeClick('#modal .foot .btn:last-child'); await page.waitForTimeout(300);
+  await safeClick('#menu-btn'); await page.waitForTimeout(350);
+  await shot('03-menu');
+  const menuTxt = await page.$eval('#modal', el => el.textContent);
+  check(!/계절 문자|분기|평판/.test(menuTxt), '메뉴에 계절 문자·시나리오·평판이 없다 — ' + menuTxt.replace(/\s+/g, ' ').slice(0, 60));
+  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(300);
 
   say('\n■ 4사이클 플레이 (UI 로만)');
   let guard = 0, cyc = 0, calls = 0, waits = 0, stuck = 0, last = '';
