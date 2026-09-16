@@ -796,7 +796,13 @@
     const custs = s.customers && game.shows('customers') ? `${sec('Cust')}` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${T('common.trust')} ${c.month.lvStart}→${c.level}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : '';
     const body = head + income + cost + incident + state + custs;
     const last = !R.endless && game.month >= R.months;
-    modal(T('sum.title', { n: game.cycleLabel(s.month) }), body, [{ label: last ? T('sum.final') : T('sum.toMarket'), cls: 'primary', onClick: () => { closeModal(); game.closeSummary(); saveGame(); checkPhase(); } }]);
+    modal(T('sum.title', { n: game.cycleLabel(s.month) }), body, [{ label: last ? T('sum.final') : game.shows('market') ? T('sum.toMarket') : T('sum.toNext', { n: game.cycleLabel(s.month + 1) }), cls: 'primary', onClick: () => {
+      closeModal(); game.closeSummary(); game.takeEvents(); saveGame();
+      // 마켓이 없는 런(레벨 1)은 정산 다음이 바로 다음 사이클 — 마켓 화면이 대신 해 주던 갱신을 여기서 한다
+      if (game.phase === 'play') { scene.sync(game, { animate: true }); renderAll(); }
+      checkPhase();
+      if (game.phase === 'play') { storyCheck({ kind: 'turn' }); showSms(); }
+    } }]);
     storyCheck({ kind: 'summary' });
   }
 

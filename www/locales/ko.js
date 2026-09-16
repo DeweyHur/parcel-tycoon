@@ -550,6 +550,7 @@
     'lv.l1.title': '쌓았다가, 꽉 채워 보낸다',
     'lv.continue': '이어하기',
     'lv.doneGo': '다음',
+    'sum.toNext': '{n} 시작',
     'title.story': '인수인계',
     'title.storySub': '스토리 튜토리얼 · 첫 석 달',
     'prep.story': '창고장 안내',

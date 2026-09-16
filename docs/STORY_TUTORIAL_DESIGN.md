@@ -958,3 +958,26 @@ M.CALENDARS.kr = {
 
 - 초대형(xl) 구역은 아직 모델에 표시가 없다.
 - 마켓에서 확장을 산 직후가 아니라 **마켓을 닫을 때** 건물이 붙는다(그때 `scene.sync` 가 돈다). 마켓 안에서 바로 보여 주려면 구매 시점에 sync 를 한 번 더 불러야 한다.
+
+## 부록 T. 정산 뒤 화면이 멈추던 버그 (v1.13.2)
+
+레벨 1을 Playwright 로 **처음부터 끝까지 UI 로만** 굴려 보다가 잡았다(`test/play-ui.js`). 2사이클 1일차에서 화면이 얼어붙는다 — 날짜는 `3월 15일`(1사이클 마지막 날) 그대로, 대기 버튼은 `월말 정산`인 채 비활성, 아무것도 눌리지 않는다. 게임 상태는 이미 2사이클 1일차였다.
+
+원인은 **마켓이 없는 런에는 화면을 다시 그릴 사람이 없다**는 것이었다. 정산 모달의 버튼은
+
+    closeModal(); game.closeSummary(); saveGame(); checkPhase();
+
+인데, 보통은 `closeSummary()` 가 `phase = 'market'` 으로 가고 `showMarket()` 이 화면을 맡았다가 마켓을 닫을 때 `scene.sync` + `renderAll()` 을 해 줬다. 레벨 1은 마켓이 없어서(부록 R) `closeSummary()` 가 바로 다음 사이클로 넘어가는데, `checkPhase()` 는 `phase === 'play'` 면 아무것도 하지 않는다 → 아무도 다시 그리지 않는다.
+
+정산 버튼이 마켓 화면이 대신 해 주던 일을 직접 하게 고쳤다.
+
+    closeModal(); game.closeSummary(); game.takeEvents(); saveGame();
+    if (game.phase === 'play') { scene.sync(game, { animate: true }); renderAll(); }
+    checkPhase();
+    if (game.phase === 'play') { storyCheck({ kind: 'turn' }); showSms(); }
+
+버튼 문구도 갈랐다 — 마켓이 있으면 「마켓으로」, 없으면 「3월 후반 시작」(`sum.toNext`).
+
+**교훈**: 빨리 감기(게임 API 직접 호출)로 끝까지 도는 테스트는 이 버그를 못 잡는다. 화면을 갱신하는 것은 UI 쪽 코드이기 때문이다. `test/play-ui.js` 는 51일을 **버튼만 눌러서** 간다(약 3분).
+
+**검증** `test/play-ui.js`: 타이틀(최소 메뉴) → 레벨 1 4사이클 완주(호출 22·대기 29) → 반송·폐기 0 → 레벨 완료 → 상호 입력 → 해금 확인 → 자유 런에서 3D 건물이 `24/6/4` 로 다시 지어지고 평판·날씨가 돌아오는 것까지. 콘솔 에러 0.

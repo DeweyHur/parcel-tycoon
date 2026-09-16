@@ -549,6 +549,7 @@
     'lv.l1.title': 'Pile them up, send a full truck',
     'lv.continue': 'Continue',
     'lv.doneGo': 'Next',
+    'sum.toNext': 'Start {n}',
     'title.story': 'Handover',
     'title.storySub': 'story tutorial · first three months',
     'prep.story': 'Manager guide',
