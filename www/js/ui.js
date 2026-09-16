@@ -59,6 +59,8 @@
   function showTitle() {
     $('#story').hidden = true; $('#sms').hidden = true; clearStoryHl(); clearGate(); storyBusy = false;
     const save = loadSave(), P = Profile.get();
+    // 캠페인을 아직 다 못 했으면 타이틀도 최소한만 보여 준다 — 시작 · 소리 · 언어 (levels.js)
+    if ((P.campaign.cleared || 0) < LEVELS.IMPLEMENTED) return showTitleCampaign(save, P.campaign);
     const nUnlocked = P.unlocked.companies.length + P.unlocked.perks.length + P.unlocked.scenarios.length;
     const nTotal = Object.keys(M.COMPANIES).length + Object.keys(M.PERKS).length + Object.keys(M.SCENARIOS).length;
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div><div class="goal">${T('title.goal')}</div>
@@ -83,6 +85,52 @@
     m.querySelector('#t-music').onclick = () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); SFX.resume(); BGM.resume(); SFX.click(); showTitle(); };
     m.querySelector('#t-lang').onclick = () => { const ids = I18n.languages().map(l => l.id); I18n.setLang(ids[(ids.indexOf(I18n.lang) + 1) % ids.length]); SFX.click(); applyStaticText(); showTitle(); };
     BGM.play('title');
+  }
+
+  // ---------- 캠페인 (레벨) ----------
+  // 첫 화면에 있는 것이 적을수록 좋다. 캠페인 중에는 시작 · 소리 · 언어뿐 — 자유 런·도감·기록은 캠페인을 끝내면 열린다.
+  function showTitleCampaign(save, camp) {
+    const n = Math.min(camp.level || 1, LEVELS.IMPLEMENTED), lv = LEVELS.get(n);
+    const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
+      ${save ? `<button class="btn primary" id="t-continue">${T('lv.continue')} <small style="color:var(--dim)">${T('lv.startSub', { n, title: T('lv.l' + n + '.title') })}</small></button>` : ''}
+      <button class="btn ${save ? '' : 'gold'}" id="t-level">${T('lv.start')} <small style="color:var(--dim)">${T('lv.startSub', { n, title: T('lv.l' + n + '.title') })}</small></button>
+      <div style="display:flex;gap:8px"><button class="btn" id="t-sound" style="flex:1">${T('opt.sound', { v: T(opts.sound ? 'opt.on' : 'opt.off') })}</button><button class="btn" id="t-music" style="flex:1">${T('opt.music', { v: T(opts.music ? 'opt.on' : 'opt.off') })}</button></div>
+      <button class="btn" id="t-lang">${T('opt.lang')}: ${I18n.languages().map(l => l.id === I18n.lang ? `<b>${esc(l.name)}</b>` : esc(l.name)).join(' / ')}</button></div>`;
+    const m = modal(T('title.modal'), body, null, 'v0.3');
+    if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
+    m.querySelector('#t-level').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); startLevel(n); }, T('title.newShort'), showTitle); return; } startLevel(n); };
+    m.querySelector('#t-sound').onclick = () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); SFX.resume(); SFX.click(); showTitle(); };
+    m.querySelector('#t-music').onclick = () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); SFX.resume(); BGM.resume(); SFX.click(); showTitle(); };
+    m.querySelector('#t-lang').onclick = () => { const ids = I18n.languages().map(l => l.id); I18n.setLang(ids[(ids.indexOf(I18n.lang) + 1) % ids.length]); SFX.click(); applyStaticText(); showTitle(); };
+    BGM.play('title');
+  }
+  // 레벨 런: 난이도·회사·퍽을 묻지 않는다. 소개는 박 반장이 게임 안에서 한다
+  function startLevel(n) {
+    const P = Profile.get();
+    game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false, companyName: P.campaign.name || '' });
+    closeModal(); startPlay();
+  }
+  function showLevelDone(r) {
+    if (!r.recorded) { r.recorded = true; Store.remove(SAVE_KEY); BGM.stop(0.5); SFX.win(); BGM.oneShot('fanfare'); }
+    const body = `<p style="text-align:center">${T('lv.doneBody', { months: Math.round(r.monthsDone / D.CYCLES_PER_MONTH), delivered: r.delivered, cash: r.cash })}</p>`;
+    modal(T('lv.doneTitle', { n: r.level }), body, [{ label: T('lv.doneGo'), cls: 'primary', onClick: () => askCompanyName(r) }]);
+  }
+  // 레벨 1을 끝내면 상호를 묻는다 — 여기서 처음으로 '내 가게'가 된다
+  function askCompanyName(r) {
+    const P = Profile.get();
+    const face = `<img src="${Story.SPRITES.smile}" width="64" height="64" style="image-rendering:pixelated;float:left;margin:0 10px 6px 0">`;
+    const body = `<p>${face}${T('lv.nameBody')}</p><div style="clear:both"></div>
+      <input id="lv-name" maxlength="14" placeholder="${esc(T('lv.namePlaceholder'))}" value="${esc(P.campaign.name || '')}"
+        style="width:100%;box-sizing:border-box;padding:10px;font:inherit;font-size:16px;background:#1b1a2e;color:var(--ink);border:3px solid var(--line);outline:none">`;
+    const m = modal(T('lv.nameAsk'), body, [{ label: T('lv.nameSave'), cls: 'primary', onClick: () => {
+      const v = ((m.querySelector('#lv-name') || {}).value || '').trim().slice(0, 14) || T('lv.nameDefault');
+      const P2 = Profile.get();
+      P2.campaign = Object.assign({}, P2.campaign, { name: v, cleared: Math.max(P2.campaign.cleared || 0, r.level), level: r.level + 1 });
+      Profile.save(); game = null;
+      modal(T('lv.doneTitle', { n: r.level }), `<div class="big-num">${esc(v)}</div><p>${T('lv.next')}</p>`,
+        [{ label: T('res.toTitle'), cls: 'primary', onClick: () => { closeModal(); showTitle(); } }]);
+    } }]);
+    setTimeout(() => { const el = m.querySelector('#lv-name'); if (el) el.focus(); }, 60);
   }
 
   // ---------- "이건 이런 게임이다" 3장 카드 (첫 실행 · 게임 방법에서 다시 보기) ----------
@@ -250,12 +298,16 @@
     let notch = gauge.querySelector('u'); const fl = g.repFloor();
     if (fl > 0 && rcap > fl) { if (!notch) { notch = document.createElement('u'); gauge.appendChild(notch); } notch.style.left = (fl / rcap * 100) + '%'; notch.hidden = false; }
     else if (notch) notch.hidden = true;
-    $('#hud-right').onclick = () => { SFX.click(); showRepInfo(); };
-    $('#hud-perks').innerHTML = [`<a class="hl" data-pop="company">${g.difficulty && (g.cfg.difficulty || 'normal') !== 'normal' ? g.difficulty.icon + esc(g.difficulty.name) + ' · ' : ''}${g.company.icon} ${esc(g.company.name)}</a>`, ...g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}">${esc(M.PERKS[p].name)}</a>`), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ') + (g.strikeCarrier ? ` · ✊${D.CARRIERS[g.strikeCarrier].short} ${T('hud.strike')}` : '');
+    $('#hud-right').onclick = () => { SFX.click(); if (g.shows('rep')) showRepInfo(); };
+    // 아직 안 연 것은 화면에도 없다 (levels.js) — 평판 게이지·회사 줄은 레벨이 열어 준다
+    $('#hud-right').hidden = !g.shows('rep') && !g.shows('perks');
+    $('#stress-wrap').hidden = !g.shows('rep');
+    $('#hud-perks').innerHTML = !g.shows('perks') ? `<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName ? g.companyName() : g.company.name)}</a>` : [`<a class="hl" data-pop="company">${g.difficulty && (g.cfg.difficulty || 'normal') !== 'normal' ? g.difficulty.icon + esc(g.difficulty.name) + ' · ' : ''}${g.company.icon} ${esc(g.company.name)}</a>`, ...g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}">${esc(M.PERKS[p].name)}</a>`), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ') + (g.strikeCarrier ? ` · ✊${D.CARRIERS[g.strikeCarrier].short} ${T('hud.strike')}` : '');
     $('#hud-perks').querySelectorAll('[data-pop]').forEach(el => el.onclick = () => { SFX.click(); if (el.dataset.pop === 'company') showCompanyInfo(); else if (el.dataset.pop === 'insurer') showInsurance(closeModal); else { const pk = M.PERKS[el.dataset.id]; modal(pk.name, `<p>${esc(pk.desc)}</p><p style="color:var(--dim);font-size:12px">${esc(T('hud.familyPerk', { family: M.PERK_FAMILIES[pk.family] }))}</p>`, [{ label: T('btn.close'), onClick: closeModal }]); } });
     const used = g.usedVolume(), cap = g.warehouse.cap, pct = used / cap * 100;
     const bu = $('#bar-usage'); bu.querySelector('i').style.width = Math.min(100, pct) + '%'; $('#usage-txt').textContent = `${used}/${cap} (${Math.round(pct)}%)`;
     bu.className = 'bar usage ' + (pct > 100 ? 'over' : pct > 90 ? 'danger' : pct > 75 ? 'caution' : pct > 60 ? 'eff' : '');
+    $('#bar-cold').hidden = !g.shows('cold');
     const cu = g.coldUsed(), cc = g.warehouse.cold; const bc = $('#bar-cold'); bc.querySelector('i').style.width = cc ? Math.min(100, cu / cc * 100) + '%' : '100%'; const fz = g.warehouse.frozen || 0, fu = g.frozenUsed(); $('#cold-txt').textContent = (cc ? `${cu}/${cc}` : T('common.none')) + (fz || fu ? ` · ❆ ${fu}/${fz}` : ''); bc.className = 'bar cold ' + (cu > cc || fu > fz ? 'over' : '');
     const up = g.upcoming();
     let sawEnd = false;   // 월말 정산 칩이 두 번 세 번 반복되면 줄만 길어진다 — 한 번만
@@ -268,13 +320,13 @@
       return `<span class="chip none">${end ? T('hud.monthEnd') : '-'}</span>`;
     }).join('');
     if (g.isWeekendAfter(g.turn)) $('#upcoming').innerHTML += `<span class="chip none">🛌 ${T('hud.weekend')}</span>`;
-    const wxNow = g.weatherNow(), W = M.WEATHER[wxNow];
+    const wxNow = g.weatherNow(), W = M.WEATHER[wxNow], showWx = g.shows('weather');
     const fc = up.filter(u => u.weather && u.turn > g.turn).map(u => `${T('fmt.dayN', { d: g.dateOf(u.turn) })} ${M.WEATHER[u.weather].icon}`).join(' · ');
-    $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.desc)}">${W.icon} ${W.name}${fc ? ` <small style="color:var(--dim)">→ ${fc}</small>` : ''}</span>` + $('#upcoming').innerHTML;
+    if (showWx) $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.desc)}">${W.icon} ${W.name}${fc ? ` <small style="color:var(--dim)">→ ${fc}</small>` : ''}</span>` + $('#upcoming').innerHTML;
     $('#upcoming').querySelectorAll('.chip.wx').forEach(el => el.onclick = () => { SFX.click(); showWeatherInfo(); });
     $('#upcoming').querySelectorAll('.chip.up').forEach(el => el.onclick = () => { SFX.click(); showUpcomingInfo(+el.dataset.turn); });
     $('#wxline').onclick = () => { SFX.click(); showWeatherInfo(); };
-    $('#wxline').className = 'wxline ' + wxNow; $('#wxline').innerHTML = wxNow !== 'sunny' ? `${W.icon} ${esc(W.desc)}` : ''; $('#wxline').hidden = wxNow === 'sunny';
+    $('#wxline').className = 'wxline ' + wxNow; $('#wxline').innerHTML = wxNow !== 'sunny' ? `${W.icon} ${esc(W.desc)}` : ''; $('#wxline').hidden = wxNow === 'sunny' || !showWx;
     if (g.items.transitCert || g.items.yardIns === g.month || g.items.customsBond === g.month) $('#upcoming').innerHTML += `<span class="chip">${[g.items.transitCert ? `${M.INS_ITEMS.transitCert.icon} ${esc(M.INS_ITEMS.transitCert.name)} ${g.items.transitCert}` : '', g.items.yardIns === g.month ? `${M.INS_ITEMS.yardIns.icon} ${esc(M.INS_ITEMS.yardIns.name)}` : '', g.items.customsBond === g.month ? `${M.INS_ITEMS.customsBond.icon} ${esc(M.INS_ITEMS.customsBond.name)}` : ''].filter(Boolean).join(' · ')}</span>`;
     if (g.outdoorVolume() > 0) $('#upcoming').innerHTML += `<span class="chip heat">${T('hud.outdoor', { vol: g.outdoorVolume(), n: g.outdoorParcels().length, storage: g.storage.some(s => s.outdoor) ? T('hud.outdoorStorage') : '', pct: Math.round(g.theftProb() * 100) })}</span>`;
     renderOffer();
@@ -285,7 +337,8 @@
     $('#parcels').querySelectorAll('.parcel.storage').forEach(el => el.onclick = () => showStorage(+el.dataset.sid));
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) {
       const btn = $('#c' + i), c = g.contracts[i];
-      if (!c) { btn.innerHTML = `<div class="nm">${T('err.emptySlot')}</div><div class="sub">${T('hud.buyInMarket')}</div>`; btn.disabled = true; btn.className = 'btn contract'; continue; }
+      if (!c) { btn.hidden = !g.shows('market'); btn.innerHTML = `<div class="nm">${T('err.emptySlot')}</div><div class="sub">${T('hud.buyInMarket')}</div>`; btn.disabled = true; btn.className = 'btn contract'; continue; }
+      btn.hidden = false;
       const car = D.CARRIERS[c.carrier], vcap = g.vehicleCap(c), elig = g.eligibleParcels(c), lv = g.trustLevel(c);
       const can = g.canCall(c) && !busy, struck = g.isStruck(c);
       btn.disabled = !can; btn.className = 'btn contract' + (can ? ' ready' : '');
@@ -295,7 +348,7 @@
       // 한 대로 지금 부르면 몇 개가 실리고 개당 얼마인가 — 이 게임의 핵심 숫자를 카드에 직접 띄운다.
       const pv = loadPreview(g, c, elig);
       const extras = [simul > 1 ? T('hud.simulN', { n: simul }) : '', delay ? T('call.payLater', { n: delay }) : '', c.enh.regular && !c.freeUsedMonth ? T('hud.regular') : ''].filter(Boolean);
-      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${caps.length ? ` <small>${attrIcons(caps)}</small>` : ''}</span><span class="calls ${c.calls === 0 ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : spare ? T('hud.spare') : T('fmt.trucks', { n: c.calls })}</span></div>
+      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${caps.length ? ` <small>${attrIcons(caps)}</small>` : ''}</span><span class="calls ${c.calls === 0 && g.shows('calls') ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : T('fmt.trucks', { n: c.calls })}</span></div>
         <div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>
         <div class="sub"><b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b> · <span class="per ${pv.fill >= 0.8 ? 'good' : ''}">${pv.n ? T('hud.perParcel', { per: pv.per }) : T('hud.perNone')}</span>${extras.length ? ' · ' + extras.join(' · ') : ''}</div>`;
     }
@@ -305,7 +358,9 @@
     if (f.overdue) warn.push(T('wait.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wait.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wait.frozenOver', { n: f.frozenOver }));
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
     // 기다리면 어떻게 되는지 — 이 게임에서 매 턴 제일 중요한 한 줄. 흐리게 두거나 잘리게 두지 않는다.
-    wb.innerHTML = `${T('wait.btn')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
+    wb.innerHTML = `${T(g.shows('self') ? 'wait.btn' : 'wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
+    $('#cust-btn').hidden = !g.shows('customers');
+    $('#log-btn').hidden = !g.shows('market');   // 레벨 1은 화면에 버튼 셋이면 충분하다
     renderCoach();
   }
   // ---------- 스토리 모드 코치 한 줄 ----------
@@ -493,7 +548,7 @@
     const t = ptype(p), a = attrsOf(p);
     const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (s && s.sel.has(p.id) ? ' sel' : '') + (s && !s.elig.has(p.id) ? ' dis' : '') + (s && s.risk && s.risk.has(p.id) ? ' risk' : '');
     const cu = M.CUSTOMERS[p.customer || 'anon'];
-    return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust" title="${esc(cu.name)}">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`;
+    return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${game && !game.shows('customers') ? '' : `<span class="cust" title="${esc(cu.name)}">${cu.icon}</span>`}<span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`;
   }
   // 똑같이 생긴 택배가 여러 줄로 늘어서는 것이 "글이 너무 많다"의 가장 큰 원인이다.
   // 지금 당장 결정에 영향을 주지 않는 것들(급하지 않고, 기한 안 지났고, 밖에 없고, 상할 위험 없는 것)만 한 줄로 묶는다.
@@ -731,14 +786,14 @@
     const state = `${sec('State')}<div class="kv">
       <span>${T('sum.callsWaits')}</span><span class="v">${T('fmt.calls', { n: s.calls })} / ${T('fmt.calls', { n: s.waits })}</span>
       <span>${T('sum.delivered')}</span><span class="v">${T('fmt.count', { n: s.delivered })}</span>
-      <span>${T('sum.rep')}</span><span class="v ${s.rep <= s.repCap * 0.45 ? 'bad' : ''}">${s.rep}/${s.repCap} <small>${esc(T('rep.tier.' + s.repTier))}${s.repDelta ? ` · ${s.repDelta > 0 ? '+' : ''}${s.repDelta}` : ''}${!s.repTierUp && game.repToNext() ? `<br>${T('sum.repToNext', { n: game.repToNext() })}` : ''}</small>${s.repTierUp ? `<br><small style="color:var(--gold)">${T('sum.repTierUp')}</small>` : ''}</span>
+      ${!game.shows('rep') ? '' : `<span>${T('sum.rep')}</span><span class="v ${s.rep <= s.repCap * 0.45 ? 'bad' : ''}">${s.rep}/${s.repCap} <small>${esc(T('rep.tier.' + s.repTier))}${s.repDelta ? ` · ${s.repDelta > 0 ? '+' : ''}${s.repDelta}` : ''}${!s.repTierUp && game.repToNext() ? `<br>${T('sum.repToNext', { n: game.repToNext() })}` : ''}</small>${s.repTierUp ? `<br><small style="color:var(--gold)">${T('sum.repTierUp')}</small>` : ''}</span>`}
       <span>${T('sum.usage')}</span><span class="v">${T('sum.usageVal', { pct: s.usage, n: s.left })}</span>
       ${s.overdueVol ? `<span>${T('sum.overdueVol')}</span><span class="v bad">${T('fmt.cells', { n: s.overdueVol })}</span>` : ''}
       ${bad === 0 && R.winMaxDiscard != null ? `<span>${T('sum.discarded')}</span><span class="v">${T('sum.runDiscard', { n: game.run.discarded, max: R.winMaxDiscard })}</span>` : ''}
       ${R.winDelivered ? `<span>${T('sum.deliverGoal')}</span><span class="v">${game.run.delivered}/${T('fmt.count', { n: R.winDelivered })}</span>` : ''}
       ${R.winStorage ? `<span>${T('sum.storageGoal')}</span><span class="v">${game.stats.storageDone}/${T('fmt.cases', { n: R.winStorage })}</span>` : ''}
       ${R.winBigCustomer && game.bigCustomer ? `<span>${T('sum.bigCustomer')}</span><span class="v">${M.CUSTOMERS[game.bigCustomer].icon} ${esc(M.CUSTOMERS[game.bigCustomer].name)} ${T('common.trust')} ${game.customerLevel(game.bigCustomer)}/3</span>` : ''}</div>`;
-    const custs = s.customers ? `${sec('Cust')}` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${T('common.trust')} ${c.month.lvStart}→${c.level}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : '';
+    const custs = s.customers && game.shows('customers') ? `${sec('Cust')}` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${T('common.trust')} ${c.month.lvStart}→${c.level}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : '';
     const body = head + income + cost + incident + state + custs;
     const last = !R.endless && game.month >= R.months;
     modal(T('sum.title', { n: game.cycleLabel(s.month) }), body, [{ label: last ? T('sum.final') : T('sum.toMarket'), cls: 'primary', onClick: () => { closeModal(); game.closeSummary(); saveGame(); checkPhase(); } }]);
@@ -913,6 +968,7 @@
   // ---------- result ----------
   function showResult() {
     const r = game.result;
+    if (r.level) return showLevelDone(r);   // 레벨 런은 점수·기록이 아니라 '완료'로 끝난다
     if (!r.recorded) {
       r.recorded = true;
       r.got = Profile.recordRun(game, r);

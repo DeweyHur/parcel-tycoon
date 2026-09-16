@@ -268,6 +268,59 @@ t('달력: 1월은 인플레 한 단계를 건너뛴다, 12월은 반송 유예 
   g.month = 20; assert.equal(g.calMonth(), 12); assert.equal(g.returnGraceFor(P(1, 'normal', 1)), D.RETURN_GRACE - 1);
 });
 const Story = require('../www/js/story.js'); globalThis.I18n = I18n; globalThis.DATA = D;
+// ----- 캠페인 레벨 (docs/STORY_TUTORIAL_DESIGN.md 부록 R) -----
+const LV = require('../www/js/levels.js');
+const L1 = extra => new Game(Object.assign({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 1 }, extra || {}));
+t('레벨: 플래그는 누적이고, 자유 런(레벨 없음)은 전부 켜져 있다', () => {
+  assert.deepEqual([...LV.showsAt(1)], []);
+  const s2 = LV.showsAt(2); assert.ok(s2.has('market') && s2.has('calls') && !s2.has('weather'));
+  const s3 = LV.showsAt(3); assert.ok(s3.has('market') && s3.has('weather'), '누적');
+  const free = NG(1); for (const f of LV.FLAGS) assert.ok(free.shows(f), f);
+});
+t('레벨 1: 계약 하나 · 고객 하나 · 창고 16칸 · 시드 고정 · 4사이클', () => {
+  const g = L1(), g2 = L1({ difficulty: 'normal' });
+  assert.equal(g.seed, LV.get(1).seed); assert.equal(g.rules.months, 4);
+  assert.equal(g.contracts.filter(Boolean).length, 1);
+  assert.equal(g.contracts[0].carrier, 'bulk0');
+  assert.deepEqual(Object.keys(g.customers), ['mart']);
+  assert.equal(g.warehouse.cap, 16); assert.equal(g.warehouse.cold, 0); assert.equal(g.yearOf(), 2027);
+  const flat = x => x.map(tt => tt.map(sp => sp.type + sp.size).join()).join('|');
+  assert.equal(flat(g.schedule), flat(g2.schedule), '난이도가 달라도 물류는 같다');
+  assert.ok(g.schedule.flat().every(sp => sp.type === 'normal'), '일반 택배만');
+});
+t('레벨 1: 숨긴 기능은 규칙에서도 꺼져 있다 (배차 무제한 · 동시 1대 · 맑음 · 평판 고정)', () => {
+  const g = L1();
+  for (const f of LV.FLAGS) assert.ok(!g.shows(f), f + ' 은 아직 안 열렸다');
+  assert.deepEqual([...new Set(g.weather)], ['sunny']);
+  const c = g.contracts[0], calls = c.calls;
+  const ids = g.parcels.map(p => p.id).slice(0, 1);
+  const before = g.rep;
+  g.callCarrier(0, ids, 1);
+  assert.equal(c.calls, calls, '배차가 줄지 않는다');
+  assert.equal(g.simulMax(c), 1, '동시 1대');
+  g.addRep(-5, 'test'); assert.equal(g.rep, before, '평판은 움직이지 않는다');
+});
+t('레벨 1: 정산 다음이 마켓이 아니라 바로 다음 사이클', () => {
+  const g = L1();
+  let guard = 0;
+  while (g.phase !== 'summary' && guard++ < 200) { if (g.phase === 'weekend') g.weekendChoose('rest'); else g.wait(); }
+  assert.equal(g.phase, 'summary');
+  g.closeSummary();
+  assert.equal(g.phase, 'play'); assert.equal(g.month, 2);
+  assert.equal(g.market, null);
+});
+t('레벨 1: 마지막 사이클을 넘기면 결과에 level 이 실린다', () => {
+  const g = L1();
+  let guard = 0;
+  while (g.phase !== 'win' && g.phase !== 'over' && guard++ < 400) {
+    if (g.phase === 'weekend') g.weekendChoose('rest');
+    else if (g.phase === 'summary') g.closeSummary();
+    else if (g.phase === 'play') g.wait();
+    else break;
+  }
+  assert.equal(g.phase, 'win', '기한을 다 놓쳐도 레벨 1은 끝난다(실패 없음)');
+  assert.equal(g.result.level, 1);
+});
 // ----- 튜토리얼 대본 (docs/STORY_TUTORIAL_DESIGN.md 부록 I) -----
 const TUT = require('../www/js/tutorial.js');
 const TG = extra => new Game(Object.assign({ scenario: 'standard', company: 'local', perks: [], insurer: 'none', story: true, scripted: true }, extra || {}));
@@ -381,6 +434,8 @@ t('자동 선택: 마지막 차가 본전선(80%)도 못 채우면 그 차는 �
   assert.equal(r4.trucks, 2); assert.ok(!r4.trimmed);
 });
 t('스토리: 비트 문구 키가 ko/en 에 모두 있다', () => {
+  for (const b of Story.BEATS_L1) b.pages.forEach((pg, i) => { const k = `story.${b.id}.${i + 1}`; assert.ok(KO.ui[k] && EN.ui[k], k); });
+  for (const k of ['lv.doneTitle', 'lv.doneBody', 'lv.nameAsk', 'lv.nameBody', 'lv.nameSave', 'lv.nameDefault', 'lv.start', 'lv.startSub', 'lv.l1.title', 'lv.continue', 'lv.next', 'lv.doneGo', 'wait.btnPlain']) assert.ok(KO.ui[k] && EN.ui[k], k);
   for (const b of Story.BEATS) b.pages.forEach((pg, i) => { if (pg.k) return; const k = `story.${b.id}.${i + 1}`; assert.ok(KO.ui[k] && EN.ui[k], k); });
   for (const a of ['cold', 'fragile', 'customs', 'frozen']) assert.ok(KO.ui['story.special.' + a] && EN.ui['story.special.' + a]);
   for (const k of ['good', 'bad']) assert.ok(KO.ui['story.summary3.' + k]);

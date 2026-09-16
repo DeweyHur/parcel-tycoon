@@ -5,6 +5,7 @@
   const M = typeof module !== 'undefined' ? require('./meta.js') : root.META;
   const I18n = typeof module !== 'undefined' ? require('./i18n.js').init(D, M) : root.I18n;
   const TUT = typeof module !== 'undefined' ? require('./tutorial.js') : root.TUTORIAL;
+  const LV = typeof module !== 'undefined' ? require('./levels.js') : root.LEVELS;
   const T = I18n.t, MSG = I18n.msg; // T: 즉시 문자열, MSG: 로그용 메시지 객체 {k, p} (표시 시점에 번역)
 
   // ---------- RNG ----------
@@ -46,7 +47,7 @@
     selfCapDelta: 0, allStartTrust: 0,
     // 3.5단계: 보험·날씨·보관·적재
     premiumMult: 1, premiumDelta: {}, noInsurance: false, season: null, startMonth: null, weatherWeights: {}, tent: false, forecastTurns: 2,
-    storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, eventGoods: false, storageAnon: false,
+    noBankrupt: false, storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, eventGoods: false, storageAnon: false,
     // 4단계: 난이도·시나리오 고객 규칙
     feeMult: 1, feeFixed: null, feeDelta: 0,
     gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, burstDeadlineDelta: 0, customerClaimMult: {}, storageOfferEvery: 0, winStorage: 0, bigCustomer: false, winBigCustomer: false,
@@ -95,6 +96,10 @@
       cfg = Object.assign({ scenario: 'standard', company: 'local', perks: [], variants: [], difficulty: 'normal' }, cfg || {});
       if (cfg.scenario === 'daily') cfg.difficulty = 'normal';
       // 인수인계(대본) 런은 시드까지 고정 — 대본 밖 굴림(파손·도난·통관)도 매번 같아야 같은 환경이 재현된다
+      // 캠페인 레벨: 대본 · 고정 시드 · 켜져 있는 기능 집합 (levels.js)
+      this.level = cfg.level && LV ? LV.get(cfg.level) : null;
+      this._shows = this.level ? LV.showsAt(cfg.level) : null;
+      if (this.level && this.level.seed) cfg.seed = this.level.seed;
       if (cfg.scripted && TUT) cfg.seed = TUT.SEED;
       if (cfg.seed == null) cfg.seed = Date.now() % 2147483647;
       this.cfg = cfg;
@@ -147,6 +152,8 @@
       const co = M.COMPANIES[c.company] || M.COMPANIES.local;
       const df = M.DIFFICULTIES[c.difficulty] || M.DIFFICULTIES.normal;
       const mods = [{ months: sc.months }, sc.mods, df.mods, co.mods];
+      // 레벨은 시나리오 위에 얹는다 — 길이(사이클)·해·시작 달과 그 레벨만의 보정
+      if (this.level) { mods.push({ months: this.level.cycles }); if (this.level.year) mods.push({ year: this.level.year }); if (this.level.startMonth) mods.push({ startMonth: this.level.startMonth }); if (this.level.monthOffset) mods.push({ monthOffset: this.level.monthOffset }); if (this.level.mods) mods.push(this.level.mods); }
       if (c.startMonth) mods.push({ startMonth: c.startMonth }); // 데일리: 그날 지정된 달력 달
       for (const p of c.perks) if (M.PERKS[p]) mods.push(M.PERKS[p].mods);
       for (const v of c.variants || []) if (M.DAILY_VARIANTS[v]) mods.push(M.DAILY_VARIANTS[v].mods);
@@ -161,13 +168,13 @@
         const pool = Object.keys(D.CARRIERS).filter(k => !this.isBanned(k) && D.CARRIERS[k].tier <= 1);
         const fams = [...new Set(this.rng.shuffle(pool).map(FAM))].slice(0, 4);
         contracts = fams.map(f => ({ carrier: f, grade: this.rng.next() < 0.3 ? 'trusted' : 'normal' }));
-      } else { wh = { ...co.warehouse }; contracts = co.contracts; }
+      } else { const lc = this.level && this.level.company; wh = { ...((lc && lc.warehouse) || co.warehouse) }; contracts = (lc && lc.contracts) || co.contracts; }
       wh.cap += R.capDelta; wh.xl += R.xlDelta;
       if (R.coldCapMax != null) wh.cold = Math.min(wh.cold, R.coldCapMax);
       if (wh.frozen == null) wh.frozen = R.coldCapMax === 0 ? 0 : (wh.cold > 0 ? D.WAREHOUSE.frozen : 0);
       if (R.frozenCapMax != null) wh.frozen = Math.min(wh.frozen, R.frozenCapMax);
       this.warehouse = wh;
-      this.cash = Math.round((co.cash + R.cashDelta) * R.cashMult);
+      this.cash = Math.round((((this.level && this.level.company && this.level.company.cash) != null ? this.level.company.cash : co.cash) + R.cashDelta) * R.cashMult);
       this.contracts = contracts.map(s => {
         const c = this._makeContract(this.resolveCenter(s.carrier, s.grade || 'normal'), null, null, true);
         if (s.calls != null) c.calls = Math.min(c.maxCalls, s.calls + R.startCallsDelta);
@@ -180,7 +187,7 @@
     // ----- 고객(화주) (docs/CUSTOMER_DESIGN.md 2장) -----
     _initCustomers() {
       const R = this.rules, co = this.company;
-      let list = co.customers;
+      let list = (this.level && this.level.company && this.level.company.customers) || co.customers;
       if (!list) { const pool = this.rng.shuffle(Object.keys(M.CUSTOMERS).filter(k => k !== 'anon')).slice(0, 3); list = pool.map(k => [k, this.rng.int(3)]).concat([['anon', 0]]); }
       for (const k of R.forceCustomers) if (!list.some(x => x[0] === k)) list = list.concat([[k, 0]]);
       if (R.noAnon) list = list.filter(x => x[0] !== 'anon');
@@ -466,6 +473,7 @@
     returnGraceFor(p) { const R = this.rules; return Math.max(1, (this._attrs(p).includes('cold') ? R.returnGraceFresh : R.returnGrace) + (this.seasonMods().returnGraceDelta || 0)); }
     season(m) { const R = this.rules; if (R.season) return R.season; const c = this.calMonth(m); return c >= 3 && c <= 5 ? 'spring' : c >= 6 && c <= 8 ? 'summer' : c >= 9 && c <= 11 ? 'autumn' : 'winter'; }
     _genWeather(m) {
+      if (!this.shows('weather')) return Array.from({ length: this.turns(m) }, () => 'sunny');   // 날씨가 열리기 전(레벨 1·2)엔 언제나 맑음
       const sc = this.script(m); if (sc && sc.weather) { const w0 = sc.weather.slice(); while (w0.length < this.turns(m)) w0.push('sunny'); return w0.slice(0, this.turns(m)); }
       const R = this.rules, w = Object.assign({}, M.WEATHER_BY_SEASON[this.season(m)]);
       const cw = this.seasonMods(m).weather || {}; for (const k in cw) w[k] = (w[k] || (cw[k] > 1 ? 10 : 0)) * cw[k];
@@ -562,6 +570,7 @@
     selfSizeMax() { return this.warehouse.bigvan ? 4 : D.SELF_DELIVERY.sizeMax; }
     // 자체 배송 가능: 크기 범위 안이고 속성마다 차량이 있어야 (❄❆ 냉동 탑차, ⚠ 완충 포장차, 🛃 통관 끝난 뒤)
     selfCan(p) {
+      if (!this.shows('self')) return false;
       if (p.size > this.selfSizeMax()) return false;
       for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return false; if (a === 'fragile' && !this.warehouse.padvan) return false; if (a === 'customs' && (p.customs || 0) > 0) return false; }
       return true;
@@ -600,7 +609,8 @@
     baseCapacity(c) { return this.vehicleCap(c); }
     callCapacity(c) { return this.vehicleCap(c) * this.simulMax(c); }
     // 한 호출에 부를 수 있는 최대 대수
-    simulMax(c) { return Math.max(1, Math.max(D.CARRIERS[c.carrier].simul || 1, this.trustPerk(c.carrier, 'simul') || 1) + (c.enh.express ? 1 : 0)); }
+    simulMax(c) {
+      if (!this.shows('simul')) return 1; return Math.max(1, Math.max(D.CARRIERS[c.carrier].simul || 1, this.trustPerk(c.carrier, 'simul') || 1) + (c.enh.express ? 1 : 0)); }
     // 대당 배차비
     truckFee(c) {
       const R = this.rules, car = D.CARRIERS[c.carrier];
@@ -687,6 +697,7 @@
     }
     canCall(c) {
       if (!c || this.isStruck(c) || this.isOffTurn()) return false;
+      if (!this.shows('calls')) return this.eligibleParcels(c).length > 0;   // 배차가 소모품이 되기 전(레벨 1)엔 잔량이 없다
       if (c.calls <= 0 && !(this.rules.spareCall && !this.monthStats.spareUsed)) return false;
       return this.eligibleParcels(c).length > 0;
     }
@@ -750,7 +761,7 @@
     repTierName() { return T('rep.tier.' + this.repTierId()); }
     // 평판 증감. 사고는 깎고(pen 양수 = 깎임), 잘한 일은 올린다. 상한을 넘지 않고, 0 이하면 런이 끝난다
     addRep(n, why) {
-      if (!n) return 0;
+      if (!n || !this.shows('rep')) return 0;
       if (n < 0) this.repDropped = true;
       const before = this.rep;
       this.rep = Math.max(0, Math.min(this.repCap(), this.rep + n));
@@ -768,7 +779,11 @@
     // 달력 컷 시나리오(성수기·폭염·데일리)는 monthOffset 만큼 뒤 개월차의 표(입고·품목·등급·가격)를 쓴다 — 11월 컷이 1개월차 물량으로 시작하면 싱겁다
     tableMonth(c) { return this.monthIndex(c) + (this.rules.monthOffset || 0); }
     // 튜토리얼 대본(1~3개월차). 「인수인계」로 시작한 런에서만 (docs/STORY_TUTORIAL_DESIGN.md 부록 I)
-    script(m) { if (!this.cfg.scripted || !TUT) return null; return TUT.months[m || this.month] || null; }
+    // 이 런에서 그 기능이 켜져 있는가. 캠페인 레벨 밖(자유 런)은 전부 켜져 있다 (levels.js FLAGS)
+    shows(k) { return !this._shows || this._shows.has(k); }
+    // 상호: 레벨 1을 끝내면 플레이어가 붙인 이름이 회사 이름을 대신한다
+    companyName() { return this.cfg.companyName || this.company.name; }
+    script(m) { if (this.level && this.level.script) return this.level.script[m || this.month] || null; if (!this.cfg.scripted || !TUT) return null; return TUT.months[m || this.month] || null; }
     scripted() { return !!this.script(); }
     _extraArrivals(m) { const tm = this.tableMonth(m); return Math.round((tm <= 6 ? D.EXTRA_ARRIVALS[tm] : D.EXTRA_ARRIVALS[6] + (tm - 6) * 2) * this.seasonMods(m).arrivalsMult) + this._customerExtra(); }
     _typeRatio(m) {
@@ -1043,7 +1058,8 @@
       }
       if (!delivered.length && broken) {
         // 전부 파손: 호출은 소모, 보상 없음
-        if (useSpare) { this.monthStats.spareUsed = true; c.calls = Math.max(0, c.calls - (trucks - 1)); } else c.calls -= trucks; c.totalCalls++;
+        if (!this.shows('calls')) { /* 무제한 */ } else if (useSpare) { this.monthStats.spareUsed = true; c.calls = Math.max(0, c.calls - (trucks - 1)); } else c.calls -= trucks;
+        c.totalCalls++;
         this.monthStats.calls++; this.run.calls++; this.stats.calls++;
         this.waitStack = 0; this._assignCold();
         this.say('log.callAllBroken', { name: this.contractName(c), broken });
@@ -1062,6 +1078,7 @@
       // 배차 대수 소모
       let refunded = false;
       if (useSpare) { this.monthStats.spareUsed = true; this.say('log.spareCall'); c.calls = Math.max(0, c.calls - (trucks - 1)); }
+      else if (!this.shows('calls')) { /* 무제한 */ }
       else if (R.bundleRefund && chosen.length >= R.bundleRefund && !this.monthStats.bundleUsed) { this.monthStats.bundleUsed = true; refunded = true; c.calls -= Math.max(0, trucks - 1); }
       else c.calls -= trucks;
       c.successCalls++; c.totalCalls++; c.delivered += chosen.length;
@@ -1224,7 +1241,7 @@
       return true;
     }
     weekendChoices() {
-      return D.WEEKEND_CHOICES.map(c => {
+      return D.WEEKEND_CHOICES.filter(c => this.shows('weekendChoice') || c.id === 'rest').map(c => {
         const cost = c.cost ? Math.round(c.cost * this.rules.itemPriceMult * this.inflation()) : 0;
         return { id: c.id, cost, stress: c.stress || 0, self: c.self || 0,
           ok: (!cost || this.cash >= cost) && (!c.needOutdoor || this.outdoorVolume() > 0) };
@@ -1294,7 +1311,8 @@
       this.say('log.settle', { month: this.month, revenue: ms.revenue, opCost, fees: feesDue, closing: closing ? MSG('log.settleClosing', { closing }) : '' });
       if (loan.repaid) this.say('log.loanRepaid', { n: loan.repaid, interest: loan.interest });
       if (loan.borrowed) this.say('log.loan', { n: loan.borrowed, interest: Math.ceil(loan.borrowed * D.LOAN.interest) });
-      if (this.debt > D.LOAN.limit) return this._gameOver(MSG('over.bankrupt', { debt: this.debt, limit: D.LOAN.limit }));
+      // 레벨 1은 실패가 없다 — 배우는 자리에서 부도로 끊지 않는다 (levels.js noBankrupt)
+      if (!this.rules.noBankrupt && this.debt > D.LOAN.limit) return this._gameOver(MSG('over.bankrupt', { debt: this.debt, limit: D.LOAN.limit }));
       this.phase = 'summary';
     }
     closeSummary() {
@@ -1302,6 +1320,7 @@
       const dm = this.cfg.demoMonths || 0;
       if (dm && this.month >= dm && this.month < this.rules.months) return this._finishDemo();
       if (!this.rules.endless && this.month >= this.rules.months) return this._finish();
+      if (!this.shows('market')) { this._startMonth(this.month + 1); return true; }   // 마켓이 열리기 전(레벨 1)엔 정산 다음이 바로 다음 사이클
       this._openMarket();
       return true;
     }
@@ -1341,7 +1360,7 @@
       this.stats.monthsDone = monthsDone;
       this.stats.distinctCarriersAtEnd = new Set(this.contracts.filter(Boolean).map(c => c.carrier)).size;
       const score = Math.round(Math.max(0, this.run.revenue + Math.max(0, this.cash) + monthsDone * (this.rules.endless ? 300 : 200) + this.rep * 20) * this.rules.scoreMult);
-      return { win, demo: false, story: !!this.cfg.scripted, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
+      return { win, demo: false, story: !!this.cfg.scripted, level: this.cfg.level || 0, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
         scenario: this.cfg.scenario, company: this.cfg.company, difficulty: this.cfg.difficulty || 'normal', perks: this.perks.slice(), variants: (this.cfg.variants || []).slice(), date: this.cfg.date || null, ...this.run };
     }
 

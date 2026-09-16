@@ -80,6 +80,23 @@
   // 배차가 바닥난 계약(보낼 택배는 있는데 차를 못 부르는 상태)
   const outOfCalls = g => (g.contracts || []).find(c => c && c.calls === 0 && g.eligibleParcels(c).length > 0);
 
+  // ----- 레벨 1 전용 비트 (docs/STORY_TUTORIAL_DESIGN.md 부록 R) -----
+  // 레벨 1 화면에는 계약 하나 · 고객 하나 · 맑음뿐이다. 설명할 것이 적으니 비트도 짧다 — 열두 개, 대부분 한 장.
+  const BEATS_L1 = [
+    { id: 'l1intro', kind: 'start', when: () => true, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: '#parcels' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
+    { id: 'l1waitGo', kind: 'modal', modal: 'wait', when: g => g.story.seen.includes('l1intro'), pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
+    { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 3, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
+    { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
+    { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
+    { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { expr: 'neutral' }] },
+    { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
+    { id: 'l1deadline', kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1), pages: [{ expr: 'worry', hl: '#parcels' }] },
+    { id: 'l1sunday', kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
+    { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
+    { id: 'l1usage', kind: 'turn', when: g => usage(g) >= 0.75, pages: [{ expr: 'worry', hl: '#bar-usage' }] },
+    { id: 'l1last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
+  ];
+
   const BEATS = [
     // ----- 3월 (1개월차): 창고 -----
     { id: 'intro', months: [1], kind: 'start', when: () => true, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: '#parcels' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
@@ -90,13 +107,13 @@
     // 호출 팝업 안: 자동 선택 버튼 → 호출 버튼. 팝업이 다시 그려질 때마다 ctx.sel(선택 수)로 확인한다
     { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     // 차가 두 대 붙는 첫 순간. 자동으로 붙는 거라 설명이 없으면 배차가 왜 2대 줄었는지 모른다 (대본 1개월차 8턴에 정확히 12칸이 온다)
-    { id: 'trucks2', months: [1, 2, 3], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'smile', hl: '#modal .truckgauge' }] },
+    { id: 'trucks2', needs: 'simul', months: [1, 2, 3], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'smile', hl: '#modal .truckgauge' }] },
     { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#pick-list' }, { expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
     // 안내가 끝났다는 걸 말로 못 박아 준다. 이게 없으면 언제까지 시키는 대로 해야 하는지 알 수 없다.
     { id: 'handOff', months: [1], kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile' }] },
     // 배차 소진: 이 게임에서 제일 많이 막히는 지점 — 배차는 월초에 안 채워진다
-    { id: 'callsOut', months: [1, 2, 3], kind: 'turn', when: g => !!outOfCalls(g), pages: [{ expr: 'worry', hl: '#actions' }, { expr: 'neutral' }] },
+    { id: 'callsOut', needs: 'calls', months: [1, 2, 3], kind: 'turn', when: g => !!outOfCalls(g), pages: [{ expr: 'worry', hl: '#actions' }, { expr: 'neutral' }] },
     { id: 'deadline1', months: [1, 2, 3], kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1 && !(p.customs > 0)), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'usage76', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.76, pages: [{ expr: 'worry', hl: '#bar-usage' }, { expr: 'neutral', hl: '#upcoming' }] },
     { id: 'usage91', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.91, pages: [{ expr: 'shock', hl: '#bar-usage' }] },
@@ -106,17 +123,17 @@
     { id: 'weekendYard', months: [1, 2, 3], kind: 'weekend', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'worry', hl: '.wkopts .wkc:nth-child(3)' }] },
     // 평판: 처음 깎였을 때 한 번. 이 게임이 왜 끝나는지를 말해 주는 자리다
     // '방금 깎였지'는 진짜 깎였을 때만. 등급이 올라 상한이 늘어난 것뿐인데 깎였다고 하면 안 된다
-    { id: 'rep', months: [1, 2, 3], kind: 'turn', when: g => g.repDropped || g.rep < g.repCap(), pages: [{ expr: g => g.repDropped ? 'worry' : 'neutral', hl: '#hud-right', k: g => g.repDropped ? 'story.rep.1drop' : 'story.rep.1' }, { expr: 'neutral', hl: '#hud-right' }] },
+    { id: 'rep', needs: 'rep', months: [1, 2, 3], kind: 'turn', when: g => g.repDropped || g.rep < g.repCap(), pages: [{ expr: g => g.repDropped ? 'worry' : 'neutral', hl: '#hud-right', k: g => g.repDropped ? 'story.rep.1drop' : 'story.rep.1' }, { expr: 'neutral', hl: '#hud-right' }] },
     // 등급이 처음 오른 정산 — 평판을 키우면 뭐가 열리는지 여기서 말한다
-    { id: 'repUp', months: [1, 2, 3], kind: 'summary', when: g => !!(g.summary && g.summary.repTierUp), pages: [{ expr: 'laugh' }, { expr: 'smile' }] },
+    { id: 'repUp', needs: 'rep', months: [1, 2, 3], kind: 'summary', when: g => !!(g.summary && g.summary.repTierUp), pages: [{ expr: 'laugh' }, { expr: 'smile' }] },
     { id: 'summary1', months: [1], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
-    { id: 'market1', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }] },
+    { id: 'market1', needs: 'market', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }] },
     // 예상 물량: 접혀 있는 줄을 '눌러서 펼치게' 한 다음, 펼쳐진 내용을 보면서 설명한다
-    { id: 'marketFc', months: [1], kind: 'market', when: (g, ctx) => !ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fctoggle', gate: true }] },
-    { id: 'marketFcOpen', months: [1], kind: 'market', when: (g, ctx) => !!ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fc' }] },
+    { id: 'marketFc', needs: 'market', months: [1], kind: 'market', when: (g, ctx) => !ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fctoggle', gate: true }] },
+    { id: 'marketFcOpen', needs: 'market', months: [1], kind: 'market', when: (g, ctx) => !!ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fc' }] },
     // 다음 사이클에 못 싣는 게 온다 — 마켓이 마지막 기회다. 어느 달이든
-    { id: 'marketBlocked', kind: 'market', when: g => g.forecastBlocked().length > 0, pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
-    { id: 'market1b', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
+    { id: 'marketBlocked', needs: 'market', kind: 'market', when: g => g.forecastBlocked().length > 0, pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
+    { id: 'market1b', needs: 'market', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
     // ----- 4월 (2개월차): 고객과 돈 -----
     // 고객 설명은 말로 하면 안 들어온다. 택배를 직접 누르게 하고 상세 팝업에서 짚는다.
     { id: 'm2', months: [2], kind: 'turn', when: g => g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: g => { const p = namedParcel(g); return p ? `#parcels .parcel[data-id="${p.id}"]` : '#parcels'; }, gate: g => !!namedParcel(g) }] },
@@ -130,24 +147,24 @@
     // 대기 팝업 안 (noContract 다음): 직접 배송할 택배 하나 → 대기 버튼
     { id: 'waitSelf', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('noContract') && ctx.picked === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .zone .parcel', gate: true }] },
     { id: 'waitGo', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('waitSelf') && ctx.picked > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
-    { id: 'offer', months: [2, 3], kind: 'turn', when: g => !!g.offer, pages: [{ expr: 'neutral', hl: '#offer' }, { expr: 'think' }] },
+    { id: 'offer', needs: 'storage', months: [2, 3], kind: 'turn', when: g => !!g.offer, pages: [{ expr: 'neutral', hl: '#offer' }, { expr: 'think' }] },
     { id: 'cash', months: [2, 3], kind: 'turn', when: g => g.projectedCash().total < 0 || g.debt > 0, pages: [{ expr: 'think', hl: '#hud-left' }, { expr: 'worry' }] },
     { id: 'summary2', months: [2], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }] },
-    { id: 'market2', months: [2], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
+    { id: 'market2', needs: 'market', months: [2], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
     // ----- 마켓: 배차를 늘리는 세 가지 (충전 · 한도 강화 · 상위 센터) -----
-    { id: 'marketRefill', months: [1, 2, 3], kind: 'market', when: g => !!refillSlot(g), pages: [{ expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; } }, { expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; }, gate: g => { const r = refillSlot(g); return !!r && r.c.calls === 0; } }] },
+    { id: 'marketRefill', needs: 'market', months: [1, 2, 3], kind: 'market', when: g => !!refillSlot(g), pages: [{ expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; } }, { expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; }, gate: g => { const r = refillSlot(g); return !!r && r.c.calls === 0; } }] },
     // 프리미엄: 실제 매물 카드를 짚고, 계열 표준 대비 무엇이 달라지는지 읽힌다
-    { id: 'marketPremium', kind: 'market', when: g => !!premiumItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.CARRIERS[it.carrier] && root.DATA.CARRIERS[it.carrier].tier > 0) }] },
-    { id: 'marketLimit', months: [1, 2, 3], kind: 'market', when: g => !!limitItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'enh' && /^limit/.test(it.enh)) }] },
-    { id: 'marketSwitch', months: [2, 3], kind: 'market', when: g => !!switchItem(g), pages: [{ expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'contract' && it.switchFrom) }, { expr: 'think' }] },
+    { id: 'marketPremium', needs: 'market', kind: 'market', when: g => !!premiumItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.CARRIERS[it.carrier] && root.DATA.CARRIERS[it.carrier].tier > 0) }] },
+    { id: 'marketLimit', needs: 'market', months: [1, 2, 3], kind: 'market', when: g => !!limitItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'enh' && /^limit/.test(it.enh)) }] },
+    { id: 'marketSwitch', needs: 'market', months: [2, 3], kind: 'market', when: g => !!switchItem(g), pages: [{ expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'contract' && it.switchFrom) }, { expr: 'think' }] },
     // ----- 5월 (3개월차): 손실, 승리, 작별 -----
     { id: 'm3', months: [3], kind: 'turn', when: g => g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'fragileRisk', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => attrsOf(g, p).includes('fragile')) && !g.contracts.some(c => c && g.contractCaps(c).includes('fragile')), pages: [{ expr: 'neutral', hl: '#parcels' }] },
     { id: 'loss', months: [1, 2, 3], kind: 'any', when: (g, ctx) => hasEvent(ctx, ['discard', 'returned', 'stolen', 'broken', 'claim']), pages: [{ expr: 'shock' }, { speaker: 'kang', expr: 'neutral', k: () => 'story.loss.rep' }, { expr: 'neutral', k: () => 'story.loss.2' }] },
     // 비 + 마당에 나가 있는 택배가 있을 때만 (창고가 안 찼으면 나오지 않는다). 대기 팝업의 적재 정리까지 안내
-    { id: 'rain', months: [1, 2, 3], kind: 'turn', when: g => g.outdoorVolume() > 0 && (g.weatherNow() === 'rain' || g.upcoming().some(u => u.weather === 'rain')), pages: [{ speaker: 'noh', expr: 'neutral', hl: '#upcoming .chip.wx' }, { expr: 'neutral', hl: '#upcoming .chip.wx', gate: g => !g.story.seen.includes('weatherDetail') }] },
+    { id: 'rain', needs: 'weather', months: [1, 2, 3], kind: 'turn', when: g => g.outdoorVolume() > 0 && (g.weatherNow() === 'rain' || g.upcoming().some(u => u.weather === 'rain')), pages: [{ speaker: 'noh', expr: 'neutral', hl: '#upcoming .chip.wx' }, { expr: 'neutral', hl: '#upcoming .chip.wx', gate: g => !g.story.seen.includes('weatherDetail') }] },
     // 날씨도 지나가는 대사 대신 직접 눌러 확인하게 한다 (호기심에 먼저 눌러도 나온다)
-    { id: 'weatherDetail', months: [1, 2, 3], kind: 'modal', modal: 'weather', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral' }] },
+    { id: 'weatherDetail', needs: 'weather', months: [1, 2, 3], kind: 'modal', modal: 'weather', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral' }] },
     { id: 'rainReorder', months: [1, 2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('rain') && ctx.outdoor > 0, pages: [{ expr: 'neutral', hl: '#wm-reorder', gate: true }] },
     { id: 'win', months: [3], kind: 'turn', when: g => g.turn >= 5, pages: [{ expr: 'neutral' }, { expr: 'smile' }, { expr: 'think' }] },
     { id: 'summary3', months: [3], kind: 'summary', when: () => true, pages: [{ expr: g => (g.summary && g.summary.cash > 0 ? 'laugh' : 'worry'), k: g => 'story.summary3.' + (g.summary && g.summary.cash > 0 ? 'good' : 'bad') }] },
@@ -191,7 +208,9 @@
   function check(g, ctx) {
     if (!g || !g.story || g.story.off) return null;
     const kind = ctx.kind || 'turn';
-    for (const b of BEATS) {
+    const list = g.level && g.level.n === 1 ? BEATS_L1 : BEATS;
+    for (const b of list) {
+      if (b.needs && !g.shows(b.needs)) continue;   // 아직 안 열린 기능을 말하지 않는다 (levels.js)
       if (g.story.seen.includes(b.id)) continue;
       if (b.months && !b.months.includes(g.monthIndex())) continue;   // 비트의 months 는 개월차(사이클 2개)
       if (b.kind === 'turn' ? !['turn', 'call'].includes(kind) : b.kind !== 'any' && b.kind !== kind) continue;
@@ -226,6 +245,6 @@
   function done(g) { return !!(g && g.story && g.story.seen.includes('farewell')); }
   function active(g) { return !!(g && g.story && !g.story.off && !done(g)); }
 
-  const Story = { BEATS, SPRITES, REPS, CHARACTER, check, sms, done, active, sprite, repOf, repName, greet, bestSlot: bestReadySlot, mkKey, params };
+  const Story = { BEATS, BEATS_L1, SPRITES, REPS, CHARACTER, check, sms, done, active, sprite, repOf, repName, greet, bestSlot: bestReadySlot, mkKey, params };
   if (typeof module !== 'undefined') module.exports = Story; else root.Story = Story;
 })(typeof window !== 'undefined' ? window : globalThis);
