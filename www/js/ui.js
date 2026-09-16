@@ -92,8 +92,8 @@
   function showTitleCampaign(save, camp) {
     const n = Math.min(camp.level || 1, LEVELS.IMPLEMENTED), lv = LEVELS.get(n);
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
-      ${save ? `<button class="btn primary" id="t-continue">${T('lv.continue')} <small style="color:var(--dim)">${T('lv.startSub', { n, title: T('lv.l' + n + '.title') })}</small></button>` : ''}
-      <button class="btn ${save ? '' : 'gold'}" id="t-level">${T('lv.start')} <small style="color:var(--dim)">${T('lv.startSub', { n, title: T('lv.l' + n + '.title') })}</small></button>
+      ${save ? `<button class="btn primary" id="t-continue">${T('lv.continue')} <small style="color:var(--dim)">${T('lv.startSub', { ch: T('lv.ch.' + n) })}</small></button>` : ''}
+      <button class="btn ${save ? '' : 'gold'}" id="t-level">${T('lv.start')} <small style="color:var(--dim)">${T('lv.startSub', { ch: T('lv.ch.' + n) })}</small></button>
       <div style="display:flex;gap:8px"><button class="btn" id="t-sound" style="flex:1">${T('opt.sound', { v: T(opts.sound ? 'opt.on' : 'opt.off') })}</button><button class="btn" id="t-music" style="flex:1">${T('opt.music', { v: T(opts.music ? 'opt.on' : 'opt.off') })}</button></div>
       <button class="btn" id="t-lang">${T('opt.lang')}: ${I18n.languages().map(l => l.id === I18n.lang ? `<b>${esc(l.name)}</b>` : esc(l.name)).join(' / ')}</button></div>`;
     const m = modal(T('title.modal'), body, null, 'v0.3');
@@ -113,7 +113,7 @@
   function showLevelDone(r) {
     if (!r.recorded) { r.recorded = true; Store.remove(SAVE_KEY); BGM.stop(0.5); SFX.win(); BGM.oneShot('fanfare'); }
     const body = `<p style="text-align:center">${T('lv.doneBody', { months: Math.round(r.monthsDone / D.CYCLES_PER_MONTH), delivered: r.delivered, cash: r.cash })}</p>`;
-    modal(T('lv.doneTitle', { n: r.level }), body, [{ label: T('lv.doneGo'), cls: 'primary', onClick: () => askCompanyName(r) }]);
+    modal(T('lv.doneTitle', { ch: T('lv.ch.' + r.level) }), body, [{ label: T('lv.doneGo'), cls: 'primary', onClick: () => askCompanyName(r) }]);
   }
   // 레벨 1을 끝내면 상호를 묻는다 — 여기서 처음으로 '내 가게'가 된다
   function askCompanyName(r) {
@@ -127,7 +127,7 @@
       const P2 = Profile.get();
       P2.campaign = Object.assign({}, P2.campaign, { name: v, cleared: Math.max(P2.campaign.cleared || 0, r.level), level: r.level + 1 });
       Profile.save(); game = null;
-      modal(T('lv.doneTitle', { n: r.level }), `<div class="big-num">${esc(v)}</div><p>${T('lv.next')}</p>`,
+      modal(T('lv.doneTitle', { ch: T('lv.ch.' + r.level) }), `<div class="big-num">${esc(v)}</div><p>${T('lv.next')}</p>`,
         [{ label: T('res.toTitle'), cls: 'primary', onClick: () => { closeModal(); showTitle(); } }]);
     } }]);
     setTimeout(() => { const el = m.querySelector('#lv-name'); if (el) el.focus(); }, 60);

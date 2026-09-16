@@ -149,7 +149,7 @@ const say = m => { console.log(m); log.push(m); };
   say('\n■ 레벨 완료 → 상호');
   await page.waitForTimeout(500); await shot('40-done');
   const doneTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
-  check(/레벨 1 완료/.test(doneTxt), '「레벨 1 완료」 — ' + doneTxt.replace(/\s+/g, ' ').slice(0, 50));
+  check(/서장 완료/.test(doneTxt), '「서장 완료」 — ' + doneTxt.replace(/\s+/g, ' ').slice(0, 50));
   await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(350);
   await shot('41-name');
   const input = await page.$('#lv-name');

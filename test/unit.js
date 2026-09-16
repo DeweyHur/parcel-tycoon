@@ -435,7 +435,7 @@ t('자동 선택: 마지막 차가 본전선(80%)도 못 채우면 그 차는 �
 });
 t('스토리: 비트 문구 키가 ko/en 에 모두 있다', () => {
   for (const b of Story.BEATS_L1) b.pages.forEach((pg, i) => { const k = `story.${b.id}.${i + 1}`; assert.ok(KO.ui[k] && EN.ui[k], k); });
-  for (const k of ['lv.doneTitle', 'lv.doneBody', 'lv.nameAsk', 'lv.nameBody', 'lv.nameSave', 'lv.nameDefault', 'lv.start', 'lv.startSub', 'lv.l1.title', 'lv.continue', 'lv.next', 'lv.doneGo', 'wait.btnPlain', 'sum.toNext', 'help.l1']) assert.ok(KO.ui[k] && EN.ui[k], k);
+  for (const k of ['lv.doneTitle', 'lv.doneBody', 'lv.nameAsk', 'lv.nameBody', 'lv.nameSave', 'lv.nameDefault', 'lv.start', 'lv.startSub', 'lv.ch.1', 'lv.ch.2', 'lv.continue', 'lv.next', 'lv.doneGo', 'wait.btnPlain', 'sum.toNext', 'help.l1']) assert.ok(KO.ui[k] && EN.ui[k], k);
   // 레벨 1 도움말에는 아직 안 연 것이 없어야 한다
   for (const w of ['평판', '냉장', '냉동', '마켓', '보험', '고객', '통관']) assert.ok(!KO.ui['help.l1'].includes(w), 'help.l1 에 ' + w);
   for (const b of Story.BEATS) b.pages.forEach((pg, i) => { if (pg.k) return; const k = `story.${b.id}.${i + 1}`; assert.ok(KO.ui[k] && EN.ui[k], k); });
