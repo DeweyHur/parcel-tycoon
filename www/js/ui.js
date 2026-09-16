@@ -1260,6 +1260,6 @@
     }
     showTitle();
   }
-  window.PT = { get game() { return game; }, get busy() { return busy; }, renderAll, saveGame, prep, startRun, showTitle };
+  window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, renderAll, saveGame, prep, startRun, showTitle };
   init();
 })();

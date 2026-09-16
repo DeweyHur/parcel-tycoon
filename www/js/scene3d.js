@@ -1,9 +1,12 @@
 // 로우폴리 창고 장면 (Three.js)
 window.Scene3D = (function () {
   const CELL = 0.6;
-  const MAIN = { x0: -1.2, cells: 8, depth: 7 };   // 일반 구역 (오른쪽)
-  const COLD = { x0: -4.6, cells: 4, depth: 7 };   // 냉장 구역 (왼쪽)
-  const YARD = { x0: -2.4, cells: 11, depth: 2, z0: 3.15 };   // 야외 적재 (창고 앞, 지붕 밖)
+  // 창고는 착탈식이다 — 아래는 '최대치'이고, 실제 크기는 warehouse 상태에서 매번 계산한다 (_zonesFor)
+  const MAIN = { x0: -1.2, cells: 8, maxDepth: 7 };   // 일반 구역 (오른쪽). 깊이가 창고 칸수를 따라 자란다
+  const COLD = { x0: -4.6, cells: 4, maxDepth: 7 };   // 냉장/냉동 구역 (왼쪽). 0칸이면 아예 안 붙는다
+  const YARD = { cells: 11, depth: 2 };               // 야외 적재 (창고 앞, 지붕 밖)
+  const BACK_Z = -1.7, ROW_Z = -1.3, DOCK_X = 4.6;    // 뒷벽 · 첫 줄 시작 · 도크(오른쪽 끝)
+  const FULL = { x0: -5.2, front: 3.35, width: 9.8 }; // 만재 기준(옛 고정 모델) — 카메라 보정의 기준점
   const WX = {
     sunny: { hemi: 0xdfefff, hemiI: 0.9, sunI: 1.1, clear: [0x000000, 0], rain: 0, snow: 0 },
     rain:  { hemi: 0x9fb0c8, hemiI: 0.7, sunI: 0.45, clear: [0x5d6b80, 0.5], rain: 420, snow: 0 },
@@ -38,7 +41,10 @@ window.Scene3D = (function () {
       this.camera.lookAt(1.3, 0.3, 0.3);
       this.tweens = []; this.boxes = new Map(); this.clock = new THREE.Clock(); this.time = 0;
       this.busy = 0;
-      this._buildWorld();
+      this.parts = {};                     // 착탈식 모듈: shell · cold · yard · van
+      this.Z = this._zonesFor({ cap: 24, cold: 6, frozen: 4 });   // 첫 프레임용 기본값 (sync 가 곧 덮는다)
+      this._buildTerrain();
+      this._syncBuilding({ cap: 24, cold: 6, frozen: 4 });
       this._buildWeather();
       this.weather = 'sunny';
       this.resize();
@@ -55,8 +61,14 @@ window.Scene3D = (function () {
       this.camera.fov = a < 0.9 ? 46 : 38;
       // 넓은 화면(가로형)이면 카메라를 왼쪽으로 옮겨 냉장 구역이 잘리지 않게
       // 장면 가로 범위는 x -5.2(냉장 벽)~5.7(도크). 세로형(a<0.9)은 창고 중앙(2.6) 기준, 그 외는 가운데(0.3)를 보되 다 들어올 때까지 카메라를 뒤로
-      if (a < 0.9) { this.camX = 2.6; this.camY = 7.8; this.camZ = 9.8; this.camera.position.set(2.6, 7.8, 9.8); this.camera.lookAt(1.3, 0.3, 0.3); }
-      else { const need = 6.4 / (Math.tan(this.camera.fov / 2 * Math.PI / 180) * a); const k = Math.max(1, need / 12.1); this.camX = 0.3; this.camY = 0.3 + 7.5 * k; this.camZ = 0.3 + 9.5 * k; this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(0.1, 0.3, 0.3); }
+      // 건물이 작아지면 카메라도 같이 당겨 온다 (모델이 먼저 바뀌고, 카메라는 그것을 따라갈 뿐)
+      const Z = this.Z || this._zonesFor({ cap: 24, cold: 6, frozen: 4 });
+      // 왼쪽(냉장실)이 없으면 그만큼 오른쪽으로, 건물이 작으면 그만큼 가깝게. 보는 높이(z)는 그대로 둔다
+      const dx = (Z.x0 - FULL.x0) / 2;
+      const spanX = (Z.x1 + 1.2 - Z.x0) / 11, spanZ = (Z.yardZ0 + Z.YARD.depth * CELL + 0.3 - BACK_Z) / 6.35;
+      const k = Math.max(0.9, Math.min(1, Math.max(spanX, spanZ)));   // 작아져도 너무 붙지는 않는다 — 건물이 자라는 게 보여야 하니까
+      if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.3 * k; this.camY = 0.3 + 7.5 * k; this.camZ = 0.3 + 9.5 * k; this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(fx, 0.3, 0.3); }
+      else { const need = 6.4 * k / (Math.tan(this.camera.fov / 2 * Math.PI / 180) * a); const kk = Math.max(1, need / 12.1); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.3 + 7.5 * kk * k; this.camZ = 0.3 + 9.5 * kk * k; this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(fx, 0.3, 0.3); }
       this.camera.updateProjectionMatrix();
     }
     _mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, flatShading: true, ...opts }); }
@@ -67,7 +79,93 @@ window.Scene3D = (function () {
       m.add(edges);
       return m;
     }
-    _buildWorld() {
+    // 창고 상태 → 실제 구역·발자국. "칸 수가 늘면 건물이 자란다"를 여기 한 곳에서 정한다
+    _zonesFor(wh) {
+      const cap = Math.max(1, wh.cap || 1), coldCells = (wh.cold || 0) + (wh.frozen || 0);
+      const mainDepth = Math.max(2, Math.min(MAIN.maxDepth, Math.ceil(cap / MAIN.cells)));
+      const coldDepth = coldCells > 0 ? Math.max(1, Math.min(COLD.maxDepth, Math.ceil(coldCells / COLD.cells))) : 0;
+      const frontZ = ROW_Z + mainDepth * CELL + 0.45;
+      const yardZ0 = ROW_Z + mainDepth * CELL + 0.25;
+      const x0 = coldDepth ? COLD.x0 - 0.6 : MAIN.x0 - 0.5;
+      const yardX0 = Math.max(-2.4, x0 + 0.3);
+      return {
+        MAIN: { x0: MAIN.x0, cells: MAIN.cells, depth: mainDepth, z0: ROW_Z },
+        COLD: { x0: COLD.x0, cells: COLD.cells, depth: coldDepth, z0: ROW_Z },
+        YARD: { x0: yardX0, cells: Math.max(4, Math.floor((DOCK_X - 0.2 - yardX0) / CELL)), depth: YARD.depth, z0: yardZ0 },
+        x0, x1: DOCK_X, frontZ, yardZ0,
+      };
+    }
+    // 착탈: 창고가 바뀌면 바뀐 모듈만 다시 짓는다. 처음 짓는 게 아니면 위에서 내려앉는다
+    _syncBuilding(wh, opts) {
+      const sig = [wh.cap, wh.cold || 0, wh.frozen || 0, ['coldvan', 'padvan', 'bigvan'].filter(k => wh[k]).length].join('/');
+      if (sig === this.buildSig) return false;
+      // 런을 처음 그릴 때는 조용히 짓고, 게임 중에 바뀐 것(확장·냉장실·차량)만 내려앉는다
+      const first = !this.buildSig || !!(opts && opts.silent);
+      this.buildSig = sig;
+      const Z = this.Z = this._zonesFor(wh);
+      const put = (name, group, drop) => {
+        const old = this.parts[name];
+        if (old) { this.scene.remove(old); }
+        this.parts[name] = group || null;
+        if (group) { this.scene.add(group); if (!first) this._dropIn(group, drop); }
+      };
+      put('shell', this._makeShell(Z), 0.7);
+      put('cold', Z.COLD.depth ? this._makeColdRoom(Z) : null, 1.8);
+      put('yard', this._makeYardPad(Z), 0.5);
+      const vans = ['coldvan', 'padvan', 'bigvan'].filter(k => wh[k]);
+      put('van', vans.length ? this._makeVan(Z, vans[0]) : null, 1.4);
+      if (this.road) this.road.position.x = Z.x1 + 0.6 + 20;   // 도로는 건물 오른쪽 끝에서 시작 (좁은 창고 앞을 아스팔트가 가리지 않게)
+      this.tileCaps = null;   // 구역이 바뀌었으니 바닥 타일도 다시
+      this.resize();
+      return true;
+    }
+    _dropIn(group, h) {
+      group.position.y += (h || 1.2);
+      this.tweens.push({ obj: group.position, from: { y: group.position.y }, to: { y: group.position.y - (h || 1.2) }, dur: 0.55, fn: bounce, t: 0 });
+    }
+    // 본동: 바닥 · 뒷벽 · 오른쪽 벽 · 지붕 · 기둥 · 도크
+    _makeShell(Z) {
+      const g = new THREE.Group();
+      const w = Z.x1 - Z.x0, cx = (Z.x0 + Z.x1) / 2;
+      const padBack = BACK_Z, padFront = Z.yardZ0 + Z.YARD.depth * CELL + 0.15;
+      const floor = this._box(w, 0.12, padFront - padBack, 0x9a9aa8); floor.position.set(cx, 0.0, (padBack + padFront) / 2); g.add(floor);
+      const back = this._box(w, 3.2, 0.25, 0xd9c8a8); back.position.set(cx, 1.6, BACK_Z); g.add(back);
+      const left = this._box(0.25, 3.2, Z.frontZ - BACK_Z, 0xcdbd9e); left.position.set(Z.x0 + 0.1, 1.6, (BACK_Z + Z.frontZ) / 2); g.add(left);
+      const roofD = Math.min(2.4, (Z.frontZ - BACK_Z) * 0.62);
+      const roof = this._box(w + 0.4, 0.22, roofD, 0xb8453b); roof.position.set(cx, 3.2, BACK_Z + roofD / 2 - 0.2); g.add(roof);
+      const px = [Z.x0 + 0.3, cx, Z.x1 - 0.1];
+      for (const x of px) { const p = this._box(0.22, 3.1, 0.22, 0xb59a75); p.position.set(x, 1.55, BACK_Z + 0.25); g.add(p); }
+      const right = this._box(0.25, 3.2, Math.min(2.0, Z.frontZ - BACK_Z), 0xcdbd9e); right.position.set(Z.x1 - 0.1, 1.6, BACK_Z + Math.min(2.0, Z.frontZ - BACK_Z) / 2); g.add(right);
+      const dock = this._box(0.4, 0.05, Math.min(3.0, Z.frontZ - BACK_Z + 0.6), 0xf0d060); dock.position.set(Z.x1 + 0.3, 0.08, BACK_Z + 1.6); g.add(dock);
+      return g;
+    }
+    // 냉장실: 냉장 구역이 0칸이면 아예 안 붙는다
+    _makeColdRoom(Z) {
+      const g = new THREE.Group(), C = Z.COLD;
+      const d = C.depth * CELL + 0.2, zc = ROW_Z + C.depth * CELL / 2;
+      const cf = this._box(C.cells * CELL + 0.2, 0.06, d, 0x6cabbd); cf.position.set(C.x0 + C.cells * CELL / 2 - 0.1, 0.1, zc); g.add(cf);
+      const cw = this._box(0.12, 0.5, d, 0x47869a); cw.position.set(C.x0 + C.cells * CELL + 0.06, 0.3, zc); g.add(cw);
+      const cw2 = this._box(C.cells * CELL + 0.2, 0.5, 0.12, 0x47869a); cw2.position.set(cf.position.x, 0.3, ROW_Z + C.depth * CELL + 0.06); g.add(cw2);
+      const lamp = this._box(0.3, 0.3, 0.3, 0x5ee0d8, { emissive: 0x2a8f8a }); lamp.position.set(C.x0 + 0.4, 2.9, -1.5); g.add(lamp);
+      return g;
+    }
+    _makeYardPad(Z) {
+      const g = new THREE.Group(), Y = Z.YARD;
+      const pad = this._box(Y.cells * CELL + 0.3, 0.05, Y.depth * CELL + 0.3, 0x85765b);
+      pad.position.set(Y.x0 + Y.cells * CELL / 2 - 0.15, 0.09, Y.z0 + Y.depth * CELL / 2 - 0.05); g.add(pad);
+      return g;
+    }
+    // 차량 시설을 사면 마당에 그 차가 선다 (냉장 밴 · 완충 밴 · 대형 밴)
+    _makeVan(Z, kind) {
+      const color = kind === 'coldvan' ? 0x5ee0d8 : kind === 'padvan' ? 0xf0a04b : 0xb08bd8;
+      const g = new THREE.Group();
+      const body = this._box(1.1, 0.5, 0.6, color); body.position.set(0, 0.42, 0); g.add(body);
+      const cabin = this._box(0.4, 0.4, 0.55, 0xe8e8f0); cabin.position.set(0.72, 0.37, 0); g.add(cabin);
+      for (const [x, z] of [[-0.3, 0.32], [-0.3, -0.32], [0.62, 0.32], [0.62, -0.32]]) { const w = this._box(0.18, 0.18, 0.1, 0x2a2740); w.position.set(x, 0.17, z); g.add(w); }
+      g.position.set(Math.max(Z.x0 + 0.9, Z.YARD.x0 - 0.6), 0, Z.yardZ0 + Z.YARD.depth * CELL - 0.35);   // 마당 왼쪽 끝에 세워 둔다
+      return g;
+    }
+    _buildTerrain() {
       const s = this.scene;
       this.hemi = new THREE.HemisphereLight(0xdfefff, 0x6b8f4e, 0.9); s.add(this.hemi);
       const sun = new THREE.DirectionalLight(0xfff2d0, 1.1); this.sun = sun; sun.position.set(6, 12, 5); sun.castShadow = true;
@@ -75,27 +173,11 @@ window.Scene3D = (function () {
       s.add(sun);
       // 바닥 (콘크리트) + 잔디
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), this._mat(0x6b8f4e)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; s.add(ground);
-      const floor = this._box(9.8, 0.12, 6.2, 0x9a9aa8); floor.position.set(-0.3, 0.0, 1.4); s.add(floor);
-      // 뒷벽 / 왼쪽벽 / 기둥
-      const back = this._box(9.8, 3.2, 0.25, 0xd9c8a8); back.position.set(-0.3, 1.6, -1.7); s.add(back);
-      const left = this._box(0.25, 3.2, 6.2, 0xcdbd9e); left.position.set(-5.1, 1.6, 1.4); s.add(left);
-      const roof = this._box(10.2, 0.22, 2.4, 0xb8453b); roof.position.set(-0.3, 3.2, -0.7); s.add(roof);
-      for (let i = 0; i < 3; i++) { const p = this._box(0.22, 3.1, 0.22, 0xb59a75); p.position.set(-4.9 + i * 4.7, 1.55, -1.45); s.add(p); }
-      const right = this._box(0.25, 3.2, 2.0, 0xcdbd9e); right.position.set(4.5, 1.6, -0.7); s.add(right);
-      // 냉장 구역 바닥 + 낮은 벽
-      const cf = this._box(COLD.cells * CELL + 0.2, 0.06, COLD.depth * CELL + 0.2, 0x6cabbd); cf.position.set(COLD.x0 + COLD.cells * CELL / 2 - 0.1, 0.1, -1.3 + COLD.depth * CELL / 2); s.add(cf);
-      const cw = this._box(0.12, 0.5, COLD.depth * CELL + 0.2, 0x47869a); cw.position.set(COLD.x0 + COLD.cells * CELL + 0.06, 0.3, cf.position.z); s.add(cw);
-      const cw2 = this._box(COLD.cells * CELL + 0.2, 0.5, 0.12, 0x47869a); cw2.position.set(cf.position.x, 0.3, -1.3 + COLD.depth * CELL + 0.06); s.add(cw2);
-      // 냉장 표시등
-      const lamp = this._box(0.3, 0.3, 0.3, 0x5ee0d8, { emissive: 0x2a8f8a }); lamp.position.set(COLD.x0 + 0.4, 2.9, -1.5); s.add(lamp);
-      // 도크 라인 (오른쪽)
-      const dock = this._box(0.4, 0.05, 3.0, 0xf0d060); dock.position.set(4.9, 0.08, 1.8); s.add(dock);
-      // 앞마당 (야외 적재장)
-      const yard = this._box(YARD.cells * CELL + 0.3, 0.05, YARD.depth * CELL + 0.3, 0x85765b); yard.position.set(YARD.x0 + YARD.cells * CELL / 2 - 0.15, 0.09, YARD.z0 + YARD.depth * CELL / 2 - 0.05); s.add(yard);
+      // 건물(바닥·벽·지붕·냉장실·마당)은 착탈식이라 _syncBuilding 이 짓는다
       // 트럭
       this.truck = this._makeTruck(); this.truck.position.set(TRUCK_PARK, 0, 1.8); s.add(this.truck);
       // 도로
-      const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 3.4), this._mat(0x4a4a52)); road.rotation.x = -Math.PI / 2; road.position.set(14, -0.02, 1.8); road.receiveShadow = true; s.add(road);
+      const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 3.4), this._mat(0x4a4a52)); road.rotation.x = -Math.PI / 2; road.position.set(14, -0.02, 1.8); road.receiveShadow = true; s.add(road); this.road = road;
       // 나무 몇 그루 (장식)
       [[-7.5, -3], [8.5, -3.5], [-8, 3.5]].forEach(([x, z]) => { const t = new THREE.Group(); const trunk = this._box(0.3, 0.8, 0.3, 0x8a5a3a); trunk.position.y = 0.4; const leaf = this._box(1.2, 1.2, 1.2, 0x4f9a4a); leaf.position.y = 1.4; t.add(trunk, leaf); t.position.set(x, 0, z); s.add(t); });
     }
@@ -122,13 +204,14 @@ window.Scene3D = (function () {
     // 용량 타일: 창고 안 바닥에 용량만큼 타일을 깔아 남은 자리를 눈으로 보게 한다 (택배 1칸 ≈ 타일 1개)
     _buildTiles(cap, cold, frozen) {
       if (this.tiles) this.scene.remove(this.tiles);
+      const Z = this.Z, MAIN = Z.MAIN, COLD = Z.COLD, YARD = Z.YARD;
       const g = new THREE.Group(); this.tiles = g; this.tileCaps = [cap, cold, frozen];
-      const tile = (zone, i, color) => { const x = i % zone.cells, z = Math.floor(i / zone.cells); const m = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 0.08, CELL - 0.08), new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.55 })); m.rotation.x = -Math.PI / 2; m.position.set(zone.x0 + (x + 0.5) * CELL, zone === COLD ? 0.145 : 0.075, -1.3 + (z + 0.5) * CELL); m.receiveShadow = true; g.add(m); };
+      const tile = (zone, i, color) => { const x = i % zone.cells, z = Math.floor(i / zone.cells); const m = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 0.08, CELL - 0.08), new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.55 })); m.rotation.x = -Math.PI / 2; m.position.set(zone.x0 + (x + 0.5) * CELL, zone === COLD ? 0.145 : 0.075, zone.z0 + (z + 0.5) * CELL); m.receiveShadow = true; g.add(m); };
       for (let i = 0; i < Math.min(cap, MAIN.cells * MAIN.depth); i++) tile(MAIN, i, 0xb9b9c6);
       for (let i = 0; i < Math.min(cold, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x8fd0dc);
       for (let i = cold; i < Math.min(cold + frozen, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x6c8cff);
       // 냉장/냉동 경계선
-      if (frozen > 0 && cold > 0) { const row = Math.floor(cold / COLD.cells), col = cold % COLD.cells; const z = -1.3 + row * CELL; const mk = (x0, x1, zz) => { const w = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x3a4a8c })); w.position.set((x0 + x1) / 2, 0.2, zz); g.add(w); }; if (col > 0) { mk(COLD.x0 + col * CELL, COLD.x0 + COLD.cells * CELL, z); mk(COLD.x0, COLD.x0 + col * CELL, z + CELL); const v = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, CELL), new THREE.MeshLambertMaterial({ color: 0x3a4a8c })); v.position.set(COLD.x0 + col * CELL, 0.2, z + CELL / 2); g.add(v); } else mk(COLD.x0, COLD.x0 + COLD.cells * CELL, z); }
+      if (frozen > 0 && cold > 0) { const row = Math.floor(cold / COLD.cells), col = cold % COLD.cells; const z = COLD.z0 + row * CELL; const mk = (x0, x1, zz) => { const w = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.12, 0.05), new THREE.MeshLambertMaterial({ color: 0x3a4a8c })); w.position.set((x0 + x1) / 2, 0.2, zz); g.add(w); }; if (col > 0) { mk(COLD.x0 + col * CELL, COLD.x0 + COLD.cells * CELL, z); mk(COLD.x0, COLD.x0 + col * CELL, z + CELL); const v = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, CELL), new THREE.MeshLambertMaterial({ color: 0x3a4a8c })); v.position.set(COLD.x0 + col * CELL, 0.2, z + CELL / 2); g.add(v); } else mk(COLD.x0, COLD.x0 + COLD.cells * CELL, z); }
       // 구역 표지: 냉장 / 냉동 / 야외 (카메라를 보는 픽셀 간판 스프라이트)
       const sign = (iconKey, label, accent, x, z, y) => {
         const t = this._signTexture(iconKey, label, accent);
@@ -136,8 +219,8 @@ window.Scene3D = (function () {
         sp.scale.set(t.vw * SIGN.unit, t.vh * SIGN.unit, 1); sp.position.set(x, y || 0.9, z); g.add(sp);
       };
       const A = window.DATA.ATTRS, OUT = window.I18n ? window.I18n.t('hud.outdoorLabel') : '';
-      if (cold > 0) sign('cold', A.cold.name, '#5ee0d8', COLD.x0 + 0.9, -1.2, 1.7);
-      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('frozen', A.frozen.name, '#9ad7ff', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, -1.3 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
+      if (cold > 0) sign('cold', A.cold.name, '#5ee0d8', COLD.x0 + 0.9, COLD.z0 + 0.1, 1.7);
+      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('frozen', A.frozen.name, '#9ad7ff', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, COLD.z0 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
       sign('rain', OUT, '#c9a06c', YARD.x0 + 0.9, YARD.z0 + 0.6);
       this.scene.add(g);
     }
@@ -219,7 +302,7 @@ window.Scene3D = (function () {
       for (const p of parcels) {
         const [w, d] = FOOT[p.baseSizeVis];
         if (x + w > zone.cells) { x = 0; z += rowD; rowD = 0; }
-        out.set(p.id, { cx: zone.x0 + (x + w / 2) * CELL, cz: (zone.z0 != null ? zone.z0 : -1.3) + (z + d / 2) * CELL, over: z + d > zone.depth });
+        out.set(p.id, { cx: zone.x0 + (x + w / 2) * CELL, cz: zone.z0 + (z + d / 2) * CELL, over: z + d > zone.depth });
         x += w; rowD = Math.max(rowD, d);
       }
       return out;
@@ -228,14 +311,16 @@ window.Scene3D = (function () {
     sync(game, opts = {}) {
       const D = window.DATA;
       if (game.weatherNow) this.setWeather(game.weatherNow());
-      { const wh = game.warehouse, caps = [wh.cap, wh.cold, wh.frozen || 0]; if (!this.tiles || caps.some((v, i) => v !== this.tileCaps[i])) this._buildTiles(...caps); }
+      // 창고가 바뀌었으면 건물부터 다시 짓는다 (착탈식 모듈) — 그 다음 바닥 타일
+      if (game.warehouse) { this._syncBuilding(game.warehouse, { silent: !this._synced }); this._synced = true; }
+      { const wh = game.warehouse, caps = [wh.cap, wh.cold, wh.frozen || 0]; if (!this.tiles || !this.tileCaps || caps.some((v, i) => v !== this.tileCaps[i])) this._buildTiles(...caps); }
       if (game.upcoming) { const u = game.upcoming()[0]; this._syncGhosts(u && u.specs ? u.specs : [], D); }
       const cold = [], main = [], yard = [];
       const items = [];
       for (const s of game.storage || []) items.push({ id: 's' + s.id, type: 'storage', size: s.vol, baseSize: s.vol, baseSizeVis: s.vol >= 7 ? 7 : s.vol >= 4 ? 4 : 2, outdoor: s.outdoor, storage: true });
       for (const p of game.parcels) items.push(p);
       for (const p of items) { if (!p.storage) p.baseSizeVis = this._visSize(p); (p.outdoor ? yard : ((p.inCold || p.inFrozen) ? cold : main)).push(p); }
-      const pos = new Map([...this._pack(cold, COLD), ...this._pack(main, MAIN), ...this._pack(yard, YARD)]);
+      const pos = new Map([...this._pack(cold, this.Z.COLD), ...this._pack(main, this.Z.MAIN), ...this._pack(yard, this.Z.YARD)]);
       // 지금 비가 오거나 예보에 비·눈이 있으면 마당에 나가 있는 것들은 젖는다
       let wetRisk = false;
       try { const w = game.weatherNow && game.weatherNow(); wetRisk = ['rain', 'snow', 'storm'].includes(w) || (game.upcoming && game.upcoming().some(u => ['rain', 'snow', 'storm'].includes(u.weather))); } catch (e) { }
