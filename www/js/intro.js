@@ -40,8 +40,8 @@ window.Intro = (function () {
     { t: 15.1, d: 2.5, k: 'intro.7', recall: true },
     { t: 17.9, d: 1.6, k: 'intro.8', recall: true },
     { t: 20.6, d: 2.6, k: 'intro.9' },
-    { t: 23.5, d: 1.2, k: 'intro.10' },
-    { t: 25.6, d: 3.2, k: 'intro.11' },
+    { t: 23.4, d: 2.3, k: 'intro.10' },
+    { t: 26.1, d: 2.9, k: 'intro.11' },
   ];
   // 인물 소개 — 대화창이 아니라 영화 자막처럼 옆에서 밀려 들어왔다 빠진다
   const CARDS = [
