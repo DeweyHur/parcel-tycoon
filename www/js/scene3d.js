@@ -447,6 +447,13 @@ window.Scene3D = (function () {
         else if (o.isLineSegments) { o.material.opacity = 0.55 * a; }
       });
     }
+    // 오프닝: 탑차가 도로를 따라 들어온다 (평소엔 화면 밖 대기 자리에 그냥 서 있다)
+    truckTo(x, dur) {
+      if (!this.truck) return;
+      this.dropTween('introtruck');
+      this.tweens.push({ tag: 'introtruck', obj: this.truck.position, from: { x: this.truck.position.x }, to: { x }, dur: dur || 2.4, fn: ease, t: 0 });
+    }
+    dropTween(tag) { this.tweens = this.tweens.filter(t => t.tag !== tag); }
     camSet(p, l) { this.camera.position.set(p[0], p[1], p[2]); this.camera.lookAt(l[0], l[1], l[2]); }
     camHome() { return { p: [this.camX, this.camY, this.camZ], l: (this.camLook || [1.3, 0.3, 0.3]).slice(), fov: this.camFov || this.camera.fov }; }
 

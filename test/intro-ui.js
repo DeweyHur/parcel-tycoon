@@ -45,6 +45,35 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   await page.evaluate(() => { const g = PT.game; g.story.off = true; for (let i = 0; i < 4; i++) { g.wait(); g.takeEvents(); } PT.saveGame(); PT.renderAll(); });
   await page.waitForTimeout(300);
 
+  console.log('\n세피아 · 인물 카드 · 탑차 입장 (한 번 더 틀어서 추적)');
+  await page.reload(); await page.waitForTimeout(700);
+  await page.click('#t-level'); await page.waitForTimeout(350);
+  const yes0 = await page.$('#modal .foot .btn.warn'); if (yes0) { await yes0.click(); await page.waitForTimeout(500); }
+  const t0 = Date.now(); const rows = [];
+  while (Date.now() - t0 < 30500) {
+    const st = await page.evaluate(() => {
+      const ov = document.getElementById('intro'); if (!ov) return null;
+      const l = document.getElementById('intro-line'), cd = document.getElementById('intro-card');
+      return { line: l.textContent.slice(0, 16), a: +getComputedStyle(l.parentNode).opacity,
+        recall: document.getElementById('app').classList.contains('recall'),
+        card: +getComputedStyle(cd).opacity > 0.15 ? cd.querySelector('b').textContent : '',
+        truck: +PT.scene.truck.position.x.toFixed(1) };
+    });
+    if (!st) break;
+    rows.push(st);
+    await page.waitForTimeout(200);
+  }
+  let mid = 0, prev = null;
+  for (const r of rows) { if (prev && prev.line === r.line && r.a > 0.5 && prev.a > 0.5 && prev.recall !== r.recall) mid++; prev = r; }
+  check(rows.length > 100, '오프닝이 30초쯤 간다 — ' + (rows.length * 0.2).toFixed(0) + '초');
+  check(mid === 0, '대사 도중에 세피아가 바뀌지 않는다 (위반 ' + mid + '건)');
+  check(rows.some(r => r.recall) && rows.some(r => !r.recall), '회상 구간과 오늘 구간이 둘 다 있다');
+  const cards = [...new Set(rows.map(r => r.card).filter(Boolean))];
+  check(cards.length === 2, '인물 카드가 둘 나온다 — ' + cards.join(' / '));
+  const tr = rows.map(r => r.truck), tmin = Math.min(...tr);   // 마지막 한 프레임은 끝난 뒤 복귀값(12)이 잡힌다
+  check(tr[0] > 20 && tmin < 9, '탑차가 화면 밖에서 들어와 도크 앞에 선다 — x' + tr[0] + ' → x' + tmin);
+  await skip();
+
   console.log('\n이어하기');
   await page.reload(); await page.waitForTimeout(800);
   const btns = await page.$$eval('#modal .btn', els => els.map(e => e.id).filter(Boolean));
