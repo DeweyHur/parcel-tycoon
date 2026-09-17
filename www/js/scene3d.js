@@ -59,7 +59,9 @@ window.Scene3D = (function () {
       this.renderer.setSize(w, h, false);
       this.camera.aspect = w / h;
       const a = w / h;
-      this.camera.fov = a < 0.9 ? 46 : 38;
+      // 세로형/가로형에서 화각이 다르다. 오프닝 중에는 intro.js 가 두 값 사이를 부드럽게 건너간다 (여기서 바꾸면 딱 끊긴다)
+      const fov = a < 0.9 ? 46 : 38; this.camFov = fov;
+      if (!this.cine) this.camera.fov = fov;
       // 넓은 화면(가로형)이면 카메라를 왼쪽으로 옮겨 냉장 구역이 잘리지 않게
       // 장면 가로 범위는 x -5.2(냉장 벽)~5.7(도크). 세로형(a<0.9)은 창고 중앙(2.6) 기준, 그 외는 가운데(0.3)를 보되 다 들어올 때까지 카메라를 뒤로
       // 건물이 작아지면 카메라도 같이 당겨 온다 (모델이 먼저 바뀌고, 카메라는 그것을 따라갈 뿐)
@@ -68,8 +70,10 @@ window.Scene3D = (function () {
       const dx = (Z.x0 - FULL.x0) / 2;
       const spanX = (Z.x1 + 1.2 - Z.x0) / 11, spanZ = (Z.yardZ0 + Z.YARD.depth * CELL + 0.3 - BACK_Z) / 6.35;
       const k = Math.max(0.9, Math.min(1, Math.max(spanX, spanZ)));   // 작아져도 너무 붙지는 않는다 — 건물이 자라는 게 보여야 하니까
-      if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.3 * k; this.camY = 0.3 + 7.5 * k; this.camZ = 0.3 + 9.5 * k; this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(fx, 0.3, 0.3); }
-      else { const need = 6.4 * k / (Math.tan(this.camera.fov / 2 * Math.PI / 180) * a); const kk = Math.max(1, need / 12.1); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.3 + 7.5 * kk * k; this.camZ = 0.3 + 9.5 * kk * k; this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(fx, 0.3, 0.3); }
+      if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.3 * k; this.camY = 0.3 + 7.5 * k; this.camZ = 0.3 + 9.5 * k; this.camLook = [fx, 0.3, 0.3]; }
+      else { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a); const kk = Math.max(1, need / 12.1); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.3 + 7.5 * kk * k; this.camZ = 0.3 + 9.5 * kk * k; this.camLook = [fx, 0.3, 0.3]; }
+      // 오프닝 중에는 카메라를 intro.js 가 몬다 — 여기서는 자리만 계산해 두고 건드리지 않는다
+      if (!this.cine) { this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(this.camLook[0], this.camLook[1], this.camLook[2]); }
       this.camera.updateProjectionMatrix();
     }
     _mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, flatShading: true, ...opts }); }
@@ -393,6 +397,10 @@ window.Scene3D = (function () {
       this._tween(b.position, { y: b.position.y - 0.4 }, 0.4, ease);
     }
     shake(amount = 0.15) { this.shakeT = 0.35; this.shakeA = amount; }
+    // ---------- 오프닝 카메라 (intro.js 가 밖에서 몬다) ----------
+    // this.cine = true 인 동안 resize()·_loop() 는 카메라를 건드리지 않는다.
+    camSet(p, l) { this.camera.position.set(p[0], p[1], p[2]); this.camera.lookAt(l[0], l[1], l[2]); }
+    camHome() { return { p: [this.camX, this.camY, this.camZ], l: (this.camLook || [1.3, 0.3, 0.3]).slice(), fov: this.camFov || this.camera.fov }; }
 
     _loop() {
       requestAnimationFrame(() => this._loop());
@@ -417,7 +425,10 @@ window.Scene3D = (function () {
       // 트럭 바퀴 흔들림
       if (this.truck.position.x < TRUCK_PARK - 0.1 && this.truck.position.x > TRUCK_DOCK + 0.1) this.truck.position.y = Math.abs(Math.sin(this.time * 30)) * 0.03; else this.truck.position.y = 0;
       const cy = this.camY || 7.8;
-      if (this.shakeT > 0) { this.shakeT -= dt; this.camera.position.x = this.camX + (Math.random() - 0.5) * this.shakeA; this.camera.position.y = cy + (Math.random() - 0.5) * this.shakeA; }
+      // 오프닝: 카메라는 intro.js 가 놓는다. 반드시 render 직전에 불러야 한다 —
+      // 따로 rAF 를 돌리면 setSize 로 캔버스를 비운 프레임이 그대로 찍혀 장면이 깜빡인다
+      if (this.cine) { if (this.cineStep) { try { this.cineStep(); } catch (e) { this.cine = false; this.cineStep = null; console.error(e); } } }
+      else if (this.shakeT > 0) { this.shakeT -= dt; this.camera.position.x = this.camX + (Math.random() - 0.5) * this.shakeA; this.camera.position.y = cy + (Math.random() - 0.5) * this.shakeA; }
       else if (this.weather === 'storm') { this.camera.position.x = this.camX + Math.sin(this.time * 9) * 0.05; this.camera.position.y = cy + Math.sin(this.time * 7) * 0.04; }
       else { this.camera.position.x = this.camX; this.camera.position.y = cy; }
       this.renderer.render(this.scene, this.camera);

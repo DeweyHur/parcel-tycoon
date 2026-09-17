@@ -29,7 +29,30 @@ const say = m => { console.log(m); log.push(m); };
   check(sig0 === '16/0/0/0', '첫 화면 모델에 냉장·냉동이 없다 — ' + sig0);
   await scene('00s-title-scene');
 
-  await page.click('#t-level'); await page.waitForTimeout(900);
+  await page.click('#t-level'); await page.waitForTimeout(1500);
+
+  say('\n■ 오프닝 씬');
+  const intro0 = await page.evaluate(() => {
+    const ov = document.getElementById('intro');
+    return ov ? { bar: getComputedStyle(ov).getPropertyValue('--bar').trim(), line: (document.getElementById('intro-line') || {}).textContent, cine: PT.scene.cine,
+      panel: getComputedStyle(document.getElementById('panel')).opacity, story: document.getElementById('story').hidden } : null;
+  });
+  check(!!intro0, '오프닝이 재생된다');
+  check(!!intro0 && intro0.cine === true && intro0.story === true, '오프닝 동안 대화창이 안 뜬다 — ' + JSON.stringify(intro0));
+  check(!!intro0 && +intro0.panel === 0, '오프닝 동안 게임 패널이 안 보인다');
+  check(!!intro0 && /\S/.test(intro0.line || ''), '자막이 나온다 — "' + (intro0 && intro0.line) + '"');
+  await shot('00b-intro');
+  await page.mouse.click(195, 400);                       // 아무 데나 누르면 건너뛴다
+  await page.waitForTimeout(700);
+  const intro1 = await page.evaluate(() => ({
+    gone: !document.getElementById('intro'), cine: PT.scene.cine, basis: document.getElementById('scene').style.flexBasis,
+    cls: document.getElementById('app').className, bodyCls: document.body.className,
+    truck: +PT.scene.truck.position.x.toFixed(1), fov: PT.scene.camera.fov, seen: Profile.get().campaign.introSeen,
+  }));
+  check(intro1.gone && !intro1.cine && !intro1.cls && !intro1.bodyCls && intro1.basis === '', '건너뛰면 화면이 제자리로 돌아온다 — ' + JSON.stringify(intro1));
+  check(intro1.truck === 12 && intro1.fov === 38, '탑차·화각이 평소대로 — 탑차 x' + intro1.truck + ' · 화각 ' + intro1.fov);
+  check(intro1.seen === true, '두 번째부터는 안 나오게 기록됐다');
+  await page.waitForTimeout(400);
 
   const state = () => page.evaluate(() => { const g = PT.game; return g ? { phase: g.phase, m: g.month, t: g.turn, turns: g.turns(), cash: g.cash, used: g.usedVolume(), cap: g.warehouse.cap, ret: g.stats.returned, disc: g.stats.discarded, sig: PT.scene.buildSig, seen: g.story.seen.length } : { phase: 'none' }; });
   const storyOpen = () => page.$eval('#story', el => !el.hidden).catch(() => false);

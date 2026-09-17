@@ -278,3 +278,20 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .wkopts .wkc { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 8px 10px; }
 .wkopts .wkc small { color: var(--dim); font-weight: 400; }
 .wkopts .wkc[disabled] { opacity: .45; }
+
+/* ---------- 오프닝 씬 (js/intro.js) ---------- */
+/* 창고 뷰가 화면 전체로 자랐다가 제자리로 줄어든다 — 카메라 이동과 화면 크기 변화가 한 동작이다 */
+body.cine { background: #000; }
+#app.cine #panel { overflow: hidden; opacity: var(--hud-a, 0); }
+#app.cine #hud { opacity: var(--hud-a, 0); }
+#app.cine #scene { min-height: 0; }
+#intro { position: fixed; inset: 0; z-index: 58; pointer-events: auto; transition: opacity .25s; }
+#intro.out { opacity: 0; pointer-events: none; }
+#intro .ibar { position: absolute; left: 0; right: 0; height: var(--bar, 0vh); background: #000; }
+#intro .ibar.top { top: 0; }
+/* 아래 띠는 '창고 뷰 아래 남는 자리'까지 덮는다 — 오프닝 동안 게임 패널이 비쳐 보이면 안 된다 */
+#intro .ibar.bot { bottom: 0; height: calc(var(--bot, 0%) + var(--bar, 0vh)); }
+#intro .iline { position: absolute; left: 0; right: 0; bottom: calc(var(--bot, 0%) + var(--bar, 0vh) + 18px); text-align: center; padding: 0 18px; opacity: 0; }
+#intro .iline span { display: inline-block; background: #0b0a14cc; border: 3px solid var(--line); box-shadow: 3px 3px 0 var(--shadow); padding: 7px 12px; font-size: 13px; line-height: 1.5; color: var(--ink); max-width: 100%; }
+#intro #intro-skip { position: absolute; right: 10px; top: calc(var(--bar, 0vh) + 10px); opacity: .8; }
+#intro .ifade { position: absolute; inset: 0; background: #000; opacity: 1; pointer-events: none; }
