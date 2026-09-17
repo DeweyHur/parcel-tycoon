@@ -47,11 +47,10 @@ const say = m => { console.log(m); log.push(m); };
   const intro1 = await page.evaluate(() => ({
     gone: !document.getElementById('intro'), cine: PT.scene.cine, basis: document.getElementById('scene').style.flexBasis,
     cls: document.getElementById('app').className, bodyCls: document.body.className,
-    truck: +PT.scene.truck.position.x.toFixed(1), fov: PT.scene.camera.fov, seen: Profile.get().campaign.introSeen,
+    truck: +PT.scene.truck.position.x.toFixed(1), fov: PT.scene.camera.fov,
   }));
   check(intro1.gone && !intro1.cine && !intro1.cls && !intro1.bodyCls && intro1.basis === '', '건너뛰면 화면이 제자리로 돌아온다 — ' + JSON.stringify(intro1));
   check(intro1.truck === 12 && intro1.fov === 38, '탑차·화각이 평소대로 — 탑차 x' + intro1.truck + ' · 화각 ' + intro1.fov);
-  check(intro1.seen === true, '두 번째부터는 안 나오게 기록됐다');
   await page.waitForTimeout(400);
 
   const state = () => page.evaluate(() => { const g = PT.game; return g ? { phase: g.phase, m: g.month, t: g.turn, turns: g.turns(), cash: g.cash, used: g.usedVolume(), cap: g.warehouse.cap, ret: g.stats.returned, disc: g.stats.discarded, sig: PT.scene.buildSig, seen: g.story.seen.length } : { phase: 'none' }; });

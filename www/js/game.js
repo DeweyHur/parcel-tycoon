@@ -1609,13 +1609,19 @@
 
     // ----- save / load -----
     toJSON() {
-      const { rng, rules, scenario, company, difficulty, ...rest } = this;
+      // level·_shows 는 levels.js 의 표에서 매번 다시 만든다. 특히 _shows 는 Set 이라 JSON 으로 나가면 {} 가 되고,
+      // 그대로 불러오면 shows() 가 터진다 (= 서장 이어하기가 깨진다). 저장하지 않고 fromJSON 에서 복원한다.
+      const { rng, rules, scenario, company, difficulty, level, _shows, ...rest } = this;
       return { ...rest, rngCalls: rng.calls, seed: this.seed };
     }
     static fromJSON(obj) {
       const g = Object.create(Game.prototype);
       Object.assign(g, obj);
       g.cfg = obj.cfg; g.seed = obj.seed;
+      // 캠페인 레벨 복원 (표에서 다시 — 세이브에는 없다)
+      const lvn = g.cfg && g.cfg.level;
+      g.level = lvn && LV ? LV.get(lvn) : null;
+      g._shows = g.level ? LV.showsAt(lvn) : null;
       g._buildRules();
       g.rng = new Rng(obj.seed, obj.rngCalls);
       delete g.rngCalls;

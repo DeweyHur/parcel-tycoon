@@ -9,7 +9,7 @@ window.Profile = (function () {
       bigDelivered: 0, bestScore: 0, clearsByCompany: {}, clearsByCompanyStandard: {}, clearsByScenario: {}, dailyStreak: 0, lastDaily: null, dailyDone: {} };
   }
   function fresh() {
-    return { version: 1, license: { full: false, source: 'demo' }, campaign: { level: 1, cleared: 0, name: '', introSeen: false }, unlocked: JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), achievements: {}, stats: emptyStats(), records: {}, recentRuns: [], createdAt: Date.now() };
+    return { version: 1, license: { full: false, source: 'demo' }, campaign: { level: 1, cleared: 0, name: '' }, unlocked: JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), achievements: {}, stats: emptyStats(), records: {}, recentRuns: [], createdAt: Date.now() };
   }
   function load() {
     P = Store.get(KEY);
@@ -32,7 +32,7 @@ window.Profile = (function () {
     // 새 필드 보정
     P.stats = Object.assign(emptyStats(), P.stats);
     P.license = Object.assign({ full: false, source: 'demo' }, P.license);
-    P.campaign = Object.assign({ level: 1, cleared: 0, name: '', introSeen: false }, P.campaign);   // 캠페인 레벨 진행 (levels.js)
+    P.campaign = Object.assign({ level: 1, cleared: 0, name: '' }, P.campaign);   // 캠페인 레벨 진행 (levels.js)
     P.unlocked = Object.assign(JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), P.unlocked);
     for (const k of ['companies', 'perks', 'scenarios']) for (const d of M.DEFAULT_UNLOCK[k]) if (!P.unlocked[k].includes(d)) P.unlocked[k].push(d);
     evaluate(null, null); // 해금 조건이 바뀐 경우(누적·메타) 기존 기록으로 즉시 반영

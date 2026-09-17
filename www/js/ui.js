@@ -108,10 +108,8 @@
   function startLevel(n) {
     const P = Profile.get();
     game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false, companyName: P.campaign.name || '' });
-    // 오프닝 씬은 서장을 처음 여는 순간 딱 한 번. 두 번째부터는 바로 박 반장이 말을 건다
-    const intro = n === 1 && !P.campaign.introSeen;
-    if (intro) { P.campaign.introSeen = true; Profile.save(); }
-    closeModal(); startPlay({ intro });
+    // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
+    closeModal(); startPlay({ intro: n === 1 });
   }
   function showLevelDone(r) {
     if (!r.recorded) { r.recorded = true; Store.remove(SAVE_KEY); BGM.stop(0.5); SFX.win(); BGM.oneShot('fanfare'); }

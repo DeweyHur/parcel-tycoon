@@ -495,4 +495,23 @@ t('배차비 규칙: 차를 80% 채우면 똔똔 (fee ≈ 0.8 × 용량 × 칸�
     assert.ok(Math.abs(F.fee - want) <= 2, `${f}: fee ${F.fee} ≠ ${want} (80% 적재 똔똔)`);
   }
 });
+t('세이브 왕복: 서장(레벨 1) 이어하기 — level·_shows 가 살아 있다', () => {
+  // _shows 는 Set 이라 JSON 으로 나가면 {} 가 된다. 저장하지 말고 levels.js 에서 다시 만들어야 한다
+  const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 1, prep: false });
+  for (let i = 0; i < 5; i++) { g.wait(); g.takeEvents(); }
+  const j = JSON.parse(JSON.stringify(g.toJSON()));
+  assert.ok(!('_shows' in j) && !('level' in j), '세이브에 level/_shows 가 들어가면 안 된다');
+  const g2 = Game.fromJSON(j);
+  assert.strictEqual(g2.level && g2.level.n, 1);
+  assert.strictEqual(g2.shows('market'), false, '서장은 마켓이 잠겨 있어야 한다');
+  assert.strictEqual(g2.shows('rep'), false, '서장은 평판이 잠겨 있어야 한다');
+  assert.ok(g2.script(1), '대본이 다시 붙어야 한다');
+  assert.strictEqual(g2.turn, g.turn);
+});
+t('세이브 왕복: 자유 런은 전부 열려 있다', () => {
+  const g2 = Game.fromJSON(JSON.parse(JSON.stringify(new Game({ seed: 7 }).toJSON())));
+  assert.strictEqual(g2.level, null);
+  assert.strictEqual(g2.shows('market'), true);
+});
+
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);
