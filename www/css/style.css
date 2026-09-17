@@ -330,3 +330,6 @@ body.cine { background: #000; }
 #intro .icard span { display: block; font-size: 12px; color: var(--dim); line-height: 1.4; }
 #intro.recall .icard { background: #171208e0; border-color: #4a3c22; }
 #intro.recall .icard b { color: #e0c98a; }
+/* 오프닝 자막 타자 커서 — 치는 동안만 붙는다 */
+#intro .iline .caret { display: inline-block; width: 7px; height: 13px; margin-left: 2px; background: var(--ink); vertical-align: -1px; animation: blink .5s steps(2) infinite; }
+#intro.recall .iline .caret { background: #e8dcbe; }

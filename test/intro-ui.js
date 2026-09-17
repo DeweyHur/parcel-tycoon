@@ -50,11 +50,11 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   await page.click('#t-level'); await page.waitForTimeout(350);
   const yes0 = await page.$('#modal .foot .btn.warn'); if (yes0) { await yes0.click(); await page.waitForTimeout(500); }
   const t0 = Date.now(); const rows = [];
-  while (Date.now() - t0 < 30500) {
+  while (Date.now() - t0 < 45000) {
     const st = await page.evaluate(() => {
       const ov = document.getElementById('intro'); if (!ov) return null;
       const l = document.getElementById('intro-line'), cd = document.getElementById('intro-card');
-      return { line: l.textContent.slice(0, 16), a: +getComputedStyle(l.parentNode).opacity,
+      return { line: l.textContent.slice(0, 16), html: l.innerHTML, a: +getComputedStyle(l.parentNode).opacity,
         recall: document.getElementById('app').classList.contains('recall'),
         card: +getComputedStyle(cd).opacity > 0.15 ? cd.querySelector('b').textContent : '',
         truck: +PT.scene.truck.position.x.toFixed(1) };
@@ -65,7 +65,18 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   }
   let mid = 0, prev = null;
   for (const r of rows) { if (prev && prev.line === r.line && r.a > 0.5 && prev.a > 0.5 && prev.recall !== r.recall) mid++; prev = r; }
-  check(rows.length > 100, '오프닝이 30초쯤 간다 — ' + (rows.length * 0.2).toFixed(0) + '초');
+  const secs = rows.length * 0.2;
+  check(secs > 32 && secs < 50, '오프닝이 35초쯤 간다 — ' + secs.toFixed(0) + '초');
+  // 타자: 같은 줄 안에서 글자가 늘어나는 '중간 상태' 프레임이 있어야 한다
+  let partial = 0, caret = 0, pv = '';
+  for (const r of rows) {
+    const txt = (r.html || '').replace(/<i class="caret"><\/i>/, '');
+    if (txt && pv && txt.startsWith(pv) && txt.length > pv.length) partial++;
+    if (/caret/.test(r.html || '')) caret++;
+    pv = txt;
+  }
+  check(partial > 30, '자막이 한 글자씩 쳐진다 (중간 상태 ' + partial + '프레임)');
+  check(caret > 10, '치는 동안 커서가 붙는다 (' + caret + '프레임)');
   check(mid === 0, '대사 도중에 세피아가 바뀌지 않는다 (위반 ' + mid + '건)');
   check(rows.some(r => r.recall) && rows.some(r => !r.recall), '회상 구간과 오늘 구간이 둘 다 있다');
   const cards = [...new Set(rows.map(r => r.card).filter(Boolean))];

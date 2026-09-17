@@ -1,8 +1,9 @@
-// 오프닝 씬 — 서장을 시작할 때마다 (docs/STORY_TUTORIAL_DESIGN.md 부록 X·Z).
+// 오프닝 씬 — 서장을 시작할 때마다 (docs/STORY_TUTORIAL_DESIGN.md 부록 X·Z·AA).
 // 왜: 첫 화면이 곧장 '창고 + 버튼'이면 플레이어는 자기가 어디에 서 있는지 모른 채 조작부터 배운다.
 //     박 반장이 입을 열기 전에, 카메라가 먼저 장소와 사람과 사정을 보여 준다.
 // 규칙: 조작은 하나도 없다. 아무 데나 누르면 즉시 끝난다. 끝나면 화면이 제자리로 돌아오며 그대로 게임이 시작된다.
 //     마지막 샷은 컷이 아니라 '게임 카메라로 착지'다 — 오프닝과 플레이 화면 사이에 이음매가 없어야 한다.
+// 자막은 한 번에 뜨지 않고 한 글자씩 쳐진다. 길이는 글자 수에서 계산하므로(build) 문구를 고치면 타임라인이 따라온다.
 window.Intro = (function () {
   const T = (k, p) => (window.I18n ? I18n.t(k, p) : k);
   const ease = t => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
@@ -12,60 +13,79 @@ window.Intro = (function () {
   const CUT = 0.22;       // 컷 암전 반폭 (초)
   const TRUCK_X = 7.6;    // 탑차가 들어와 서는 자리 (도크 밖)
   const TRUCK_OFF = 24;   // 화면 밖 — 오프닝은 빈 마당에서 시작한다
+  // 자막 호흡. 한글은 한 글자에 담긴 정보가 많아 라틴보다 천천히 친다
+  const LEAD = 0.32;      // 줄이 떠오르고 타자가 시작되기까지
+  const HOLD = 1.35;      // 다 친 뒤 머무는 시간
+  const GAP = 0.38;       // 줄과 줄 사이 (자막이 비는 시간)
+  const cps = () => (window.I18n && I18n.lang !== 'ko' ? 0.034 : 0.052);
 
-  // 거리는 게임 카메라(≈11)와 비슷하게 잡는다 — 세로 화면은 가로 화각이 37도쯤이라 가까이 가면 벽만 찍힌다
-  // recall 샷은 '회상'이다. 세피아는 샷이 아니라 자막에 걸린다 (LINES.recall) — 대사 중간에 색이 변하면 안 되니까
-  const SHOTS = [
+  // 샷 = 카메라 + 그 샷에서 칠 자막들. 샷 길이는 자막 길이에서 나온다 (아래 build)
+  // recall = 회상. 세피아는 샷이 아니라 자막에 걸린다 — 대사 중간에 색이 변하면 안 되니까
+  const SEQ = [
     // S1 오늘 아침 · 길 건너. 마당은 비어 있다
-    { dur: 4.6, from: { p: [15.0, 4.9, 15.8], l: [3.4, 1.0, 1.4] }, to: { p: [13.2, 4.6, 14.9], l: [3.1, 1.0, 1.2] } },
+    { from: { p: [15.0, 4.9, 15.8], l: [3.4, 1.0, 1.4] }, to: { p: [12.9, 4.5, 14.7], l: [3.0, 1.0, 1.2] }, keys: ['intro.1', 'intro.2'] },
     // S2 회상 · 창고 옆구리, 오래 드나든 자리
-    { dur: 5.0, cut: true, from: { p: [-8.8, 3.1, 10.2], l: [0.2, 1.2, 0.2] }, to: { p: [-6.6, 2.9, 11.0], l: [0.8, 1.2, 0.3] } },
-    // S3 회상 · 셔터 앞. 짐을 같이 내리던 자리
-    { dur: 5.0, cut: true, from: { p: [7.6, 2.1, 11.8], l: [2.6, 1.3, 0.6] }, to: { p: [6.2, 2.3, 10.9], l: [2.3, 1.3, 0.5] } },
-    // S4 회상 · 더 가까이. 영감님이 말한 그날
-    { dur: 5.0, cut: true, from: { p: [5.2, 0.9, 9.6], l: [1.4, 2.5, 0.1] }, to: { p: [4.2, 1.15, 8.7], l: [1.3, 2.3, 0.0] } },
+    { cut: true, recall: true, from: { p: [-8.8, 3.1, 10.2], l: [0.2, 1.2, 0.2] }, to: { p: [-6.2, 2.9, 11.2], l: [0.9, 1.2, 0.3] }, keys: ['intro.3', 'intro.4'] },
+    // S3 회상 · 셔터 앞, 짐을 같이 내리던 자리
+    { cut: true, recall: true, from: { p: [7.8, 2.1, 12.0], l: [2.6, 1.3, 0.6] }, to: { p: [6.0, 2.3, 10.8], l: [2.2, 1.3, 0.4] }, keys: ['intro.5', 'intro.6'] },
+    // S4 회상 · 로우앵글로 지붕선을 올려다본다. 영감님이 말한 그날
+    { cut: true, recall: true, from: { p: [5.2, 0.9, 9.6], l: [1.4, 2.5, 0.1] }, to: { p: [4.0, 1.2, 8.5], l: [1.3, 2.3, 0.0] }, keys: ['intro.7', 'intro.8'] },
     // S5 오늘 · 색이 돌아오고, 탑차가 들어온다
-    { dur: 5.2, cut: true, truck: true, from: { p: [11.4, 3.5, 13.4], l: [2.0, 1.0, 0.8] }, to: { p: [9.0, 3.6, 12.0], l: [1.6, 0.95, 0.4] } },
+    { cut: true, truck: true, from: { p: [11.4, 3.5, 13.4], l: [2.0, 1.0, 0.8] }, to: { p: [8.8, 3.6, 11.9], l: [1.6, 0.95, 0.4] }, keys: ['intro.9', 'intro.10'] },
     // S6 착지 — 앞면이 들리고 화면이 제자리로
-    { dur: 4.6, home: true },
+    { home: true, min: 4.6, keys: ['intro.11'] },
   ];
-  // 샷 경계(암전)와 줄 사이 공백이 맞물리게 짰다. 한 줄이 컷을 넘어가면 그 줄 도중에 색이 바뀐다
-  const LINES = [
-    { t: 0.6, d: 2.0, k: 'intro.1' },
-    { t: 2.9, d: 1.6, k: 'intro.2' },
-    { t: 5.0, d: 2.6, k: 'intro.3', recall: true },
-    { t: 7.9, d: 1.6, k: 'intro.4', recall: true },
-    { t: 10.1, d: 2.9, k: 'intro.5', recall: true },
-    { t: 13.3, d: 1.2, k: 'intro.6', recall: true },
-    { t: 15.1, d: 2.5, k: 'intro.7', recall: true },
-    { t: 17.9, d: 1.6, k: 'intro.8', recall: true },
-    { t: 20.6, d: 2.6, k: 'intro.9' },
-    { t: 23.4, d: 2.3, k: 'intro.10' },
-    { t: 26.1, d: 2.9, k: 'intro.11' },
-  ];
-  // 인물 소개 — 대화창이 아니라 영화 자막처럼 옆에서 밀려 들어왔다 빠진다
+  // 인물 소개 — 대화창이 아니라 영화 자막처럼 옆에서 밀려 들어왔다 빠진다. 샷 시작 기준 초
   const CARDS = [
-    { t: 5.6, d: 4.0, who: 'han', expr: 'smile', name: 'card.han.name', desc: 'card.han.desc' },
-    { t: 21.2, d: 4.0, who: 'park', expr: 'neutral', name: 'card.park.name', desc: 'card.park.desc' },
+    { shot: 1, at: 0.7, d: 4.4, who: 'han', expr: 'smile', name: 'card.han.name', desc: 'card.han.desc' },
+    { shot: 4, at: 1.4, d: 4.4, who: 'park', expr: 'neutral', name: 'card.park.name', desc: 'card.park.desc' },
   ];
-  // 소리: 회상에 들고 나는 숨, 탑차, 셔터
+  // 소리: 회상에 들고 나는 숨, 탑차, 셔터. 샷 시작 기준 초
   const CUES = [
-    { t: 4.9, f: () => SFX.recallIn() },
-    { t: 19.9, f: () => SFX.recallOut() },
-    { t: 20.3, f: () => SFX.truck() },
-    { t: 23.0, f: () => SFX.horn() },
-    { t: 25.0, f: () => SFX.shutter() },
+    { shot: 1, at: 0.02, f: () => SFX.recallIn() },
+    { shot: 4, at: 0.02, f: () => SFX.recallOut() },
+    { shot: 4, at: 0.45, f: () => SFX.truck() },
+    { shot: 4, at: 3.1, f: () => SFX.horn() },
+    { shot: 5, at: 0.25, f: () => SFX.shutter() },
   ];
-  const TOTAL = SHOTS.reduce((s, x) => s + x.dur, 0);
+
   const lerp3 = (a, b, e) => [a[0] + (b[0] - a[0]) * e, a[1] + (b[1] - a[1]) * e, a[2] + (b[2] - a[2]) * e];
   const clamp01 = v => Math.max(0, Math.min(1, v));
-  const portrait = (who, expr) => (window.Story ? Story.sprite(who === 'park' ? 'park' : who, expr, false) : '');
+  const portrait = (who, expr) => (window.Story ? Story.sprite(who, expr, false) : '');
+  // '<br>' 은 한 글자로 친다 — 타자 중에 태그가 반쯤 잘려 나오면 안 된다
+  const tokens = html => html.split(/(<br\s*\/?>)/i).reduce((a, part) => (/^<br/i.test(part) ? (a.push('<br>'), a) : a.concat(part.split(''))), []);
+
+  // 문구 길이에서 타임라인을 만든다. 문구를 고치면 샷 길이가 따라 늘어난다
+  function build() {
+    const C = cps();
+    const shots = [], lines = [], cards = [], cues = [];
+    let t = 0;
+    SEQ.forEach((s, si) => {
+      const start = t;
+      let dur = 0;
+      for (const k of s.keys) {
+        const tk = tokens(T(k));
+        const typ = tk.length * C;
+        lines.push({ t: start + dur, lead: LEAD, type: typ, d: LEAD + typ + HOLD, k, tk, recall: !!s.recall });
+        dur += LEAD + typ + HOLD + GAP;
+      }
+      dur = Math.max(dur, s.min || 0);
+      shots.push({ start, dur, cut: !!s.cut, home: !!s.home, truck: !!s.truck, from: s.from, to: s.to });
+      t += dur;
+    });
+    for (const c of CARDS) cards.push(Object.assign({}, c, { t: shots[c.shot].start + c.at }));
+    for (const c of CUES) cues.push({ t: shots[c.shot].start + c.at, f: c.f });
+    cues.sort((a, b) => a.t - b.t);
+    return { shots, lines, cards, cues, total: t };
+  }
 
   function play(scene, done) {
     const app = document.getElementById('app'), sceneEl = document.getElementById('scene');
     const end = () => { done && done(); };
     // ?nointro — 테스트·반복 확인용 (오프닝을 건너뛰고 바로 1턴)
     if (!scene || !scene.camera || !app || !sceneEl || /(\?|&)nointro\b/.test(location.search)) { end(); return null; }
+
+    const { shots: SHOTS, lines: LINES, cards: CARDS2, cues: CUES2, total: TOTAL } = build();
 
     const ov = document.createElement('div');
     ov.id = 'intro';
@@ -97,7 +117,7 @@ window.Intro = (function () {
     if (scene.truck) scene.truck.position.x = TRUCK_OFF;   // 마당은 비어 있다 — 탑차는 S5 에 들어온다
 
     let over = false, look = SHOTS[0].from.l.slice(), homeFrom = null, homeTo = null;
-    let shownKey = null, recall = false, shownCard = null, fired = 0, truckIn = false;
+    let shownKey = null, shownN = -1, recall = false, shownCard = null, fired = 0, truckIn = false, narrN = 0;
     const finish = () => {
       if (over) return; over = true;
       scene.cineStep = null;
@@ -123,9 +143,9 @@ window.Intro = (function () {
       const t = (performance.now() - t0) / 1000;
       if (t >= TOTAL) { finish(); return; }
 
-      let acc = 0, i = 0;
-      while (i < SHOTS.length - 1 && t >= acc + SHOTS[i].dur) { acc += SHOTS[i].dur; i++; }
-      const s = SHOTS[i], e = ease(clamp01((t - acc) / s.dur));
+      let i = 0;
+      while (i < SHOTS.length - 1 && t >= SHOTS[i].start + SHOTS[i].dur) i++;
+      const s = SHOTS[i], e = ease(clamp01((t - s.start) / s.dur));
       if (s.home) {
         if (!homeFrom) {
           homeFrom = { p: scene.camera.position.toArray(), l: look.slice(), fov: scene.camera.fov };
@@ -146,25 +166,32 @@ window.Intro = (function () {
         look = lerp3(s.from.l, s.to.l, e);
         scene.camSet(lerp3(s.from.p, s.to.p, e), look);
         ov.style.setProperty('--bar', Math.min(1, t / 0.45) * BAR + 'vh');
-        if (s.truck && !truckIn) { truckIn = true; if (scene.truckTo) scene.truckTo(TRUCK_X, 2.6); }
+        if (s.truck && !truckIn) { truckIn = true; if (scene.truckTo) scene.truckTo(TRUCK_X, 2.8); }
       }
 
       // 암전: 시작 페이드인 + 컷
       let dark = clamp01(1 - t / 0.5);
-      for (let j = 0, a = 0; j < SHOTS.length; a += SHOTS[j].dur, j++) if (SHOTS[j].cut) dark = Math.max(dark, clamp01(1 - Math.abs(t - a) / CUT));
+      for (const sh of SHOTS) if (sh.cut) dark = Math.max(dark, clamp01(1 - Math.abs(t - sh.start) / CUT));
       fadeEl.style.opacity = dark.toFixed(3);
 
       // 효과음
-      while (fired < CUES.length && t >= CUES[fired].t) { try { CUES[fired].f(); } catch (err) { } fired++; }
+      while (fired < CUES2.length && t >= CUES2[fired].t) { try { CUES2[fired].f(); } catch (err) { } fired++; }
 
-      // 자막
+      // 자막 — 한 글자씩 친다
       let cur = null, alpha = 0;
       for (const L of LINES) {
         if (t < L.t || t > L.t + L.d) continue;
-        cur = L; alpha = Math.min(clamp01((t - L.t) / 0.35), clamp01((L.t + L.d - t) / 0.35));
+        cur = L; alpha = Math.min(clamp01((t - L.t) / 0.3), clamp01((L.t + L.d - t) / 0.35));
       }
-      if (cur && shownKey !== cur.k) { shownKey = cur.k; lineEl.innerHTML = T(cur.k); }
-      if (!cur) shownKey = null;
+      if (cur) {
+        if (shownKey !== cur.k) { shownKey = cur.k; shownN = -1; }
+        const n = Math.max(0, Math.min(cur.tk.length, Math.floor((t - cur.t - cur.lead) / cps()) + 1));
+        if (n !== shownN) {
+          if (n > shownN && shownN >= 0 && cur.tk[n - 1] !== '<br>' && cur.tk[n - 1] !== ' ') { try { SFX.narrate(narrN++); } catch (err) { } }
+          shownN = n;
+          lineEl.innerHTML = cur.tk.slice(0, n).join('') + (n < cur.tk.length ? '<i class="caret"></i>' : '');
+        }
+      } else { shownKey = null; shownN = -1; }
       lineEl.parentNode.style.opacity = (cur ? alpha : 0).toFixed(3);
 
       // 세피아는 '자막이 바뀌는 순간'에만 갈아탄다 — 한 줄을 읽는 도중에 색이 변하면 안 된다
@@ -173,7 +200,7 @@ window.Intro = (function () {
 
       // 인물 소개 카드
       let card = null, cAlpha = 0;
-      for (const C of CARDS) {
+      for (const C of CARDS2) {
         if (t < C.t || t > C.t + C.d) continue;
         card = C; cAlpha = Math.min(clamp01((t - C.t) / 0.4), clamp01((C.t + C.d - t) / 0.4));
       }
@@ -191,5 +218,5 @@ window.Intro = (function () {
     return { skip: finish };
   }
 
-  return { play, TOTAL };
+  return { play, build };
 })();

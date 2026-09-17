@@ -2,7 +2,7 @@
 // 컨텍스트는 BGM 과 공유한다 — 따로 만들면 창이 가려졌을 때 음악만 멈추고 효과음만 계속 울린다.
 window.SFX = (function () {
   let ctx = null, master = null, enabled = true;
-  let voices = 0, lastBlip = -1;
+  let voices = 0, lastBlip = -1, lastNarr = -1;
   const MAX_VOICES = 16;   // 동시에 울리는 목소리 상한 — 겹쳐 쌓여 "삐-" 한 음으로 뭉치지 않게
   function init() {
     if (ctx) return;
@@ -72,6 +72,17 @@ window.SFX = (function () {
     win() { [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => tone(f, 0.16, 'square', 0.45, i * 0.14)); },
     over() { [392, 349, 311, 262].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.5, i * 0.28, -20)); },
     // ---------- 오프닝 전용 ----------
+    // 나레이션 타자 소리: 박 반장의 blip(300Hz 사각파)과 확실히 다른 음색이어야 한다.
+    // 말하는 사람이 아니라 '속으로 읽는 글'이라 더 낮고 둥글게 — 삼각파 176Hz + 아주 옅은 배음.
+    narrate(n = 0) {
+      if (!ctx || !enabled || ctx.state !== 'running') return;
+      const now = ctx.currentTime;
+      if (lastNarr >= 0 && now - lastNarr < 0.05) return;
+      lastNarr = now;
+      const f = 176 + [0, 14, 26, 8, 20][n % 5];
+      tone(f, 0.06, 'triangle', 0.14, 0, 26);
+      tone(f * 2, 0.03, 'sine', 0.045);
+    },
     recallIn() { tone(523, 1.0, 'sine', 0.30, 0, -300); tone(262, 1.2, 'sine', 0.22, 0.06, -120); noise(0.8, 0.10, 0.02); },
     recallOut() { tone(196, 0.9, 'sine', 0.28, 0, 340); tone(392, 0.7, 'sine', 0.20, 0.12, 180); noise(0.5, 0.08); },
     card() { tone(784, 0.05, 'triangle', 0.26); tone(1046, 0.09, 'triangle', 0.20, 0.05); },
