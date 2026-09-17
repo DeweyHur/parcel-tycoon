@@ -86,6 +86,10 @@ const say = m => { console.log(m); log.push(m); };
   check(!(await vis('#bar-cold')), '냉장 바 없음');
   check(!(await page.$('#upcoming .chip.wx')), '날씨 칩 없음');
   check(!(await vis('#cust-btn')) && !(await vis('#log-btn')), '고객·기록 버튼 없음');
+  // 첫날 대사: 여 실장이 실제 숫자로 계산해 준다 (시키는 대로 누르라는 말 대신)
+  const firstSeen = await page.evaluate(() => PT.game.story.seen.slice());
+  check(firstSeen.includes('l1intro'), '첫날 대사가 끝났다 — ' + firstSeen.join(','));
+  check(!firstSeen.includes('l1waitGo'), '대기 팝업 안내 비트가 없다 (팝업 자체가 없다)');
   check(!(await vis('#c1')), '빈 계약 슬롯 없음');
   check(!(await page.$('#parcels .parcel .cust')), '택배 줄에 고객 아이콘 없음');
   const s0 = await state();
@@ -158,15 +162,19 @@ const say = m => { console.log(m); log.push(m); };
     }
     const w = await page.$('#wait-btn:not([disabled])');
     if (w) {
-      await safeClick(w); await page.waitForTimeout(180);
+      const before = (await state()).t;
+      await safeClick(w); await page.waitForTimeout(400);
       await readBeat(); await passGate();
-      if (await safeClick('#modal .foot .btn.primary:not([disabled])')) { waits++; await page.waitForTimeout(420); }
+      // 서장에는 대기 팝업이 없다 — 눌렀으면 그대로 하루가 넘어간다. (자체 배송이 열리면 팝업이 다시 생긴다)
+      if (await safeClick('#modal .foot .btn.primary:not([disabled])')) await page.waitForTimeout(420);
+      if ((await state()).t !== before) waits++;
     }
     await readBeat();
   }
   const end = await state();
   say(`  플레이 끝: ${Math.round((Date.now() - t0) / 1000)}초 · 호출 ${calls} · 대기 ${waits} · phase ${end.phase}`);
   check(end.ret === 0 && end.disc === 0, `반송·폐기 0 (반송 ${end.ret} 폐기 ${end.disc})`);
+  check(waits > 15, `대기가 팝업 없이 바로 넘어간다 (${waits}일)`);
 
   say('\n■ 장 마무리: 리포트 → 편지 → 상호 → 계약서');
   await page.waitForTimeout(500); await shot('40-report');

@@ -91,17 +91,19 @@
   // 레벨 1 화면에는 계약 하나 · 고객 하나 · 맑음뿐이다. 설명할 것이 적으니 비트도 짧다 — 열두 개, 대부분 한 장.
   const BEATS_L1 = [
     // 서장 오프닝 — 인사 · 왜 이 창고를 넘겨받는가 · 한길 물류 담당자 인사. 규칙은 맨 마지막 한 장뿐이다
+    // 첫날은 '시키는 대로 눌러'가 아니라 '왜 지금 보내면 손해인지'를 숫자로 본다.
+    // 여 실장이 인사차 들러 실제 배차비와 지금 실을 수 있는 값을 계산해 준다 — 보내지는 않는다.
     { id: 'l1intro', kind: 'start', when: () => true, pages: [
-      { expr: 'smile' }, { expr: 'neutral' }, { expr: 'think' },
-      { expr: 'neutral', hl: '#parcels' },
+      { expr: 'smile' },
       { speaker: 'yeo', expr: 'smile' },
+      { speaker: 'yeo', expr: 'neutral', hl: '#c0' },
+      { speaker: 'yeo', expr: 'neutral', hl: '#c0' },
       { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },
     // 유일한 고객이 누구인지도 사람이 와서 말한다 (2일차)
     { id: 'l1mart', kind: 'turn', when: g => g.turn >= 2 && g.story.seen.includes('l1intro'), pages: [
       { speaker: 'rep', nameKey: 'story.name.mart', expr: 'neutral' }, { expr: 'smile' },
     ] },
-    { id: 'l1waitGo', kind: 'modal', modal: 'wait', when: g => g.story.seen.includes('l1intro'), pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 3, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
@@ -208,7 +210,13 @@
     const cap = bulk ? g.vehicleCap(bulk) : 6, fee = bulk ? g.truckFee(bulk) : 35;
     const b = bestReadySlot(g); const c = b.slot >= 0 ? g.contracts[b.slot] : bulk;
     const oc = ctx && ctx.slot != null ? g.contracts[ctx.slot] : null;   // 지금 열려 있는 호출 팝업의 계약
-    return { name: bulk ? g.contractName(bulk) : '', cap, fee, per: Math.round(fee / Math.max(1, cap)), ready: c ? g.contractName(c) : '', readyCap: c ? g.vehicleCap(c) : cap,
+    // 지금 이 순간 차를 부르면 실제로 얼마인가 — 말 대신 숫자로 보여 주기 위한 값들
+    const nowC = c || bulk;
+    const nowCap = nowC ? g.vehicleCap(nowC) : cap, nowFee = nowC ? g.truckFee(nowC) : fee;
+    let nowVol = 0, nowRev = 0;
+    if (nowC) for (const p of g.eligibleParcels(nowC).slice().sort((x, y) => x.deadline - y.deadline)) { if (nowVol + p.size > nowCap) continue; nowVol += p.size; nowRev += p.reward; }
+    return { nowCap, nowFee, nowVol, nowRev, nowNet: nowRev - nowFee, nowLoss: Math.max(0, nowFee - nowRev),
+      name: bulk ? g.contractName(bulk) : '', cap, fee, per: Math.round(fee / Math.max(1, cap)), ready: c ? g.contractName(c) : '', readyCap: c ? g.vehicleCap(c) : cap,
       readyVol: c ? g.eligibleParcels(c).reduce((s2, p) => s2 + p.size, 0) : 0, readyFee: c ? g.truckFee(c) : fee,
       openName: oc ? g.contractName(oc) : '', openCap: oc ? g.vehicleCap(oc) : cap, openFee: oc ? g.truckFee(oc) : fee,
       openVol: oc ? g.eligibleParcels(oc).reduce((s2, p) => s2 + p.size, 0) : 0, openSimul: oc ? g.simulMax(oc) : 1, openCalls: oc ? oc.calls : 0,

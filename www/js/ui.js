@@ -726,6 +726,15 @@
   function doWait(selfIds) {
     if (busy || game.phase !== 'play') return;
     SFX.resume();
+    // 자체 배송이 열리기 전(서장~2장)에는 대기 팝업에 고를 것이 없다 — 팝업 없이 그냥 하루를 넘긴다.
+    // 대신 팝업이 알려 주던 경고(반송·부패 임박)는 토스트로 남긴다.
+    if (!selfIds && !game.shows('self')) {
+      const f = game.forecast(), w = [];
+      if (f.overdue) w.push(T('wm.overdue', { n: f.overdue }));
+      if (f.spoil) w.push(T('wm.spoil', { n: f.spoil }));
+      if (w.length) toast(T('wm.ifWait') + ': ' + w.join(' · '), 2600);
+      doWait([]); return;
+    }
     if (!selfIds) { SFX.click(); showWaitModal(); return; }
     const r = game.wait(selfIds);
     if (r && r.ok === false) { toast(r.msg); return; }
