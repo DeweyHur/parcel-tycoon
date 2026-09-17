@@ -1360,7 +1360,11 @@
       this.stats.monthsDone = monthsDone;
       this.stats.distinctCarriersAtEnd = new Set(this.contracts.filter(Boolean).map(c => c.carrier)).size;
       const score = Math.round(Math.max(0, this.run.revenue + Math.max(0, this.cash) + monthsDone * (this.rules.endless ? 300 : 200) + this.rep * 20) * this.rules.scoreMult);
+      // 장 리포트(박 반장)가 쓰는 숫자 — 처리·정시·반송·파손
+      const sum = o => Object.keys(o).reduce((a, k) => a + o[k], 0);
+      const onTimeCount = sum(this.stats.onTimeByType), deliveredCount = sum(this.stats.deliveredByType);
       return { win, demo: false, story: !!this.cfg.scripted, level: this.cfg.level || 0, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
+        onTimeCount, deliveredCount, returned: this.stats.returned || 0, broken: this.stats.broken || 0,
         scenario: this.cfg.scenario, company: this.cfg.company, difficulty: this.cfg.difficulty || 'normal', perks: this.perks.slice(), variants: (this.cfg.variants || []).slice(), date: this.cfg.date || null, ...this.run };
     }
 

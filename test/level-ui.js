@@ -13,7 +13,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   const errors = [];
   page.on('pageerror', e => { if (!/audio/i.test(e.message)) { errors.push('PAGEERROR ' + e.message); console.log('PAGEERROR', e.message, (e.stack || '').split('\n')[1]); } });
   page.on('console', m => { if (m.type() === 'error' && !/audio|font|mp3|woff|404|Failed to load/i.test(m.text())) errors.push('CONSOLE ' + m.text()); if (/\[i18n\]/.test(m.text())) errors.push(m.text()); });
-  await page.goto('http://localhost:8765/index.html');
+  await page.goto('http://localhost:8765/index.html?nointro=1');
   await page.waitForTimeout(700);
   fs.mkdirSync('shots', { recursive: true });
   await page.screenshot({ path: 'shots/L00-title.png' });
@@ -93,15 +93,17 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   await page.waitForTimeout(400);
   await page.screenshot({ path: 'shots/L02-done.png' });
   const doneTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
-  check(/레벨 1 완료/.test(doneTxt), '「레벨 1 완료」 화면이 떴다');
+  check(/서장 리포트/.test(doneTxt), '박 반장 리포트가 떴다');
 
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);   // 편지
   await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);
   await page.screenshot({ path: 'shots/L03-name.png' });
   const hasInput = await page.$('#lv-name');
   check(!!hasInput, '상호 이름을 묻는다');
   if (hasInput) { await hasInput.fill('한길택배'); await page.waitForTimeout(100); }
-  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);
-  await page.screenshot({ path: 'shots/L04-named.png' });
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);   // 계약서
+  await page.screenshot({ path: 'shots/L04-contract.png' });
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(500);   // 도장
   await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(500);
   await page.screenshot({ path: 'shots/L05-title2.png' });
 

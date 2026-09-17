@@ -14,7 +14,8 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
 
   const playing = () => page.evaluate(() => {
     const ov = document.getElementById('intro');
-    return ov ? { line: (document.getElementById('intro-line') || {}).textContent || '', cine: PT.scene.cine, panel: +getComputedStyle(document.getElementById('panel')).opacity } : null;
+    return ov ? { line: (document.getElementById('intro-line') || {}).textContent || '', cine: PT.scene.cine, panel: +getComputedStyle(document.getElementById('panel')).opacity,
+      closed: !!PT.scene.closed, front: !!(PT.scene.parts.front && PT.scene.parts.front.visible) } : null;
   });
   const skip = async () => { await page.mouse.click(195, 400); await page.waitForTimeout(700); };
   const clean = () => page.evaluate(() => ({
@@ -22,6 +23,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
     cls: document.getElementById('app').className, bodyCls: document.body.className,
     truck: +PT.scene.truck.position.x.toFixed(1), fov: PT.scene.camera.fov,
     story: document.getElementById('story').hidden,
+    closed: !!PT.scene.closed, front: !!(PT.scene.parts.front && PT.scene.parts.front.visible),
   }));
 
   await page.goto('http://localhost:8765/index.html');
@@ -32,9 +34,11 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   const a = await playing();
   check(!!a, '오프닝이 나온다');
   check(!!a && a.cine === true && a.panel === 0, '창고 뷰만 보이고 패널은 감춰진다 — ' + JSON.stringify(a));
+  check(!!a && a.closed && a.front, '오프닝 동안은 벽이 다 있는 완성 건물이다');
   await skip();
   const c1 = await clean();
   check(c1.gone && !c1.cine && !c1.cls && !c1.bodyCls && c1.basis === '' && c1.truck === 12 && c1.fov === 38, '건너뛰면 원상복구 — ' + JSON.stringify(c1));
+  check(!c1.closed && !c1.front, '플레이 화면은 앞면이 벗겨진 단면이다');
   check(c1.story === false, '건너뛴 직후 박 반장이 말을 건다');
 
   // 몇 턴 굴려서 세이브를 만든다

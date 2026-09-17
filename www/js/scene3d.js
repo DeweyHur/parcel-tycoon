@@ -26,6 +26,8 @@ window.Scene3D = (function () {
   const TRUCK_PARK = 12, TRUCK_DOCK = 6.7, TRUCK_GONE = 17;
 
   function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+  // 지붕·기둥은 그림자를 던지지 않는다 (실내가 통째로 어두워진다). 받기는 한다
+  function noShadow(m) { m.traverse(o => { if (o.isMesh) o.castShadow = false; }); return m; }
   function bounce(t) { if (t < 1 / 2.75) return 7.5625 * t * t; if (t < 2 / 2.75) return 7.5625 * (t -= 1.5 / 2.75) * t + 0.75; if (t < 2.5 / 2.75) return 7.5625 * (t -= 2.25 / 2.75) * t + 0.9375; return 7.5625 * (t -= 2.625 / 2.75) * t + 0.984375; }
 
   class Scene3D {
@@ -69,9 +71,9 @@ window.Scene3D = (function () {
       // 왼쪽(냉장실)이 없으면 그만큼 오른쪽으로, 건물이 작으면 그만큼 가깝게. 보는 높이(z)는 그대로 둔다
       const dx = (Z.x0 - FULL.x0) / 2;
       const spanX = (Z.x1 + 1.2 - Z.x0) / 11, spanZ = (Z.yardZ0 + Z.YARD.depth * CELL + 0.3 - BACK_Z) / 6.35;
-      const k = Math.max(0.9, Math.min(1, Math.max(spanX, spanZ)));   // 작아져도 너무 붙지는 않는다 — 건물이 자라는 게 보여야 하니까
-      if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.3 * k; this.camY = 0.3 + 7.5 * k; this.camZ = 0.3 + 9.5 * k; this.camLook = [fx, 0.3, 0.3]; }
-      else { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a); const kk = Math.max(1, need / 12.1); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.3 + 7.5 * kk * k; this.camZ = 0.3 + 9.5 * kk * k; this.camLook = [fx, 0.3, 0.3]; }
+      const k = Math.max(0.96, Math.min(1, Math.max(spanX, spanZ)));   // 작아져도 너무 붙지는 않는다 — 건물이 자라는 게 보여야 하니까
+      if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.3 * k; this.camY = 0.3 + 7.5 * k; this.camZ = 0.55 + 9.5 * k; this.camLook = [fx, 0.3, 0.55]; }
+      else { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a); const kk = Math.max(1, need / 12.1); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.3 + 7.5 * kk * k; this.camZ = 0.55 + 9.5 * kk * k; this.camLook = [fx, 0.3, 0.55]; }
       // 오프닝 중에는 카메라를 intro.js 가 몬다 — 여기서는 자리만 계산해 두고 건드리지 않는다
       if (!this.cine) { this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(this.camLook[0], this.camLook[1], this.camLook[2]); }
       this.camera.updateProjectionMatrix();
@@ -89,8 +91,8 @@ window.Scene3D = (function () {
       const cap = Math.max(1, wh.cap || 1), coldCells = (wh.cold || 0) + (wh.frozen || 0);
       const mainDepth = Math.max(2, Math.min(MAIN.maxDepth, Math.ceil(cap / MAIN.cells)));
       const coldDepth = coldCells > 0 ? Math.max(1, Math.min(COLD.maxDepth, Math.ceil(coldCells / COLD.cells))) : 0;
-      const frontZ = ROW_Z + mainDepth * CELL + 0.45;
-      const yardZ0 = ROW_Z + mainDepth * CELL + 0.25;
+      const frontZ = ROW_Z + mainDepth * CELL + 0.45;     // 앞벽(셔터) 자리 = 실내의 끝
+      const yardZ0 = frontZ + 0.35;                        // 야외 적재는 앞벽 '바깥' 이다 — 지붕도 바닥도 건물 것이 아니다
       const x0 = coldDepth ? COLD.x0 - 0.6 : MAIN.x0 - 0.5;
       const yardX0 = Math.max(-2.4, x0 + 0.3);
       return {
@@ -98,6 +100,7 @@ window.Scene3D = (function () {
         COLD: { x0: COLD.x0, cells: COLD.cells, depth: coldDepth, z0: ROW_Z },
         YARD: { x0: yardX0, cells: Math.max(4, Math.floor((DOCK_X - 0.2 - yardX0) / CELL)), depth: YARD.depth, z0: yardZ0 },
         x0, x1: DOCK_X, frontZ, yardZ0,
+        roadZ: yardZ0 + YARD.depth * CELL + 1.0,          // 도로는 마당 너머 (창고가 깊어지면 같이 밀린다)
       };
     }
     // 착탈: 창고가 바뀌면 바뀐 모듈만 다시 짓는다. 처음 짓는 게 아니면 위에서 내려앉는다
@@ -115,11 +118,14 @@ window.Scene3D = (function () {
         if (group) { this.scene.add(group); if (!first) this._dropIn(group, drop); }
       };
       put('shell', this._makeShell(Z), 0.7);
+      put('front', this._makeFront(Z), 0.7);
       put('cold', Z.COLD.depth ? this._makeColdRoom(Z) : null, 1.8);
       put('yard', this._makeYardPad(Z), 0.5);
       const vans = ['coldvan', 'padvan', 'bigvan'].filter(k => wh[k]);
       put('van', vans.length ? this._makeVan(Z, vans[0]) : null, 1.4);
-      if (this.road) this.road.position.x = Z.x1 + 0.6 + 20;   // 도로는 건물 오른쪽 끝에서 시작 (좁은 창고 앞을 아스팔트가 가리지 않게)
+      if (this.parts.front) { this.parts.front.visible = !!this.closed; this._setAlpha(this.parts.front, 1); }
+      if (this.road) { this.road.position.x = Z.x1 + 0.6 + 20; this.road.position.z = Z.roadZ; }   // 도로는 마당 너머, 건물 오른쪽으로
+      if (this.truck) this.truck.position.z = Z.roadZ;
       this.tileCaps = null;   // 구역이 바뀌었으니 바닥 타일도 다시
       this.resize();
       return true;
@@ -128,20 +134,39 @@ window.Scene3D = (function () {
       group.position.y += (h || 1.2);
       this.tweens.push({ obj: group.position, from: { y: group.position.y }, to: { y: group.position.y - (h || 1.2) }, dur: 0.55, fn: bounce, t: 0 });
     }
-    // 본동: 바닥 · 뒷벽 · 오른쪽 벽 · 지붕 · 기둥 · 도크
+    // 본동(실내): 바닥 · 뒷벽 · 양옆 벽 · 뒤쪽 지붕 · 기둥 · 도크.
+    // 앞벽(셔터)과 앞지붕은 _makeFront 가 따로 만든다 — 평소엔 벗겨 놓고(단면), 오프닝에선 씌운다(완성 건물).
     _makeShell(Z) {
       const g = new THREE.Group();
       const w = Z.x1 - Z.x0, cx = (Z.x0 + Z.x1) / 2;
-      const padBack = BACK_Z, padFront = Z.yardZ0 + Z.YARD.depth * CELL + 0.15;
-      const floor = this._box(w, 0.12, padFront - padBack, 0x9a9aa8); floor.position.set(cx, 0.0, (padBack + padFront) / 2); g.add(floor);
+      const depth = Z.frontZ - BACK_Z;
+      const floor = this._box(w, 0.12, depth + 0.2, 0x9a9aa8); floor.position.set(cx, 0.0, (BACK_Z + Z.frontZ) / 2); g.add(floor);
       const back = this._box(w, 3.2, 0.25, 0xd9c8a8); back.position.set(cx, 1.6, BACK_Z); g.add(back);
-      const left = this._box(0.25, 3.2, Z.frontZ - BACK_Z, 0xcdbd9e); left.position.set(Z.x0 + 0.1, 1.6, (BACK_Z + Z.frontZ) / 2); g.add(left);
-      const roofD = Math.min(2.4, (Z.frontZ - BACK_Z) * 0.62);
-      const roof = this._box(w + 0.4, 0.22, roofD, 0xb8453b); roof.position.set(cx, 3.2, BACK_Z + roofD / 2 - 0.2); g.add(roof);
-      const px = [Z.x0 + 0.3, cx, Z.x1 - 0.1];
-      for (const x of px) { const p = this._box(0.22, 3.1, 0.22, 0xb59a75); p.position.set(x, 1.55, BACK_Z + 0.25); g.add(p); }
-      const right = this._box(0.25, 3.2, Math.min(2.0, Z.frontZ - BACK_Z), 0xcdbd9e); right.position.set(Z.x1 - 0.1, 1.6, BACK_Z + Math.min(2.0, Z.frontZ - BACK_Z) / 2); g.add(right);
-      const dock = this._box(0.4, 0.05, Math.min(3.0, Z.frontZ - BACK_Z + 0.6), 0xf0d060); dock.position.set(Z.x1 + 0.3, 0.08, BACK_Z + 1.6); g.add(dock);
+      const left = this._box(0.25, 3.2, depth, 0xcdbd9e); left.position.set(Z.x0 + 0.1, 1.6, (BACK_Z + Z.frontZ) / 2); g.add(left);
+      const right = this._box(0.25, 3.2, depth, 0xcdbd9e); right.position.set(Z.x1 - 0.1, 1.6, (BACK_Z + Z.frontZ) / 2); g.add(right);
+      // 뒤쪽 지붕: 안이 보여야 하니 깊이의 절반만. 그림자는 안 던진다 — 던지면 실내가 통째로 어두워져 택배가 안 보인다
+      const roofD = Math.max(0.9, depth * 0.5);
+      const roof = this._box(w + 0.4, 0.22, roofD, 0xb8453b); roof.position.set(cx, 3.2, BACK_Z + roofD / 2 - 0.2); noShadow(roof); g.add(roof);
+      for (const x of [Z.x0 + 0.3, cx, Z.x1 - 0.1]) { const p = this._box(0.22, 3.1, 0.22, 0xb59a75); p.position.set(x, 1.55, BACK_Z + 0.25); noShadow(p); g.add(p); }
+      const dock = this._box(0.4, 0.05, depth + 0.4, 0xf0d060); dock.position.set(Z.x1 + 0.3, 0.08, (BACK_Z + Z.frontZ) / 2); g.add(dock);
+      return g;
+    }
+    // 앞면(앞지붕 + 앞벽 + 셔터). 이게 붙어 있으면 밖에서 본 '완성된 창고', 벗기면 플레이용 단면이다
+    _makeFront(Z) {
+      const g = new THREE.Group();
+      const w = Z.x1 - Z.x0, cx = (Z.x0 + Z.x1) / 2, fz = Z.frontZ;
+      const depth = fz - BACK_Z, roofD = Math.max(0.9, depth * 0.5);
+      const front = this._box(w + 0.4, 0.22, depth - roofD + 0.45, 0xb8453b);
+      front.position.set(cx, 3.2, BACK_Z + roofD - 0.2 + (depth - roofD + 0.45) / 2); noShadow(front); g.add(front);
+      // 셔터는 도크 쪽(오른쪽)에 치우쳐 있다 — 트럭이 대는 자리와 맞물려야 자연스럽다
+      const sw = Math.min(2.6, w * 0.42), sx = Z.x1 - 0.5 - sw / 2;
+      const lintel = this._box(w, 0.55, 0.28, 0xcdbd9e); lintel.position.set(cx, 2.85, fz); g.add(lintel);
+      const lw = sx - sw / 2 - Z.x0;
+      if (lw > 0.15) { const L = this._box(lw, 2.55, 0.28, 0xd9c8a8); L.position.set(Z.x0 + lw / 2, 1.3, fz); g.add(L); }
+      const rw = Z.x1 - (sx + sw / 2);
+      if (rw > 0.15) { const R = this._box(rw, 2.55, 0.28, 0xd9c8a8); R.position.set(Z.x1 - rw / 2, 1.3, fz); g.add(R); }
+      const sh = this._box(sw, 2.5, 0.14, 0x8e8e9c); sh.position.set(sx, 1.28, fz + 0.06); g.add(sh);
+      for (let i = 0; i < 4; i++) { const b = this._box(sw - 0.1, 0.07, 0.04, 0x6f6f7c); b.position.set(sx, 0.5 + i * 0.6, fz + 0.15); noShadow(b); g.add(b); }
       return g;
     }
     // 냉장실: 냉장 구역이 0칸이면 아예 안 붙는다
@@ -156,7 +181,7 @@ window.Scene3D = (function () {
     }
     _makeYardPad(Z) {
       const g = new THREE.Group(), Y = Z.YARD;
-      const pad = this._box(Y.cells * CELL + 0.3, 0.05, Y.depth * CELL + 0.3, 0x85765b);
+      const pad = this._box(Y.cells * CELL + 0.3, 0.05, Y.depth * CELL + 0.3, 0x7d6f56);
       pad.position.set(Y.x0 + Y.cells * CELL / 2 - 0.15, 0.09, Y.z0 + Y.depth * CELL / 2 - 0.05); g.add(pad);
       return g;
     }
@@ -180,9 +205,9 @@ window.Scene3D = (function () {
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), this._mat(0x6b8f4e)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; s.add(ground);
       // 건물(바닥·벽·지붕·냉장실·마당)은 착탈식이라 _syncBuilding 이 짓는다
       // 트럭
-      this.truck = this._makeTruck(); this.truck.position.set(TRUCK_PARK, 0, 1.8); s.add(this.truck);
+      this.truck = this._makeTruck(); this.truck.position.set(TRUCK_PARK, 0, 3.6); s.add(this.truck);   // z 는 _syncBuilding 이 도로에 맞춘다
       // 도로
-      const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 3.4), this._mat(0x4a4a52)); road.rotation.x = -Math.PI / 2; road.position.set(14, -0.02, 1.8); road.receiveShadow = true; s.add(road); this.road = road;
+      const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 3.4), this._mat(0x4a4a52)); road.rotation.x = -Math.PI / 2; road.position.set(14, -0.02, 3.6); road.receiveShadow = true; s.add(road); this.road = road;
       // 나무 몇 그루 (장식)
       [[-7.5, -3], [8.5, -3.5], [-8, 3.5]].forEach(([x, z]) => { const t = new THREE.Group(); const trunk = this._box(0.3, 0.8, 0.3, 0x8a5a3a); trunk.position.y = 0.4; const leaf = this._box(1.2, 1.2, 1.2, 0x4f9a4a); leaf.position.y = 1.4; t.add(trunk, leaf); t.position.set(x, 0, z); s.add(t); });
     }
@@ -226,7 +251,8 @@ window.Scene3D = (function () {
       const A = window.DATA.ATTRS, OUT = window.I18n ? window.I18n.t('hud.outdoorLabel') : '';
       if (cold > 0) sign('cold', A.cold.name, '#5ee0d8', COLD.x0 + 0.9, COLD.z0 + 0.1, 1.7);
       if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('frozen', A.frozen.name, '#9ad7ff', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, COLD.z0 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
-      sign('rain', OUT, '#c9a06c', YARD.x0 + 0.9, YARD.z0 + 0.6);
+      sign('rain', OUT, '#c9a06c', YARD.x0 + 0.9, YARD.z0 + YARD.depth * CELL - 0.15, 0.62);   // 마당 앞자락, 낮게 — 건물 벽에 걸쳐 뜨면 안이 뚫려 보인다
+      g.visible = !this.closed;   // 완성 건물(오프닝)일 때는 바닥 표시가 벽을 뚫고 보이면 안 된다
       this.scene.add(g);
     }
     relabel() { if (this.tileCaps) this._buildTiles(...this.tileCaps); }
@@ -399,6 +425,28 @@ window.Scene3D = (function () {
     shake(amount = 0.15) { this.shakeT = 0.35; this.shakeA = amount; }
     // ---------- 오프닝 카메라 (intro.js 가 밖에서 몬다) ----------
     // this.cine = true 인 동안 resize()·_loop() 는 카메라를 건드리지 않는다.
+    // ---------- 완성 건물 ↔ 단면 ----------
+    // 평소(플레이)엔 앞면이 벗겨져 있어 안이 보인다. 밖에서 보여 줄 때(오프닝)는 씌운다.
+    // close(true) 로 씌우고, close(false, true) 로 '뚜껑이 들리듯' 벗긴다.
+    close(on, animate) {
+      const f = this.parts.front;
+      this.closed = !!on;
+      if (!f) return;
+      this.tweens = this.tweens.filter(t => t.tag !== 'front');
+      if (this.tiles) this.tiles.visible = !on;
+      if (on) { f.visible = true; f.position.y = 0; this._setAlpha(f, 1); return; }
+      if (!animate) { f.visible = false; f.position.y = 0; this._setAlpha(f, 1); return; }
+      const box = { y: 0, a: 1 };
+      this.tweens.push({ tag: 'front', obj: box, from: { y: 0, a: 1 }, to: { y: 2.6, a: 0 }, dur: 0.9, fn: ease, t: 0,
+        onTick: () => { f.position.y = box.y; this._setAlpha(f, box.a); },
+        onDone: () => { f.visible = false; f.position.y = 0; this._setAlpha(f, 1); } });
+    }
+    _setAlpha(group, a) {
+      group.traverse(o => {
+        if (o.isMesh) { o.material.transparent = a < 1; o.material.opacity = a; }
+        else if (o.isLineSegments) { o.material.opacity = 0.55 * a; }
+      });
+    }
     camSet(p, l) { this.camera.position.set(p[0], p[1], p[2]); this.camera.lookAt(l[0], l[1], l[2]); }
     camHome() { return { p: [this.camX, this.camY, this.camZ], l: (this.camLook || [1.3, 0.3, 0.3]).slice(), fov: this.camFov || this.camera.fov }; }
 
@@ -410,6 +458,7 @@ window.Scene3D = (function () {
         if (tw.t < 0) continue;
         const k = Math.min(1, tw.t / tw.dur), e = tw.fn(k);
         for (const key in tw.to) tw.obj[key] = tw.from[key] + (tw.to[key] - tw.from[key]) * e;
+        if (tw.onTick) tw.onTick();
         if (k >= 1) { this.tweens.splice(i, 1); tw.onDone && tw.onDone(); }
       }
       // 기한 초과 깜빡임 / 냉장 밖 신선식품 흔들림

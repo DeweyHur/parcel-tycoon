@@ -17,17 +17,28 @@ window.Intro = (function () {
   //   A 도로 — 길가에 선 트럭(x 12, z 1.8)을 앞에 두고 창고 쪽으로 미끄러진다
   //   B 창고 앞 — 도크와 셔터를 낮게 훑으며 다가간다
   //   C 착지 — 게임 카메라로 떠오르면서 화면이 제자리로 줄어든다
+  // recall: true = 회상. 화면이 바래고(세피아) 자막이 과거형이 된다
   const SHOTS = [
-    { dur: 3.6, from: { p: [14.8, 4.7, 14.2], l: [3.4, 0.9, 0.9] }, to: { p: [12.6, 4.3, 13.0], l: [3.0, 0.9, 0.7] } },
-    { dur: 3.6, cut: true, from: { p: [10.2, 3.1, 11.0], l: [1.7, 0.9, 0.0] }, to: { p: [8.4, 3.4, 10.0], l: [1.4, 0.85, -0.2] } },
-    { dur: 3.8, home: true },
+    // 오늘 아침, 길 건너에서
+    { dur: 4.0, from: { p: [15.0, 4.9, 15.8], l: [3.4, 1.0, 1.4] }, to: { p: [13.2, 4.6, 14.9], l: [3.1, 1.0, 1.2] } },
+    // ── 회상 ── 창고 옆구리. 오래 드나든 자리
+    { dur: 4.2, cut: true, recall: true, from: { p: [-8.6, 3.0, 9.8], l: [0.2, 1.2, 0.2] }, to: { p: [-6.4, 2.8, 10.6], l: [0.8, 1.2, 0.3] } },
+    // ── 회상 ── 셔터 앞. 영감님이 서 있던 자리
+    { dur: 4.2, cut: true, recall: true, from: { p: [7.2, 2.0, 11.4], l: [2.6, 1.3, 0.6] }, to: { p: [6.0, 2.2, 10.6], l: [2.4, 1.3, 0.5] } },
+    // 오늘로 — 다시 색이 돌아온다
+    { dur: 3.6, cut: true, from: { p: [10.6, 3.3, 12.8], l: [1.8, 1.0, 0.5] }, to: { p: [8.8, 3.6, 11.8], l: [1.5, 0.95, 0.3] } },
+    // 착지 — 앞면이 들리고 화면이 제자리로
+    { dur: 4.4, home: true },
   ];
   // 자막은 샷 경계에 딱 맞추지 않는다 — 한 줄이 컷을 넘어가야 두 샷이 한 장면으로 읽힌다
   const LINES = [
-    { t: 0.5, d: 2.1, k: 'intro.1' },
-    { t: 2.9, d: 3.0, k: 'intro.2' },
-    { t: 6.2, d: 2.8, k: 'intro.3' },
-    { t: 9.3, d: 1.7, k: 'intro.4' },
+    { t: 0.5, d: 2.2, k: 'intro.1' },
+    { t: 2.9, d: 2.6, k: 'intro.2' },
+    { t: 5.8, d: 2.6, k: 'intro.3' },
+    { t: 8.7, d: 2.6, k: 'intro.4' },
+    { t: 11.5, d: 3.4, k: 'intro.5' },
+    { t: 15.2, d: 2.8, k: 'intro.6' },
+    { t: 18.3, d: 2.0, k: 'intro.7' },
   ];
   const TOTAL = SHOTS.reduce((s, x) => s + x.dur, 0);
   const lerp3 = (a, b, e) => [a[0] + (b[0] - a[0]) * e, a[1] + (b[1] - a[1]) * e, a[2] + (b[2] - a[2]) * e];
@@ -61,17 +72,19 @@ window.Intro = (function () {
     scene.resize();
     scene.camera.fov = FOV; scene.camera.updateProjectionMatrix();
     scene.camSet(SHOTS[0].from.p, SHOTS[0].from.l);
+    scene.close(true);   // 밖에서 보는 동안은 벽이 다 있는 '완성된 창고' 다
     const truckX = scene.truck ? scene.truck.position.x : null;
     if (scene.truck) scene.truck.position.x = TRUCK_X;
 
-    let over = false, look = SHOTS[0].from.l.slice(), homeFrom = null, homeTo = null, shownKey = null;
+    let over = false, look = SHOTS[0].from.l.slice(), homeFrom = null, homeTo = null, shownKey = null, recall = false;
     const finish = () => {
       if (over) return; over = true;
       scene.cineStep = null;
       scene.cine = false;
+      scene.close(false);   // 건너뛰어도 앞면은 벗겨진 채로 (플레이 화면은 단면이다)
       if (scene.truck && truckX !== null) scene.truck.position.x = truckX;
       sceneEl.style.flexBasis = '';
-      app.classList.remove('cine');
+      app.classList.remove('cine', 'recall');
       document.body.classList.remove('cine');
       app.style.removeProperty('--hud-a');
       scene.resize();
@@ -99,6 +112,7 @@ window.Intro = (function () {
           sceneEl.style.flexBasis = BASE + '%'; scene.resize();
           homeTo = scene.camHome();
           sceneEl.style.flexBasis = WIDE + '%'; scene.resize();   // 잰 뒤 되돌린다 (--bot 은 아래에서 다시 맞춘다)
+          scene.close(false, true);   // 카메라가 안으로 들어오는 순간 앞면이 들려 올라간다
         }
         setBasis(WIDE + (BASE - WIDE) * e);
         scene.resize();
@@ -112,6 +126,7 @@ window.Intro = (function () {
         scene.camSet(lerp3(s.from.p, s.to.p, e), look);
         ov.style.setProperty('--bar', Math.min(1, t / 0.45) * BAR + 'vh');
       }
+      if (!!s.recall !== recall) { recall = !!s.recall; app.classList.toggle('recall', recall); ov.classList.toggle('recall', recall); }
 
       // 암전: 시작 페이드인 + 컷
       let dark = clamp01(1 - t / 0.5);

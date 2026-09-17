@@ -111,16 +111,53 @@
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
     closeModal(); startPlay({ intro: n === 1 });
   }
+  // 장을 끝내면 세 화면이 이어진다: 박 반장 리포트 → 한 사장님 편지 → (마지막 장이면) 상호 · 계약서
   function showLevelDone(r) {
     if (!r.recorded) { r.recorded = true; Store.remove(SAVE_KEY); BGM.stop(0.5); SFX.win(); BGM.oneShot('fanfare'); }
-    const body = `<p style="text-align:center">${T('lv.doneBody', { months: Math.round(r.monthsDone / D.CYCLES_PER_MONTH), delivered: r.delivered, cash: r.cash })}</p>`;
-    modal(T('lv.doneTitle', { ch: T('lv.ch.' + r.level) }), body, [{ label: T('lv.doneGo'), cls: 'primary', onClick: () => askCompanyName(r) }]);
+    showChapterReport(r);
   }
-  // 레벨 1을 끝내면 상호를 묻는다 — 여기서 처음으로 '내 가게'가 된다
+  const chName = n => T('lv.ch.' + Math.min(n, LEVELS.LAST));
+  const faceImg = (who, expr, size) => `<img src="${who === 'park' ? Story.sprite('park', expr) : Story.sprite(who, expr)}" width="${size || 56}" height="${size || 56}" alt="" style="image-rendering:pixelated;flex:0 0 auto">`;
+
+  // 두 달치를 숫자로 정리해 준다. 영감님한테 보낼 보고서의 초안이기도 하다
+  function showChapterReport(r) {
+    const done = r.deliveredCount || r.delivered || 0;
+    const rate = done ? Math.round((r.onTimeCount || 0) / done * 100) : 100;
+    const bad = (r.returned || 0) + (r.discarded || 0);
+    const verdict = bad === 0 && rate >= 95 ? 'good' : rate >= 80 ? 'ok' : 'bad';
+    const row = (k, v, warn) => `<div class="rpt-row"><span>${esc(k)}</span><b${warn ? ' style="color:var(--orange)"' : ''}>${esc(v)}</b></div>`;
+    const body = `<div class="rpt-head">${faceImg('park', verdict === 'bad' ? 'worry' : 'think')}
+        <div><b>${esc(T('rpt.by'))}</b><br><span style="color:var(--dim);font-size:12px">${esc(T('rpt.sub', { months: Math.round(r.monthsDone / D.CYCLES_PER_MONTH) }))}</span></div></div>
+      <div class="rpt">${row(T('rpt.delivered'), T('rpt.unit', { n: done }))}${row(T('rpt.onTime'), rate + '%')}${row(T('rpt.trouble'), T('rpt.unit', { n: bad }), bad > 0)}${row(T('rpt.cash'), r.cash + 'c')}</div>
+      <p class="rpt-say">${T('rpt.' + verdict)}</p>`;
+    modal(T('rpt.title', { ch: chName(r.level) }), body, [{ label: T('rpt.next'), cls: 'primary', onClick: () => showLetter(r, verdict) }]);
+  }
+
+  // 한 사장님(영감님)의 손편지. 장이 올라갈수록 문장이 달라진다
+  function showLetter(r, verdict) {
+    const P = Profile.get();
+    const who = P.campaign.name ? T('letter.toName', { name: P.campaign.name }) : T('letter.toYou');
+    const k = 'letter.' + Math.min(r.level, LEVELS.LAST) + '.' + (verdict === 'bad' ? 'bad' : 'good');
+    const text = T(k) === k ? T('letter.generic.' + (verdict === 'bad' ? 'bad' : 'good')) : T(k);
+    const body = `<div class="letter"><p class="to">${esc(who)}</p><p>${text}</p>
+      <p class="sign">${faceImg('han', verdict === 'bad' ? 'neutral' : 'smile', 40)}<span>${esc(T('letter.sign'))}</span></p></div>`;
+    modal(T('letter.title'), body, [{ label: T('letter.close'), cls: 'primary', onClick: () => afterChapter(r) }]);
+  }
+
+  function afterChapter(r) {
+    // 구현된 마지막 장을 끝냈다 = 한 해 시험이 끝난 것으로 친다 → 상호를 짓고 계약서에 도장
+    if (r.level >= LEVELS.IMPLEMENTED) return askCompanyName(r);
+    const P = Profile.get();
+    P.campaign = Object.assign({}, P.campaign, { cleared: Math.max(P.campaign.cleared || 0, r.level), level: r.level + 1 });
+    Profile.save(); game = null;
+    modal(T('lv.doneTitle', { ch: chName(r.level) }), `<p>${T('lv.nextCh', { ch: chName(r.level + 1) })}</p>`,
+      [{ label: T('res.toTitle'), cls: 'primary', onClick: () => { closeModal(); showTitle(); } }]);
+  }
+
+  // 상호를 짓는다 — 여기서 처음으로 '내 가게'가 된다
   function askCompanyName(r) {
     const P = Profile.get();
-    const face = `<img src="${Story.SPRITES.smile}" width="64" height="64" style="image-rendering:pixelated;float:left;margin:0 10px 6px 0">`;
-    const body = `<p>${face}${T('lv.nameBody')}</p><div style="clear:both"></div>
+    const body = `<p>${faceImg('han', 'smile', 64)}</p><p>${T('lv.nameBody')}</p>
       <input id="lv-name" maxlength="14" placeholder="${esc(T('lv.namePlaceholder'))}" value="${esc(P.campaign.name || '')}"
         style="width:100%;box-sizing:border-box;padding:10px;font:inherit;font-size:16px;background:#1b1a2e;color:var(--ink);border:3px solid var(--line);outline:none">`;
     const m = modal(T('lv.nameAsk'), body, [{ label: T('lv.nameSave'), cls: 'primary', onClick: () => {
@@ -128,10 +165,27 @@
       const P2 = Profile.get();
       P2.campaign = Object.assign({}, P2.campaign, { name: v, cleared: Math.max(P2.campaign.cleared || 0, r.level), level: r.level + 1 });
       Profile.save(); game = null;
-      modal(T('lv.doneTitle', { ch: T('lv.ch.' + r.level) }), `<div class="big-num">${esc(v)}</div><p>${T('lv.next')}</p>`,
-        [{ label: T('res.toTitle'), cls: 'primary', onClick: () => { closeModal(); showTitle(); } }]);
+      showContract(r, v);
     } }]);
     setTimeout(() => { const el = m.querySelector('#lv-name'); if (el) el.focus(); }, 60);
+  }
+
+  // 계약서에 도장 — 한 해 시험이 끝나고 창고가 내 것이 되는 자리
+  function showContract(r, name) {
+    const body = `<div class="paper"><h3>${esc(T('ct.title'))}</h3>
+      <div class="ct-row"><span>${esc(T('ct.seller'))}</span><b>${esc(T('ct.sellerName'))}</b></div>
+      <div class="ct-row"><span>${esc(T('ct.buyer'))}</span><b>${esc(name)}</b></div>
+      <div class="ct-row"><span>${esc(T('ct.item'))}</span><b>${esc(T('ct.itemName'))}</b></div>
+      <p class="ct-body">${T('ct.body')}</p>
+      <div class="stamp" id="ct-stamp">${esc(T('ct.stampMark'))}</div></div>`;
+    const m = modal(T('ct.modal'), body, [{ label: T('ct.stamp'), cls: 'primary', onClick: () => {
+      const st = m.querySelector('#ct-stamp');
+      if (st && !st.classList.contains('on')) {
+        st.classList.add('on'); SFX.thud(); BGM.oneShot('fanfare');
+        const foot = m.querySelector('.foot .btn'); if (foot) { foot.textContent = T('ct.done'); }
+        m.querySelector('.foot .btn').onclick = () => { SFX.click(); closeModal(); showTitle(); };
+      }
+    } }]);
   }
 
   // ---------- "이건 이런 게임이다" 3장 카드 (첫 실행 · 게임 방법에서 다시 보기) ----------

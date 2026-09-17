@@ -178,6 +178,38 @@ def hair_ponytail_brown(img, col=(120, 75, 45), sh=(85, 50, 30)):
     rect(img, 25, 8, 27, 16, col); rect(img, 26, 9, 27, 16, sh)
     rect(img, 28, 8, 28, 16, o); hline(img, 25, 27, 17, o); px(img, 25, 12, o)
 
+def hair_thin_white(img, col=(230, 230, 234), sh=(192, 192, 200)):
+    """성긴 백발 — 정수리는 비었고 옆머리만 남았다 (80대)"""
+    o = P["o"]
+    rect(img, 6, 8, 8, 14, col); rect(img, 23, 8, 25, 14, col)
+    rect(img, 6, 12, 7, 14, sh); rect(img, 24, 12, 25, 14, sh)
+    rect(img, 5, 8, 5, 15, o); rect(img, 26, 8, 26, 15, o)
+    hline(img, 6, 8, 7, o); hline(img, 23, 25, 7, o)
+    # 이마 위로 몇 올만
+    hline(img, 9, 11, 6, col); hline(img, 20, 22, 6, col)
+    px(img, 13, 5, col); px(img, 16, 4, col); px(img, 19, 5, col)
+    px(img, 9, 5, o); px(img, 22, 5, o)
+
+
+def cardigan(img, col=(152, 122, 92), sh=(116, 91, 66), shirt=(236, 236, 228)):
+    o = P["o"]
+    rect(img, 6, 24, 25, 31, col)
+    rect(img, 6, 24, 7, 31, sh); rect(img, 24, 24, 25, 31, sh)
+    rect(img, 13, 23, 18, 31, shirt)                      # 앞섶 사이 셔츠
+    rect(img, 12, 24, 12, 31, o); rect(img, 19, 24, 19, 31, o)
+    px(img, 15, 27, (96, 84, 70)); px(img, 15, 30, (96, 84, 70))
+    hline(img, 10, 12, 23, shirt); hline(img, 19, 21, 23, shirt)   # 칼라
+
+
+def cane(img, col=(96, 64, 34), sh=(64, 42, 22)):
+    """지팡이 — 왼쪽 아래로 세워 잡았다"""
+    o = P["o"]
+    rect(img, 2, 24, 3, 31, col); rect(img, 3, 24, 3, 31, sh)
+    rect(img, 1, 24, 1, 31, o); rect(img, 4, 24, 4, 31, o)
+    rect(img, 2, 22, 6, 23, col); hline(img, 2, 6, 21, o); px(img, 7, 22, o); px(img, 7, 23, o)
+    hline(img, 2, 6, 23, sh)
+
+
 def headset(img, col=(50, 50, 60), mic=(120, 120, 130)):
     rect(img, 5, 10, 6, 14, col); rect(img, 25, 10, 26, 14, col)
     hline(img, 6, 25, 2, col)
@@ -287,11 +319,26 @@ def char_D(expr, talk=False):
     tablet(img)
     return img
 
+def char_E(expr, talk=False):
+    """한 사장님(영감님) — 80대, 성긴 백발, 깊은 주름, 갈색 카디건, 지팡이. 이 창고의 전 주인"""
+    img = new()
+    skin, sh = (226, 194, 166), (184, 148, 120)
+    bust(img, skin, sh, (152, 122, 92), (116, 91, 66))
+    cardigan(img)
+    head(img, skin, sh)
+    hair_thin_white(img)
+    face(img, expr, skin_sh=sh, wrinkles=True, blush=False, talk=talk)
+    hline(img, 10, 12, 9, (228, 228, 232)); hline(img, 19, 21, 9, (228, 228, 232))   # 흰 눈썹
+    cane(img)
+    return img
+
+
 CHARS = [
     ("A", "박 반장", "60대 · 흰머리 · 안경 · 작업조끼 · 머그", "느긋한 멘토. 실수해도 '그럴 수 있지' 하고 커피부터 권한다", char_A),
     ("B", "강 소장", "50대 · 쪽머리(새치) · 클립보드", "깐깐한 베테랑. 숫자로 말한다. 칭찬은 짧고 지적은 정확", char_B),
     ("C", "노 기사", "70대 · 트럭 캡 · 흰 콧수염 · 수건", "1세대 화물 기사 출신. 명절·장마·김장철 이야기를 몸으로 안다", char_C),
     ("D", "여 실장", "40대 · 포니테일 · 헤드셋 · 형광조끼 · 태블릿", "빠릿한 현장 실장. 짧은 문장, 이모지 톤. 젊은 플레이어 친화", char_D),
+    ("E", "한 사장님", "80대 · 성긴 백발 · 깊은 주름 · 카디건 · 지팡이", "이 창고의 전 주인. 말이 느리고 짧다. 야단치지 않고 그냥 기다린다", char_E),
 ]
 EXPRS = [("neutral", "기본"), ("smile", "웃음"), ("worry", "걱정"), ("shock", "놀람"), ("think", "생각"), ("laugh", "웃음(큰)")]
 
@@ -393,8 +440,10 @@ def export_js():
     open(OUT + "/sprites_b64.txt", "w").write("\n".join(out) + "\n")
     # 조연: 여 실장(D)·노 기사(C)·강 소장(B)·이름 없는 담당자 — neutral/talk/smile
     reps = []
-    for rid, fn in (("yeo", char_D), ("noh", char_C), ("kang", char_B), ("rep", char_generic)):
-        for ek, talk in (("neutral", False), ("neutral", True), ("smile", False)):
+    for rid, fn in (("yeo", char_D), ("noh", char_C), ("kang", char_B), ("rep", char_generic), ("han", char_E)):
+        exprs = (("neutral", False), ("neutral", True), ("smile", False))
+        if rid == "han": exprs = exprs + (("smile", True), ("worry", False), ("laugh", False))   # 영감님은 편지·회상에서 표정을 더 쓴다
+        for ek, talk in exprs:
             im = fn(ek, talk).quantize(colors=32, method=Image.Quantize.FASTOCTREE, dither=0)
             b = io.BytesIO(); im.save(b, format="PNG", optimize=True)
             reps.append(f"    {rid}_{ek}{'_talk' if talk else ''}: 'data:image/png;base64,{base64.b64encode(b.getvalue()).decode()}',")
