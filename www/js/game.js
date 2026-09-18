@@ -177,6 +177,8 @@
         wh = { ...((cy && cy.warehouse) || (lc && lc.warehouse) || co.warehouse) };
         contracts = (cy && cy.contracts) || (lc && lc.contracts) || co.contracts;
       }
+      // 앞 장을 망쳐도(확장을 못 샀어도) 그 장의 대본이 성립하도록 바닥값을 보장한다
+      if (this.level && this.level.minCap != null) wh.cap = Math.max(wh.cap, this.level.minCap);
       wh.cap += R.capDelta; wh.xl += R.xlDelta;
       if (R.coldCapMax != null) wh.cold = Math.min(wh.cold, R.coldCapMax);
       if (wh.frozen == null) wh.frozen = R.coldCapMax === 0 ? 0 : (wh.cold > 0 ? D.WAREHOUSE.frozen : 0);
@@ -187,10 +189,15 @@
       this.cash = Math.round((baseCash + R.cashDelta) * R.cashMult);
       // 망한 판으로 다음 장이 막히지 않게, 그 장의 바닥값은 보장한다
       if (this.level && this.level.minCash != null) this.cash = Math.max(this.cash, this.level.minCash);
+      const carried = !!this.cfg.carry;
       this.contracts = contracts.map(s => {
         const c = this._makeContract(this.resolveCenter(s.carrier, s.grade || 'normal'), null, null, true);
         if (s.enh) Object.assign(c.enh, s.enh);
         if (s.calls != null) c.calls = Math.min(c.maxCalls, s.calls + R.startCallsDelta);
+        // 장 사이에는 두 달의 공백이 있다. 앞 장을 배차 0으로 끝냈다고 다음 장의 첫 사이클을 통째로
+        // 못 보내면 안 된다 — 마켓은 사이클 끝에만 열리니까 그 열흘은 손쓸 방법이 아예 없다.
+        // 공백 동안 새로 끊어 둔 것으로 치고 바닥을 보장한다.
+        if (carried) c.calls = Math.max(c.calls, Math.ceil(c.maxCalls * D.CARRY_CALLS_FLOOR));
         return c;
       });
       while (this.contracts.length < D.CONTRACT_SLOTS) this.contracts.push(null);

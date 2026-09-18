@@ -164,7 +164,60 @@
         // 3~4사이클(6월)은 대본이 없다 — 무작위로 풀어 혼자 굴려 본다
       },
     },
-    { n: 3, cycles: 4, grants: ['weather', 'theft', 'self', 'trust'] },        // 7~8월: 장마·폭염·야외 적재·직접 배송·신뢰도
+    // ----- 레벨 3 (7~8월): 장마. 창고가 넘치면 마당이고, 마당에는 지붕이 없다 -----
+    // 새로 여는 것: 날씨·예보 · 야외 적재와 젖음·도난 · 직접 배송 · 그리고 신뢰도(줄곧 쌓이고 있던 것의 정체)
+    {
+      n: 3, cycles: 4, year: 2027, startMonth: 7, monthOffset: 4, grants: ['weather', 'theft', 'self', 'trust'],
+      minCash: 700, minCap: 16,
+      company: { cash: 1200, warehouse: { cap: 24, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }], customers: [['anon', 0]] },
+      // 폭염은 화면에 뜨지만 아직 할 일이 없다 — ❄ 신선이 오는 3장에서 다시 꺼낸다
+      mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 330, monthlyStress: 0, noBankrupt: true, callsDelta: 3 },
+      seed: 20270701,
+      script: {
+        // 1사이클 = 7월 전반 13영업일. 장마가 시작된다.
+        // 11일차에 26칸이 한꺼번에 들어온다 — "비 오기 전에 다들 밀어 넣는다".
+        // 차가 하루에 옮길 수 있는 건 많아야 두 대 14칸이라, 이날은 어떻게 해도 창고가 넘쳐 마당으로 나간다.
+        // 그리고 그날부터 비다.
+        1: { weather: ['sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'rain', 'rain', 'rain'],
+          turns: turns([
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ]),
+          market: { contracts: [], enh: ['limit1'], fac: ['expand1', 'yard'] } },
+        // 2사이클 = 7월 후반 14영업일. 하루 6칸이 꾸준히 — 배차 10대(70칸)로는 모자라서
+        // 마지막 며칠은 차가 없다. 직접 배송을 한 번 써 보는 자리다.
+        2: { weather: ['rain', 'sunny', 'rain', 'sunny', 'sunny', 'rain', 'sunny', 'heat', 'heat', 'sunny', 'rain', 'sunny', 'sunny', 'rain'],
+          turns: turns([
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ]),
+          market: { contracts: ['bulk1'], enh: ['limit1'], fac: ['expand2'] } },
+        // 3~4사이클(8월)은 대본이 없다
+      },
+    },
     { n: 4, cycles: 4, grants: ['attrs', 'cold', 'customers'] },               // 9~10월: ❄ 특수 품목·냉장 구역·고객과 신뢰
     { n: 5, cycles: 4, grants: ['rep', 'insurance', 'storage'] },              // 11~12월: 평판과 등급·사고와 보험·보관
     { n: 6, cycles: 4, grants: ['frozen', 'weekendChoice', 'perks', 'codex'] },// 1~2월: ❆ 냉동·🛃 통관·주말 선택·퍽
@@ -182,6 +235,6 @@
   // price 는 2장 이후가 붙으면 다시 잡는다 (지금은 서장 종료 자금 1.5~3.5k 기준의 임시 값).
   const DEAL = { price: 8000, downRate: 0.6 };
 
-  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 2 };
+  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 3 };
   if (typeof module !== 'undefined') module.exports = API; else root.LEVELS = API;
 })(typeof window !== 'undefined' ? window : globalThis);

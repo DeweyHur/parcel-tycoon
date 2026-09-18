@@ -145,7 +145,52 @@
     { id: 'l2last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
   ];
 
-  const LEVEL_BEATS = { 1: BEATS_L1, 2: BEATS_L2 };
+  // ----- 레벨 3 전용 비트 (2장 · 7~8월 · 장마) -----
+  // 새로 여는 것: 날씨·예보 · 야외 적재와 젖음·도난 · 직접 배송 · 신뢰도의 정체.
+  // 신뢰도는 새 규칙이 아니라 '줄곧 돌고 있던 것'의 공개다 — 두 대가 붙은 것도, 배차비가 싼 것도 그거였다.
+  const wetSoon = g => g.outdoorVolume() > 0 && (g.weatherNow() === 'rain' || g.upcoming().some(u => u.weather === 'rain'));
+  const BEATS_L3 = [
+    { id: 'l3intro', kind: 'start', when: () => true, pages: [
+      { expr: 'neutral' },
+      { expr: 'think', hl: '#upcoming' },
+    ] },
+    // 예보 줄 — 며칠 뒤 비가 온다는 걸 미리 읽는 법
+    { id: 'l3forecast', kind: 'turn', when: g => g.upcoming().some(u => u.weather === 'rain'), pages: [{ expr: 'neutral', hl: '#upcoming' }] },
+    // 창고가 넘쳐 마당으로 나갔다
+    { id: 'l3yard', kind: 'turn', when: g => g.outdoorVolume() > 0, pages: [
+      { expr: 'worry', hl: '#bar-usage' },
+      { expr: 'neutral', hl: '#parcels' },
+    ] },
+    // 마당에 나가 있는데 비가 온다
+    { id: 'l3rain', kind: 'turn', when: wetSoon, pages: [
+      { speaker: 'noh', expr: 'neutral', hl: '#upcoming .chip.wx' },
+      { expr: 'neutral', hl: '#wait-btn', gate: true },
+    ] },
+    // 대기 팝업에서 안팎을 바꾼다
+    { id: 'l3reorder', kind: 'modal', modal: 'wait', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'neutral', hl: '#wm-reorder' }] },
+    // 도난 — 마당은 문이 없다
+    { id: 'l3theft', kind: 'any', when: (g, ctx) => hasEvent(ctx, ['stolen']), pages: [{ expr: 'shock' }, { expr: 'neutral' }] },
+    // 직접 배송 — 차가 없을 때 내가 나른다
+    { id: 'l3self', kind: 'turn', when: g => !!outOfCalls(g), pages: [
+      { expr: 'think', hl: '#wait-btn' },
+      { expr: 'neutral', hl: '#wait-btn', gate: true },
+    ] },
+    { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => (ctx.picked || 0) === 0 && !!outOfCalls(g), pages: [{ expr: 'neutral', hl: '#modal .zone .parcel', gate: true }] },
+    // 신뢰도 — 새로 생긴 게 아니라 줄곧 쌓이고 있던 것
+    { id: 'l3trust', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel >= 0, pages: [
+      { expr: 'smile', hl: '#modal .trust' },
+      { expr: 'neutral', hl: '#modal .trust' },
+      { expr: 'think', hl: '#modal .trust' },
+    ] },
+    { id: 'l3switch', kind: 'market', when: g => !!switchItem(g), pages: [
+      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'contract' && it.switchFrom) },
+      { expr: 'worry' },
+    ] },
+    { id: 'l3yardBuy', kind: 'market', when: g => !!mkItem(g, it => it.kind === 'fac' && it.fac === 'yard'), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'fac' && it.fac === 'yard') }] },
+    { id: 'l3last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
+  ];
+
+  const LEVEL_BEATS = { 1: BEATS_L1, 2: BEATS_L2, 3: BEATS_L3 };
 
   const BEATS = [
     // ----- 3월 (1개월차): 창고 -----
