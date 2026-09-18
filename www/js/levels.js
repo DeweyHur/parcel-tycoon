@@ -17,6 +17,7 @@
     'market',       // 마켓 — 정산 뒤 매물 화면
     'calls',        // 배차 = 소모품(잔량·충전). 꺼져 있으면 무제한이고 잔량도 안 보인다
     'simul',        // 한 번에 두 대 이상
+    'trust',        // 운송사 신뢰도 (막대·단계 트랙·등급 상승 알림). 꺼져 있으면 쌓이기는 해도 화면에 안 나온다
     'weather',      // 날씨·예보 (꺼져 있으면 언제나 맑음)
     'theft',        // 마당 도난·젖음
     'self',         // 직접 배송
@@ -110,7 +111,7 @@
     },
     // ----- 아래는 아직 선언만 (부록 R 의 커리큘럼). 레벨 1 이 끝나면 여기를 채운다 -----
     { n: 2, cycles: 4, grants: ['market', 'calls', 'simul'] },                 // 5~6월: 마켓·배차 소모품·창고 확장·2대 동시
-    { n: 3, cycles: 4, grants: ['weather', 'theft', 'self'] },                 // 7~8월: 장마·폭염·야외 적재·직접 배송
+    { n: 3, cycles: 4, grants: ['weather', 'theft', 'self', 'trust'] },        // 7~8월: 장마·폭염·야외 적재·직접 배송·신뢰도
     { n: 4, cycles: 4, grants: ['attrs', 'cold', 'customers'] },               // 9~10월: ❄ 특수 품목·냉장 구역·고객과 신뢰
     { n: 5, cycles: 4, grants: ['rep', 'insurance', 'storage'] },              // 11~12월: 평판과 등급·사고와 보험·보관
     { n: 6, cycles: 4, grants: ['frozen', 'weekendChoice', 'perks', 'codex'] },// 1~2월: ❆ 냉동·🛃 통관·주말 선택·퍽

@@ -119,6 +119,16 @@ const say = m => { console.log(m); log.push(m); };
     hourglass: /⏳/.test(document.getElementById('parcels').textContent),
     txt: (document.querySelector('#parcels .st') || {}).textContent || '' }));
   check(dl.nodl && !dl.hourglass, '첫 사이클 택배에 기한이 없다 — "' + dl.txt.trim() + '"');
+  check(!(await page.evaluate(() => PT.game.shows('trust'))) && (await page.$$('.trust')).length === 0, '신뢰도가 화면에 없다');
+  // 택배 상세도 같은 기준으로 비어 있어야 한다
+  // 같은 택배는 묶음 줄로 접혀 있다 — 먼저 펼치고 낱줄을 연다
+  if (!(await page.$('#parcels .parcel[data-id]'))) { await safeClick('#parcels .parcel.group'); await page.waitForTimeout(300); }
+  await safeClick('#parcels .parcel[data-id]'); await page.waitForTimeout(400);
+  const pd = await page.evaluate(() => ({ txt: (document.getElementById('modal') || {}).textContent || '',
+    trust: document.querySelectorAll('#modal .trust').length, cust: document.querySelectorAll('#modal .cust').length }));
+  check(/보낼 수 있는 곳/.test(pd.txt), '택배 상세가 열렸다');
+  check(pd.trust === 0 && pd.cust === 0 && !/신뢰|고객|직접 배송/.test(pd.txt), '택배 상세에 신뢰·고객·직접 배송이 없다 — ' + pd.txt.replace(/\s+/g, ' ').slice(0, 60));
+  await safeClick('#modal .foot .btn'); await page.waitForTimeout(250);
   // 첫날 대사: 여 실장이 실제 숫자로 계산해 준다 (시키는 대로 누르라는 말 대신)
   const firstSeen = await page.evaluate(() => PT.game.story.seen.slice());
   check(firstSeen.includes('l1intro'), '첫날 대사가 끝났다 — ' + firstSeen.join(','));
