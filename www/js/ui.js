@@ -517,11 +517,14 @@
     const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], lv = g.customerLevel(p.customer || 'anon');
     const claim = Math.round(((p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))) * cu.claimMult * g.rules.claimMult * (g.rules.customerClaimMult[p.customer] || 1));
     const attrRows = a.map(k => `<div class="d">${D.ATTRS[k].icon} <b>${D.ATTRS[k].name}</b> — ${T('attr.' + k)}</div>`).join('');
-    const rows = g.contracts.map(c => { if (!c) return ''; const car = D.CARRIERS[c.carrier]; const ok = g.canHandle(c, p), bp = ok ? g.breakProb(c, p) : 0, can = g.canCall(c); const why = !ok ? T(p.size > g.contractSizeMax(c) || p.size < car.sizeMin ? 'pd.sizeOut' : car.onlyPlain ? 'pd.plainOnly' : car.need ? 'pd.notSpecial' : a.includes('frozen') ? 'pd.noFrozenCap' : p.customs > 0 ? 'self.customsWait' : 'pd.no') : ''; const spec = ok && g.isSpecialist(car, p.type) && t.bonus; return `<div class="ttrow ${ok ? 'on' : ''}"><span class="lv">${car.badge || '🚚'}</span><span class="ef">${esc(car.short)}${gradeBadge(c.grade)} ${ok ? `${spec ? `<span style="color:var(--gold)">${T('pd.specialBonus', { n: t.bonus })}</span> ` : ''}${bp ? `<span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(bp * 100) })}</span>` : ''}${!can ? `<span style="color:var(--dim)">(${T('pd.cannotCall')})</span>` : ''}` : `<span style="color:var(--dim)">${why}</span>`}</span><span class="st">${ok ? T('fmt.calls', { n: c.calls }) : '—'}</span></div>`; }).join('');
+    // 못 싣는 계약 줄은 읽을 이유가 없다 — 실을 수 있는 것만 보여 주고,
+    // 하나도 없을 때만 전부 펼쳐 "왜 안 실리는지"를 답한다
+    const anyOk = g.contracts.some(c => c && g.canHandle(c, p));
+    const rows = g.contracts.map(c => { if (!c || (anyOk && !g.canHandle(c, p))) return ''; const car = D.CARRIERS[c.carrier]; const ok = g.canHandle(c, p), bp = ok ? g.breakProb(c, p) : 0, can = g.canCall(c); const why = !ok ? T(p.size > g.contractSizeMax(c) || p.size < car.sizeMin ? 'pd.sizeOut' : car.onlyPlain ? 'pd.plainOnly' : car.need ? 'pd.notSpecial' : a.includes('frozen') ? 'pd.noFrozenCap' : p.customs > 0 ? 'self.customsWait' : 'pd.no') : ''; const spec = ok && g.isSpecialist(car, p.type) && t.bonus; return `<div class="ttrow ${ok ? 'on' : ''}"><span class="lv">${car.badge || '🚚'}</span><span class="ef">${esc(car.short)}${gradeBadge(c.grade)} ${ok ? `${spec ? `<span style="color:var(--gold)">${T('pd.specialBonus', { n: t.bonus })}</span> ` : ''}${bp ? `<span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(bp * 100) })}</span>` : ''}${!can ? `<span style="color:var(--dim)">(${T('pd.cannotCall')})</span>` : ''}` : `<span style="color:var(--dim)">${why}</span>`}</span><span class="st">${ok ? T('fmt.calls', { n: c.calls }) : '—'}</span></div>`; }).join('');
     const selfOk = g.selfCan(p), selfWhy = g.selfBlockReason(p);
     const body = `<div class="parcel" style="margin-bottom:6px"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cu.icon}</span><span class="nm">${esc(t.name)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${T('pd.baseReward', { n: p.reward })}</div><div class="st">${parcelStatus(p)}</div></div>
       <div class="d">${T('company.customers')} <b>${cu.icon} ${esc(cu.name)}</b>${p.customer !== 'anon' ? ` · ${T('cust.trustLv', { n: lv })} ${T('pd.perPiece', { n: M.CUSTOMER_BONUS[lv] })}` : ''}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}</div>
-      <div class="d">${T('pd.claim', { claim })}${p.arrivalTurn ? ` · ${T('pd.arrivedAgo', { n: p.age })}` : ''}${p.wet ? ` · ${T('pd.wet')}` : ''}${p.outdoor ? ` · ${T('pd.outdoor')}` : ''}</div>
+      ${p.wet || p.outdoor ? `<div class="d">${[p.wet ? T('pd.wet') : '', p.outdoor ? T('pd.outdoor') : ''].filter(Boolean).join(' · ')}</div>` : ''}
       ${attrRows}
       ${g.contracts.some(c => c && g.canHandle(c, p) && g.breakProb(c, p) === 0) || selfOk ? '' : `<div class="d" style="color:var(--orange);margin-top:6px">${famNames(p) ? T('pd.needFamily', { list: famNames(p) }) : T('pd.needNothing')}</div>`}
       <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('pd.contracts')}</div><div class="ttrack">${rows || `<div class="d">${T('pd.noContract')}</div>`}<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">${T('pd.selfRow')} ${selfOk ? T('pd.selfCost', { cost: g.selfCost(p) }) : `<span style="color:var(--dim)">${esc(selfWhy || T('pd.no'))}</span>`}</span><span class="st">${selfOk ? T('pd.ok') : '—'}</span></div></div>`;
@@ -1004,9 +1007,8 @@
   }
   function showOfferDetail(it, back) {
     const o = offerSpec(it), car = o.car, base = D.FAMILIES[car.family], rep = Story.repOf(it.carrier);
-    const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d"><b>${esc(car.name)}</b>${gradeBadge(it.grade)}<br>${T('cd.rep', { name: esc(Story.repName(rep, it.carrier)) })}<br>${T('cd.family', { name: esc(base.name), tier: esc(D.GRADES[it.grade].name) })}</div></div>
-      <div class="d" style="margin-top:8px">${esc(car.desc)}</div>
-      <div class="d" style="color:var(--dim)">${blockLine({ carrier: it.carrier, enh: {} })}</div>
+    const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d"><b>${esc(car.name)}</b>${gradeBadge(it.grade)}<br>${rep === 'rep' ? '' : `${esc(Story.repName(rep, it.carrier))}<br>`}${T('cd.family', { name: esc(base.name), tier: esc(D.GRADES[it.grade].name) })}</div></div>
+      ${blockLine({ carrier: it.carrier, enh: {} }) ? `<div class="d" style="color:var(--dim);margin-top:8px">${blockLine({ carrier: it.carrier, enh: {} })}</div>` : ''}
       <div class="kv" style="margin-top:6px"><span>${T('call.caps')}</span><span class="v">${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}</span>
       <span>${esc(o.vehicle)}</span><span class="v">${T('fmt.cells', { n: o.cap })}</span>
       <span>${T('sum.fees')}</span><span class="v">${o.fee}c${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}</span>
@@ -1016,11 +1018,11 @@
     modal(esc(it.name), body, [{ label: T('btn.close'), onClick: back }]);
   }
   // 이 계약이 못 받는 것 — 계약 카드·상세에 한 줄로. "왜 이 택배가 여기 안 실리지?"에 대한 답
+  // 이 계약이 못 받는 것 — 크기는 아래 표에 이미 있으니 여기선 속성만. 없으면 줄 자체를 안 쓴다
   function blockLine(c) {
-    const b = game.contractBlocks(c), parts = [];
-    if (b.attrs.length) parts.push(b.attrs.map(a => `${D.ATTRS[a].icon}${D.ATTRS[a].name}`).join(' '));
-    parts.push(T('cd.sizeOnly', { min: b.sizeMin, max: b.sizeMax }));
-    return T('cd.blocks', { list: parts.join(' · ') });
+    const b = game.contractBlocks(c);
+    if (!b.attrs.length) return '';
+    return T('cd.blocks', { list: b.attrs.map(a => `${D.ATTRS[a].icon}${D.ATTRS[a].name}`).join(' ') });
   }
   // 이 택배를 받아 주는 계열 이름들 (지금 계약이 없을 때 뭘 사야 하는지)
   function famNames(p) {
@@ -1030,15 +1032,14 @@
     const g = game, car = D.CARRIERS[c.carrier], fam = D.FAMILIES[car.family];
     const enh = [c.enh.limit ? T('my.limit', { n: c.enh.limit }) : '', c.enh.cap ? T('my.cap', { n: c.enh.cap }) : '', c.enh.regular ? D.ENHANCEMENTS.regular.name : '', c.enh.express ? D.ENHANCEMENTS.express.name : '', c.enh.opt ? D.ENHANCEMENTS[c.enh.opt].name : ''].filter(Boolean);
     const rep = Story.repOf(c.carrier);
-    const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d"><b>${esc(car.name)}</b>${gradeBadge(c.grade)}<br>${T('cd.rep', { name: esc(Story.repName(rep, c.carrier)) })}<br>${T('cd.family', { name: esc(fam.name), tier: esc(D.GRADES[c.grade].name) })}</div></div>
-      <div class="d" style="margin-top:8px">${esc(car.desc)}</div>
-      <div class="kv" style="margin-top:6px"><span>${T('call.caps')}</span><span class="v">${g.contractCaps(c).length ? attrIcons(g.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: g.contractSizeMax(c) })}</span>
+    const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d"><b>${esc(car.name)}</b>${gradeBadge(c.grade)}<br>${rep === 'rep' ? '' : `${esc(Story.repName(rep, c.carrier))}<br>`}${T('cd.family', { name: esc(fam.name), tier: esc(D.GRADES[c.grade].name) })}</div></div>
+      <div class="kv" style="margin-top:8px"><span>${T('call.caps')}</span><span class="v">${g.contractCaps(c).length ? attrIcons(g.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: g.contractSizeMax(c) })}</span>
       <span>${esc(car.vehicle || '')}</span><span class="v">${T('fmt.cells', { n: g.vehicleCap(c) })} · ×${g.simulMax(c)}</span>
       <span>${T('sum.fees')}</span><span class="v">${g.truckFee(c)}c${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}</span>
       <span>${T('fmt.trucks', { n: c.maxCalls })}</span><span class="v ${c.calls === 0 ? 'bad' : ''}">${T('my.remain', { calls: c.calls, max: c.maxCalls })} · ${T('cd.refillLine', { price: g.refillPrice(c) })}</span>
       <span>${T('common.trust')}</span><span class="v">${trustBar(g, c.carrier)}</span></div>
       ${trustTrack(c.carrier, g.trustXp(c.carrier))}${enh.length ? `<div class="d">${T('kind.enh')}: ${enh.join(', ')}</div>` : ''}
-      <div class="d" style="color:var(--dim)">${T('my.stats', { vehicle: esc(car.vehicle || ''), cap: g.vehicleCap(c), fee: g.truckFee(c), simul: g.simulMax(c), calls: c.totalCalls, n: c.delivered })}</div>`;
+      <div class="d" style="color:var(--dim)">${T('my.record', { calls: c.totalCalls, n: c.delivered })}</div>`;
     modal(g.contractName(c), body, [{ label: T('btn.close'), onClick: back || closeModal }]);
   }
   function chooseSlot(it, idx, back) {
@@ -1136,7 +1137,7 @@
       const car = D.CARRIERS[c.carrier];
       const enh = [c.enh.limit ? T('my.limit', { n: c.enh.limit }) : '', c.enh.cap ? T('my.cap', { n: c.enh.cap }) : '', c.enh.regular ? D.ENHANCEMENTS.regular.name : '', c.enh.express ? D.ENHANCEMENTS.express.name : '', c.enh.opt ? D.ENHANCEMENTS[c.enh.opt].name : ''].filter(Boolean);
       return `<div class="card" style="cursor:default"><div class="t"><span>${esc(g.contractName(c))}</span><span class="price">${T('my.remain', { calls: c.calls, max: c.maxCalls })}</span></div>
-        <div class="d">${esc(car.desc)}<br>${T('my.stats', { vehicle: esc(car.vehicle || ''), cap: g.vehicleCap(c), fee: g.truckFee(c), simul: g.simulMax(c), calls: c.totalCalls, n: c.delivered })}${enh.length ? `<br>${T('kind.enh')}: ${enh.join(', ')}` : ''}<br>${trustBar(g, c.carrier)}${trustTrack(c.carrier, g.trustXp(c.carrier))}</div></div>`;
+        <div class="d">${T('my.line', { vehicle: esc(car.vehicle || ''), cap: g.vehicleCap(c), fee: g.truckFee(c), simul: g.simulMax(c) })}${enh.length ? ` · ${enh.join(', ')}` : ''}<br>${T('my.record', { calls: c.totalCalls, n: c.delivered })}<br>${trustBar(g, c.carrier)}${trustTrack(c.carrier, g.trustXp(c.carrier))}</div></div>`;
     }).join('');
     const others = Object.keys(D.CARRIERS).filter(k => g.trustXp(k) > 0 && !g.contracts.some(c => c && c.carrier === k));
     const otherHtml = others.length ? `<div class="perk-count">${T('my.others')}</div>` + others.map(k => `<div class="card" style="cursor:default"><div class="t"><span>${esc(D.CARRIERS[k].name)}</span></div><div class="d">${trustBar(g, k)}${trustTrack(k, g.trustXp(k))}</div></div>`).join('') : '';
