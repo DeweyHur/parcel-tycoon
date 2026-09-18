@@ -182,19 +182,34 @@
     setTimeout(() => { const el = m.querySelector('#lv-name'); if (el) el.focus(); }, 60);
   }
 
-  // 계약서에 도장 — 한 해 시험이 끝나고 창고가 내 것이 되는 자리
+  // 가계약서에 도장 — 값을 부르고, 번 돈에서 계약금을 걸고, 잔금은 남은 열 달 동안 채운다.
+  // 무상 양도가 아니다: 여기서 목표 금액이 생겨야 다음 장부터 '이번 달 얼마 남겨야 하나'가 계산이 된다.
   function showContract(r, name) {
+    const D2 = LEVELS.DEAL, price = D2.price;
+    const down = Math.max(0, Math.min(price, Math.floor((r.cash || 0) * D2.downRate)));
+    const rest = price - down, left = Math.max(0, (r.cash || 0) - down);
     const body = `<div class="paper"><h3>${esc(T('ct.title'))}</h3>
       <div class="ct-row"><span>${esc(T('ct.seller'))}</span><b>${esc(T('ct.sellerName'))}</b></div>
       <div class="ct-row"><span>${esc(T('ct.buyer'))}</span><b>${esc(name)}</b></div>
       <div class="ct-row"><span>${esc(T('ct.item'))}</span><b>${esc(T('ct.itemName'))}</b></div>
-      <p class="ct-body">${T('ct.body')}</p>
+      <div class="ct-row"><span>${esc(T('ct.price'))}</span><b>${price}c</b></div>
+      <div class="ct-row"><span>${esc(T('ct.down'))}</span><b>${down}c</b></div>
+      <div class="ct-row"><span>${esc(T('ct.rest'))}</span><b>${rest}c</b></div>
+      <p class="ct-body">${T('ct.body', { price, down, rest })}</p>
       <div class="stamp" id="ct-stamp">${esc(T('ct.stampMark'))}</div></div>`;
     const m = modal(T('ct.modal'), body, [{ label: T('ct.stamp'), cls: 'primary', onClick: () => {
       const st = m.querySelector('#ct-stamp');
       if (st && !st.classList.contains('on')) {
         st.classList.add('on'); SFX.thud(); BGM.oneShot('fanfare');
-        const foot = m.querySelector('.foot .btn'); if (foot) { foot.textContent = T('ct.done'); }
+        // 계약금은 실제로 나간다 — 다음 장은 남은 돈으로 시작한다
+        const P = Profile.get();
+        P.campaign = Object.assign({}, P.campaign, { deal: { price, paid: down, rest }, carry: Object.assign({}, P.campaign.carry, { cash: left }) });
+        Profile.save();
+        const foot = m.querySelector('.foot .btn'); if (foot) foot.textContent = T('ct.done');
+        const note = document.createElement('p');
+        note.className = 'd'; note.style.cssText = 'margin-top:10px;font-size:13px;color:var(--gold);text-align:center';
+        note.innerHTML = T('ct.after', { rest, left });
+        const pap = m.querySelector('.paper'); if (pap && pap.parentNode) pap.parentNode.appendChild(note);
         m.querySelector('.foot .btn').onclick = () => { SFX.click(); closeModal(); showTitle(); };
       }
     } }]);
@@ -1358,6 +1373,6 @@
     // 1장 스튜디오 → 2장 타이틀. 2장은 별도 화면이 아니라 showTitle() 그 자체다
     if (window.Splash) Splash.play(showTitle); else showTitle();
   }
-  window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, renderAll, saveGame, prep, startRun, showTitle };
+  window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, Profile, renderAll, saveGame, prep, startRun, showTitle };
   init();
 })();

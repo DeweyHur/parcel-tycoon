@@ -239,9 +239,20 @@ const say = m => { console.log(m); log.push(m); };
   await shot('43-contract');
   const ctTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
   check(/매도인/.test(ctTxt) && /두번째창고/.test(ctTxt), '계약서에 매도인·내 상호가 적힌다');
+  // 무상 양도가 아니다 — 값·계약금·잔금이 적혀 있고, 셋이 맞아떨어진다
+  const deal = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#modal .ct-row')].map(r => r.textContent);
+    const num = re => { const r = rows.find(x => re.test(x)); return r ? +(r.match(/(\d+)c/) || [0, 0])[1] : null; };
+    return { price: num(/매매 대금|Price/), down: num(/계약금|Deposit/), rest: num(/잔금|Balance/) };
+  });
+  check(deal.price > 0 && deal.down > 0 && deal.down + deal.rest === deal.price,
+    '값 = 계약금 + 잔금 — ' + JSON.stringify(deal));
   await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(600);
   const stamped = await page.$eval('#ct-stamp', el => el.classList.contains('on')).catch(() => false);
   check(stamped, '도장이 찍힌다');
+  const saved = await page.evaluate(() => (PT.Profile.get().campaign || {}));
+  check(saved.deal && saved.deal.paid === deal.down && saved.carry && saved.carry.cash >= 0,
+    '계약금이 빠지고 잔금 목표가 남는다 — ' + JSON.stringify(saved.deal) + ' carry ' + JSON.stringify(saved.carry));
   await shot('44-stamped');
   await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(500);
   await shot('45-title2');

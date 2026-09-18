@@ -126,6 +126,11 @@
   // 레벨 N 이 시작하는 사이클 번호 (캠페인은 한 런이 이어지는 것처럼 달력이 계속 흐른다)
   const startCycle = n => { let c = 1; for (const l of LEVELS) { if (l.n >= n) break; c += l.cycles; } return c; };
 
-  const API = { LEVELS, FLAGS, get, showsAt, startCycle, LAST, IMPLEMENTED: 1 };
+  // 창고 매매 — 무상 양도가 아니다. 한 사장님이 값을 부르고, 서장 끝에 계약금을 걸고,
+  // 남은 열 달 동안 잔금을 채운다. 목표 금액이 있어야 매달 '얼마를 남겨야 하나'가 계산이 된다.
+  // price 는 2장 이후가 붙으면 다시 잡는다 (지금은 서장 종료 자금 1.5~3.5k 기준의 임시 값).
+  const DEAL = { price: 8000, downRate: 0.6 };
+
+  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 1 };
   if (typeof module !== 'undefined') module.exports = API; else root.LEVELS = API;
 })(typeof window !== 'undefined' ? window : globalThis);
