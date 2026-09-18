@@ -113,12 +113,23 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);   // 계약서
   await page.screenshot({ path: 'shots/L04-contract.png' });
   await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(500);   // 도장
-  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(500);
-  await page.screenshot({ path: 'shots/L05-title2.png' });
+  const deal = await page.evaluate(() => Profile.get().campaign.deal);
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(1200);  // 창고를 넘겨받는다 → 바로 1장
+  await page.screenshot({ path: 'shots/L05-ch2.png' });
 
-  console.log('\n클리어 후 타이틀');
-  const after = await page.$$eval('#modal .btn', els => els.map(e => e.id));
-  check(after.includes('t-new') && after.includes('t-story'), '자유 런·인수인계가 열렸다');
+  console.log('\n서장 다음은 타이틀이 아니라 1장');
+  const ch2 = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
+  check(/1장/.test(ch2) && /두 번째 트럭/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
+  await page.click('#modal .chcard'); await page.waitForTimeout(900);
+  const carried = await page.evaluate(() => { const g = PT.game, P = Profile.get().campaign;
+    return { level: g.cfg.level, cash: g.cash, cap: g.warehouse.cap, carryCash: P.carry && P.carry.cash,
+      contracts: g.contracts.filter(Boolean).map(c => c.carrier), name: g.companyName ? g.companyName() : '',
+      seen: g.story.seen.length, market: g.shows('market'), calls: g.shows('calls'), attrs: g.shows('attrs') }; });
+  check(carried.level === 2 && carried.market && carried.calls && !carried.attrs, '1장에서 마켓·배차가 열리고 특수 품목은 아직 — ' + JSON.stringify(carried));
+  check(!!deal && deal.paid > 0 && carried.cash === carried.carryCash, '계약금이 빠진 돈으로 1장을 시작한다 — 계약금 ' + (deal && deal.paid) + 'c · 시작 자금 ' + carried.cash + 'c');
+  check(carried.contracts.join() === 'bulk0' && carried.cap === 16, '계약·창고가 그대로 넘어왔다 — ' + carried.contracts.join() + ' · ' + carried.cap + '칸');
+  check(carried.seen > 0, '서장에서 들은 대사는 다시 안 한다 (본 비트 ' + carried.seen + '개)');
+  await page.screenshot({ path: 'shots/L06-ch2-play.png' });
   const camp = await page.evaluate(() => Profile.get().campaign);
   check(camp && camp.name === '한길택배' && camp.cleared >= 1, '프로필에 상호·클리어가 남았다 — ' + JSON.stringify(camp));
 

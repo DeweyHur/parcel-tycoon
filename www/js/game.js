@@ -129,9 +129,12 @@
       this.stats = Game.emptyStats();
       this.summary = null; this.result = null;
       this.strikeCarrier = null; this.heatTurns = []; this.burstTurns = [];
-      this.story = cfg.story ? { seen: [], notes: [] } : null; // 창고장 안내(스토리 모드) 진행 상태 — 본 비트 id
+      // 창고장 안내(스토리 모드) 진행 상태 — 본 비트 id. 장이 넘어가도 이어진다: 박 반장이 같은 말을 두 번 하지 않는다
+      this.story = cfg.story ? { seen: ((cfg.carry && cfg.carry.seen) || []).slice(), notes: ((cfg.carry && cfg.carry.notes) || []).slice() } : null;
       this.trust = {}; // 업체별 신뢰도 경험치 (런 내 유지)
       for (const k of Object.keys(D.CARRIERS)) this.trust[k] = (famVal(this.rules.carrierStartTrust, k) || 0) + this.rules.allStartTrust;
+      const cyTrust = cfg.carry && cfg.carry.trust;
+      if (cyTrust) for (const k in cyTrust) if (this.trust[k] != null) this.trust[k] = cyTrust[k];
       if (this.rules.year) this.year = this.rules.year;   // 시나리오가 해를 지정하면 그 해의 달력으로
       this.rep = this.rules.gameoverStress;   // 전임 창고장이 물려준 평판에서 시작한다
       this._initCompany();
@@ -168,15 +171,25 @@
         const pool = Object.keys(D.CARRIERS).filter(k => !this.isBanned(k) && D.CARRIERS[k].tier <= 1);
         const fams = [...new Set(this.rng.shuffle(pool).map(FAM))].slice(0, 4);
         contracts = fams.map(f => ({ carrier: f, grade: this.rng.next() < 0.3 ? 'trusted' : 'normal' }));
-      } else { const lc = this.level && this.level.company; wh = { ...((lc && lc.warehouse) || co.warehouse) }; contracts = (lc && lc.contracts) || co.contracts; }
+      } else {
+        // 장이 넘어가면 지난 장의 판을 그대로 물려받는다 (profile.campaign.carry). 없으면 그 레벨의 시작 판.
+        const cy = this.cfg.carry, lc = this.level && this.level.company;
+        wh = { ...((cy && cy.warehouse) || (lc && lc.warehouse) || co.warehouse) };
+        contracts = (cy && cy.contracts) || (lc && lc.contracts) || co.contracts;
+      }
       wh.cap += R.capDelta; wh.xl += R.xlDelta;
       if (R.coldCapMax != null) wh.cold = Math.min(wh.cold, R.coldCapMax);
       if (wh.frozen == null) wh.frozen = R.coldCapMax === 0 ? 0 : (wh.cold > 0 ? D.WAREHOUSE.frozen : 0);
       if (R.frozenCapMax != null) wh.frozen = Math.min(wh.frozen, R.frozenCapMax);
       this.warehouse = wh;
-      this.cash = Math.round((((this.level && this.level.company && this.level.company.cash) != null ? this.level.company.cash : co.cash) + R.cashDelta) * R.cashMult);
+      const cyCash = this.cfg.carry && this.cfg.carry.cash, lvCash = this.level && this.level.company && this.level.company.cash;
+      const baseCash = cyCash != null ? cyCash : lvCash != null ? lvCash : co.cash;
+      this.cash = Math.round((baseCash + R.cashDelta) * R.cashMult);
+      // 망한 판으로 다음 장이 막히지 않게, 그 장의 바닥값은 보장한다
+      if (this.level && this.level.minCash != null) this.cash = Math.max(this.cash, this.level.minCash);
       this.contracts = contracts.map(s => {
         const c = this._makeContract(this.resolveCenter(s.carrier, s.grade || 'normal'), null, null, true);
+        if (s.enh) Object.assign(c.enh, s.enh);
         if (s.calls != null) c.calls = Math.min(c.maxCalls, s.calls + R.startCallsDelta);
         return c;
       });
@@ -184,10 +197,24 @@
       this.startContractIds = this.contracts.filter(Boolean).map(c => c.id);
     }
 
+    // 장이 끝날 때 다음 장으로 넘길 판. 한 런이 이어지는 것처럼 보이려면 자금·창고·계약·고객·신뢰가 같이 가야 한다.
+    // (택배·기한·달력은 안 넘긴다 — 장 사이는 두 달의 공백이고, 남은 물건은 리포트에서 정리된 것으로 친다)
+    carryState() {
+      return {
+        cash: this.cash,
+        warehouse: { cap: this.warehouse.cap, cold: this.warehouse.cold, frozen: this.warehouse.frozen, xl: this.warehouse.xl || 0 },
+        contracts: this.contracts.filter(Boolean).map(c => ({ carrier: c.carrier, grade: c.grade, calls: c.calls, enh: { ...c.enh } })),
+        customers: Object.keys(this.customers).map(id => [id, this.customerLevel(id)]),
+        trust: { ...this.trust },
+        seen: this.story ? this.story.seen.slice() : [],
+        notes: this.story ? this.story.notes.slice() : [],
+      };
+    }
+
     // ----- 고객(화주) (docs/CUSTOMER_DESIGN.md 2장) -----
     _initCustomers() {
       const R = this.rules, co = this.company;
-      let list = (this.level && this.level.company && this.level.company.customers) || co.customers;
+      let list = (this.cfg.carry && this.cfg.carry.customers) || (this.level && this.level.company && this.level.company.customers) || co.customers;
       if (!list) { const pool = this.rng.shuffle(Object.keys(M.CUSTOMERS).filter(k => k !== 'anon')).slice(0, 3); list = pool.map(k => [k, this.rng.int(3)]).concat([['anon', 0]]); }
       for (const k of R.forceCustomers) if (!list.some(x => x[0] === k)) list = list.concat([[k, 0]]);
       if (R.noAnon) list = list.filter(x => x[0] !== 'anon');
@@ -796,6 +823,13 @@
       // 🛃 통관 · ❆ 냉동은 평판 등급이 열어 준다 — 아직이면 그 몫은 일반으로 (달력이 아니라 내가 키워서 여는 것).
       // 시나리오가 그 품목을 주제로 삼은 경우(typeOverride·보장 업체)는 건드리지 않는다
       if (!R.typeOverride) for (const t of ['intl', 'frozen']) if (base[t] && !this.repUnlocked(t)) { base.normal = (base.normal || 0) + base[t]; base[t] = 0; }
+      // 캠페인: 아직 안 연 품목은 아예 오지 않는다. 화면에서 숨기는 것으로는 부족하다 —
+      // ⚠🛃🌾 를 받아 줄 계약도, ❄ 를 둘 냉장 구역도 없는 장에 그게 오면 반송 말고는 길이 없다.
+      // (대본이 없는 사이클을 무작위로 풀어 두려면 이 문이 규칙 쪽에도 있어야 한다)
+      if (this._shows) {
+        const gate = { fragile: 'attrs', produce: 'attrs', intl: 'attrs', large: 'attrs', fresh: 'cold', frozen: 'frozen' };
+        for (const t in gate) if (base[t] && !this.shows(gate[t])) { base.normal = (base.normal || 0) + base[t]; base[t] = 0; }
+      }
       return base;
     }
     _gradeProb(m) {
@@ -1367,7 +1401,7 @@
       // 장 리포트(박 반장)가 쓰는 숫자 — 처리·정시·반송·파손
       const sum = o => Object.keys(o).reduce((a, k) => a + o[k], 0);
       const onTimeCount = sum(this.stats.onTimeByType), deliveredCount = sum(this.stats.deliveredByType);
-      return { win, demo: false, story: !!this.cfg.scripted, level: this.cfg.level || 0, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
+      return { win, demo: false, story: !!this.cfg.scripted, level: this.cfg.level || 0, carry: this.cfg.level ? this.carryState() : null, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
         onTimeCount, deliveredCount, returned: this.stats.returned || 0, broken: this.stats.broken || 0,
         scenario: this.cfg.scenario, company: this.cfg.company, difficulty: this.cfg.difficulty || 'normal', perks: this.perks.slice(), variants: (this.cfg.variants || []).slice(), date: this.cfg.date || null, ...this.run };
     }

@@ -40,7 +40,24 @@ while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 400) {
     console.log(`— ${g.cycleLabel ? g.cycleLabel() : g.month} 정산: 순익 ${s.net >= 0 ? '+' : ''}${s.net}c · 자금 ${g.cash}c · 반송 ${g.stats.returned} 폐기 ${g.stats.discarded} 기한초과 ${g.monthStats.overdue}`);
     beats({ kind: 'summary' }); g.closeSummary(); continue;
   }
-  if (g.phase === 'market') { beats({ kind: 'market' }); g.closeMarket(); continue; }
+  if (g.phase === 'market') {
+    beats({ kind: 'market' });
+    // 사람처럼: 배차가 바닥난 계약을 먼저 채우고, 돈이 남으면 한도 강화 → 창고 확장 순으로 산다
+    // 사람은 0이 될 때까지 기다리지 않는다 — 한 사이클을 못 돌 것 같으면 채운다
+    for (const c of g.contracts) if (c && g.shows('calls') && c.calls <= Math.max(1, Math.floor(c.maxCalls * 0.4))) {
+      const price = g.refillPrice(c);
+      if (g.cash >= price) { g.refill(c.id); console.log(`  [마켓] 배차 충전 ${D.CARRIERS[c.carrier].name} -${price}c → ${c.calls}대`); }
+    }
+    let n = 0;
+    while (n++ < 3) {
+      const i = g.market.items.findIndex(it => !it.sold && it.kind !== 'refill' && it.price <= g.cash - 400);
+      if (i < 0) break;
+      const it = g.market.items[i], r = g.buy(i, it.kind === 'enh' ? g.contracts.findIndex(Boolean) : undefined);
+      if (!r || !r.ok) break;
+      console.log(`  [마켓] ${it.name || it.kind} 구매 -${it.price}c`);
+    }
+    g.closeMarket(); continue;
+  }
   if (g.phase !== 'play') break;
   const m = g.month, t = g.turn;
   const arrived = (g.schedule[t - 1] || []).map(s => s.type + s.size).join(',');

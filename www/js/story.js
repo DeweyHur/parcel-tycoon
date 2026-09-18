@@ -117,6 +117,36 @@
     { id: 'l1last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'think' }] },
   ];
 
+  // ----- 레벨 2 전용 비트 (1장 · 5~6월) -----
+  // 새로 여는 것은 셋뿐이다: 배차가 소모품이라는 것, 그래서 마켓이 있다는 것, 그리고 두 대.
+  // 서장에서 가르친 것(쌓기·적재율·기한)은 다시 말하지 않는다.
+  const capItem = g => mkItem(g, it => it.kind === 'fac' && /^expand/.test(it.fac || ''));
+  const BEATS_L2 = [
+    { id: 'l2intro', kind: 'start', when: () => true, pages: [
+      { expr: 'smile' },
+      { expr: 'neutral', hl: '#c0' },
+      { expr: 'think', hl: '#c0' },
+    ] },
+    // 배차가 줄어드는 것을 실제로 본 다음에 말한다
+    { id: 'l2calls', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'neutral', hl: '#c0' }] },
+    // 바닥났다. 여기서 처음으로 "월초에 안 채워진다"가 나온다
+    { id: 'l2callsOut', kind: 'turn', when: g => !!outOfCalls(g), pages: [{ expr: 'worry', hl: '#c0' }, { expr: 'neutral' }] },
+    { id: 'l2market', kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }] },
+    { id: 'l2refill', kind: 'market', when: g => !!refillSlot(g), pages: [
+      { expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; } },
+      { expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; }, gate: g => { const r = refillSlot(g); return !!r && r.c.calls === 0; } },
+    ] },
+    { id: 'l2limit', kind: 'market', when: g => !!limitItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'enh' && /^limit/.test(it.enh)) }] },
+    // 두 대가 붙는 순간 — 배차도 배차비도 두 배로 나간다
+    { id: 'l2two', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'smile', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#modal .truckgauge' }] },
+    // 넘쳐 본 다음에 확장을 판다
+    { id: 'l2cap', kind: 'market', when: g => !!capItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'fac' && /^expand/.test(it.fac || '')) }] },
+    { id: 'l2usage', kind: 'turn', when: g => usage(g) >= 0.9, pages: [{ expr: 'worry', hl: '#bar-usage' }] },
+    { id: 'l2last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
+  ];
+
+  const LEVEL_BEATS = { 1: BEATS_L1, 2: BEATS_L2 };
+
   const BEATS = [
     // ----- 3월 (1개월차): 창고 -----
     { id: 'intro', months: [1], kind: 'start', when: () => true, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: '#parcels' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
@@ -234,7 +264,7 @@
   function check(g, ctx) {
     if (!g || !g.story || g.story.off) return null;
     const kind = ctx.kind || 'turn';
-    const list = g.level && g.level.n === 1 ? BEATS_L1 : BEATS;
+    const list = (g.level && LEVEL_BEATS[g.level.n]) || BEATS;
     for (const b of list) {
       if (b.needs && !g.shows(b.needs)) continue;   // 아직 안 열린 기능을 말하지 않는다 (levels.js)
       if (g.story.seen.includes(b.id)) continue;

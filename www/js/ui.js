@@ -119,7 +119,8 @@
   // 레벨 런: 난이도·회사·퍽을 묻지 않는다. 소개는 박 반장이 게임 안에서 한다
   function startLevel(n) {
     const P = Profile.get();
-    game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false, companyName: P.campaign.name || '' });
+    game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false,
+      companyName: P.campaign.name || '', carry: n > 1 ? (P.campaign.carry || null) : null });
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
     closeModal(); startPlay({ intro: n === 1, chapter: n });
   }
@@ -158,19 +159,25 @@
 
   function afterChapter(r) {
     const next = r.level + 1, hasNext = next <= LEVELS.IMPLEMENTED;
-    showChapterEnd(r.level, Math.min(next, LEVELS.LAST), () => {
-      // 마지막 구현 장이면 한 해 시험이 끝난 것으로 친다 → 상호를 짓고 가계약서에 도장
-      if (!hasNext) return askCompanyName(r);
+    // 다음 장으로 넘긴다. adjust 가 있으면 넘길 판을 한 번 손본다 (가계약금이 빠지는 자리)
+    const advance = adjust => {
       const P = Profile.get();
-      P.campaign = Object.assign({}, P.campaign, { cleared: Math.max(P.campaign.cleared || 0, r.level), level: next,
-        carry: Object.assign({}, P.campaign.carry, { cash: r.cash }) });
+      const carry = r.carry ? { ...r.carry } : { cash: r.cash };
+      if (adjust) adjust(carry);
+      P.campaign = Object.assign({}, P.campaign, { cleared: Math.max(P.campaign.cleared || 0, r.level), level: next, carry });
       Profile.save(); game = null;
-      startLevel(next);                                   // 타이틀로 돌아가지 않는다 — 장은 이어진다
+      if (hasNext) return startLevel(next);            // 타이틀로 돌아가지 않는다 — 장은 이어진다
+      closeModal(); showTitle();                       // 아직 다음 장이 없다 (임시 다리)
+    };
+    showChapterEnd(r.level, Math.min(next, LEVELS.LAST), () => {
+      // 서장 끝에서만: 여기서 처음으로 간판을 달고 가계약서에 도장을 찍는다
+      if (r.level === 1) return askCompanyName(r, advance);
+      advance();
     });
   }
 
   // 상호를 짓는다 — 여기서 처음으로 '내 가게'가 된다
-  function askCompanyName(r) {
+  function askCompanyName(r, done) {
     const P = Profile.get();
     const body = `<p>${faceImg('han', 'smile', 64)}</p><p>${T('lv.nameBody')}</p>
       <input id="lv-name" maxlength="14" placeholder="${esc(T('lv.namePlaceholder'))}" value="${esc(P.campaign.name || '')}"
@@ -178,16 +185,16 @@
     const m = modal(T('lv.nameAsk'), body, [{ label: T('lv.nameSave'), cls: 'primary', onClick: () => {
       const v = ((m.querySelector('#lv-name') || {}).value || '').trim().slice(0, 14) || T('lv.nameDefault');
       const P2 = Profile.get();
-      P2.campaign = Object.assign({}, P2.campaign, { name: v, cleared: Math.max(P2.campaign.cleared || 0, r.level), level: r.level + 1 });
-      Profile.save(); game = null;
-      showContract(r, v);
+      P2.campaign = Object.assign({}, P2.campaign, { name: v });
+      Profile.save();
+      showContract(r, v, done);
     } }]);
     setTimeout(() => { const el = m.querySelector('#lv-name'); if (el) el.focus(); }, 60);
   }
 
   // 가계약서에 도장 — 값을 부르고, 번 돈에서 계약금을 걸고, 잔금은 남은 열 달 동안 채운다.
   // 무상 양도가 아니다: 여기서 목표 금액이 생겨야 다음 장부터 '이번 달 얼마 남겨야 하나'가 계산이 된다.
-  function showContract(r, name) {
+  function showContract(r, name, done) {
     const D2 = LEVELS.DEAL, price = D2.price;
     const down = Math.max(0, Math.min(price, Math.floor((r.cash || 0) * D2.downRate)));
     const rest = price - down, left = Math.max(0, (r.cash || 0) - down);
@@ -204,16 +211,16 @@
       const st = m.querySelector('#ct-stamp');
       if (st && !st.classList.contains('on')) {
         st.classList.add('on'); SFX.thud(); BGM.oneShot('fanfare');
-        // 계약금은 실제로 나간다 — 다음 장은 남은 돈으로 시작한다
         const P = Profile.get();
-        P.campaign = Object.assign({}, P.campaign, { deal: { price, paid: down, rest }, carry: Object.assign({}, P.campaign.carry, { cash: left }) });
+        P.campaign = Object.assign({}, P.campaign, { deal: { price, paid: down, rest } });
         Profile.save();
         const foot = m.querySelector('.foot .btn'); if (foot) foot.textContent = T('ct.done');
         const note = document.createElement('p');
         note.className = 'd'; note.style.cssText = 'margin-top:10px;font-size:13px;color:var(--gold);text-align:center';
         note.innerHTML = T('ct.after', { rest, left });
         const pap = m.querySelector('.paper'); if (pap && pap.parentNode) pap.parentNode.appendChild(note);
-        m.querySelector('.foot .btn').onclick = () => { SFX.click(); closeModal(); showTitle(); };
+        // 계약금은 실제로 나간다 — 다음 장은 남은 돈으로 시작한다
+        m.querySelector('.foot .btn').onclick = () => { SFX.click(); if (done) return done(cy => { cy.cash = left; }); closeModal(); showTitle(); };
       }
     } }]);
   }
@@ -360,10 +367,12 @@
   // ---------- 장 카드 ----------
   // 영화 챕터 카드다. 컷씬이 끝나고 첫날이 시작되기 전에 한 번, 장이 끝나고 다음 장으로 넘어가기 전에 한 번.
   // 규칙을 말하지 않는다 — 제목·부제·달력, 그것뿐이다.
+  // 그 장이 도는 달력 구간. 장마다 런이 새로 시작하므로 그 런의 1..cycles 로 읽는다
+  // (캠페인 전체의 사이클 번호 startCycle 로 읽으면 startMonth 위에 또 더해져 두 달씩 밀린다)
   function chWhen(n) {
     const lv = LEVELS.get(n); if (!game || !lv) return '';
-    const c0 = LEVELS.startCycle(n), c1 = c0 + (lv.cycles || 4) - 1;
-    return T('ch.when', { y: game.yearOf(c0), a: game.calMonth(c0), b: game.calMonth(c1) });
+    const c1 = lv.cycles || 4;
+    return T('ch.when', { y: game.yearOf(1), a: game.calMonth(1), b: game.calMonth(c1) });
   }
   function chapterCard(cls, inner, onTap) {
     const m = modal('', `<div class="chcard ${cls}">${inner}<div class="tap">${T(cls === 'end' ? 'ch.tapNext' : 'ch.tap')}</div></div>`, null);

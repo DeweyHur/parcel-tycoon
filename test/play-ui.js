@@ -264,19 +264,46 @@ const say = m => { console.log(m); log.push(m); };
   const stamped = await page.$eval('#ct-stamp', el => el.classList.contains('on')).catch(() => false);
   check(stamped, '도장이 찍힌다');
   const saved = await page.evaluate(() => (PT.Profile.get().campaign || {}));
-  check(saved.deal && saved.deal.paid === deal.down && saved.carry && saved.carry.cash >= 0,
-    '계약금이 빠지고 잔금 목표가 남는다 — ' + JSON.stringify(saved.deal) + ' carry ' + JSON.stringify(saved.carry));
+  check(saved.deal && saved.deal.paid === deal.down, '가계약금과 잔금 목표가 남는다 — ' + JSON.stringify(saved.deal));
   await shot('44-stamped');
-  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(500);
-  await shot('45-title2');
-  const after = await page.$$eval('#modal .btn', els => els.map(e => e.id).filter(Boolean));
-  check(after.includes('t-new') && after.includes('t-story') && after.includes('t-codex'), '자유 런·인수인계·도감이 열렸다 — ' + after.join(','));
+
+  say('\n■ 서장 다음은 타이틀이 아니라 1장');
+  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(1300);   // 창고를 넘겨받는다 → 바로 1장
+  const ch2 = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
+  check(/1장/.test(ch2) && /두 번째 트럭/.test(ch2) && /5월/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
+  await shot('45-ch2');
+  await page.click('#modal .chcard'); await page.waitForTimeout(900); await readBeat();
+  const l2 = await page.evaluate(() => { const g = PT.game, P = PT.Profile.get().campaign;
+    return { level: g.cfg.level, cash: g.cash, carryCash: P.carry && P.carry.cash, cap: g.warehouse.cap,
+      contracts: g.contracts.filter(Boolean).map(c => c.carrier), calls: !!document.querySelector('.contract .calls, #c0 .calls'),
+      shows: ['market', 'calls', 'simul', 'attrs', 'cold', 'weather'].filter(k => g.shows(k)),
+      types: [...new Set(g.schedule.flat().map(x => x.type))] }; });
+  check(l2.level === 2 && l2.cash === l2.carryCash && l2.contracts.join() === 'bulk0' && l2.cap === 16,
+    '계약금 뺀 판이 그대로 넘어왔다 — ' + JSON.stringify(l2).slice(0, 120));
+  check(l2.shows.join() === 'market,calls,simul', '1장에 열린 것은 마켓·배차·동시뿐 — ' + l2.shows.join(','));
+  check(l2.types.join() === 'normal', '1장 입고는 아직 일반뿐 — ' + l2.types.join(','));
+  await shot('46-ch2-play');
 
   say('\n■ 자유 런(인수인계)에서는 냉장실이 다시 붙는가');
-  await safeClick('#t-story'); await page.waitForTimeout(400);
-  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(700);
-  for (let k = 0; k < 4; k++) { const how = await page.$('#modal-root.show .how'); if (!how) break; await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(300); }
-  await page.waitForTimeout(700); await readBeat(); await passGate(); await readBeat();
+  // 1장까지 끝낸 프로필을 만들어 타이틀을 연다 (해금 이후 회귀 확인)
+  await page.evaluate(() => { const P = PT.Profile.get(); P.campaign.cleared = 99; PT.Profile.save(); });
+  await page.reload(); await page.waitForTimeout(900);
+  const after = await page.$$eval('#modal .btn', els => els.map(e => e.id).filter(Boolean));
+  check(after.includes('t-new') && after.includes('t-story') && after.includes('t-codex'), '자유 런·인수인계·도감이 열렸다 — ' + after.join(','));
+  // 1장 세이브가 남아 있으니 「새로 시작」 확인이 먼저 뜬다 — 넘기고 인수인계로 들어간다
+  await safeClick('#t-story'); await page.waitForTimeout(500);
+  for (let k = 0; k < 8; k++) {
+    if (await page.evaluate(() => !!(window.PT && PT.game && PT.game.phase === 'play' && !document.getElementById('modal-root').classList.contains('show')))) break;
+    const warn = await page.$('#modal .foot .btn.warn');
+    if (warn) { await warn.click(); await page.waitForTimeout(600); continue; }
+    const pri = await page.$('#modal .foot .btn.primary');
+    if (pri) { await pri.click(); await page.waitForTimeout(500); continue; }
+    break;
+  }
+  await page.waitForTimeout(800); await readBeat(); await passGate(); await readBeat();
+  const ok2 = await page.evaluate(() => !!(window.PT && PT.game));
+  check(ok2, '인수인계(자유 런)가 시작됐다');
+  if (!ok2) { console.log('\n에러:', errors.length ? errors.slice(0, 5) : '없음'); await browser.close(); process.exit(1); }
   const st2 = await page.evaluate(() => ({ sig: PT.scene.buildSig, cap: PT.game.warehouse.cap, cold: PT.game.warehouse.cold, rep: !document.getElementById('stress-wrap').hidden, wx: !!document.querySelector('#upcoming .chip.wx') }));
   check(st2.sig === '24/6/4/0', '3D 건물이 24칸·냉장6·냉동4 로 다시 지어졌다 — ' + st2.sig);
   check(st2.rep && st2.wx, '자유 런에는 평판·날씨가 다시 보인다');

@@ -111,8 +111,59 @@
         ]) },
       },
     },
-    // ----- 아래는 아직 선언만 (부록 R 의 커리큘럼). 레벨 1 이 끝나면 여기를 채운다 -----
-    { n: 2, cycles: 4, grants: ['market', 'calls', 'simul'] },                 // 5~6월: 마켓·배차 소모품·창고 확장·2대 동시
+    // ----- 레벨 2 (5~6월): 배차가 소모품이라는 것. 그래서 마켓이 필요하다는 것. 그리고 두 대 -----
+    // 시작 판은 지난 장에서 그대로 넘어온다(campaign.carry) — 자금·창고·계약·고객·신뢰.
+    // 앞 두 사이클만 대본이다: 배차를 다 쓰게 만들고(1), 두 대가 붙는 날을 만든다(2). 3~4는 무작위로 풀어 혼자 해 본다.
+    {
+      n: 2, cycles: 4, year: 2027, startMonth: 5, monthOffset: 2, grants: ['market', 'calls', 'simul'],
+      minCash: 400,                     // 서장을 망쳐도 1장이 막히지 않게
+      company: { cash: 600, warehouse: { cap: 16, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }], customers: [['anon', 0]] },
+      // callsDelta +3: 계약이 하나뿐인 장이라 배차가 사이클 중간에 마르면 남은 열흘을 통째로 못 보낸다.
+      // 마켓은 사이클 끝에만 열리니까, 한 번 충전하면 한 사이클이 도는 그릇이어야 한다.
+      // (배차가 바닥나는 경험은 1사이클 대본이 마지막 날에 한 번만 만들어 준다)
+      mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 260, monthlyStress: 0, theftMult: 0, noBankrupt: true, callsDelta: 3 },
+      seed: 20270501,
+      script: {
+        // 1사이클 = 5월 전반 13영업일. 배차 7대 × 7칸 = 49칸인데 입고는 그보다 많다 —
+        // 배차가 줄어드는 것을 열세 번 보고, 다 쓰고, 정산 뒤 마켓에서 처음 충전한다.
+        1: { turns: turns([
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],           // 누적 11칸 — 한 대(7칸) 보내고도 남는다
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon'],
+          ['normal 2 anon'],                            // 5월 15일 — 배차는 여기쯤 바닥난다
+        ]),
+          // 첫 마켓: 배차를 늘리는 두 가지만(충전은 상시 · 한도 강화). 확장은 실제로 넘쳐 본 뒤에 판다
+          market: { contracts: [], enh: ['limit1'], fac: [] } },
+        // 2사이클 = 5월 후반. 한 턴에 몰아 줘서 '두 대가 자동으로 붙는' 날을 만든다
+        2: { turns: turns([
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon'],  // 누적 14칸 = 두 대(7+7) 정확히
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],                                    // 창고(16칸)가 처음 빡빡해진다
+        ]),
+          // 넘쳐 본 다음에 판다 — 창고 확장이 여기서 처음 나온다
+          market: { contracts: [], enh: ['limit1'], fac: ['expand1'] } },
+        // 3~4사이클(6월)은 대본이 없다 — 무작위로 풀어 혼자 굴려 본다
+      },
+    },
     { n: 3, cycles: 4, grants: ['weather', 'theft', 'self', 'trust'] },        // 7~8월: 장마·폭염·야외 적재·직접 배송·신뢰도
     { n: 4, cycles: 4, grants: ['attrs', 'cold', 'customers'] },               // 9~10월: ❄ 특수 품목·냉장 구역·고객과 신뢰
     { n: 5, cycles: 4, grants: ['rep', 'insurance', 'storage'] },              // 11~12월: 평판과 등급·사고와 보험·보관
@@ -131,6 +182,6 @@
   // price 는 2장 이후가 붙으면 다시 잡는다 (지금은 서장 종료 자금 1.5~3.5k 기준의 임시 값).
   const DEAL = { price: 8000, downRate: 0.6 };
 
-  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 1 };
+  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 2 };
   if (typeof module !== 'undefined') module.exports = API; else root.LEVELS = API;
 })(typeof window !== 'undefined' ? window : globalThis);
