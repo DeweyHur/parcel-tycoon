@@ -17,7 +17,7 @@ const CASES = [
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => { if (!/audio/i.test(e.message)) { errors.push('PAGEERROR ' + e.message); console.log('PAGEERROR', e.message); } });
-  await page.goto('http://localhost:8765/index.html?nointro=1');
+  await page.goto('http://localhost:8765/index.html?nointro=1&nosplash=1');
   await page.waitForTimeout(700);
   fs.mkdirSync('shots', { recursive: true });
 

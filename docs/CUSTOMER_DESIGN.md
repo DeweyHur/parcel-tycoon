@@ -1,4 +1,4 @@
-# 택배 타이쿤 — 고객(화주) · 손실 · 적재 · 보험 · 날씨 기획서 v0.3
+# 상하차의 신 — 고객(화주) · 손실 · 적재 · 보험 · 날씨 기획서 v0.3
 
 `GAME_DESIGN.md`, `META_DESIGN.md`, `CARRIER_CAPABILITY_DESIGN.md` 위에 얹는다. 여섯 축을 정의한다.
 

@@ -12,9 +12,12 @@ const fs = require('fs');
   const errors = [];
   page.on('pageerror', e => { if (!/audio/i.test(e.message)) { errors.push('PAGEERROR ' + e.message); console.log('PAGEERROR', e.message, (e.stack || '').split('\n')[1]); } });
   page.on('console', m => { if (m.type() === 'error' && !/audio|font|mp3|woff|404|Failed to load/i.test(m.text())) errors.push('CONSOLE ' + m.text()); if (/\[i18n\]/.test(m.text())) errors.push(m.text()); });
-  await page.goto('http://localhost:8765/index.html');
+  await page.goto('http://localhost:8765/index.html?nosplash=1');
   await page.waitForTimeout(600);
   fs.mkdirSync('shots', { recursive: true });
+  // 인수인계·자유 런은 캠페인을 끝내야 열린다 (v1.13 캠페인 타이틀) — 테스트는 클리어한 프로필로 연다
+  await page.evaluate(() => { const P = Profile.get(); P.campaign.cleared = 99; Profile.save(); PT.showTitle(); });
+  await page.waitForTimeout(300);
   await page.screenshot({ path: 'shots/t00-title.png' });
 
   // 1) 인수인계를 한 번도 안 한 프로필에서 '새 런' → 권유 모달

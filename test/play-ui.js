@@ -20,7 +20,35 @@ const say = m => { console.log(m); log.push(m); };
   const shot = n => page.screenshot({ path: `shots/P-${n}.png` });
   const scene = async n => { const b = await (await page.$('#scene')).boundingBox(); await page.screenshot({ path: `shots/P-${n}.png`, clip: b }); };
 
-  say('■ 타이틀 (캠페인 전)');
+  say('■ 스튜디오 스플래시 (1장)');
+  const sp = await page.evaluate(() => {
+    const el = document.getElementById('splash');
+    return el ? { quick: el.classList.contains('quick'), marks: el.querySelectorAll('svg').length, rects: el.querySelectorAll('rect').length,
+      title: !!document.querySelector('.title h1') } : null;
+  });
+  check(!!sp, '스플래시가 뜬다');
+  check(!!sp && sp.marks === 3 && sp.rects > 300, '아치·워드마크가 도트로 그려진다 — svg ' + (sp && sp.marks) + ' · rect ' + (sp && sp.rects));
+  check(!!sp && !sp.quick, '첫 실행은 긴 버전이다');
+  await shot('00a-splash');
+  await page.mouse.click(195, 400);                       // 아무 데나 누르면 2장으로
+  await page.waitForTimeout(600);
+  check(!(await page.$('#splash')), '누르면 바로 타이틀로 넘어간다');
+
+  say('\n■ 타이틀 (캠페인 전)');
+  const brand = await page.evaluate(() => ({
+    h1: (document.querySelector('.title h1') || {}).textContent || '',
+    sub: (document.querySelector('.title .sub') || {}).textContent || '',
+    studio: (document.querySelector('.title .studio') || {}).textContent || '',
+    goal: !!document.querySelector('.title .goal'),
+    head: !!document.querySelector('#modal h2'),
+    doc: document.title,
+    px: getComputedStyle(document.querySelector('.title h1')).fontSize,
+  }));
+  check(brand.h1 === '상하차의 신' && brand.sub === '택배 창고 타이쿤', '제목 · 부제 — ' + brand.h1 + ' / ' + brand.sub);
+  check(/DOO'IN STUDIO/.test(brand.studio), '하단에 스튜디오 — ' + brand.studio);
+  check(!brand.goal && !brand.head, '목표 문장과 모달 머리띠가 없다');
+  check(brand.doc === '상하차의 신: 택배 창고 타이쿤', '탭 제목 — ' + brand.doc);
+  check(brand.px === '44px' || brand.px === '55px', '제목이 Galmuri 정수배 — ' + brand.px);
   await shot('00-title');
   const btns = await page.$$eval('#modal .btn', els => els.map(e => e.id).filter(Boolean));
   check(btns.includes('t-level'), '「시작하기」만 있다 — ' + btns.join(','));

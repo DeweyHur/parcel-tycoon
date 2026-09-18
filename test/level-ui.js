@@ -13,7 +13,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   const errors = [];
   page.on('pageerror', e => { if (!/audio/i.test(e.message)) { errors.push('PAGEERROR ' + e.message); console.log('PAGEERROR', e.message, (e.stack || '').split('\n')[1]); } });
   page.on('console', m => { if (m.type() === 'error' && !/audio|font|mp3|woff|404|Failed to load/i.test(m.text())) errors.push('CONSOLE ' + m.text()); if (/\[i18n\]/.test(m.text())) errors.push(m.text()); });
-  await page.goto('http://localhost:8765/index.html?nointro=1');
+  await page.goto('http://localhost:8765/index.html?nointro=1&nosplash=1');
   await page.waitForTimeout(700);
   fs.mkdirSync('shots', { recursive: true });
   await page.screenshot({ path: 'shots/L00-title.png' });
@@ -21,6 +21,8 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   console.log('타이틀(캠페인)');
   const titleBtns = await page.$$eval('#modal .btn', els => els.map(e => e.id || e.textContent.trim().slice(0, 12)));
   check(titleBtns.includes('t-level'), '「시작하기」 버튼이 있다');
+  const br = await page.evaluate(() => ({ h1: (document.querySelector('.title h1') || {}).textContent, studio: !!document.querySelector('.title .studio'), goal: !!document.querySelector('.title .goal') }));
+  check(br.h1 === '상하차의 신' && br.studio && !br.goal, '제목·스튜디오가 붙고 목표 문장은 없다 — ' + br.h1);
   check(!titleBtns.includes('t-new') && !titleBtns.includes('t-story'), '자유 런·인수인계는 아직 없다');
   check(!titleBtns.includes('t-codex') && !titleBtns.includes('t-rec'), '도감·기록은 아직 없다');
 

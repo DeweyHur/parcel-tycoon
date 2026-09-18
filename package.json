@@ -2,7 +2,7 @@
   "name": "parcel-tycoon",
   "version": "0.2.0",
   "private": true,
-  "description": "택배 타이쿤 — 턴제 물류 경영 로그라이크 (프로토타입)",
+  "description": "상하차의 신 (택배 창고 타이쿤) — 턴제 물류 경영 로그라이크",
   "scripts": {
     "serve": "python3 -m http.server 8765 --directory www",
     "test": "node test/unit.js && node test/sim.js 200",

@@ -1,4 +1,6 @@
-# 택배 타이쿤 (Parcel Tycoon) — 프로토타입
+# 상하차의 신 (God of the Dock) — 택배 창고 타이쿤
+
+> Doo'In Studio · 레포·빌드 산출물 이름은 `parcel-tycoon` 그대로다 (내부 식별자)
 
 턴제 물류 경영 로그라이크. 기획서 `GAME_DESIGN.md` v0.2의 **20장 프로토타입 범위**를 구현한 모바일(안드로이드) 게임입니다.
 HTML5 + Three.js(로우폴리 창고) + 픽셀아트 UI(Galmuri 폰트)로 만들었고 Capacitor로 안드로이드 앱으로 패키징합니다.

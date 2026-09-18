@@ -127,9 +127,11 @@ body { touch-action: manipulation; }
 .kv .v.bad { color: var(--red); } .kv .v.good { color: var(--green); }
 hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .title { text-align: center; padding: 20px 10px 8px; }
-.title h1 { font-size: 26px; margin: 0 0 2px; color: var(--gold); text-shadow: 3px 3px 0 var(--line); line-height: 1.2; }
-.title .sub { color: var(--ink); font-size: 13px; margin-bottom: 2px; }
-.title .goal { color: var(--dim); font-size: 11px; margin-bottom: 14px; }
+/* 제목은 Galmuri11 Bold 를 정수배로만 키운다 (11×5=55). 자간·줄간을 분수로 건드리지 않는다 */
+.title h1 { font-family: 'Galmuri11', monospace; font-weight: 700; font-size: 55px; margin: 0 0 6px; color: var(--ink); text-shadow: 3px 3px 0 #000; line-height: 1.25; letter-spacing: 0; }
+.title .sub { color: var(--gold); font-size: 22px; margin-bottom: 18px; }
+.title .studio { color: var(--dim); font-size: 11px; margin-top: 14px; opacity: .75; }
+@media (max-width: 420px) { .title h1 { font-size: 44px; } }
 .title .btn { display: block; width: 100%; margin-bottom: 8px; text-align: center; font-size: 15px; }
 .records { font-size: 12px; color: var(--dim); text-align: left; }
 .records b { color: var(--gold); }
@@ -333,3 +335,37 @@ body.cine { background: #000; }
 /* 오프닝 자막 타자 커서 — 치는 동안만 붙는다 */
 #intro .iline .caret { display: inline-block; width: 7px; height: 13px; margin-left: 2px; background: var(--ink); vertical-align: -1px; animation: blink .5s steps(2) infinite; }
 #intro.recall .iline .caret { background: #e8dcbe; }
+
+/* ---------- 스튜디오 스플래시 (js/splash.js) — 타이틀의 1장 ---------- */
+/* 모든 동작은 steps() 다. 도트가 미끄러지면 안 되고 칸 단위로 튀어야 한다 */
+#splash { position: fixed; inset: 0; z-index: 200; background: #141210; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 0; cursor: pointer; user-select: none; transition: opacity .45s linear; }
+#splash.out { opacity: 0; pointer-events: none; }
+#splash svg { shape-rendering: crispEdges; display: block; }
+#splash .mark { width: min(58vw, 300px); animation: spDrop .5s steps(5) both; }
+#splash .word { width: min(34vw, 190px); margin-top: 26px; fill: #f0e4cf; animation: spIn .4s .45s steps(4) both; }
+#splash .sub { width: min(31vw, 175px); margin-top: 12px; fill: #f0e4cf; animation: spIn .4s .6s steps(4) both; }
+#splash #sp-star { animation: spShoot 1.15s .55s steps(30) both; }
+@keyframes spDrop { from { transform: translateY(-10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes spIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spShoot { from { transform: translate(2px, 15px); } to { transform: translate(60px, 25px); } }
+/* 2회차: 애니메이션 없이 바로 보여 주고 금방 넘어간다 */
+#splash.quick .mark, #splash.quick .word, #splash.quick .sub, #splash.quick #sp-star { animation: none; opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { #splash .mark, #splash .word, #splash .sub, #splash #sp-star { animation: none; opacity: 1; transform: none; } }
+
+/* ---------- 타이틀 화면 = 스플래시 2장 ---------- */
+/* 모달 틀을 벗는다. 제목이 곧 머리고, 메뉴는 버튼 하나 + 텍스트 한 줄이다 */
+#modal-root.title-mode { background: #141210; padding: 0; }   /* :has() 대신 클래스 — 구형 웹뷰까지 확실하게 */
+.modal.titlecard { background: transparent; border: 0; box-shadow: none; max-width: 460px; height: 100%; }
+.modal.titlecard > .body { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; padding: 0 18px; background: transparent; }
+.modal.titlecard .title { padding: 0; }
+/* 시작 버튼: 도트 톤의 4px 오프셋 그림자 (아이콘 없음) */
+.modal.titlecard .title .btn.cta { display: inline-block; width: auto; min-width: 190px; margin: 34px auto 0; font-family: 'Galmuri11', monospace; font-weight: 700;
+  font-size: 22px; padding: 14px 44px; color: #141210; background: var(--gold); border: 0; box-shadow: 4px 4px 0 #6b3c18; }
+.modal.titlecard .title .btn.cta:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #6b3c18; }
+.modal.titlecard .title .ch { color: var(--dim); font-size: 11px; margin-top: 12px; }
+.modal.titlecard .title .studio { position: absolute; left: 0; right: 0; bottom: calc(18px + var(--safe-bottom)); margin: 0; }
+.modal.titlecard .title .opts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; margin-top: 34px; font-size: 11px; color: var(--dim); }
+.modal.titlecard .title .opts span, .modal.titlecard .title .lnk { cursor: pointer; padding: 6px 2px; }
+.modal.titlecard .title .opts span:active, .modal.titlecard .title .lnk:active { color: var(--gold); }
+.modal.titlecard .title .lnk { text-decoration: underline dotted; text-underline-offset: 3px; }

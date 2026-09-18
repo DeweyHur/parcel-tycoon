@@ -36,7 +36,8 @@ js_inline = '<script>' + audio_js + '</script>\n' + '\n'.join(
 body = html.split('<body>')[1].split('</body>')[0]
 body = re.sub(r'\s*<script src="[^"]+"></script>', '', body)
 wide_css = '\n/* 웹(넓은 화면): 폰 비율 컬럼으로 가운데 정렬 */\n@media (min-width: 640px) { #app { left: 50%; right: auto; width: 480px; transform: translateX(-50%); box-shadow: 0 0 0 4px var(--line), 0 0 60px #000; } #modal-root { left: 50%; right: auto; width: 480px; transform: translateX(-50%); } }\n'
-head_extra = f'<title>택배 타이쿤</title>\n<style>\n{css}{wide_css}\n</style>'
+icon = f'<link rel="icon" href="data:image/png;base64,{b64(WWW/"img"/"mark-icon.png")}">'
+head_extra = f'<title>상하차의 신: 택배 창고 타이쿤</title>\n{icon}\n<style>\n{css}{wide_css}\n</style>'
 
 if artifact:
     out = f'{head_extra}\n{body}\n{js_inline}\n'

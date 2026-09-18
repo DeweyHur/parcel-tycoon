@@ -44,7 +44,8 @@
   // ---------- modal ----------
   function modal(title, bodyHtml, buttons, sub) {
     const m = $('#modal');
-    m.innerHTML = `<h2>${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</h2><div class="body">${bodyHtml}</div>` +
+    m.classList.remove('titlecard'); $('#modal-root').classList.remove('title-mode');   // 타이틀 화면만 모달 틀을 벗는다 — 다음 모달로 딸려가면 안 된다
+    m.innerHTML = (title ? `<h2>${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</h2>` : '') + `<div class="body">${bodyHtml}</div>` +
       (buttons && buttons.length ? `<div class="foot">${buttons.map((b, i) => `<button class="btn ${b.cls || ''}" data-i="${i}" ${b.disabled ? 'disabled' : ''}>${esc(b.label)}</button>`).join('')}</div>` : '');
     m.querySelectorAll('.foot .btn').forEach(btn => btn.onclick = () => { SFX.resume(); SFX.click(); const b = buttons[+btn.dataset.i]; if (b.onClick) b.onClick(); });
     $('#modal-root').classList.add('show');
@@ -56,6 +57,13 @@
   function closeModal() { $('#modal-root').classList.remove('show'); $('#modal').innerHTML = ''; if (gateTarget && !document.body.contains(gateTarget)) clearGate(); }
 
   // ---------- title ----------
+  // 소리 · 음악 · 언어 — 버튼 세 개가 아니라 아래쪽 텍스트 한 줄. 아이콘으로 바꾸지 않는다(도트 화면에선 세 글자가 더 짧다)
+  function optRow() {
+    const lang = (I18n.languages().find(l => l.id === I18n.lang) || {}).name || '';
+    return `<div class="opts"><span id="t-sound">${T('opt.sound', { v: T(opts.sound ? 'opt.on' : 'opt.off') })}</span>`
+      + `<span id="t-music">${T('opt.music', { v: T(opts.music ? 'opt.on' : 'opt.off') })}</span>`
+      + `<span id="t-lang">${T('opt.lang')}: ${esc(lang)}</span></div>`;
+  }
   function showTitle() {
     $('#story').hidden = true; $('#sms').hidden = true; clearStoryHl(); clearGate(); storyBusy = false;
     const save = loadSave(), P = Profile.get();
@@ -63,17 +71,18 @@
     if ((P.campaign.cleared || 0) < LEVELS.IMPLEMENTED) return showTitleCampaign(save, P.campaign);
     const nUnlocked = P.unlocked.companies.length + P.unlocked.perks.length + P.unlocked.scenarios.length;
     const nTotal = Object.keys(M.COMPANIES).length + Object.keys(M.PERKS).length + Object.keys(M.SCENARIOS).length;
-    const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div><div class="goal">${T('title.goal')}</div>
-      ${save ? `<button class="btn primary" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(save.story ? T('title.story') : M.SCENARIOS[save.cfg.scenario] ? M.SCENARIOS[save.cfg.scenario].name : save.cfg.scenario)} · ${T('fmt.monthTurn', { m: cycleName(save.month), t: save.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })})</small></button>` : ''}
+    const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
+      ${save ? `<button class="btn cta" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(save.story ? T('title.story') : M.SCENARIOS[save.cfg.scenario] ? M.SCENARIOS[save.cfg.scenario].name : save.cfg.scenario)} · ${T('fmt.monthTurn', { m: cycleName(save.month), t: save.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })})</small></button>` : ''}
       <button class="btn ${P.story && P.story.seen ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${demoLocked() ? T('demo.storySub', { n: demoMonthsLabel() }) : T('title.storySub')}</small></button>
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
       <button class="btn ${P.story && P.story.seen && !demoLocked() ? 'gold' : ''}" id="t-new">${demoLocked() ? '🔒 ' : ''}${T('title.new')}${demoLocked() ? ` <small style="color:var(--dim)">${T('demo.fullOnly')}</small>` : P.story && P.story.seen ? '' : ` <small style="color:var(--dim)">${T('title.newHint')}</small>`}</button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).length, d: Object.keys(M.ACHIEVEMENTS).length })}</small></button>
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
       <button class="btn" id="t-help">${T('title.help')}</button>
-      <div style="display:flex;gap:8px"><button class="btn" id="t-sound" style="flex:1">${T('opt.sound', { v: T(opts.sound ? 'opt.on' : 'opt.off') })}</button><button class="btn" id="t-music" style="flex:1">${T('opt.music', { v: T(opts.music ? 'opt.on' : 'opt.off') })}</button></div>
-      <button class="btn" id="t-lang">${T('opt.lang')}: ${I18n.languages().map(l => l.id === I18n.lang ? `<b>${esc(l.name)}</b>` : esc(l.name)).join(' / ')}</button></div>`;
-    const m = modal(T('title.modal'), body, null, 'v0.3 meta');
+      ${optRow()}
+      <div class="studio">${T('title.studio')} · v0.3</div></div>`;
+    const m = modal('', body, null);
+    m.classList.add('titlecard'); $('#modal-root').classList.add('title-mode');
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
     m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort')); return; } if (!(P.story && P.story.seen)) { suggestStory(); return; } showScenarioSelect(); };
     m.querySelector('#t-story').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-story').click(); }, T('title.newShort')); return; } showStoryStart(); };
@@ -91,12 +100,15 @@
   // 첫 화면에 있는 것이 적을수록 좋다. 캠페인 중에는 시작 · 소리 · 언어뿐 — 자유 런·도감·기록은 캠페인을 끝내면 열린다.
   function showTitleCampaign(save, camp) {
     const n = Math.min(camp.level || 1, LEVELS.IMPLEMENTED), lv = LEVELS.get(n);
+    // 메인 메뉴는 버튼 하나다. 소리·음악·언어는 아래 텍스트 한 줄 (아이콘으로 바꾸지 않는다)
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
-      ${save ? `<button class="btn primary" id="t-continue">${T('lv.continue')} <small style="color:var(--dim)">${T('lv.startSub', { ch: T('lv.ch.' + n) })}</small></button>` : ''}
-      <button class="btn ${save ? '' : 'gold'}" id="t-level">${T('lv.start')} <small style="color:var(--dim)">${T('lv.startSub', { ch: T('lv.ch.' + n) })}</small></button>
-      <div style="display:flex;gap:8px"><button class="btn" id="t-sound" style="flex:1">${T('opt.sound', { v: T(opts.sound ? 'opt.on' : 'opt.off') })}</button><button class="btn" id="t-music" style="flex:1">${T('opt.music', { v: T(opts.music ? 'opt.on' : 'opt.off') })}</button></div>
-      <button class="btn" id="t-lang">${T('opt.lang')}: ${I18n.languages().map(l => l.id === I18n.lang ? `<b>${esc(l.name)}</b>` : esc(l.name)).join(' / ')}</button></div>`;
-    const m = modal(T('title.modal'), body, null, 'v0.3');
+      ${save ? `<button class="btn cta" id="t-continue">${T('lv.continue')}</button>`
+             : `<button class="btn cta" id="t-level">${T('lv.start')}</button>`}
+      <div class="ch">${T('lv.ch.' + n)}${save ? ` · <span class="lnk" id="t-level">${T('lv.restart')}</span>` : ''}</div>
+      ${optRow()}
+      <div class="studio">${T('title.studio')} · v0.3</div></div>`;
+    const m = modal('', body, null);
+    m.classList.add('titlecard'); $('#modal-root').classList.add('title-mode');
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
     m.querySelector('#t-level').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); startLevel(n); }, T('title.newShort'), showTitle); return; } startLevel(n); };
     m.querySelector('#t-sound').onclick = () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); SFX.resume(); SFX.click(); showTitle(); };
@@ -1313,7 +1325,7 @@
   // ---------- init ----------
   // index.html 의 고정 라벨 (언어 변경 시 다시 호출)
   function applyStaticText() {
-    document.title = T('title.name');
+    document.title = T('title.name') + ': ' + T('title.sub');
     document.documentElement.lang = I18n.lang;
     $('#hud-cash-lbl').textContent = T('hud.cashLbl'); $('#usage-lbl').textContent = T('common.warehouse'); $('#cold-lbl').textContent = D.ATTRS.cold.name;
     $('#cust-btn').textContent = T('company.customers'); $('#log-btn').textContent = T('title.records'); $('#help-btn').textContent = T('btn.help'); $('#menu-btn').textContent = T('menu.title');
@@ -1336,7 +1348,8 @@
     if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
       window.Capacitor.Plugins.App.addListener('backButton', () => { if ($('#modal-root').classList.contains('show') && game && game.phase === 'play') closeModal(); });
     }
-    showTitle();
+    // 1장 스튜디오 → 2장 타이틀. 2장은 별도 화면이 아니라 showTitle() 그 자체다
+    if (window.Splash) Splash.play(showTitle); else showTitle();
   }
   window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, renderAll, saveGame, prep, startRun, showTitle };
   init();

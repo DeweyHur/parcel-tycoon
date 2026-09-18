@@ -26,7 +26,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
     closed: !!PT.scene.closed, front: !!(PT.scene.parts.front && PT.scene.parts.front.visible),
   }));
 
-  await page.goto('http://localhost:8765/index.html');
+  await page.goto('http://localhost:8765/index.html?nosplash=1');
   await page.waitForTimeout(700);
 
   console.log('첫 시작');
@@ -106,7 +106,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(c2.gone && !c2.cine && c2.basis === '' && c2.truck === 12, '두 번째도 깨끗이 끝난다 — ' + JSON.stringify(c2));
 
   console.log('\n?nointro');
-  await page.goto('http://localhost:8765/index.html?nointro=1'); await page.waitForTimeout(700);
+  await page.goto('http://localhost:8765/index.html?nointro=1&nosplash=1'); await page.waitForTimeout(700);
   const go = await page.$('#t-level'); await go.click(); await page.waitForTimeout(400);
   const cf = await page.$('#modal .foot .btn.warn'); if (cf) { await cf.click(); await page.waitForTimeout(900); }
   check(!(await playing()), '?nointro 면 바로 1턴');
