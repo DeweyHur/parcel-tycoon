@@ -152,6 +152,20 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!mk.ins && !mk.cust && !mk.mine, '보험·고객·내 계약 버튼이 없다');
   check(!mk.refresh && !/가격 ×/.test(mk.txt), '새로고침·가격 배수가 없다');
   check(mk.empty === 0, '빈 계약 슬롯이 없다 (지금: ' + mk.empty + '칸)');
+
+  console.log('\n1장에서 서장으로 돌아갈 수 있다');
+  await page.evaluate(() => { const P = PT.Profile.get(); P.campaign.cleared = 1; P.campaign.level = 2; PT.Profile.save(); });
+  await page.reload(); await page.waitForTimeout(900);
+  const chips = await page.$$eval('#modal .chpick .chip', els => els.map(e => e.textContent));
+  check(chips.length === 2 && chips[0] === '서장' && chips[1] === '1장', '타이틀에 장 고르기가 있다 — ' + chips.join(','));
+  await page.click('#modal .chpick .chip[data-ch="1"]'); await page.waitForTimeout(400);
+  const ask = await page.$eval('#modal', el => el.textContent).catch(() => '');
+  check(/서장/.test(ask) && /다시/.test(ask), '되돌아가기 전에 확인을 묻는다 — ' + ask.replace(/\s+/g, ' ').slice(0, 50));
+  await page.click('#modal .foot .btn.warn, #modal .foot .btn.primary'); await page.waitForTimeout(1400);
+  const back = await page.evaluate(() => ({ level: PT.game && PT.game.cfg.level, cash: PT.game && PT.game.cash,
+    cap: PT.game && PT.game.warehouse.cap, saved: PT.Profile.get().campaign.level }));
+  check(back.level === 1 && back.cash === 300 && back.cap === 16 && back.saved === 1,
+    '서장이 처음 상태로 다시 시작된다 — ' + JSON.stringify(back));
   await page.screenshot({ path: 'shots/L06-ch2-play.png' });
   const camp = await page.evaluate(() => Profile.get().campaign);
   check(camp && camp.name === '한길택배' && camp.cleared >= 1, '프로필에 상호·클리어가 남았다 — ' + JSON.stringify(camp));

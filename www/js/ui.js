@@ -100,17 +100,30 @@
   // 첫 화면에 있는 것이 적을수록 좋다. 캠페인 중에는 시작 · 소리 · 언어뿐 — 자유 런·도감·기록은 캠페인을 끝내면 열린다.
   function showTitleCampaign(save, camp) {
     const n = Math.min(camp.level || 1, LEVELS.IMPLEMENTED), lv = LEVELS.get(n);
+    // 지나온 장은 언제든 다시 할 수 있다 — 한 장을 넘기고 나면 앞 장으로 돌아갈 길이 없으면 안 된다.
+    // 고를 수 있는 것은 깬 장 + 지금 장까지. 한 장뿐이면 아예 안 그린다.
+    const open = Math.min(Math.max(camp.cleared || 0, 0) + 1, LEVELS.IMPLEMENTED);
+    const picker = open <= 1 ? '' : `<div class="chpick">${Array.from({ length: open }, (_, i) => i + 1)
+      .map(k => `<span class="chip${k === n ? ' on' : ''}" data-ch="${k}">${T('lv.ch.' + k)}</span>`).join('')}</div>`;
     // 메인 메뉴는 버튼 하나다. 소리·음악·언어는 아래 텍스트 한 줄 (아이콘으로 바꾸지 않는다)
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
       ${save ? `<button class="btn cta" id="t-continue">${T('lv.continue')}</button>`
              : `<button class="btn cta" id="t-level">${T('lv.start')}</button>`}
       <div class="ch">${T('lv.ch.' + n)}${save ? ` · <span class="lnk" id="t-level">${T('lv.restart')}</span>` : ''}</div>
+      ${picker}
       ${optRow()}
       <div class="studio">${T('title.studio')} · v0.3</div></div>`;
     const m = modal('', body, null);
     m.classList.add('titlecard'); $('#modal-root').classList.add('title-mode');
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
     m.querySelector('#t-level').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); startLevel(n); }, T('title.newShort'), showTitle); return; } startLevel(n); };
+    // 장 고르기 — 고른 장의 시작 판(carryAt)으로 처음부터 다시 한다. 진행 중인 런이 있으면 확인부터
+    m.querySelectorAll('.chpick .chip').forEach(el => el.onclick = () => {
+      const k = +el.dataset.ch; SFX.resume(); SFX.select();
+      const go = () => { const P = Profile.get(); P.campaign = Object.assign({}, P.campaign, { level: k }); Profile.save(); Store.remove(SAVE_KEY); startLevel(k); };
+      if (save || k !== n) return askConfirm(T('lv.pickAsk', { ch: T('lv.ch.' + k) }), go, T('lv.pickGo'), showTitle);
+      go();
+    });
     m.querySelector('#t-sound').onclick = () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); SFX.resume(); SFX.click(); showTitle(); };
     m.querySelector('#t-music').onclick = () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); SFX.resume(); BGM.resume(); SFX.click(); showTitle(); };
     m.querySelector('#t-lang').onclick = () => { const ids = I18n.languages().map(l => l.id); I18n.setLang(ids[(ids.indexOf(I18n.lang) + 1) % ids.length]); SFX.click(); applyStaticText(); showTitle(); };
@@ -120,7 +133,7 @@
   function startLevel(n) {
     const P = Profile.get();
     game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false,
-      companyName: P.campaign.name || '', carry: n > 1 ? (P.campaign.carry || null) : null });
+      companyName: P.campaign.name || '', carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
     closeModal(); startPlay({ intro: n === 1, chapter: n });
   }
@@ -164,7 +177,9 @@
       const P = Profile.get();
       const carry = r.carry ? { ...r.carry } : { cash: r.cash };
       if (adjust) adjust(carry);
-      P.campaign = Object.assign({}, P.campaign, { cleared: Math.max(P.campaign.cleared || 0, r.level), level: next, carry });
+      // carryAt[N] = N장을 시작할 때의 판. 장을 되돌아가 다시 하려면 그 장의 시작 판이 남아 있어야 한다
+      const carryAt = Object.assign({}, P.campaign.carryAt, { [next]: carry });
+      P.campaign = Object.assign({}, P.campaign, { cleared: Math.max(P.campaign.cleared || 0, r.level), level: next, carry, carryAt });
       Profile.save(); game = null;
       if (hasNext) return startLevel(next);            // 타이틀로 돌아가지 않는다 — 장은 이어진다
       closeModal(); showTitle();                       // 아직 다음 장이 없다 (임시 다리)
