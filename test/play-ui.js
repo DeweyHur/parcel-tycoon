@@ -117,8 +117,8 @@ const say = m => { console.log(m); log.push(m); };
   // 첫 사이클은 무기한 — ⏳ 가 아예 안 붙는다
   const dl = await page.evaluate(() => ({ nodl: PT.game.parcels.every(p => p.noDeadline),
     hourglass: /⏳/.test(document.getElementById('parcels').textContent),
-    txt: (document.querySelector('#parcels .st') || {}).textContent || '' }));
-  check(dl.nodl && !dl.hourglass, '첫 사이클 택배에 기한이 없다 — "' + dl.txt.trim() + '"');
+    txt: ((document.querySelector('#parcels .st') || {}).textContent || '').replace(/[▾▴]/g, '') }));
+  check(dl.nodl && !dl.hourglass && !dl.txt.trim(), '첫 사이클 택배는 기한 칸이 아예 비어 있다 — "' + dl.txt.trim() + '"');
   check(!(await page.evaluate(() => PT.game.shows('trust'))) && (await page.$$('.trust')).length === 0, '신뢰도가 화면에 없다');
   // 택배 상세도 같은 기준으로 비어 있어야 한다
   // 같은 택배는 묶음 줄로 접혀 있다 — 먼저 펼치고 낱줄을 연다

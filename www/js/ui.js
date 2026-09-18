@@ -614,7 +614,7 @@
     if (a.includes('frozen')) { if (!p.inFrozen) parts.push(`<b style="color:var(--red)">${T('ps.frozenOut')}</b>`); else parts.push(T('ps.frozen')); }
     if (a.includes('produce')) { if (p.inCold) parts.push(T('ps.produceCold')); else if (game && game.isHeatTurn() && !game.warehouse.vent) parts.push(`<b style="color:var(--orange)">${T('ps.heat')}</b>`); }
     if (p.customs > 0) { parts.push(`<b style="color:var(--blue)">${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })}</b>`); parts.push(`⏳ ${T('fmt.turns', { n: p.deadline })}`); if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`); return parts.join(' · '); }
-    if (p.noDeadline) parts.push(`<span style="color:var(--dim)">${T('ps.noDeadline')}</span>`);
+    if (p.noDeadline) { /* 무기한 — 아무 표시도 하지 않는다. 빈 칸이 곧 '급할 일 없음' */ }
     else if (p.overdue) { const ri = game ? game.returnIn(p) : null; parts.push(`<b style="color:var(--red)">${T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' })}</b>`); } else parts.push(T('ps.deadline', { n: p.deadline }));
     if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`);
     // 어떤 계약으로도 못 싣고 직접 배송도 안 되는 택배 — 반송 말고는 길이 없으니 눈에 띄어야 한다
@@ -646,7 +646,7 @@
     const cus = [...new Set(ps.map(x => M.CUSTOMERS[x.customer || 'anon'].icon))];
     const open = openGroups.has(key);
     const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '');
-    return `<div class="parcel group${cls}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">${esc(t.short)} ×${ps.length}</span>${attrIcons(a)} ${T('fmt.cells', { n: vol })} · ${money}c</div><div class="st">${parcelStatus(p)} <span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
+    return `<div class="parcel group${cls}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">${esc(t.short)} ×${ps.length}</span>${attrIcons(a)} ${T('fmt.cells', { n: vol })} · ${money}c</div><div class="st">${(st => st ? st + ' ' : '')(parcelStatus(p))}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
   }
   function renderParcels(container, parcels, selectable) {
     if (!parcels.length) { container.innerHTML = `<div id="empty">${T('hud.emptyWarehouse')}</div>`; return; }
@@ -689,7 +689,7 @@
       const cap = vcap * trucks, callFee = game.callFee(c, trucks), income = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
       const fill = vol / cap;
       const gauge = `<div class="truckgauge"><div class="tg"><i style="width:${Math.min(100, fill * 100)}%" class="${fill >= 0.8 ? 'good' : ''}"></i><span>${T('call.trucks', { n: trucks, vol, cap })}</span></div><div class="tbtn">${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : game.shows('simul') ? `<span class="d" style="color:var(--dim)">${T('call.simulMax', { n: Math.min(simul, Math.max(1, c.calls)) })}</span>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}</div></div>`;
-      const money = `<div class="pickinfo"><span>+${income}c − ${callFee}c = <b class="${income - callFee >= 0 ? '' : 'bad'}">${T('call.net', { net: income - callFee })}</b></span>${fill >= 0.8 && vol ? `<span style="color:var(--green)">${T('call.fillOk')}</span>` : vol ? `<span style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</span>` : ''}</div>`;
+      const money = `<div class="pickinfo"><span>+${income}c − ${callFee}c = <b class="${income - callFee >= 0 ? '' : 'bad'}">${T('call.net', { net: income - callFee })}</b></span>${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<span style="color:var(--green)">${T('call.fillOk')}</span>` : vol ? `<span style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</span>` : ''}</div>`;
       const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
       const riskLine = riskSel.length ? `<div class="d" style="font-size:12px;color:var(--orange);margin-bottom:6px">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
       const capsLine = !game.shows('attrs') ? '' : `<div class="d" style="font-size:11px;color:var(--dim);margin-bottom:4px">${car.badge || ''} ${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</div>`;
@@ -1209,10 +1209,11 @@
   // ---------- 달력 (한 해 · 이벤트) ----------
   function showCalendar(back) {
     const g = game; if (!g) return;
+    const mi = g.monthIndex();                   // 달력 칸은 개월차 — g.month(사이클)와 직접 비교하면 후반월에 다음 달이 켜진다
     const cells = g.calendarMonths().map(x => {
       const evs = x.events.map(e => `<div class="ev">${esc(T('cal.event.' + e.id).split(' — ')[0])} <small>${T('cal.eventTurns', { a: e.days ? e.days[0] : e.turns[0], b: e.days ? e.days[1] : e.turns[1] })}</small></div>`).join('');
       const pct = Math.round((x.arrivalsMult - 1) * 100); const vol = pct ? (pct > 0 ? '+' : '') + pct + '%' : '±0';
-      return `<div class="cm ${x.m === g.month ? 'now' : x.m < g.month ? 'past' : ''}"><div class="t">${x.icon} <b>${T('fmt.calOnly', { cal: x.cal })}</b> ${esc(T(`cal.${g.rules.calendar}.${x.cal}.label`))}${x.m === g.month ? ` <small style="color:var(--gold)">${T('cal.thisMonth')}</small>` : ''}</div><div style="color:var(--dim)">${T('cal.arrivals', { pct: vol })}</div>${evs}</div>`;
+      return `<div class="cm ${x.m === mi ? 'now' : x.m < mi ? 'past' : ''}"><div class="t">${x.icon} <b>${T('fmt.calOnly', { cal: x.cal })}</b> ${esc(T(`cal.${g.rules.calendar}.${x.cal}.label`))}${x.m === mi ? ` <small style="color:var(--gold)">${T('cal.thisMonth')}</small>` : ''}</div><div style="color:var(--dim)">${T('cal.arrivals', { pct: vol })}</div>${evs}</div>`;
     }).join('');
     const now = g.calMonth();
     modal(T('cal.title'), `<div class="calgrid">${cells}</div><hr><div class="d" style="font-size:12px">${g.seasonMods().icon || ''} ${esc(T(`cal.${g.rules.calendar}.${now}.note`))}</div>`, [{ label: T('btn.close'), onClick: back || closeModal }]);

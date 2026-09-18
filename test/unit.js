@@ -277,12 +277,13 @@ t('레벨: 플래그는 누적이고, 자유 런(레벨 없음)은 전부 켜져
   const s3 = LV.showsAt(3); assert.ok(s3.has('market') && s3.has('weather'), '누적');
   const free = NG(1); for (const f of LV.FLAGS) assert.ok(free.shows(f), f);
 });
-t('레벨 1: 계약 하나 · 고객 하나 · 창고 16칸 · 시드 고정 · 4사이클', () => {
+t('레벨 1: 계약 하나 · 개인 고객만 · 창고 16칸 · 시드 고정 · 4사이클', () => {
   const g = L1(), g2 = L1({ difficulty: 'normal' });
   assert.equal(g.seed, LV.get(1).seed); assert.equal(g.rules.months, 4);
   assert.equal(g.contracts.filter(Boolean).length, 1);
   assert.equal(g.contracts[0].carrier, 'bulk0');
-  assert.deepEqual(Object.keys(g.customers), ['mart']);
+  assert.deepEqual(Object.keys(g.customers), ['anon'], '서장에는 이름 있는 화주가 없다');
+  assert.ok(g.schedule.flat().every(sp => sp.customer === 'anon'), '대본 물류도 전부 개인 고객');
   assert.equal(g.warehouse.cap, 16); assert.equal(g.warehouse.cold, 0); assert.equal(g.yearOf(), 2027);
   const flat = x => x.map(tt => tt.map(sp => sp.type + sp.size).join()).join('|');
   assert.equal(flat(g.schedule), flat(g2.schedule), '난이도가 달라도 물류는 같다');
@@ -530,6 +531,17 @@ t('서장 1사이클은 무기한, 2사이클부터 기한이 붙는다', () => 
   g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents();
   const fresh = g.parcels.filter(p => p.arrivalTurn > 13);
   assert.ok(fresh.length && fresh.every(p => !p.noDeadline), '2사이클 택배에는 기한이 붙는다');
+});
+
+t('달력의 이번 달은 사이클이 아니라 개월차로 켜진다', () => {
+  const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 1, prep: false });
+  const cells = g.calendarMonths();
+  for (const c of [1, 2, 3, 4]) {
+    g.month = c;
+    const now = cells.filter(x => x.m === g.monthIndex());
+    assert.strictEqual(now.length, 1, `사이클 ${c} 에 이번 달 칸이 하나`);
+    assert.strictEqual(now[0].cal, g.calMonth(), `사이클 ${c}: 켜진 칸이 실제 달과 같다`);
+  }
 });
 
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);

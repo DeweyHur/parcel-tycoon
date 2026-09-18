@@ -100,10 +100,6 @@
       { speaker: 'yeo', expr: 'neutral', hl: '#c0' },
       { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },
-    // 유일한 고객이 누구인지도 사람이 와서 말한다 (2일차)
-    { id: 'l1mart', kind: 'turn', when: g => g.turn >= 2 && g.story.seen.includes('l1intro'), pages: [
-      { speaker: 'rep', nameKey: 'story.name.mart', expr: 'neutral' }, { expr: 'smile' },
-    ] },
     { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 3, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
@@ -111,7 +107,7 @@
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
     // 첫 사이클은 전부 무기한이었다. 기한 있는 택배가 처음 들어온 날, 그걸 가져온 사람이 직접 말한다
     { id: 'l1due', kind: 'turn', when: g => g.parcels.some(p => !p.noDeadline), pages: [
-      { speaker: 'rep', nameKey: 'story.name.mart', expr: 'neutral' },
+      { expr: 'neutral', hl: '#parcels' },
       { expr: 'neutral', hl: '#parcels' },
     ] },
     { id: 'l1deadline', kind: 'turn', when: g => g.story.seen.includes('l1due') && g.parcels.some(p => !p.overdue && !p.noDeadline && p.deadline <= 1), pages: [{ expr: 'worry', hl: '#parcels' }] },
