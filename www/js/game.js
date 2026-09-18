@@ -207,6 +207,14 @@
 
     // 장이 끝날 때 다음 장으로 넘길 판. 한 런이 이어지는 것처럼 보이려면 자금·창고·계약·고객·신뢰가 같이 가야 한다.
     // (택배·기한·달력은 안 넘긴다 — 장 사이는 두 달의 공백이고, 남은 물건은 리포트에서 정리된 것으로 친다)
+    // 화면에 보여 줄 계약 슬롯 수. 특수 품목이 오기 전에는 슬롯이 하나면 충분하다 —
+    // 빈 슬롯 세 칸은 "여기를 채워야 한다"는 잘못된 숙제처럼 보인다.
+    visibleSlots() {
+      if (!this._shows) return D.CONTRACT_SLOTS;
+      const n = !this.shows('cold') ? 1 : !this.shows('bigsize') ? 3 : D.CONTRACT_SLOTS;
+      return Math.max(n, this.contracts.filter(Boolean).length);
+    }
+
     carryState() {
       return {
         cash: this.cash,

@@ -129,6 +129,29 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!!deal && deal.paid > 0 && carried.cash === carried.carryCash, '계약금이 빠진 돈으로 1장을 시작한다 — 계약금 ' + (deal && deal.paid) + 'c · 시작 자금 ' + carried.cash + 'c');
   check(carried.contracts.join() === 'bulk0' && carried.cap === 16, '계약·창고가 그대로 넘어왔다 — ' + carried.contracts.join() + ' · ' + carried.cap + '칸');
   check(carried.seen > 0, '서장에서 들은 대사는 다시 안 한다 (본 비트 ' + carried.seen + '개)');
+
+  console.log('\n1장 마켓이 번잡하지 않다');
+  // 1사이클 끝까지 빨리 감고 마켓을 UI 로 연다 (열려 있는 대화창부터 닫는다 — 안 닫으면 버튼 클릭을 가로챈다)
+  await readBeat(); await passGate(); await readBeat();
+  await page.evaluate(() => { const g = PT.game; g.story.off = true; let n = 0;
+    while (g.phase === 'play' && g.turn < g.turns() && n++ < 40) { g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents(); } PT.renderAll(); });
+  await page.waitForTimeout(300);
+  await page.click('#wait-btn', { force: true }); await page.waitForTimeout(1000);
+  for (let k = 0; k < 4; k++) { if (await page.evaluate(() => PT.game.phase === 'market')) break;
+    const b = await page.$('#modal .foot .btn.primary'); if (!b) break; await b.click(); await page.waitForTimeout(600); }
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'shots/L07-market.png' });
+  const mk = await page.evaluate(() => ({
+    txt: (document.getElementById('modal') || {}).textContent || '',
+    slots: document.querySelectorAll('#modal .card').length,
+    ins: !!document.getElementById('mk-ins'), cust: !!document.getElementById('mk-cust'),
+    mine: !!document.getElementById('mk-mine'), refresh: !!document.getElementById('mk-refresh'),
+    empty: (document.getElementById('modal').textContent.match(/빈 슬롯/g) || []).length }));
+  check(await page.evaluate(() => PT.game.phase === 'market'), '마켓이 열렸다');
+  check(!/냉장|초대형/.test(mk.txt), '창고 줄에 냉장·초대형이 없다');
+  check(!mk.ins && !mk.cust && !mk.mine, '보험·고객·내 계약 버튼이 없다');
+  check(!mk.refresh && !/가격 ×/.test(mk.txt), '새로고침·가격 배수가 없다');
+  check(mk.empty === 0, '빈 계약 슬롯이 없다 (지금: ' + mk.empty + '칸)');
   await page.screenshot({ path: 'shots/L06-ch2-play.png' });
   const camp = await page.evaluate(() => Profile.get().campaign);
   check(camp && camp.name === '한길택배' && camp.cleared >= 1, '프로필에 상호·클리어가 남았다 — ' + JSON.stringify(camp));
