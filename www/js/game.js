@@ -198,6 +198,7 @@
         // 못 보내면 안 된다 — 마켓은 사이클 끝에만 열리니까 그 열흘은 손쓸 방법이 아예 없다.
         // 공백 동안 새로 끊어 둔 것으로 치고 바닥을 보장한다.
         if (carried) c.calls = Math.max(c.calls, Math.ceil(c.maxCalls * D.CARRY_CALLS_FLOOR));
+        if (this.level && this.level.minCalls != null) c.calls = Math.max(c.calls, Math.min(c.maxCalls, this.level.minCalls));
         return c;
       });
       while (this.contracts.length < D.CONTRACT_SLOTS) this.contracts.push(null);
@@ -222,6 +223,8 @@
     _initCustomers() {
       const R = this.rules, co = this.company;
       let list = (this.cfg.carry && this.cfg.carry.customers) || (this.level && this.level.company && this.level.company.customers) || co.customers;
+      // 장이 새 화주를 데려온다 — 물려받은 목록 위에 더한다(덮어쓰지 않는다)
+      for (const [k, lv] of (this.level && this.level.addCustomers) || []) if (!list.some(x => x[0] === k)) list = list.concat([[k, lv || 0]]);
       if (!list) { const pool = this.rng.shuffle(Object.keys(M.CUSTOMERS).filter(k => k !== 'anon')).slice(0, 3); list = pool.map(k => [k, this.rng.int(3)]).concat([['anon', 0]]); }
       for (const k of R.forceCustomers) if (!list.some(x => x[0] === k)) list = list.concat([[k, 0]]);
       if (R.noAnon) list = list.filter(x => x[0] !== 'anon');
@@ -834,7 +837,7 @@
       // ⚠🛃🌾 를 받아 줄 계약도, ❄ 를 둘 냉장 구역도 없는 장에 그게 오면 반송 말고는 길이 없다.
       // (대본이 없는 사이클을 무작위로 풀어 두려면 이 문이 규칙 쪽에도 있어야 한다)
       if (this._shows) {
-        const gate = { fragile: 'attrs', produce: 'attrs', intl: 'attrs', large: 'attrs', fresh: 'cold', frozen: 'frozen' };
+        const gate = { fragile: 'attrs', produce: 'attrs', fresh: 'cold', large: 'bigsize', intl: 'customs', frozen: 'frozen' };
         for (const t in gate) if (base[t] && !this.shows(gate[t])) { base.normal = (base.normal || 0) + base[t]; base[t] = 0; }
       }
       return base;
@@ -968,6 +971,9 @@
       const w = {}; for (const s of allowed) { let wt = D.SIZE_WEIGHT[s]; if (s === 7 && R.xlWeight != null) wt = R.xlWeight; if (s >= 4) wt *= R.bigWeight; if (cust.sizeBias === 'small' && s >= 2) wt *= s >= 4 ? 0.2 : 0.6; if (cust.sizeBias === 'big' && s < 4) wt *= 0.3; if (cust.sizeBias === 'mid' && s !== 2) wt *= 0.5; w[s] = wt; }
       // 냉동: 냉동 구역보다 큰 택배는 오지 않는다 (구역이 0이면 신선으로)
       if (type === 'frozen') { const fz = this.warehouse.frozen || 0; const ok = {}; for (const s in w) if (+s <= fz) ok[s] = w[s]; if (!Object.keys(ok).length) { type = 'fresh'; } else { for (const s in w) delete w[s]; Object.assign(w, ok); } }
+      // 대형(4칸 이상)이 아직 안 열린 장에는 어떤 품목도 4칸으로 오지 않는다 —
+      // 그걸 실을 수 있는 계열(대형·철도·해상)도 마켓에 안 나오기 때문이다
+      if (!this.shows('bigsize')) { const sm = {}; for (const k in w) if (+k < 4) sm[k] = w[k]; if (Object.keys(sm).length) { for (const k in w) delete w[k]; Object.assign(w, sm); } }
       const spec = { type, size: +this.rng.weighted(w), customer };
       if (attrs) spec.attrs = attrs; if (premium) spec.premium = true;
       return spec;
@@ -1421,7 +1427,7 @@
     }
     _carrierWeights() {
       const R = this.rules, w = {};
-      for (const k of Object.keys(D.FAMILIES)) { if (this.isBanned(k)) continue; w[k] = R.marketWeight[k] || 1; }
+      for (const k of Object.keys(D.FAMILIES)) { if (this.isBanned(k) || !this._familyOpen(k)) continue; w[k] = R.marketWeight[k] || 1; }
       for (const id in this.customers || {}) { const mw = this.customerPerk(id, 'marketWeight'); if (mw) for (const k in mw) if (w[k]) w[k] *= mw[k]; }
       return w;
     }
@@ -1493,10 +1499,34 @@
       for (const k of spec.customer || []) if (M.CUSTOMERS[k] && !this.customers[k]) items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: T('market.newCustomer', { name: M.CUSTOMERS[k].name }), sold: false });
       return items;
     }
+    // 아직 안 연 기능을 푸는 물건은 마켓에도 안 나온다.
+    // (입고 쪽은 _typeRatio 가 막는다 — 오지도 않는 ❆ 냉동을 위해 냉동고를 파는 것은 돈만 태우는 함정이다)
+    // 이 계열 계약이 이 장에 나올 수 있는가. **매물을 거르기 전에 가중치에서 빼야 한다** —
+    // 거르기만 하면 '막힌 품목 보장'이 철도·항공 같은 닫힌 계열을 골라 놓고, 그게 걸러져 해결책이 사라진다.
+    _familyOpen(fam) {
+      if (!this._shows) return true;
+      const g = { cold: 'cold', frozen: 'frozen', fragile: 'attrs', intl: 'customs', large: 'bigsize', air: 'bigsize', rail: 'bigsize', sea: 'bigsize' }[fam];
+      return !g || this.shows(g);
+    }
+    _marketAllowed(it) {
+      if (!this._shows) return true;
+      const facGate = { cold1: 'cold', cold2: 'cold', coldvan: 'cold', freezer1: 'frozen', vent: 'cold', padvan: 'attrs', bigvan: 'bigsize', yard: 'theft', driver: 'self' };
+      const attrGate = { fragile: 'attrs', cold: 'cold', customs: 'customs', frozen: 'frozen' };
+      if (it.kind === 'fac') { const g = facGate[it.fac]; return !g || this.shows(g); }
+      if (it.kind === 'item') return this.shows('insurance');
+      if (it.kind === 'customer') return this.shows('customers');
+      if (it.kind === 'contract') return this._familyOpen(FAM(it.carrier));
+      if (it.kind === 'enh') { const e = D.ENHANCEMENTS[it.enh]; if (!e) return true;
+        if (e.kind === 'opt') { const g = attrGate[e.attr]; return !g || this.shows(g); }
+        if (e.kind === 'trust') return this.shows('trust');
+        if (e.kind === 'express') return this.shows('simul');
+        return true; }
+      return true;
+    }
     _genMarketItems() {
       const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(m))] * R.itemPriceMult * R.priceMult;
       const sc = this.script(m);
-      if (sc && sc.market) return this._scriptedMarketItems(sc.market);
+      if (sc && sc.market) return this._scriptedMarketItems(sc.market).filter(it => this._marketAllowed(it));
       const items = [];
       const gp = this._gradeProb(m);
       const weights = this._carrierWeights(); // 계열 가중치
@@ -1549,7 +1579,7 @@
       if (Object.keys(vehW).length && this.rng.next() < 0.5) { const f = this.rng.weighted(vehW); items.push({ kind: 'fac', fac: f, price: Math.round(D.FACILITIES[f].price * mult * R.facilityPriceMult), name: D.FACILITIES[f].name, sold: false }); }
       if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3 + this.repTier * 0.12) { const cands = this.openCustomers(); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: T('market.newCustomer', { name: M.CUSTOMERS[k].name }), sold: false }); } }
       if (this.rng.next() < 0.6) { const k = this.rng.pick(Object.keys(M.INS_ITEMS)); items.push({ kind: 'item', item: k, price: Math.round(M.INS_ITEMS[k].price * mult), name: M.INS_ITEMS[k].name, sold: false }); }
-      return items;
+      return items.filter(it => this._marketAllowed(it));
     }
     refreshCost() { const mk = this.market; if (mk.refreshes < mk.freeRefresh) return 0; const r = mk.refreshes - mk.freeRefresh; return Math.round(D.REFRESH_COSTS[Math.min(r, D.REFRESH_COSTS.length - 1)] * this.rules.priceMult); }
     refreshMarket() {

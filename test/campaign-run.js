@@ -9,12 +9,8 @@ const LV = require('../www/js/levels.js');
 const diff = process.argv[2] || 'rookie';
 const fail = [], check = (ok, msg) => { console.log((ok ? '  ok ' : '  FAIL ') + msg); if (!ok) fail.push(msg); };
 
-// 장마다 그 시점에 켜져 있어야 하는 것 (levels.js 의 grants 누적)
-const EXPECT = {
-  1: [],
-  2: ['market', 'calls', 'simul'],
-  3: ['market', 'calls', 'simul', 'trust', 'weather', 'theft', 'self'],
-};
+// 장마다 그 시점에 켜져 있어야 하는 것 = levels.js 의 grants 누적 (표를 두 벌 두지 않는다)
+const expectAt = n => LV.FLAGS.filter(f => LV.showsAt(n).has(f));
 
 function bestCall(g) {
   let best = null;
@@ -49,17 +45,36 @@ function playLevel(n, carry) {
       for (const c of g.contracts) if (c && g.shows('calls') && c.calls <= Math.max(1, Math.floor(c.maxCalls * 0.4))) {
         const price = g.refillPrice(c); if (g.cash >= price) g.refill(c.id);
       }
+      // 사람처럼: 못 싣는 품목을 푸는 계약을 먼저, 그다음 시설·강화
+      const blocked = new Set(g.blockedTypes().map(b => b.type));
+      if (process.env.TRACE) console.log(`  [마켓 ${g.month}] 막힘 ${[...blocked].join(',') || '-'} · 매물 ${g.market.items.map(it => (it.name || it.kind)).join(' | ')}`);
+      const slotFor = it => {
+        if (it.kind === 'contract') { const e = g.contracts.findIndex(c => !c); return e >= 0 ? e : g.contracts.findIndex(Boolean); }
+        if (it.kind === 'enh') return g.contracts.findIndex(Boolean);
+        return undefined;
+      };
+      const want = it => {
+        if (it.sold || it.kind === 'refill' || it.switchFrom) return -1;
+        if (it.price > g.cash - 700) return -1;
+        if (it.kind === 'contract') return blocked.size ? 0 : 3;     // 막힌 게 있으면 계약이 최우선
+        if (it.kind === 'fac' && /^cold|^freezer/.test(it.fac || '')) return g.warehouse.cold < 8 ? 1 : 4;
+        if (it.kind === 'fac') return 2;
+        return 3;
+      };
       let k = 0;
-      while (k++ < 3) {
-        const i = g.market.items.findIndex(it => !it.sold && it.kind !== 'refill' && !it.switchFrom && it.price <= g.cash - 500);
-        if (i < 0) break;
-        const it = g.market.items[i];
-        const r = g.buy(i, it.kind === 'enh' ? g.contracts.findIndex(Boolean) : undefined);
-        if (!r || !r.ok) break;
+      while (k++ < 4) {
+        let bi = -1, bw = 9;
+        g.market.items.forEach((it, i) => { const w = want(it); if (w >= 0 && w < bw) { bw = w; bi = i; } });
+        if (bi < 0) break;
+        const it = g.market.items[bi];
+        const r = g.buy(bi, slotFor(it));
+        if (!r || !r.ok) { it.sold = true; continue; }               // 못 사면 건너뛴다
+        if (process.env.TRACE) console.log(`  [마켓] ${it.name || it.kind} -${it.price}c`);
       }
       g.closeMarket(); continue;
     }
     if (g.phase !== 'play') break;
+    if (process.env.TRACE && g.unhandled().length) console.log(`  !! ${g.month}-${g.turn} 실을 차 없음 ${g.unhandled().map(p => p.type + p.size).join(',')}`);
     if (process.env.TRACE) console.log(`  ${g.month}-${g.turn} 창고 ${g.usedVolume()}/${g.warehouse.cap}${g.outdoorVolume() ? ' 야외 ' + g.outdoorVolume() : ''} · 배차 ${g.contracts.filter(Boolean).map(c => c.calls + '/' + c.maxCalls).join(' ')} · 반송 ${g.stats.returned}`);
     const best = bestCall(g);
     if (best) { const r = g.callCarrier(best.i, best.r.ids, best.r.trucks); beats({ kind: 'call', result: r }); }
@@ -89,7 +104,7 @@ for (let n = 1; n <= LV.IMPLEMENTED; n++) {
   check(g.phase === 'win', `${name} 완주`);
   check(g.stats.returned === 0 && g.stats.discarded === 0, `${name} 반송·폐기 0 (반송 ${g.stats.returned} 폐기 ${g.stats.discarded})`);
   check(g.cash > 0, `${name} 흑자로 끝난다 — ${g.cash}c`);
-  check(on.join() === EXPECT[n].join(), `${name} 에 열린 기능이 맞다 — ${on.join(',') || '(없음)'}`);
+  check(on.join() === expectAt(n).join(), `${name} 에 열린 기능이 맞다 — ${on.join(',') || '(없음)'}`);
   // 안 연 품목은 아예 오지 않는다
   const types = [...new Set(g.schedule.flat().map(s => s.type))];
   const bad = types.filter(t => (t === 'fresh' && !g.shows('cold')) || (t === 'frozen' && !g.shows('frozen'))

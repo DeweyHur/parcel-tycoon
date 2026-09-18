@@ -175,7 +175,7 @@
       seed: 20270701,
       script: {
         // 1사이클 = 7월 전반 13영업일. 장마가 시작된다.
-        // 11일차에 26칸이 한꺼번에 들어온다 — "비 오기 전에 다들 밀어 넣는다".
+        // 11일차에 34칸이 한꺼번에 들어온다 — "비 오기 전에 다들 밀어 넣는다".
         // 차가 하루에 옮길 수 있는 건 많아야 두 대 14칸이라, 이날은 어떻게 해도 창고가 넘쳐 마당으로 나간다.
         // 그리고 그날부터 비다.
         1: { weather: ['sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'rain', 'rain', 'rain'],
@@ -190,7 +190,7 @@
           ['normal 2 anon', 'normal 2 anon'],
           ['normal 2 anon', 'normal 2 anon'],
           ['normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
           ['normal 2 anon', 'normal 2 anon'],
           ['normal 2 anon', 'normal 2 anon'],
           ]),
@@ -218,9 +218,59 @@
         // 3~4사이클(8월)은 대본이 없다
       },
     },
-    { n: 4, cycles: 4, grants: ['attrs', 'cold', 'customers'] },               // 9~10월: ❄ 특수 품목·냉장 구역·고객과 신뢰
-    { n: 5, cycles: 4, grants: ['rep', 'insurance', 'storage'] },              // 11~12월: 평판과 등급·사고와 보험·보관
-    { n: 6, cycles: 4, grants: ['frozen', 'weekendChoice', 'perks', 'codex'] },// 1~2월: ❆ 냉동·🛃 통관·주말 선택·퍽
+    // ----- 레벨 4 (9~10월): 찬 것과 깨지는 것, 그리고 이름이 있는 화주 -----
+    // 지금까지 다섯 달 내내 일반 택배만 왔다. 여기서 품목 문이 처음 열린다 — ❄ 신선 · ⚠ 파손 · 🌾 농산.
+    // ❄ 는 둘 곳(냉장 구역)과 보낼 곳(냉장 계열 계약)이 둘 다 있어야 한다. 그래서 오기 전에 마켓이 먼저 온다.
+    {
+      n: 4, cycles: 4, year: 2027, startMonth: 9, monthOffset: 6, grants: ['attrs', 'cold', 'customers'],
+      minCash: 1400, minCap: 24, minCalls: 6,
+      company: { cash: 2500, warehouse: { cap: 24, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }], customers: [['anon', 0]] },
+      // 이름 있는 화주가 여기서 처음 붙는다 (서장~2장은 전부 개인 고객이었다)
+      addCustomers: [['mart', 0], ['glass', 0], ['farm', 0]],
+      mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 420, monthlyStress: 0, noBankrupt: true, callsDelta: 3 },
+      seed: 20270901,
+      script: {
+        // 1사이클 = 9월 전반. 아직 일반뿐이지만 고객 이름이 붙기 시작한다.
+        // 마켓에서 ❄ 를 받을 준비(냉장 계열 계약 + 냉장고)를 먼저 갖춘다 — 예보 줄이 "다음 사이클에 ❄ 가 온다"고 알려 준다.
+        1: { turns: turns([
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart', 'normal 2 glass'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'normal 1 anon'],
+          ['normal 2 glass', 'normal 2 mart'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'normal 1 glass'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 glass', 'normal 2 mart'],
+          ['normal 2 mart', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 mart'],
+        ]),
+          market: { contracts: ['cold0'], enh: [], fac: ['cold1'] } },
+        // 2사이클 = 9월 후반. ❄ 신선이 처음 온다. 냉장 구역은 4칸뿐이라 금방 찬다.
+        2: { turns: turns([
+          ['normal 2 mart', 'fresh 2 farm'],
+          ['normal 2 anon', 'fresh 2 farm'],
+          ['normal 2 mart', 'normal 2 glass'],
+          ['fresh 2 farm', 'normal 2 mart'],
+          ['normal 2 anon', 'fresh 2 farm'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['fresh 2 farm', 'fresh 2 farm'],
+          ['normal 2 mart', 'normal 1 glass'],
+          ['normal 2 anon', 'fresh 2 farm'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['fresh 2 farm', 'normal 2 mart'],
+          ['normal 2 glass', 'normal 1 anon'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 mart'],
+        ]),
+          market: { contracts: [], enh: ['limit1'], fac: ['cold2', 'expand2'] } },
+        // 3~4사이클(10월)은 대본이 없다 — ⚠ 파손·🌾 농산이 무작위로 섞여 온다
+      },
+    },
+    { n: 5, cycles: 4, grants: ['rep', 'insurance', 'storage', 'bigsize'] },   // 11~12월: 평판과 등급·사고와 보험·보관·대형
+    { n: 6, cycles: 4, grants: ['frozen', 'customs', 'weekendChoice', 'perks', 'codex'] }, // 1~2월: ❆ 냉동·🛃 통관·주말 선택·퍽
   ];
 
   const get = n => LEVELS.find(l => l.n === n) || null;
@@ -235,6 +285,6 @@
   // price 는 2장 이후가 붙으면 다시 잡는다 (지금은 서장 종료 자금 1.5~3.5k 기준의 임시 값).
   const DEAL = { price: 8000, downRate: 0.6 };
 
-  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 3 };
+  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 4 };
   if (typeof module !== 'undefined') module.exports = API; else root.LEVELS = API;
 })(typeof window !== 'undefined' ? window : globalThis);

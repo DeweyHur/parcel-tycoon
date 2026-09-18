@@ -41,21 +41,36 @@ while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 400) {
     beats({ kind: 'summary' }); g.closeSummary(); continue;
   }
   if (g.phase === 'market') {
-    beats({ kind: 'market' });
-    // 사람처럼: 배차가 바닥난 계약을 먼저 채우고, 돈이 남으면 한도 강화 → 창고 확장 순으로 산다
-    // 사람은 0이 될 때까지 기다리지 않는다 — 한 사이클을 못 돌 것 같으면 채운다
-    for (const c of g.contracts) if (c && g.shows('calls') && c.calls <= Math.max(1, Math.floor(c.maxCalls * 0.4))) {
-      const price = g.refillPrice(c);
-      if (g.cash >= price) { g.refill(c.id); console.log(`  [마켓] 배차 충전 ${D.CARRIERS[c.carrier].name} -${price}c → ${c.calls}대`); }
-    }
-    let n = 0;
-    while (n++ < 3) {
-      const i = g.market.items.findIndex(it => !it.sold && it.kind !== 'refill' && it.price <= g.cash - 400);
-      if (i < 0) break;
-      const it = g.market.items[i], r = g.buy(i, it.kind === 'enh' ? g.contracts.findIndex(Boolean) : undefined);
-      if (!r || !r.ok) break;
-      console.log(`  [마켓] ${it.name || it.kind} 구매 -${it.price}c`);
-    }
+      beats({ kind: 'market' });
+      for (const c of g.contracts) if (c && g.shows('calls') && c.calls <= Math.max(1, Math.floor(c.maxCalls * 0.4))) {
+        const price = g.refillPrice(c); if (g.cash >= price) g.refill(c.id);
+      }
+      // 사람처럼: 못 싣는 품목을 푸는 계약을 먼저, 그다음 시설·강화
+      const blocked = new Set(g.blockedTypes().map(b => b.type));
+      if (process.env.TRACE) console.log(`  [마켓 ${g.month}] 막힘 ${[...blocked].join(',') || '-'} · 매물 ${g.market.items.map(it => (it.name || it.kind)).join(' | ')}`);
+      const slotFor = it => {
+        if (it.kind === 'contract') { const e = g.contracts.findIndex(c => !c); return e >= 0 ? e : g.contracts.findIndex(Boolean); }
+        if (it.kind === 'enh') return g.contracts.findIndex(Boolean);
+        return undefined;
+      };
+      const want = it => {
+        if (it.sold || it.kind === 'refill' || it.switchFrom) return -1;
+        if (it.price > g.cash - 700) return -1;
+        if (it.kind === 'contract') return blocked.size ? 0 : 3;     // 막힌 게 있으면 계약이 최우선
+        if (it.kind === 'fac' && /^cold|^freezer/.test(it.fac || '')) return g.warehouse.cold < 8 ? 1 : 4;
+        if (it.kind === 'fac') return 2;
+        return 3;
+      };
+      let k = 0;
+      while (k++ < 4) {
+        let bi = -1, bw = 9;
+        g.market.items.forEach((it, i) => { const w = want(it); if (w >= 0 && w < bw) { bw = w; bi = i; } });
+        if (bi < 0) break;
+        const it = g.market.items[bi];
+        const r = g.buy(bi, slotFor(it));
+        if (!r || !r.ok) { it.sold = true; continue; }               // 못 사면 건너뛴다
+        if (process.env.TRACE) console.log(`  [마켓] ${it.name || it.kind} -${it.price}c`);
+      }
     g.closeMarket(); continue;
   }
   if (g.phase !== 'play') break;
@@ -67,7 +82,11 @@ while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 400) {
     const r = g.callCarrier(best.i, best.r.ids, best.trucks);
     console.log(`${line} → 호출 ${best.trucks}대 ${Math.round(best.fill * 100)}% (+${r.revenue}c -${r.fee}c)`);
     beats({ kind: 'call', result: r });
-  } else { g.wait(); console.log(`${line} → 대기`); beats({ kind: 'turn' }); }
+  } else {
+    let self = [];
+    if (g.shows('self')) self = g.parcels.filter(p => g.selfCan(p)).sort((a, b) => a.deadline - b.deadline).slice(0, g.selfCount()).map(p => p.id);
+    g.wait(self); console.log(`${line} → 대기${self.length ? ' (직접 ' + self.length + ')' : ''}`); beats({ kind: 'turn' });
+  }
   g.takeEvents();
 }
 console.log(`\n끝: phase ${g.phase} · ${g.month}사이클 ${g.turn}일차 · 자금 ${g.cash}c · 반송 ${g.stats.returned} 폐기 ${g.stats.discarded} 도난 ${g.stats.stolen} · 처리 ${g.run.delivered}개`);

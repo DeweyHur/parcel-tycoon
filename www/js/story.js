@@ -190,7 +190,46 @@
     { id: 'l3last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
   ];
 
-  const LEVEL_BEATS = { 1: BEATS_L1, 2: BEATS_L2, 3: BEATS_L3 };
+  // ----- 레벨 4 전용 비트 (3장 · 9~10월) -----
+  // 다섯 달 내내 일반 택배만 왔다. 여기서 품목 문이 처음 열린다 — ❄ 찬 것, ⚠ 깨지는 것, 🌾 상하는 것.
+  // ❄ 는 둘 곳과 보낼 곳이 둘 다 있어야 한다. 그래서 오기 전에 마켓이 먼저 온다.
+  const coldItem = g => mkItem(g, it => it.kind === 'fac' && /^cold/.test(it.fac || ''));
+  const coldContract = g => mkItem(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'cold');
+  const firstOf = (g, t) => g.parcels.find(p => p.type === t);
+  const BEATS_L4 = [
+    { id: 'l4intro', kind: 'start', when: () => true, pages: [
+      { expr: 'neutral' },
+      { expr: 'smile', hl: '#parcels' },
+    ] },
+    // 이름 있는 화주 — 지금까지는 전부 개인 고객이었다
+    { id: 'l4cust', kind: 'turn', when: g => g.parcels.some(p => p.customer && p.customer !== 'anon'), pages: [
+      { expr: 'neutral', hl: '#parcels' },
+      { expr: 'think', hl: '#cust-btn' },
+    ] },
+    // 마켓이 먼저 온다: 다음 사이클에 ❄ 가 오는데 받을 데가 없다
+    { id: 'l4warn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!coldContract(g), pages: [{ expr: 'worry', hl: '#mk-fcwarn' }, { expr: 'neutral' }] },
+    { id: 'l4coldCar', kind: 'market', when: g => !!coldContract(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'cold') }] },
+    { id: 'l4coldFac', kind: 'market', when: g => !!coldItem(g), pages: [
+      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'fac' && /^cold/.test(it.fac || '')) },
+      { expr: 'worry' },
+    ] },
+    // ❄ 가 실제로 들어온 날
+    { id: 'l4cold', kind: 'turn', when: g => !!firstOf(g, 'fresh'), pages: [
+      { expr: 'neutral', hl: '#parcels' },
+      { expr: 'worry', hl: '#bar-cold' },
+    ] },
+    { id: 'l4coldFull', kind: 'turn', when: g => g.warehouse.cold > 0 && g.coldUsed && g.coldUsed() >= g.warehouse.cold, pages: [{ expr: 'worry', hl: '#bar-cold' }] },
+    // ⚠ 깨지는 것 — 아무 차나 되는데 확률이 붙는다
+    { id: 'l4fragile', kind: 'turn', when: g => !!firstOf(g, 'fragile'), pages: [{ expr: 'neutral', hl: '#parcels' }, { expr: 'think' }] },
+    { id: 'l4risk', kind: 'modal', modal: 'call', when: (g, ctx) => (ctx.risk || 0) > 0, pages: [{ expr: 'worry', hl: '#modal .pickinfo' }] },
+    // 🌾 상하는 것
+    { id: 'l4produce', kind: 'turn', when: g => !!firstOf(g, 'produce'), pages: [{ expr: 'neutral', hl: '#parcels' }] },
+    { id: 'l4break', kind: 'any', when: (g, ctx) => hasEvent(ctx, ['broken']), pages: [{ expr: 'shock' }, { expr: 'neutral' }] },
+    { id: 'l4custUp', kind: 'any', when: (g, ctx) => hasEvent(ctx, ['custLevel']), pages: [{ expr: 'laugh' }, { expr: 'smile' }] },
+    { id: 'l4last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
+  ];
+
+  const LEVEL_BEATS = { 1: BEATS_L1, 2: BEATS_L2, 3: BEATS_L3, 4: BEATS_L4 };
 
   const BEATS = [
     // ----- 3월 (1개월차): 창고 -----
