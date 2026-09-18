@@ -187,8 +187,61 @@
     showChapterEnd(r.level, Math.min(next, LEVELS.LAST), () => {
       // 서장 끝에서만: 여기서 처음으로 간판을 달고 가계약서에 도장을 찍는다
       if (r.level === 1) return askCompanyName(r, advance);
-      advance();
+      showInstalment(r, advance);                      // 그 뒤로는 장마다 잔금을 한 회차씩 갚는다
     });
+  }
+
+  // ---------- 잔금 회차 ----------
+  // 장이 끝날 때마다 한 회차를 낸다. 한 번에 다 갚는 구조면 중간 장에서는 돈을 쌓기만 하면 돼서
+  // 계산할 것이 없다 — 회차가 있어야 "이번 두 달에 얼마를 남겨야 하나"가 매 장의 질문이 된다.
+  function showInstalment(r, done) {
+    const P = Profile.get(), deal = P.campaign.deal;
+    if (!deal) return done();                          // 가계약을 안 거친 판(장 건너뛰기 등)은 그냥 넘어간다
+    const rest = Math.max(0, deal.rest);
+    if (rest <= 0) return done();
+    const due = LEVELS.dueAt(r.level, rest);
+    const cash = r.cash || 0;
+    const pay = Math.min(due, cash);                   // 모자라면 낼 수 있는 만큼만 — 나머지는 다음 회차로 밀린다
+    const short = due - pay, after = rest - pay;
+    const final = r.level >= LEVELS.LAST;
+    const row = (k, v, cls) => `<div class="ct-row"><span>${esc(k)}</span><b${cls ? ` class="${cls}"` : ''}>${v}</b></div>`;
+    const pct = Math.round(((deal.price - after) / deal.price) * 100);
+    const body = `<div class="paper"><h3>${esc(T(final ? 'inst.titleFinal' : 'inst.title'))}</h3>
+      ${row(T('ct.price'), deal.price + 'c')}
+      ${row(T('inst.paidSoFar'), (deal.paid || 0) + 'c')}
+      ${row(T(final ? 'inst.dueFinal' : 'inst.due'), due + 'c')}
+      ${row(T('inst.pay'), pay + 'c', short ? 'bad' : '')}
+      ${row(T('inst.rest'), after + 'c')}
+      <div class="instbar"><i style="width:${pct}%"></i><span>${pct}%</span></div>
+      <p class="ct-body">${short ? T('inst.short', { n: short }) : final && after <= 0 ? T('inst.cleared') : T('inst.ok', { left: cash - pay })}</p></div>`;
+    const m = modal(T('inst.modal'), body, [{ label: T(final && after <= 0 ? 'inst.btnFinal' : 'inst.btn'), cls: 'primary', onClick: () => {
+      const P2 = Profile.get();
+      P2.campaign = Object.assign({}, P2.campaign, { deal: { price: deal.price, paid: (deal.paid || 0) + pay, rest: after, late: short } });
+      Profile.save(); SFX.thud();
+      closeModal();
+      if (final && after <= 0) return showFinalContract(r, done);
+      done(cy => { cy.cash = Math.max(0, cash - pay); });
+    } }]);
+    return m;
+  }
+
+  // 잔금을 다 치른 날 — 가계약서가 본계약서가 된다
+  function showFinalContract(r, done) {
+    const P = Profile.get(), name = P.campaign.name || T('lv.nameDefault');
+    const body = `<div class="paper"><h3>${esc(T('ct.titleFinal'))}</h3>
+      <div class="ct-row"><span>${esc(T('ct.seller'))}</span><b>${esc(T('ct.sellerName'))}</b></div>
+      <div class="ct-row"><span>${esc(T('ct.buyer'))}</span><b>${esc(name)}</b></div>
+      <div class="ct-row"><span>${esc(T('ct.item'))}</span><b>${esc(T('ct.itemName'))}</b></div>
+      <p class="ct-body">${T('ct.bodyFinal')}</p>
+      <div class="stamp" id="ct-stamp">${esc(T('ct.stampMark'))}</div></div>`;
+    const m = modal(T('ct.modal'), body, [{ label: T('ct.stamp'), cls: 'primary', onClick: () => {
+      const st = m.querySelector('#ct-stamp');
+      if (st && !st.classList.contains('on')) {
+        st.classList.add('on'); SFX.thud(); BGM.oneShot('fanfare');
+        const foot = m.querySelector('.foot .btn'); if (foot) foot.textContent = T('ct.doneFinal');
+        m.querySelector('.foot .btn').onclick = () => { SFX.click(); done(cy => { cy.cash = Math.max(0, (r.cash || 0)); }); };
+      }
+    } }]);
   }
 
   // 상호를 짓는다 — 여기서 처음으로 '내 가게'가 된다

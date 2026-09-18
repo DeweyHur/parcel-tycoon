@@ -390,3 +390,8 @@ body.cine { background: #000; }
 .modal.titlecard .title .chpick .chip { padding: 5px 10px; font-size: 11px; color: var(--dim); border: 2px solid var(--line); cursor: pointer; }
 .modal.titlecard .title .chpick .chip.on { color: var(--gold); border-color: var(--gold); }
 .modal.titlecard .title .chpick .chip:active { transform: translate(1px, 1px); }
+
+/* 잔금 진행 막대 — 영수증 위에 얹는다 */
+.paper .instbar { position: relative; height: 16px; margin: 12px 2px 0; background: #ded5c2; border: 2px solid #a99a7c; }
+.paper .instbar > i { display: block; height: 100%; background: #5c8a4a; }
+.paper .instbar > span { position: absolute; inset: 0; text-align: center; font-size: 10px; line-height: 12px; color: #24201a; }

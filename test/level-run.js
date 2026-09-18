@@ -23,7 +23,10 @@ function bestCall() {
     const vcap = g.vehicleCap(c), fill = r.vol / (vcap * r.trucks);
     const picked = r.ids.map(id => g.parcels.find(p => p.id === id));
     const urgent = picked.some(p => p.deadline <= 1 || p.overdue);
-    if (!urgent && fill < 0.8) return;
+    // 꽉 채워 보내는 게 원칙이지만, 연휴 직전이거나 창고가 넘쳤으면 덜 차도 보낸다 (사람이 그렇게 한다)
+    const soon = [1, 2].some(d => g.isOffTurn && g.isOffTurn(g.turn + d));
+    const over = g.usedVolume() > g.warehouse.cap;
+    if (!urgent && !soon && !over && fill < 0.8) return;
     if (!best || (urgent ? 100 : 0) + fill * 10 > best.score) best = { i, c, r, fill, trucks: r.trucks, score: (urgent ? 100 : 0) + fill * 10 };
   });
   return best;
@@ -47,16 +50,27 @@ while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 400) {
       }
       // 사람처럼: 못 싣는 품목을 푸는 계약을 먼저, 그다음 시설·강화
       const blocked = new Set(g.blockedTypes().map(b => b.type));
+      const blockedAttrs = new Set(g.blockedTypes().flatMap(b => D.PARCEL_TYPES[b.type].attrs));
       if (process.env.TRACE) console.log(`  [마켓 ${g.month}] 막힘 ${[...blocked].join(',') || '-'} · 매물 ${g.market.items.map(it => (it.name || it.kind)).join(' | ')}`);
+      // 계약은 **빈 슬롯에만** 넣는다 — 꽉 찬 슬롯에 밀어 넣으면 쓰던 계약이 날아간다
+      const emptySlot = () => g.contracts.slice(0, g.visibleSlots()).findIndex(c => !c);
       const slotFor = it => {
-        if (it.kind === 'contract') { const e = g.contracts.findIndex(c => !c); return e >= 0 ? e : g.contracts.findIndex(Boolean); }
+        if (it.kind === 'contract') return emptySlot();
         if (it.kind === 'enh') return g.contracts.findIndex(Boolean);
         return undefined;
       };
       const want = it => {
         if (it.sold || it.kind === 'refill' || it.switchFrom) return -1;
         if (it.price > g.cash - 700) return -1;
-        if (it.kind === 'contract') return blocked.size ? 0 : 3;     // 막힌 게 있으면 계약이 최우선
+        if (it.kind === 'contract') {
+          if (emptySlot() < 0) return -1;                             // 넣을 자리가 없으면 안 산다
+          return blocked.size ? 0 : 2;                                // 막힌 게 있으면 최우선, 아니면 한 대 더
+        }
+        // 슬롯이 꽉 찼을 때 막힌 속성을 푸는 길 — 특약은 기존 계약에 붙으니 자리를 안 먹는다
+        if (it.kind === 'enh') {
+          const e = D.ENHANCEMENTS[it.enh];
+          if (e && e.kind === 'opt') return blockedAttrs.has(e.attr) ? 0 : -1;
+        }
         if (it.kind === 'fac' && /^cold|^freezer/.test(it.fac || '')) return g.warehouse.cold < 8 ? 1 : 4;
         if (it.kind === 'fac') return 2;
         return 3;
@@ -67,8 +81,11 @@ while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 400) {
         g.market.items.forEach((it, i) => { const w = want(it); if (w >= 0 && w < bw) { bw = w; bi = i; } });
         if (bi < 0) break;
         const it = g.market.items[bi];
-        const r = g.buy(bi, slotFor(it));
-        if (!r || !r.ok) { it.sold = true; continue; }               // 못 사면 건너뛴다
+        // 강화·특약은 붙일 수 있는 계약을 찾아 가며 시도한다 (용달 계열은 특약이 안 붙는다)
+        const targets = it.kind === 'enh' ? g.contracts.map((c, i) => c ? i : -1).filter(i => i >= 0) : [slotFor(it)];
+        let r = null;
+        for (const t of targets) { r = g.buy(bi, t); if (r && r.ok) break; }
+        if (!r || !r.ok) { it.sold = true; continue; }               // 아무 데도 못 붙이면 건너뛴다
         if (process.env.TRACE) console.log(`  [마켓] ${it.name || it.kind} -${it.price}c`);
       }
     g.closeMarket(); continue;

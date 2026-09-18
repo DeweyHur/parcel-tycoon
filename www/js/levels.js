@@ -321,7 +321,65 @@
         // 3~4사이클(12월)은 대본이 없다 — 한 해에서 제일 바쁜 달을 혼자 넘긴다
       },
     },
-    { n: 6, cycles: 4, grants: ['frozen', 'customs', 'weekendChoice', 'perks', 'codex'] }, // 1~2월: ❆ 냉동·🛃 통관·주말 선택·퍽
+    // ----- 레벨 6 (1~2월): 마지막 겨울 -----
+    // 한 해의 끝. 1월은 비수기라 숨을 돌리고, 2월 설에 마지막 폭주가 온다.
+    // 새로 여는 것: ❆ 냉동 · 일요일 선택 · 퍽과 도감(캠페인을 끝낸 뒤 자유 런에서 쓰는 것들).
+    // 🛃 통관은 캠페인에서 열지 않는다 — 계열이 여섯인데 슬롯이 다섯이라, 마지막 장에서
+    // 새 품목을 둘이나 열면 어느 하나는 받을 길이 아예 없어진다. 통관은 자유 런의 평판 등급이 연다.
+    // 이 장 끝에서 잔금을 턴다 — 본계약서에 도장을 찍는 자리다.
+    {
+      n: 6, cycles: 4, year: 2028, startMonth: 1, monthOffset: 10, grants: ['frozen', 'weekendChoice', 'perks', 'codex'],
+      minCash: 2500, minCap: 56, minCalls: 8,
+      company: { cash: 6000, warehouse: { cap: 64, cold: 12, frozen: 0, xl: 0 },
+        contracts: [{ carrier: 'bulk1' }, { carrier: 'cold0' }, { carrier: 'fragile0' }, { carrier: 'large0' }],
+        customers: [['anon', 0], ['mart', 2], ['glass', 1], ['farm', 1], ['mover', 1]] },
+      addCustomers: [['ice', 0]],                      // ❆ 냉동창고
+      // 설 연휴는 이틀을 통째로 못 부르는데, 그 앞에 폭주가 붙는다. 첫 해에는 그 벽을 조금 낮춰 둔다 —
+      // 물량을 20% 덜고(1월은 원래 비수기다) 배차 그릇을 키운다. 진짜 설은 자유 런의 몫이다.
+      // noRepEnd: 마지막 장은 한 해를 끝내고 잔금을 치르는 자리다. 열 달을 굴려 온 판이 설 연휴 사흘에
+      // 평판으로 끊기면 플레이어는 캠페인의 결말을 못 본다. 평판은 4장에서 가르쳤고, 여기서는
+      // 그 결과가 성적(정시율·반송)과 '잔금을 다 낼 수 있는가'로 남는다.
+      mods: { noBankrupt: true, noRepEnd: true, opCostFixed: 700, callsDelta: 6, heatAlerts: 0, arrivalsMult: 0.8 },
+      seed: 20280101,
+      script: {
+        // 1사이클 = 1월 전반. 비수기다 — 숨을 돌리면서 ❆ 를 받을 준비를 한다.
+        // 예보가 다음 보름의 ❆ 를 경고하고, 마켓이 냉동 계약과 냉동고를 판다.
+        1: { turns: turns([
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart', 'fresh 2 farm'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 anon', 'fragile 2 glass'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart', 'fresh 2 farm'],
+          ['normal 2 anon', 'produce 2 farm'],
+          ['normal 2 mart', 'normal 2 glass'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'fresh 2 farm'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'fragile 2 glass'],
+          ['normal 2 anon', 'normal 2 mart'],
+        ]),
+          market: { contracts: ['frozen0'], enh: [], item: [], fac: ['freezer1'] } },
+        // 2사이클 = 1월 후반. ❆ 냉동이 온다. 냉동 구역이 없으면 갈 데가 없다
+        2: { turns: turns([
+          ['normal 2 mart', 'frozen 2 ice'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['frozen 2 ice', 'normal 2 mart'],
+          ['normal 2 mart', 'fresh 2 farm'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['frozen 2 ice', 'normal 2 glass'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['frozen 2 ice', 'fragile 2 glass'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'produce 2 farm'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'normal 2 anon'],
+        ]),
+          market: { contracts: [], enh: ['limit1'], item: ['transitCert'], fac: ['freezer1', 'expand3'] } },
+        // 3~4사이클(2월)은 대본이 없다 — 설 폭주와 연휴 휴무를 혼자 넘긴다
+      },
+    },
   ];
 
   const get = n => LEVELS.find(l => l.n === n) || null;
@@ -332,10 +390,18 @@
   const startCycle = n => { let c = 1; for (const l of LEVELS) { if (l.n >= n) break; c += l.cycles; } return c; };
 
   // 창고 매매 — 무상 양도가 아니다. 한 사장님이 값을 부르고, 서장 끝에 계약금을 걸고,
-  // 남은 열 달 동안 잔금을 채운다. 목표 금액이 있어야 매달 '얼마를 남겨야 하나'가 계산이 된다.
-  // price 는 2장 이후가 붙으면 다시 잡는다 (지금은 서장 종료 자금 1.5~3.5k 기준의 임시 값).
-  const DEAL = { price: 8000, downRate: 0.6 };
+  // 그다음 장마다 회차로 나눠 갚고, 마지막 장에서 잔금을 턴다.
+  // 한 번에 다 갚는 구조였을 때는 중간 장에서 돈을 쌓기만 하면 돼서 계산할 것이 없었다 —
+  // 회차가 있어야 "이번 두 달에 얼마를 남겨야 하나"가 매 장의 질문이 된다.
+  const DEAL = {
+    price: 11000,
+    downRate: 0.6,                                  // 서장 끝 계약금 = 그 시점 자금의 60%
+    // 그 레벨을 끝냈을 때 내는 회차 납입금 (1장 = level 2). 마지막 장은 남은 잔금 전액.
+    install: { 2: 500, 3: 700, 4: 1300, 5: 2600 },
+  };
+  // 그 장을 끝냈을 때 내야 할 돈. 마지막 장이면 남은 잔금 전부.
+  const dueAt = (level, rest) => (level >= LAST ? rest : Math.min(rest, DEAL.install[level] || 0));
 
-  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 5 };
+  const API = { LEVELS, FLAGS, DEAL, dueAt, get, showsAt, startCycle, LAST, IMPLEMENTED: 6 };
   if (typeof module !== 'undefined') module.exports = API; else root.LEVELS = API;
 })(typeof window !== 'undefined' ? window : globalThis);

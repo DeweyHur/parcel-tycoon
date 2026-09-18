@@ -267,7 +267,46 @@
     { id: 'l5last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'think' }] },
   ];
 
-  const LEVEL_BEATS = { 1: BEATS_L1, 2: BEATS_L2, 3: BEATS_L3, 4: BEATS_L4, 5: BEATS_L5 };
+  // ----- 레벨 6 전용 비트 (5장 · 1~2월 · 마지막 겨울) -----
+  // 마지막 장. 새로 여는 것은 ❆ 냉동과 일요일 선택뿐이고, 나머지는 한 해를 마무리하는 이야기다.
+  const frozenCar = g => mkItem(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen');
+  const freezerFac = g => mkItem(g, it => it.kind === 'fac' && /^freezer/.test(it.fac || ''));
+  const offSoon = g => [1, 2, 3].some(d => g.isOffTurn(g.turn + d));
+  const BEATS_L6 = [
+    { id: 'l6intro', kind: 'start', when: () => true, pages: [
+      { expr: 'neutral' },
+      { expr: 'smile' },
+    ] },
+    // 일요일 선택 — 여태 그냥 쉬던 날에 고를 것이 생긴다
+    { id: 'l6weekend', kind: 'weekend', when: () => true, pages: [
+      { expr: 'neutral' },
+      { expr: 'neutral', hl: '.wkopts .wkc', gate: true },
+    ] },
+    // ❆ 냉동 — 오기 전에 마켓이 먼저
+    { id: 'l6frozenWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!frozenCar(g), pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
+    { id: 'l6frozenCar', kind: 'market', when: g => !!frozenCar(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen') }] },
+    { id: 'l6freezer', kind: 'market', when: g => !!freezerFac(g), pages: [
+      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'fac' && /^freezer/.test(it.fac || '')) },
+      { expr: 'worry' },
+    ] },
+    { id: 'l6frozen', kind: 'turn', when: g => g.parcels.some(p => p.type === 'frozen'), pages: [
+      { expr: 'neutral', hl: '#parcels' },
+      { expr: 'worry', hl: '#bar-cold' },
+    ] },
+    // 설 — 폭주가 먼저 오고 연휴에 차가 안 온다
+    { id: 'l6holiday', kind: 'turn', when: offSoon, pages: [
+      { expr: 'worry', hl: '#upcoming' },
+      { expr: 'neutral', hl: '#upcoming' },
+    ] },
+    { id: 'l6off', kind: 'turn', when: g => g.isOffTurn(), pages: [{ expr: 'neutral', hl: '#actions' }] },
+    { id: 'l6last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [
+      { expr: 'smile' },
+      { expr: 'think' },
+      { expr: 'smile' },
+    ] },
+  ];
+
+  const LEVEL_BEATS = { 1: BEATS_L1, 2: BEATS_L2, 3: BEATS_L3, 4: BEATS_L4, 5: BEATS_L5, 6: BEATS_L6 };
 
   const BEATS = [
     // ----- 3월 (1개월차): 창고 -----

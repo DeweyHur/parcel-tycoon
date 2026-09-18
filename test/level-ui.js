@@ -153,6 +153,38 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!mk.refresh && !/가격 ×/.test(mk.txt), '새로고침·가격 배수가 없다');
   check(mk.empty === 0, '빈 계약 슬롯이 없다 (지금: ' + mk.empty + '칸)');
 
+  console.log('\n장이 끝나면 잔금을 한 회차 낸다');
+  await page.evaluate(() => { const P = PT.Profile.get();
+    P.campaign = { level: 3, cleared: 2, name: '한길택배', deal: { price: 11000, paid: 1385, rest: 9615 },
+      carryAt: { 3: { cash: 2000, warehouse: { cap: 24, cold: 0, frozen: 0, xl: 0 },
+        contracts: [{ carrier: 'bulk0', grade: 'normal', calls: 8 }], customers: [['anon', 0]], trust: { bulk0: 80 }, seen: ['l1intro'], notes: [] } } };
+    PT.Profile.save(); });
+  await page.reload(); await page.waitForTimeout(900);
+  await page.click('#modal .chpick .chip[data-ch="3"]'); await page.waitForTimeout(400);
+  const y2 = await page.$('#modal .foot .btn.warn'); if (y2) { await y2.click(); await page.waitForTimeout(1400); }
+  const c2 = await page.$('#modal .chcard'); if (c2) { await c2.click(); await page.waitForTimeout(800); }
+  await readBeat(); await passGate(); await readBeat();
+  await page.evaluate(() => { const g = PT.game; g.story.off = true; g.cash = 3000; let n = 0;
+    while (n++ < 500 && !(g.phase === 'play' && g.month === g.rules.months && g.turn === g.turns())) {
+      if (g.phase === 'play') g.wait(); else if (g.phase === 'summary') g.closeSummary();
+      else if (g.phase === 'market') g.closeMarket(); else if (g.phase === 'weekend') g.weekendChoose('rest'); else break; g.takeEvents(); }
+    g.cash = 3000; PT.renderAll(); });
+  await page.waitForTimeout(300);
+  await page.click('#wait-btn', { force: true }); await page.waitForTimeout(1500);
+  for (let k = 0; k < 8; k++) {
+    if (await page.$('#modal .paper .instbar')) break;
+    const ch = await page.$('#modal .chcard'); if (ch) { await ch.click(); await page.waitForTimeout(600); continue; }
+    const btn = await page.$('#modal .foot .btn.primary'); if (btn) { await btn.click(); await page.waitForTimeout(700); continue; }
+    break;
+  }
+  await page.screenshot({ path: 'shots/L08-instalment.png' });
+  const inst = await page.$eval('#modal', el => el.textContent.replace(/\s+/g, ' ')).catch(() => '');
+  check(/잔 금 영 수 증/.test(inst) && /11000c/.test(inst) && /700c/.test(inst), '잔금 회차 화면이 뜬다 — ' + inst.slice(0, 70));
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(1400);
+  const afterPay = await page.evaluate(() => { const d = PT.Profile.get().campaign.deal; return { paid: d.paid, rest: d.rest, cash: PT.game && PT.game.cash }; });
+  check(afterPay.paid === 2085 && afterPay.rest === 8915, '회차만큼 잔금이 줄어든다 — ' + JSON.stringify(afterPay));
+  check(afterPay.cash > 0 && afterPay.cash < 3000, '낸 만큼 덜어진 돈으로 다음 장을 시작한다 — ' + afterPay.cash + 'c');
+
   console.log('\n1장에서 서장으로 돌아갈 수 있다');
   await page.evaluate(() => { const P = PT.Profile.get(); P.campaign.cleared = 1; P.campaign.level = 2; PT.Profile.save(); });
   await page.reload(); await page.waitForTimeout(900);

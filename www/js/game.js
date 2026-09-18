@@ -50,7 +50,7 @@
     noBankrupt: false, noDeadlineCycles: 0, storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, eventGoods: false, storageAnon: false,
     // 4단계: 난이도·시나리오 고객 규칙
     feeMult: 1, feeFixed: null, feeDelta: 0,
-    gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, burstDeadlineDelta: 0, customerClaimMult: {}, storageOfferEvery: 0, winStorage: 0, bigCustomer: false, winBigCustomer: false,
+    noRepEnd: false, gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, burstDeadlineDelta: 0, customerClaimMult: {}, storageOfferEvery: 0, winStorage: 0, bigCustomer: false, winBigCustomer: false,
   };
   const MULT_KEYS = ['theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
   const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'burstTurns', 'selfCapDelta', 'allStartTrust'];
@@ -211,7 +211,7 @@
     // 빈 슬롯 세 칸은 "여기를 채워야 한다"는 잘못된 숙제처럼 보인다.
     visibleSlots() {
       if (!this._shows) return D.CONTRACT_SLOTS;
-      const n = !this.shows('cold') ? 1 : !this.shows('bigsize') ? 3 : D.CONTRACT_SLOTS;
+      const n = !this.shows('cold') ? 1 : !this.shows('bigsize') ? 3 : !this.shows('frozen') ? 4 : D.CONTRACT_SLOTS;
       return Math.max(n, this.contracts.filter(Boolean).length);
     }
 
@@ -1285,7 +1285,7 @@
         this.say('log.penalty', { pen, reasons, rep: this.rep });
         this.emit('penalty', { amount: pen, reasons });
       } else if (reasons.length) this.say(reasons.join(', '));
-      if (this.rep <= 0) return this._gameOver(MSG('over.rep'));
+      if (this.rep <= 0 && !this.rules.noRepEnd) return this._gameOver(MSG('over.rep'));
       if (this.isWeekendAfter(this.turn)) return this._startWeekend();
       if (this.turn >= this.turns()) return this._endMonth();
       this._startTurn();
@@ -1324,7 +1324,7 @@
       this.emit('weekendEnd', { choice: id, pen });
       this.weekend = null;
       this.phase = 'play';
-      if (this.rep <= 0) return this._gameOver(MSG('over.rep'));
+      if (this.rep <= 0 && !this.rules.noRepEnd) return this._gameOver(MSG('over.rep'));
       if (last) { this._endMonth(); return { ok: true, pen }; }   // 넷째 일요일 다음은 월말 정산
       this._startTurn();
       return { ok: true, pen };
