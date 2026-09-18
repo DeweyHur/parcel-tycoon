@@ -17,7 +17,9 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
     return ov ? { line: (document.getElementById('intro-line') || {}).textContent || '', cine: PT.scene.cine, panel: +getComputedStyle(document.getElementById('panel')).opacity,
       closed: !!PT.scene.closed, front: !!(PT.scene.parts.front && PT.scene.parts.front.visible) } : null;
   });
-  const skip = async () => { await page.mouse.click(195, 400); await page.waitForTimeout(700); };
+  // 건너뛰면 장 시작 카드가 뜬다 — 그것도 지나야 플레이 화면이다
+  const card = async () => { const c = await page.$('#modal .chcard'); if (!c) return ''; const t = await c.textContent(); await c.click(); await page.waitForTimeout(500); return t.replace(/\s+/g, ' ').trim(); };
+  const skip = async () => { await page.mouse.click(195, 400); await page.waitForTimeout(700); await card(); };
   const clean = () => page.evaluate(() => ({
     gone: !document.getElementById('intro'), cine: PT.scene.cine, basis: document.getElementById('scene').style.flexBasis,
     cls: document.getElementById('app').className, bodyCls: document.body.className,
@@ -35,7 +37,9 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!!a, '오프닝이 나온다');
   check(!!a && a.cine === true && a.panel === 0, '창고 뷰만 보이고 패널은 감춰진다 — ' + JSON.stringify(a));
   check(!!a && a.closed && a.front, '오프닝 동안은 벽이 다 있는 완성 건물이다');
-  await skip();
+  await page.mouse.click(195, 400); await page.waitForTimeout(700);
+  const cardTxt = await card();
+  check(/서장/.test(cardTxt) && /빈 창고/.test(cardTxt), '컷씬 뒤에 장 카드가 뜬다 — ' + cardTxt);
   const c1 = await clean();
   check(c1.gone && !c1.cine && !c1.cls && !c1.bodyCls && c1.basis === '' && c1.truck === 12 && c1.fov === 38, '건너뛰면 원상복구 — ' + JSON.stringify(c1));
   check(!c1.closed && !c1.front, '플레이 화면은 앞면이 벗겨진 단면이다');
@@ -110,6 +114,8 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   const go = await page.$('#t-level'); await go.click(); await page.waitForTimeout(400);
   const cf = await page.$('#modal .foot .btn.warn'); if (cf) { await cf.click(); await page.waitForTimeout(900); }
   check(!(await playing()), '?nointro 면 바로 1턴');
+  const ncCard = await card();
+  check(/서장/.test(ncCard), '컷씬을 꺼도 장 카드는 뜬다 — ' + ncCard);
 
   console.log('\n에러:', errors.length ? errors.slice(0, 5) : '없음');
   await browser.close();

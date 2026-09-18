@@ -81,6 +81,14 @@ const say = m => { console.log(m); log.push(m); };
   check(intro1.truck === 12 && intro1.fov === 38, '탑차·화각이 평소대로 — 탑차 x' + intro1.truck + ' · 화각 ' + intro1.fov);
   await page.waitForTimeout(400);
 
+  say('\n■ 장 시작 카드');
+  const startCard = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
+  check(/서장/.test(startCard) && /빈 창고/.test(startCard) && /2027/.test(startCard),
+    '컷씬 뒤에 제목·부제·달력이 뜬다 — ' + startCard.replace(/\s+/g, ' ').trim());
+  check(!(await page.$eval('#story', el => !el.hidden).catch(() => false)), '장 카드 동안 대화창이 안 뜬다');
+  await shot('00c-chapter');
+  await page.click('#modal .chcard'); await page.waitForTimeout(600);
+
   const state = () => page.evaluate(() => { const g = PT.game; return g ? { phase: g.phase, m: g.month, t: g.turn, turns: g.turns(), cash: g.cash, used: g.usedVolume(), cap: g.warehouse.cap, ret: g.stats.returned, disc: g.stats.discarded, sig: PT.scene.buildSig, seen: g.story.seen.length } : { phase: 'none' }; });
   const storyOpen = () => page.$eval('#story', el => !el.hidden).catch(() => false);
   const gateOpen = () => page.$eval('#story-gate', el => !el.hidden).catch(() => false);
@@ -230,7 +238,12 @@ const say = m => { console.log(m); log.push(m); };
   await shot('41-letter');
   const letTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
   check(/한 사장님 편지/.test(letTxt) && /한종수/.test(letTxt), '영감님 편지가 뜬다 — ' + letTxt.replace(/\s+/g, ' ').slice(0, 44));
-  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(350);
+  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(400);
+  const endCard = await page.$eval('#modal .chcard.end', el => el.textContent).catch(() => '');
+  check(/서장/.test(endCard) && /셔터/.test(endCard) && /1장/.test(endCard) && /두 번째 트럭/.test(endCard),
+    '장 끝 카드에 맺음말과 다음 장 예고가 있다 — ' + endCard.replace(/\s+/g, ' ').trim());
+  await shot('42b-chapter-end');
+  await page.click('#modal .chcard'); await page.waitForTimeout(400);
   await shot('42-name');
   const input = await page.$('#lv-name');
   check(!!input, '상호 입력칸');

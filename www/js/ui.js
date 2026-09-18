@@ -121,7 +121,7 @@
     const P = Profile.get();
     game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false, companyName: P.campaign.name || '' });
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
-    closeModal(); startPlay({ intro: n === 1 });
+    closeModal(); startPlay({ intro: n === 1, chapter: n });
   }
   // 장을 끝내면 세 화면이 이어진다: 박 반장 리포트 → 한 사장님 편지 → (마지막 장이면) 상호 · 계약서
   function showLevelDone(r) {
@@ -157,13 +157,16 @@
   }
 
   function afterChapter(r) {
-    // 구현된 마지막 장을 끝냈다 = 한 해 시험이 끝난 것으로 친다 → 상호를 짓고 계약서에 도장
-    if (r.level >= LEVELS.IMPLEMENTED) return askCompanyName(r);
-    const P = Profile.get();
-    P.campaign = Object.assign({}, P.campaign, { cleared: Math.max(P.campaign.cleared || 0, r.level), level: r.level + 1 });
-    Profile.save(); game = null;
-    modal(T('lv.doneTitle', { ch: chName(r.level) }), `<p>${T('lv.nextCh', { ch: chName(r.level + 1) })}</p>`,
-      [{ label: T('res.toTitle'), cls: 'primary', onClick: () => { closeModal(); showTitle(); } }]);
+    const next = r.level + 1, hasNext = next <= LEVELS.IMPLEMENTED;
+    showChapterEnd(r.level, Math.min(next, LEVELS.LAST), () => {
+      // 마지막 구현 장이면 한 해 시험이 끝난 것으로 친다 → 상호를 짓고 가계약서에 도장
+      if (!hasNext) return askCompanyName(r);
+      const P = Profile.get();
+      P.campaign = Object.assign({}, P.campaign, { cleared: Math.max(P.campaign.cleared || 0, r.level), level: next,
+        carry: Object.assign({}, P.campaign.carry, { cash: r.cash }) });
+      Profile.save(); game = null;
+      startLevel(next);                                   // 타이틀로 돌아가지 않는다 — 장은 이어진다
+    });
   }
 
   // 상호를 짓는다 — 여기서 처음으로 '내 가게'가 된다
@@ -350,7 +353,38 @@
       checkPhase();
       if (game && game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); }
     };
-    if (o && o.intro && window.Intro) Intro.play(scene, go); else go();
+    const after = o && o.chapter ? () => showChapterStart(o.chapter, go) : go;
+    if (o && o.intro && window.Intro) Intro.play(scene, after); else after();
+  }
+
+  // ---------- 장 카드 ----------
+  // 영화 챕터 카드다. 컷씬이 끝나고 첫날이 시작되기 전에 한 번, 장이 끝나고 다음 장으로 넘어가기 전에 한 번.
+  // 규칙을 말하지 않는다 — 제목·부제·달력, 그것뿐이다.
+  function chWhen(n) {
+    const lv = LEVELS.get(n); if (!game || !lv) return '';
+    const c0 = LEVELS.startCycle(n), c1 = c0 + (lv.cycles || 4) - 1;
+    return T('ch.when', { y: game.yearOf(c0), a: game.calMonth(c0), b: game.calMonth(c1) });
+  }
+  function chapterCard(cls, inner, onTap) {
+    const m = modal('', `<div class="chcard ${cls}">${inner}<div class="tap">${T(cls === 'end' ? 'ch.tapNext' : 'ch.tap')}</div></div>`, null);
+    m.classList.add('titlecard'); $('#modal-root').classList.add('title-mode');
+    const card = m.querySelector('.chcard');
+    let used = false;
+    card.onclick = () => { if (used) return; used = true; SFX.select(); closeModal(); onTap(); };
+    return m;
+  }
+  function showChapterStart(n, done) {
+    BGM.stop(0.6); SFX.thud();
+    chapterCard('start', `<h2>${esc(chName(n))}</h2>
+      <div class="subt">${esc(T('lv.sub.' + n))}</div>
+      <div class="when">${esc(chWhen(n))}</div>`, done);
+  }
+  function showChapterEnd(n, nextN, done) {
+    const soon = nextN > LEVELS.IMPLEMENTED;
+    const next = nextN <= LEVELS.LAST ? `<div class="nx"><span class="lbl">${T('ch.nextLabel')}</span>
+      <b>${esc(chName(nextN))}</b> · ${esc(T('lv.sub.' + nextN))}${soon ? ` <span class="soon">${T('ch.soon')}</span>` : ''}</div>` : '';
+    chapterCard('end', `<h2>${esc(T('ch.endTitle', { ch: chName(n) }))}</h2>
+      <div class="epi">${esc(T('ch.end.' + n))}</div>${next}`, done);
   }
   function updateMusic() {
     if (!game) { BGM.play('title'); return; }

@@ -369,3 +369,18 @@ body.cine { background: #000; }
 .modal.titlecard .title .opts span, .modal.titlecard .title .lnk { cursor: pointer; padding: 6px 2px; }
 .modal.titlecard .title .opts span:active, .modal.titlecard .title .lnk:active { color: var(--gold); }
 .modal.titlecard .title .lnk { text-decoration: underline dotted; text-underline-offset: 3px; }
+
+/* 장 카드 — 영화 챕터 카드. 어두운 화면에 제목과 부제만 놓는다 */
+.modal.titlecard .chcard { text-align: center; padding: 0 18px; cursor: pointer; animation: chin .7s ease-out both; }
+.modal.titlecard .chcard h2 { display: block; margin: 0; padding: 0; background: none; text-align: center;
+  font-family: 'Galmuri11', monospace; font-size: 30px; letter-spacing: 6px; color: var(--gold); }
+.modal.titlecard .chcard .subt { margin-top: 14px; font-size: 17px; letter-spacing: 2px; color: var(--ink); }
+.modal.titlecard .chcard .when { margin-top: 18px; font-size: 12px; letter-spacing: 3px; color: var(--dim); }
+.modal.titlecard .chcard .epi { margin-top: 18px; font-size: 14px; line-height: 1.8; color: var(--ink); }
+.modal.titlecard .chcard .nx { margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 13px; color: var(--dim); }
+.modal.titlecard .chcard .nx .lbl { display: block; font-size: 10px; letter-spacing: 3px; margin-bottom: 7px; }
+.modal.titlecard .chcard .nx b { color: var(--ink); }
+.modal.titlecard .chcard .nx .soon { color: var(--dim); font-size: 11px; }
+.modal.titlecard .chcard .tap { margin-top: 42px; font-size: 11px; letter-spacing: 2px; color: var(--dim); animation: chblink 2s ease-in-out infinite; }
+@keyframes chin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes chblink { 0%, 100% { opacity: .25; } 50% { opacity: .85; } }

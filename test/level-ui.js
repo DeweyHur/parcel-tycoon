@@ -27,6 +27,10 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!titleBtns.includes('t-codex') && !titleBtns.includes('t-rec'), '도감·기록은 아직 없다');
 
   await page.click('#t-level'); await page.waitForTimeout(800);
+  // 컷씬 뒤(여기선 ?nointro) 장 시작 카드가 한 번 뜬다
+  const startCard = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
+  check(/서장/.test(startCard) && /빈 창고/.test(startCard), '장 시작 카드가 뜬다 — ' + startCard.replace(/\s+/g, ' ').trim());
+  await page.click('#modal .chcard'); await page.waitForTimeout(500);
   const settle = async () => { await page.waitForFunction(() => !window.PT || !PT.busy, null, { timeout: 15000 }); await page.waitForTimeout(100); };
   const readBeat = async () => {
     await settle();
@@ -98,7 +102,10 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(/서장 리포트/.test(doneTxt), '박 반장 리포트가 떴다');
 
   await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);   // 편지
-  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);   // 장 끝 카드
+  const endCard = await page.$eval('#modal .chcard.end', el => el.textContent).catch(() => '');
+  check(/서장/.test(endCard) && /1장/.test(endCard), '장 끝 카드에 다음 장 예고가 있다 — ' + endCard.replace(/\s+/g, ' ').trim());
+  await page.click('#modal .chcard'); await page.waitForTimeout(400);
   await page.screenshot({ path: 'shots/L03-name.png' });
   const hasInput = await page.$('#lv-name');
   check(!!hasInput, '상호 이름을 묻는다');
