@@ -47,7 +47,7 @@
     selfCapDelta: 0, allStartTrust: 0,
     // 3.5단계: 보험·날씨·보관·적재
     premiumMult: 1, premiumDelta: {}, noInsurance: false, season: null, startMonth: null, weatherWeights: {}, tent: false, forecastTurns: 2,
-    noBankrupt: false, storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, eventGoods: false, storageAnon: false,
+    noBankrupt: false, noDeadlineCycles: 0, storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, eventGoods: false, storageAnon: false,
     // 4단계: 난이도·시나리오 고객 규칙
     feeMult: 1, feeFixed: null, feeDelta: 0,
     gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, burstDeadlineDelta: 0, customerClaimMult: {}, storageOfferEvery: 0, winStorage: 0, bigCustomer: false, winBigCustomer: false,
@@ -489,7 +489,7 @@
 
     // ----- 적재 (4장) -----
     // 창고 안 우선순위: 급한 순. 야외 후보는 덜 급한 것부터
-    _urgencyKey(p) { return (p.overdue ? -10 : 0) + p.deadline + (p.customs || 0) - (this._attrs(p).includes('cold') || this._attrs(p).includes('frozen') ? 3 : 0); }
+    _urgencyKey(p) { return (p.overdue ? -10 : 0) + (p.noDeadline ? 90 : 0) + p.deadline + (p.customs || 0) - (this._attrs(p).includes('cold') || this._attrs(p).includes('frozen') ? 3 : 0); }
     setOutdoor(ids) {
       if (this.phase !== 'play') return { ok: false };
       this.outdoorPref = (ids || []).slice();
@@ -587,7 +587,7 @@
       const heat = this.isHeatTurn();
       { let free = (this.warehouse.frozen || 0) - this.frozenUsed(); for (const s of nxt) if (s.type === 'frozen') { if (s.size > free) frozenOver++; else free -= s.size; } }
       for (const p of this.parcels) {
-        if (!p.overdue && p.deadline - 1 <= 0) overdue++;
+        if (!p.overdue && !p.noDeadline && p.deadline - 1 <= 0) overdue++;
         if (p.type === 'fresh' && !p.inCold && (heat || (p.warm || 0) + 1 >= R.warmLimit)) spoil++;
         if (this._attrs(p).includes('frozen') && !p.inFrozen) spoil++;
       }
@@ -944,7 +944,9 @@
       let reward = this.baseReward(spec.type, spec.size); if (spec.premium) reward = Math.round(reward * 1.5);
       if (spec.rewardDelta && spec.rewardDelta[spec.type]) reward += spec.rewardDelta[spec.type];
       const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, attrs, customer,
-        deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + burstD + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1 };
+        deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + burstD + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1,
+        // 첫 사이클에는 기한을 붙이지 않는다 — '차를 꽉 채워 보낸다'를 먼저 익히고, 기한은 그 다음에 배운다 (levels.js noDeadlineCycles)
+        noDeadline: this.month <= (R.noDeadlineCycles || 0) };
       if (attrs.includes('customs')) { p.customs = R.customsWait + (this.trustPerkAny('customsDelta') || 0); if (this.rng.next() < R.customsDelayProb && this.items.customsBond !== this.month && !this.trustPerkAny('noCustomsDelay')) { p.customs += 1; p.customsDelayed = true; } if (cust.rule && cust.rule.kind === 'customsFast') p.customs += cust.rule.delta; const cd = this.customerPerk(customer, 'customsDelta'); if (cd) p.customs += cd; p.customs = Math.max(0, p.customs); p.coldDuringCustoms = true; }
       return p;
     }
@@ -1189,7 +1191,7 @@
         if (p.outdoor && wet && !isCold && !isFrozen && !p.wet) { p.wet = true; reasons.push(MSG('r.wet', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); }
         if (p.customs > 0 && p.outdoor) p.outdoorDuringCustoms = true;
         // 🌾 농산물: 폭염이면 창고 안이라도 상한다 (냉장 구역·환기 시설이면 무사). 야외면 즉시 폐기
-        if (this._attrs(p).includes('produce') && heat && !p.inCold) { if (p.outdoor) { discard.push([p, MSG('why.heatSpoil')]); continue; } if (!this.warehouse.vent && !p.overdue) { p.deadline -= 2; reasons.push(MSG('r.heatProduce', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); } }
+        if (this._attrs(p).includes('produce') && heat && !p.inCold) { if (p.outdoor) { discard.push([p, MSG('why.heatSpoil')]); continue; } if (!this.warehouse.vent && !p.overdue && !p.noDeadline) { p.deadline -= 2; reasons.push(MSG('r.heatProduce', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); } }
         if (p.outdoor && snow) { if (isFrozen) continue; if (isCold) { p.warm = 0; if (!p.overdue) continue; } }
         // 통관 대기: 기한은 통관 뒤 시작
         if (p.customs > 0) { if (isCold && !p.inCold) p.coldDuringCustoms = false; p.customs--; continue; }
@@ -1199,6 +1201,8 @@
         if (isFrozen && !p.inFrozen) { discard.push([p, MSG('why.outsideFrozen')]); continue; }
         const freeze = isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer));
         const grace = this.returnGraceFor(p);
+        // 무기한(첫 사이클)은 기한도 안 줄고 초과도 반송도 없다 — else 로 새면 바로 반송 처리로 빠진다
+        if (p.noDeadline) continue;
         if (!p.overdue) { if (!freeze) p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; pen += R.overdueStress; if (R.overdueStress) reasons.push(MSG('r.overdue', { short: D.PARCEL_TYPES[p.type].short })); this.monthStats.overdue++; } }
         else { p.overdueTurns = (p.overdueTurns || 0) + 1; if (p.overdueTurns >= grace) returned.push(p); else if (R.overdueTurnStress) { pen += R.overdueTurnStress; reasons.push(MSG('r.overdueCont', { short: D.PARCEL_TYPES[p.type].short })); } }
       }

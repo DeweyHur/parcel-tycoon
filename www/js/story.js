@@ -109,7 +109,12 @@
     { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
-    { id: 'l1deadline', kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1), pages: [{ expr: 'worry', hl: '#parcels' }] },
+    // 첫 사이클은 전부 무기한이었다. 기한 있는 택배가 처음 들어온 날, 그걸 가져온 사람이 직접 말한다
+    { id: 'l1due', kind: 'turn', when: g => g.parcels.some(p => !p.noDeadline), pages: [
+      { speaker: 'rep', nameKey: 'story.name.mart', expr: 'neutral' },
+      { expr: 'neutral', hl: '#parcels' },
+    ] },
+    { id: 'l1deadline', kind: 'turn', when: g => g.story.seen.includes('l1due') && g.parcels.some(p => !p.overdue && !p.noDeadline && p.deadline <= 1), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'l1sunday', kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
     { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
     { id: 'l1usage', kind: 'turn', when: g => usage(g) >= 0.75, pages: [{ expr: 'worry', hl: '#bar-usage' }] },

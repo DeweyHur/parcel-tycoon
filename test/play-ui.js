@@ -114,6 +114,11 @@ const say = m => { console.log(m); log.push(m); };
   check(!(await vis('#bar-cold')), '냉장 바 없음');
   check(!(await page.$('#upcoming .chip.wx')), '날씨 칩 없음');
   check(!(await vis('#cust-btn')) && !(await vis('#log-btn')), '고객·기록 버튼 없음');
+  // 첫 사이클은 무기한 — ⏳ 가 아예 안 붙는다
+  const dl = await page.evaluate(() => ({ nodl: PT.game.parcels.every(p => p.noDeadline),
+    hourglass: /⏳/.test(document.getElementById('parcels').textContent),
+    txt: (document.querySelector('#parcels .st') || {}).textContent || '' }));
+  check(dl.nodl && !dl.hourglass, '첫 사이클 택배에 기한이 없다 — "' + dl.txt.trim() + '"');
   // 첫날 대사: 여 실장이 실제 숫자로 계산해 준다 (시키는 대로 누르라는 말 대신)
   const firstSeen = await page.evaluate(() => PT.game.story.seen.slice());
   check(firstSeen.includes('l1intro'), '첫날 대사가 끝났다 — ' + firstSeen.join(','));
@@ -203,6 +208,8 @@ const say = m => { console.log(m); log.push(m); };
   say(`  플레이 끝: ${Math.round((Date.now() - t0) / 1000)}초 · 호출 ${calls} · 대기 ${waits} · phase ${end.phase}`);
   check(end.ret === 0 && end.disc === 0, `반송·폐기 0 (반송 ${end.ret} 폐기 ${end.disc})`);
   check(waits > 15, `대기가 팝업 없이 바로 넘어간다 (${waits}일)`);
+  const seenAll = await page.evaluate(() => (PT.game && PT.game.story ? PT.game.story.seen.slice() : []));
+  check(seenAll.includes('l1due'), '기한이 처음 붙는 날 안내가 나왔다 — ' + seenAll.join(','));
 
   say('\n■ 장 마무리: 리포트 → 편지 → 상호 → 계약서');
   await page.waitForTimeout(500); await shot('40-report');

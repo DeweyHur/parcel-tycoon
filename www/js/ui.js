@@ -598,6 +598,7 @@
   function urgencyOf(p) {
     const a = attrsOf(p);
     if (p.overdue || (a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen)) return 0;
+    if (p.noDeadline) return 90;                 // 무기한 — 급할 일이 없다 (점은 초록, 정렬은 맨 뒤)
     if (p.customs > 0) return p.customs + p.deadline;
     return p.deadline;
   }
@@ -608,7 +609,8 @@
     if (a.includes('frozen')) { if (!p.inFrozen) parts.push(`<b style="color:var(--red)">${T('ps.frozenOut')}</b>`); else parts.push(T('ps.frozen')); }
     if (a.includes('produce')) { if (p.inCold) parts.push(T('ps.produceCold')); else if (game && game.isHeatTurn() && !game.warehouse.vent) parts.push(`<b style="color:var(--orange)">${T('ps.heat')}</b>`); }
     if (p.customs > 0) { parts.push(`<b style="color:var(--blue)">${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })}</b>`); parts.push(`⏳ ${T('fmt.turns', { n: p.deadline })}`); if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`); return parts.join(' · '); }
-    if (p.overdue) { const ri = game ? game.returnIn(p) : null; parts.push(`<b style="color:var(--red)">${T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' })}</b>`); } else parts.push(T('ps.deadline', { n: p.deadline }));
+    if (p.noDeadline) parts.push(`<span style="color:var(--dim)">${T('ps.noDeadline')}</span>`);
+    else if (p.overdue) { const ri = game ? game.returnIn(p) : null; parts.push(`<b style="color:var(--red)">${T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' })}</b>`); } else parts.push(T('ps.deadline', { n: p.deadline }));
     if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`);
     // 어떤 계약으로도 못 싣고 직접 배송도 안 되는 택배 — 반송 말고는 길이 없으니 눈에 띄어야 한다
     if (game && game.phase === 'play' && !(p.customs > 0) && !game.contracts.some(c => c && game.canHandle(c, p) && game.breakProb(c, p) === 0) && !game.selfCan(p)) parts.unshift(`<b style="color:var(--red)">${T('ps.noCarrier')}</b>`);
@@ -639,7 +641,7 @@
     const cus = [...new Set(ps.map(x => M.CUSTOMERS[x.customer || 'anon'].icon))];
     const open = openGroups.has(key);
     const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '');
-    return `<div class="parcel group${cls}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span><span class="nm">${esc(t.short)} ×${ps.length}</span>${attrIcons(a)} ${T('fmt.cells', { n: vol })} · ${money}c</div><div class="st">${parcelStatus(p)} <span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
+    return `<div class="parcel group${cls}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">${esc(t.short)} ×${ps.length}</span>${attrIcons(a)} ${T('fmt.cells', { n: vol })} · ${money}c</div><div class="st">${parcelStatus(p)} <span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
   }
   function renderParcels(container, parcels, selectable) {
     if (!parcels.length) { container.innerHTML = `<div id="empty">${T('hud.emptyWarehouse')}</div>`; return; }

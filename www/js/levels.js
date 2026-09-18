@@ -38,7 +38,7 @@
       n: 1, cycles: 4, year: 2027, grants: [],
       // 시작 판: 계약 하나, 고객 하나, 창고는 실내 16칸뿐(냉장·초대형 없음)
       company: { cash: 300, warehouse: { cap: 16, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }], customers: [['mart', 0]] },
-      mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 200, monthlyStress: 0, theftMult: 0, noBankrupt: true },
+      mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 200, monthlyStress: 0, theftMult: 0, noBankrupt: true, noDeadlineCycles: 1 },
       seed: 20270301,
       script: {
         // 1사이클 = 3월 전반 13영업일. 하루 한두 개씩 — 3일차에 딱 한 대(첫 차는 +1칸이라 7칸)

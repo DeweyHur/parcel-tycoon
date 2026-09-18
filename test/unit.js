@@ -514,4 +514,22 @@ t('세이브 왕복: 자유 런은 전부 열려 있다', () => {
   assert.strictEqual(g2.shows('market'), true);
 });
 
+t('서장 1사이클은 무기한, 2사이클부터 기한이 붙는다', () => {
+  const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 1, prep: false });
+  assert.ok(g.parcels.length > 0);
+  assert.ok(g.parcels.every(p => p.noDeadline), '1사이클 택배는 전부 무기한');
+  // 하루가 지나도 줄지 않고, 반송으로도 새지 않는다
+  const d0 = g.parcels[0].deadline;
+  for (let i = 0; i < 20 && g.phase === 'play'; i++) { g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents(); }
+  assert.strictEqual(g.stats.returned, 0, '무기한은 반송되지 않는다');
+  const old = g.parcels.find(p => p.noDeadline);
+  if (old) assert.strictEqual(old.deadline, d0, '기한이 줄지 않는다');
+  let guard = 0;
+  while (g.phase !== 'play' && guard++ < 6) { if (g.phase === 'summary') g.closeSummary(); else if (g.phase === 'market') g.closeMarket(); else if (g.phase === 'weekend') g.weekendChoose('rest'); else break; g.takeEvents(); }
+  assert.ok(g.month >= 2, '2사이클로 넘어갔다 — ' + g.month + '/' + g.phase);
+  g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents();
+  const fresh = g.parcels.filter(p => p.arrivalTurn > 13);
+  assert.ok(fresh.length && fresh.every(p => !p.noDeadline), '2사이클 택배에는 기한이 붙는다');
+});
+
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);
