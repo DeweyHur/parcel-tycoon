@@ -229,7 +229,45 @@
     { id: 'l4last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
   ];
 
-  const LEVEL_BEATS = { 1: BEATS_L1, 2: BEATS_L2, 3: BEATS_L3, 4: BEATS_L4 };
+  // ----- 레벨 5 전용 비트 (4장 · 11~12월 · 소문) -----
+  // 여기서 처음으로 **끝날 수 있는 판**이 된다. 평판은 지금까지 쌓기만 하던 것들의 총합이고,
+  // 0이 되면 아무도 안 맡긴다. 같이 열리는 것: 사고와 보험 · 보관 계약 · 4칸 대형.
+  const bigItem = g => mkItem(g, it => it.kind === 'contract' && ['large', 'rail', 'sea'].includes(root.DATA.familyOf(it.carrier)));
+  const insItem = g => mkItem(g, it => it.kind === 'item');
+  const BEATS_L5 = [
+    { id: 'l5intro', kind: 'start', when: () => true, pages: [
+      { expr: 'neutral' },
+      { expr: 'think', hl: '#hud-right' },
+    ] },
+    // 평판 — 지금까지 보이지 않게 움직이던 것
+    { id: 'l5rep', kind: 'turn', when: () => true, pages: [
+      { expr: 'neutral', hl: '#hud-right' },
+      { expr: 'worry', hl: '#hud-right' },
+      { expr: 'neutral', hl: '#hud-right' },
+    ] },
+    { id: 'l5repDrop', kind: 'any', when: g => g.repDropped, pages: [{ expr: 'worry', hl: '#hud-right' }] },
+    { id: 'l5repUp', kind: 'summary', when: g => !!(g.summary && g.summary.repTierUp), pages: [{ expr: 'laugh' }, { expr: 'smile' }] },
+    // 4칸 대형 — 오기 전에 마켓이 먼저
+    { id: 'l5bigWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!bigItem(g), pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
+    { id: 'l5bigCar', kind: 'market', when: g => !!bigItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && ['large', 'rail', 'sea'].includes(root.DATA.familyOf(it.carrier))) }] },
+    { id: 'l5big', kind: 'turn', when: g => g.parcels.some(p => p.size >= 4), pages: [{ expr: 'neutral', hl: '#parcels' }] },
+    // 보험
+    { id: 'l5ins', kind: 'market', when: g => !!insItem(g), pages: [
+      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'item') },
+      { expr: 'think' },
+    ] },
+    { id: 'l5claim', kind: 'any', when: (g, ctx) => hasEvent(ctx, ['broken', 'stolen']), pages: [{ expr: 'shock' }, { expr: 'neutral' }] },
+    // 보관 계약 — 자리를 파는 것
+    { id: 'l5offer', kind: 'turn', when: g => !!g.offer, pages: [
+      { expr: 'neutral', hl: '#offer' },
+      { expr: 'think', hl: '#offer' },
+    ] },
+    // 쇼핑 행사 폭주
+    { id: 'l5rush', kind: 'turn', when: g => g.isRushTurn && g.isRushTurn(), pages: [{ expr: 'worry', hl: '#upcoming' }] },
+    { id: 'l5last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'think' }] },
+  ];
+
+  const LEVEL_BEATS = { 1: BEATS_L1, 2: BEATS_L2, 3: BEATS_L3, 4: BEATS_L4, 5: BEATS_L5 };
 
   const BEATS = [
     // ----- 3월 (1개월차): 창고 -----

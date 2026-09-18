@@ -56,7 +56,11 @@ function playLevel(n, carry) {
       const want = it => {
         if (it.sold || it.kind === 'refill' || it.switchFrom) return -1;
         if (it.price > g.cash - 700) return -1;
-        if (it.kind === 'contract') return blocked.size ? 0 : 3;     // 막힌 게 있으면 계약이 최우선
+        if (it.kind === 'contract') {
+          if (blocked.size) return 0;                                 // 막힌 게 있으면 계약이 최우선
+          const empty = g.contracts.slice(0, g.visibleSlots()).some(c => !c);
+          return empty ? 2 : 5;                                       // 빈 슬롯이 있으면 한 대 더 (바쁜 달 대비)
+        }
         if (it.kind === 'fac' && /^cold|^freezer/.test(it.fac || '')) return g.warehouse.cold < 8 ? 1 : 4;
         if (it.kind === 'fac') return 2;
         return 3;
@@ -76,9 +80,10 @@ function playLevel(n, carry) {
     if (g.phase !== 'play') break;
     if (process.env.TRACE && g.unhandled().length) console.log(`  !! ${g.month}-${g.turn} 실을 차 없음 ${g.unhandled().map(p => p.type + p.size).join(',')}`);
     if (process.env.TRACE) console.log(`  ${g.month}-${g.turn} 창고 ${g.usedVolume()}/${g.warehouse.cap}${g.outdoorVolume() ? ' 야외 ' + g.outdoorVolume() : ''} · 배차 ${g.contracts.filter(Boolean).map(c => c.calls + '/' + c.maxCalls).join(' ')} · 반송 ${g.stats.returned}`);
-    const best = bestCall(g);
-    if (best) { const r = g.callCarrier(best.i, best.r.ids, best.r.trucks); beats({ kind: 'call', result: r }); }
-    else {
+    // 한 턴에 계약 하나만 부르는 게 아니다 — 부를 만한 계약은 다 부른다 (사람이 그렇게 한다)
+    let called = 0, best;
+    while ((best = bestCall(g)) && called++ < 4) { const r = g.callCarrier(best.i, best.r.ids, best.r.trucks); beats({ kind: 'call', result: r }); }
+    if (!called) {
       // 차가 없으면 직접 나른다 (3장부터 열린다)
       let self = [];
       if (g.shows('self')) {

@@ -269,7 +269,58 @@
         // 3~4사이클(10월)은 대본이 없다 — ⚠ 파손·🌾 농산이 무작위로 섞여 온다
       },
     },
-    { n: 5, cycles: 4, grants: ['rep', 'insurance', 'storage', 'bigsize'] },   // 11~12월: 평판과 등급·사고와 보험·보관·대형
+    // ----- 레벨 5 (11~12월): 이름이 난다는 것 -----
+    // 한 해에서 제일 바쁜 두 달(김장·쇼핑 행사·연말)에 평판이 열린다. 여기서 처음으로 **끝날 수 있는 판**이 된다.
+    // 같이 열리는 것: 사고와 보험 · 보관 계약 · 4칸 이상 대형.
+    {
+      n: 5, cycles: 4, year: 2027, startMonth: 11, monthOffset: 8, grants: ['rep', 'insurance', 'storage', 'bigsize'],
+      minCash: 1800, minCap: 32, minCalls: 7,
+      // 이어받기가 없을 때(장을 건너뛰어 고른 경우)의 시작 판 — 3장을 무난히 끝낸 사람의 판에 맞춘다
+      company: { cash: 3200, warehouse: { cap: 48, cold: 8, frozen: 0, xl: 0 },
+        contracts: [{ carrier: 'bulk1' }, { carrier: 'cold0' }, { carrier: 'fragile0' }, { carrier: 'large0' }],
+        customers: [['anon', 0], ['mart', 1], ['glass', 0], ['farm', 0]] },
+      addCustomers: [['mover', 0]],                    // 🚚 이사센터 — 보관 계약을 들고 오는 화주
+      // 자금 부도는 여전히 막는다. 이 장의 종료 조건은 평판이다 — 배우는 자리에서 둘을 같이 걸지 않는다.
+      mods: { opCostFixed: 520, noBankrupt: true, callsDelta: 5, heatAlerts: 0 },
+      seed: 20271101,
+      script: {
+        // 1사이클 = 11월 전반. 4칸 대형이 처음 온다 — 실을 차가 없다. 그리고 첫 사고.
+        1: { turns: turns([
+          ['normal 2 mart', 'normal 2 anon', 'fresh 2 farm'],
+          ['normal 2 mart', 'fragile 2 glass'],
+          ['normal 2 anon', 'normal 2 mart', 'produce 2 farm'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 anon', 'fragile 2 glass'],
+          ['normal 2 mart', 'fresh 2 farm'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart', 'normal 2 glass'],
+          ['produce 2 farm', 'normal 2 mart'],
+          ['normal 2 anon', 'fragile 2 glass'],
+          ['normal 2 mart', 'fresh 2 farm'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'normal 2 anon'],
+        ]),
+          market: { contracts: ['large0'], enh: ['limit1'], item: ['transitCert'], fac: [] } },
+        // 2사이클 = 11월 후반. 8~12일차가 쇼핑 행사 폭주(달력 이벤트)다. 보관 제안도 여기서.
+        2: { turns: turns([
+          ['normal 2 mart', 'normal 2 anon'],
+          ['normal 2 mart', 'fragile 2 glass'],
+          ['normal 2 anon', 'fresh 2 farm'],
+          ['normal 2 mart', 'normal 2 anon'],
+          ['large 4 mover', 'normal 2 mart'],                     // 첫 대형 — 예보가 미리 경고하고, 1사이클 마켓이 답을 판다
+          ['normal 2 anon', 'produce 2 farm'],
+          ['large 4 mover', 'normal 2 mart'],
+          ['normal 2 mart', 'normal 2 glass'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'fragile 2 glass'],
+          ['normal 2 anon', 'normal 2 mart'],
+          ['normal 2 mart', 'fresh 2 farm'],
+          ['normal 2 anon', 'normal 2 mart'],
+        ]),
+          market: { contracts: [], enh: ['limit1', 'optFragile'], item: ['transitCert'], fac: ['expand3'] } },
+        // 3~4사이클(12월)은 대본이 없다 — 한 해에서 제일 바쁜 달을 혼자 넘긴다
+      },
+    },
     { n: 6, cycles: 4, grants: ['frozen', 'customs', 'weekendChoice', 'perks', 'codex'] }, // 1~2월: ❆ 냉동·🛃 통관·주말 선택·퍽
   ];
 
@@ -285,6 +336,6 @@
   // price 는 2장 이후가 붙으면 다시 잡는다 (지금은 서장 종료 자금 1.5~3.5k 기준의 임시 값).
   const DEAL = { price: 8000, downRate: 0.6 };
 
-  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 4 };
+  const API = { LEVELS, FLAGS, DEAL, get, showsAt, startCycle, LAST, IMPLEMENTED: 5 };
   if (typeof module !== 'undefined') module.exports = API; else root.LEVELS = API;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -533,6 +533,29 @@ t('서장 1사이클은 무기한, 2사이클부터 기한이 붙는다', () => 
   assert.ok(fresh.length && fresh.every(p => !p.noDeadline), '2사이클 택배에는 기한이 붙는다');
 });
 
+t('4장에서 처음으로 평판이 움직이고, 0이면 판이 끝난다', () => {
+  const LV = (n) => new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false });
+  const g3 = LV(3);
+  assert.ok(!g3.shows('rep'), '2장에는 평판이 없다');
+  const before = g3.rep; g3.addRep(-5, 'test');
+  assert.strictEqual(g3.rep, before, '평판이 안 열린 장에서는 깎이지도 않는다');
+
+  const g = LV(5);
+  assert.ok(g.shows('rep'), '4장에는 평판이 있다');
+  assert.ok(g.rep > 0 && g.rep === g.repCap(), '1단계 상한에서 시작한다 — ' + g.rep + '/' + g.repCap());
+  g.addRep(-g.rep, 'test');
+  assert.ok(g.rep <= 0, '0까지 내려간다');
+  g.wait(); g.takeEvents();
+  assert.strictEqual(g.phase, 'over', '평판이 바닥나면 런이 끝난다 — ' + g.phase);
+});
+
+t('캠페인은 자금으로는 끝나지 않는다 (종료 조건은 평판 하나)', () => {
+  for (const n of [1, 2, 3, 4, 5]) {
+    const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false });
+    assert.ok(g.rules.noBankrupt, n + '장은 부도가 없다');
+  }
+});
+
 t('달력의 이번 달은 사이클이 아니라 개월차로 켜진다', () => {
   const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 1, prep: false });
   const cells = g.calendarMonths();

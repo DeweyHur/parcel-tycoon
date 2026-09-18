@@ -77,12 +77,14 @@ while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 400) {
   const m = g.month, t = g.turn;
   const arrived = (g.schedule[t - 1] || []).map(s => s.type + s.size).join(',');
   const line = `${m}-${t} 입고[${arrived}] 창고 ${g.usedVolume()}/${g.warehouse.cap}${g.outdoorVolume() ? ` 야외 ${g.outdoorVolume()}` : ''}`;
-  const best = bestCall();
-  if (best) {
+  // 한 턴에 계약 하나만 부르는 게 아니다 — 부를 만한 계약은 다 부른다 (사람이 그렇게 한다)
+  let called = 0, best, log = [];
+  while ((best = bestCall()) && called++ < 4) {
     const r = g.callCarrier(best.i, best.r.ids, best.trucks);
-    console.log(`${line} → 호출 ${best.trucks}대 ${Math.round(best.fill * 100)}% (+${r.revenue}c -${r.fee}c)`);
+    log.push(`${best.trucks}대 ${Math.round(best.fill * 100)}%`);
     beats({ kind: 'call', result: r });
-  } else {
+  }
+  if (called) { console.log(`${line} → 호출 ${log.join(' + ')}`); } else {
     let self = [];
     if (g.shows('self')) self = g.parcels.filter(p => g.selfCan(p)).sort((a, b) => a.deadline - b.deadline).slice(0, g.selfCount()).map(p => p.id);
     g.wait(self); console.log(`${line} → 대기${self.length ? ' (직접 ' + self.length + ')' : ''}`); beats({ kind: 'turn' });
