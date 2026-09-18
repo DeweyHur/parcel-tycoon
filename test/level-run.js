@@ -49,8 +49,10 @@ while (g.phase !== 'over' && g.phase !== 'win' && guard++ < 400) {
         const price = g.refillPrice(c); if (g.cash >= price) g.refill(c.id);
       }
       // 사람처럼: 못 싣는 품목을 푸는 계약을 먼저, 그다음 시설·강화
-      const blocked = new Set(g.blockedTypes().map(b => b.type));
-      const blockedAttrs = new Set(g.blockedTypes().flatMap(b => D.PARCEL_TYPES[b.type].attrs));
+      const blocked = new Set([...g.blockedTypes().map(b => b.type), ...g.forecastBlocked()]);
+      // 이미 막힌 것 + **다음 사이클에 올 텐데 못 받는 것** (마켓 예보 줄이 그걸 붉게 알려 준다)
+      const blockedAttrs = new Set([...g.blockedTypes().map(b => b.type), ...g.forecastBlocked()]
+        .flatMap(t => D.PARCEL_TYPES[t].attrs));
       if (process.env.TRACE) console.log(`  [마켓 ${g.month}] 막힘 ${[...blocked].join(',') || '-'} · 매물 ${g.market.items.map(it => (it.name || it.kind)).join(' | ')}`);
       // 계약은 **빈 슬롯에만** 넣는다 — 꽉 찬 슬롯에 밀어 넣으면 쓰던 계약이 날아간다
       const emptySlot = () => g.contracts.slice(0, g.visibleSlots()).findIndex(c => !c);

@@ -270,6 +270,7 @@
   // ----- 레벨 6 전용 비트 (5장 · 1~2월 · 마지막 겨울) -----
   // 마지막 장. 새로 여는 것은 ❆ 냉동과 일요일 선택뿐이고, 나머지는 한 해를 마무리하는 이야기다.
   const frozenCar = g => mkItem(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen');
+  const optItem = g => mkItem(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt');
   const freezerFac = g => mkItem(g, it => it.kind === 'fac' && /^freezer/.test(it.fac || ''));
   const offSoon = g => [1, 2, 3].some(d => g.isOffTurn(g.turn + d));
   const BEATS_L6 = [
@@ -282,8 +283,14 @@
       { expr: 'neutral' },
       { expr: 'neutral', hl: '.wkopts .wkc', gate: true },
     ] },
-    // ❆ 냉동 — 오기 전에 마켓이 먼저
-    { id: 'l6frozenWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!frozenCar(g), pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
+    // ❆ 냉동 — 오기 전에 마켓이 먼저. 그런데 이번엔 계약 자리가 없다
+    { id: 'l6frozenWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!optItem(g), pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
+    // 이 장의 진짜 교훈 — 자리가 다 찼을 때는 계약이 아니라 특약이다
+    { id: 'l6full', kind: 'market', when: g => g.contracts.filter(Boolean).length >= root.DATA.CONTRACT_SLOTS && !!optItem(g), pages: [
+      { expr: 'think', hl: '#mk-mine' },
+      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt') },
+      { expr: 'smile', hl: g => cardSel(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt') },
+    ] },
     { id: 'l6frozenCar', kind: 'market', when: g => !!frozenCar(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen') }] },
     { id: 'l6freezer', kind: 'market', when: g => !!freezerFac(g), pages: [
       { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'fac' && /^freezer/.test(it.fac || '')) },
@@ -299,6 +306,10 @@
       { expr: 'neutral', hl: '#upcoming' },
     ] },
     { id: 'l6off', kind: 'turn', when: g => g.isOffTurn(), pages: [{ expr: 'neutral', hl: '#actions' }] },
+    { id: 'l6stuck', kind: 'turn', when: g => g.unhandled().length > 0, pages: [
+      { expr: 'worry', hl: '#parcels' },
+      { expr: 'neutral', hl: '#parcels' },
+    ] },
     { id: 'l6last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [
       { expr: 'smile' },
       { expr: 'think' },

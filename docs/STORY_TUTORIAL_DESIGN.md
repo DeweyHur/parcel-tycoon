@@ -2118,3 +2118,65 @@ const dueAt = (level, rest) => (level >= LAST ? rest : Math.min(rest, DEAL.insta
 - **자유 런 밸런스** — 계약 슬롯 5칸으로 현금이 35% 올랐다. 시나리오 승리 조건·가격을 다시 본다.
 - 5장 설 구간은 봇이 반송 27을 낸다. 사람 플레이테스트에서 `l6holiday` 경고가 실제로 먹히는지 확인.
 - 캠페인을 끝낸 뒤의 엔딩 화면(한 해 성적표)은 아직 리포트·편지·본계약서로만 끝난다.
+
+## 부록 AN. 슬롯은 넷 그대로 — 자리가 없으면 '붙인다' (v1.26.1)
+
+부록 AM 에서 5장을 돌리려고 계약 슬롯을 4 → 5로 늘렸는데, 자유 런 현금이 35% 오르는 부작용이 있었고
+무엇보다 **문제를 회피한 것**이었다. 슬롯을 넷으로 되돌리고, 대신 **특약(강화)으로 푸는 법을 가르친다.**
+
+### 특약이 실제로는 작동하지 않고 있었다
+
+`optFrozen`(냉동 컨테이너 특약) 같은 것은 처음부터 있었지만 **어디에도 붙지 않았다.**
+
+```js
+// 전 — caps 만 넓혔다
+contractCaps(c) { … if (c.enh.opt) caps.push(attr); return caps; }
+canHandle(c, p) { return this._carrierAccepts(car, p, this.contractCaps(c), …); }
+// _carrierAccepts 안
+if (car.need && !car.need.some(a => attrs.includes(a))) return false;   // ← 여기서 걸린다
+```
+
+전문 계열은 `need` 가 있다 — 냉장은 `['cold','produce']`, 파손은 `['fragile']`, "이것만 받는다"는 뜻이다.
+특약이 `caps` 만 넓히면 **그 계약은 여전히 ❆ 를 거절한다.** 붙일 수 있는 건 `need` 가 없고 `sizeMax ≤ 4` 인
+항공 계열뿐이었고, 그건 사실상 없는 길이었다.
+
+```js
+// 후 — need 도 같이 넓힌다
+contractNeed(c) { const need = car.need.slice(); if (c.enh.opt) need.push(attr); return need; }
+canHandle(c, p) { return this._carrierAccepts(car, p, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)); }
+```
+
+이제 **냉장 계약에 냉동 특약을 붙이면 그 차가 ❆ 를 받는다.** 자리를 안 먹고, 계약 하나에 특약은 하나다.
+
+### 마켓이 그 길을 반드시 연다
+
+`guaranteeBlocked` 는 지금까지 **계약만** 보장했다. 슬롯이 다 찼으면 그 계약을 살 수가 없으니 무용지물이었다.
+
+```js
+if (R.guaranteeBlocked && this.contracts.filter(Boolean).length >= D.CONTRACT_SLOTS) {
+  // 막힌 속성을 푸는 opt 강화를, 붙일 계약이 실제로 있을 때만(_canFitOpt) 반드시 매물에 넣는다
+}
+```
+
+택배 상세의 안내도 갈린다 — 자리가 남았으면 `… 계열 계약이 있어야 합니다`,
+**자리가 다 찼으면 `계약 자리가 다 찼습니다 — 마켓에서 <특약>을 사서 지금 계약에 붙이면 이것도 실립니다`**(`pd.needOpt`).
+
+### 5장이 이걸 가르친다
+
+5장 1사이클 마켓에서 냉동 **계약**을 빼고 **`optFrozen` 특약**을 판다. 계약 자리는 이미 넷이 다 차 있다.
+
+새 비트 둘:
+- **`l6full`**(3쪽) — "자리가 넷이 다 찼어 → 이럴 땐 계약 말고 <b>특약</b>이야 → 자리가 모자랄 땐 늘리는 게 아니라 **붙이는 거**다"
+- `l6stuck` — 그래도 막힌 택배가 있으면 상세를 짚어 준다
+
+### 봇도 예보를 보고 산다
+
+봇이 `blockedTypes()`(이미 창고에 있는 것)만 보고 있어서, **다음 보름에 올 ❆** 를 위해 미리 사지 않았다.
+`forecastBlocked()` 를 같이 본다 — 마켓 예보 줄이 붉게 알려 주는 바로 그 정보다.
+
+### 검증
+
+단위 **82**(특약이 need 를 넓힌다 / 자리가 찼으면 마켓이 특약을 낸다 — 2개 추가) ·
+`campaign-run` 여섯 장 전부 + 잔금 완납 · `level-run 1~6` · `level-ui` · `play-ui` · `intro-ui` · `tutorial-ui`.
+
+**자유 런 현금이 18,000 → 13,100 으로 제자리**. 슬롯 5칸이 만들던 밸런스 변화가 사라졌다.

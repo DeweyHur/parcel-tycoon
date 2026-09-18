@@ -211,7 +211,7 @@
     // 빈 슬롯 세 칸은 "여기를 채워야 한다"는 잘못된 숙제처럼 보인다.
     visibleSlots() {
       if (!this._shows) return D.CONTRACT_SLOTS;
-      const n = !this.shows('cold') ? 1 : !this.shows('bigsize') ? 3 : !this.shows('frozen') ? 4 : D.CONTRACT_SLOTS;
+      const n = !this.shows('cold') ? 1 : !this.shows('bigsize') ? 3 : D.CONTRACT_SLOTS;
       return Math.max(n, this.contracts.filter(Boolean).length);
     }
 
@@ -677,14 +677,28 @@
     }
     // ----- 능력 매칭 (CARRIER_CAPABILITY_DESIGN v0.2) -----
     contractCaps(c) { const car = D.CARRIERS[c.carrier]; const caps = car.caps.slice(); if (c.enh.opt) { const a = D.ENHANCEMENTS[c.enh.opt].attr; if (!caps.includes(a)) caps.push(a); } return caps; }
+    // 특약을 붙인 계약은 그 속성도 '받는 것'에 들어간다. caps 만 넓히고 need 를 그대로 두면
+    // 전문 계열(냉장·파손·냉동·통관)은 특약을 붙여도 그 물건을 거절한다 — 특약이 아무 쓸모가 없어진다.
+    // 이 특약을 붙일 수 있는 계약이 하나라도 있는가
+    _canFitOpt(key) {
+      const e = D.ENHANCEMENTS[key]; if (!e || e.kind !== 'opt') return false;
+      return this.contracts.some(c => { if (!c || c.enh.opt) return false;
+        const car = D.CARRIERS[c.carrier];
+        if (car.onlyPlain || car.caps.includes(e.attr)) return false;
+        if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return false;
+        return true; });
+    }
+    contractNeed(c) { const car = D.CARRIERS[c.carrier]; if (!car.need) return null; const need = car.need.slice();
+      if (c.enh.opt) { const a = D.ENHANCEMENTS[c.enh.opt].attr; if (!need.includes(a)) need.push(a); } return need; }
     contractSizeMax(c) { const car = D.CARRIERS[c.carrier]; const pk = this.trustPerk(c.carrier, 'sizeMax'); return pk ? Math.max(car.sizeMax, pk) : car.sizeMax; }
     // car: 업체 데이터, p: 택배(또는 {type,size,attrs,customs} 의사 택배), caps: 계약 단위 능력, sizeMax: 계약 단위 최대 크기
-    _carrierAccepts(car, p, caps, sizeMax) {
+    _carrierAccepts(car, p, caps, sizeMax, need) {
       caps = caps || car.caps; sizeMax = sizeMax == null ? car.sizeMax : sizeMax;
-      const attrs = (p.attrs || D.PARCEL_TYPES[p.type].attrs).filter(a => D.GATING_ATTRS.includes(a) || (car.need || []).includes(a));
+      need = need === undefined ? car.need : need;
+      const attrs = (p.attrs || D.PARCEL_TYPES[p.type].attrs).filter(a => D.GATING_ATTRS.includes(a) || (need || []).includes(a));
       if (p.size < car.sizeMin || p.size > sizeMax) return false;
       if (car.onlyPlain && attrs.filter(a => D.GATING_ATTRS.includes(a)).length) return false;
-      if (car.need && !car.need.some(a => attrs.includes(a))) return false;
+      if (need && !need.some(a => attrs.includes(a))) return false;
       if (attrs.includes('frozen') && !caps.includes('frozen')) return false;
       if (attrs.includes('customs') && (p.customs || 0) > 0 && !caps.includes('customs')) return false;
       return true;
@@ -698,7 +712,7 @@
       return Math.round(r * (R.rewardMult[p.type] || 1));
     }
     isSpecialist(car, type) { return Array.isArray(car.specialist) ? car.specialist.includes(type) : car.specialist === type; }
-    canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c)); }
+    canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)); }
     // 이 택배를 (파손 없이) 받아 주는 계열들 — 지금 계약이 없을 때 "뭘 사면 되는지" 말해 주려고
     familiesFor(p) {
       const out = [];
@@ -1572,7 +1586,19 @@
       // 상시 배차 충전: 배차가 빈 계약마다 '가득 충전' 카드. 정액이라 다 쓰지 않고 충전하면 그만큼 손해
       items.push(...this._refillItems());
       const enhW = {}; for (const k of Object.keys(D.ENHANCEMENTS)) enhW[k] = R.marketWeight[k] || 1;
-      const picked = []; for (let i = 0; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }
+      const picked = [];
+      // 슬롯이 다 찼는데 못 싣는 품목이 있으면, 계약 말고 **특약**이 답이다 — 그건 반드시 내놓는다.
+      // (계약 슬롯은 넷뿐이고 계열은 그보다 많다. 마지막에 가면 늘 이 상황이 온다)
+      if (R.guaranteeBlocked && this.contracts.filter(Boolean).length >= D.CONTRACT_SLOTS) {
+        const need = new Set(this.blockedTypes().flatMap(bt => D.PARCEL_TYPES[bt.type].attrs));
+        for (const k of Object.keys(D.ENHANCEMENTS)) {
+          const e = D.ENHANCEMENTS[k];
+          if (e.kind !== 'opt' || !need.has(e.attr)) continue;
+          if (!this._canFitOpt(k)) continue;              // 붙일 계약이 하나도 없으면 파는 의미가 없다
+          picked.push(k); delete enhW[k]; break;
+        }
+      }
+      for (let i = picked.length; i < 2 && Object.keys(enhW).length; i++) { const e = this.rng.weighted(enhW); picked.push(e); delete enhW[e]; }
       for (const e of picked) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });
       const facW = {}, vehW = {};
       for (const f of Object.keys(D.FACILITIES)) { const F = D.FACILITIES[f]; if (this.warehouse[f]) continue; if (F.vehicle) { vehW[f] = R.marketWeight[f] || 1; continue; } if (F.requires && !this.warehouse[F.requires]) continue; if (F.cold && R.coldCapMax != null && this.warehouse.cold >= R.coldCapMax) continue; if (F.frozen && R.frozenCapMax != null && (this.warehouse.frozen || 0) >= R.frozenCapMax) continue; facW[f] = R.marketWeight[f] || 1; }

@@ -533,6 +533,29 @@ t('서장 1사이클은 무기한, 2사이클부터 기한이 붙는다', () => 
   assert.ok(fresh.length && fresh.every(p => !p.noDeadline), '2사이클 택배에는 기한이 붙는다');
 });
 
+t('특약은 caps 만이 아니라 need 도 넓힌다 (자리가 찼을 때의 유일한 길)', () => {
+  const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 6, prep: false });
+  assert.strictEqual(g.contracts.length, D.CONTRACT_SLOTS, '계약 슬롯은 넷');
+  assert.strictEqual(g.contracts.filter(Boolean).length, D.CONTRACT_SLOTS, '5장은 자리가 다 차 있다');
+  g.warehouse.frozen = 4;
+  const fr = P(9001, 'frozen', 2, { customer: 'anon', inFrozen: true });
+  assert.ok(!g.contracts.some(c => c && g.canHandle(c, fr)), '특약 전에는 ❆ 를 받을 계약이 없다');
+  const ci = g.contracts.findIndex(c => c && D.familyOf(c.carrier) === 'cold');
+  assert.ok(ci >= 0 && g._canFitOpt('optFrozen'), '냉동 특약을 붙일 계약이 있다');
+  g.contracts[ci].enh.opt = 'optFrozen';
+  assert.ok(g.canHandle(g.contracts[ci], fr), '특약을 붙이면 그 계약이 ❆ 를 받는다 (need 가 넓어진다)');
+});
+
+t('자리가 다 찼으면 마켓이 계약 대신 특약을 반드시 내놓는다', () => {
+  const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 6, prep: false });
+  g.warehouse.frozen = 4;
+  g.parcels = [P(9002, 'frozen', 2, { customer: 'anon', inFrozen: true })];
+  g.month = 3;                                    // 대본이 없는 사이클 = 무작위 마켓
+  const items = g._genMarketItems();
+  const opt = items.find(it => it.kind === 'enh' && (D.ENHANCEMENTS[it.enh] || {}).kind === 'opt' && D.ENHANCEMENTS[it.enh].attr === 'frozen');
+  assert.ok(opt, '냉동 특약이 매물에 있다 — ' + items.map(i => i.kind + ':' + (i.carrier || i.enh || i.fac || '')).join(' '));
+});
+
 t('4장에서 처음으로 평판이 움직이고, 0이면 판이 끝난다', () => {
   const LV = (n) => new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false });
   const g3 = LV(3);

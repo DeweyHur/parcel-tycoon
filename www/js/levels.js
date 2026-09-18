@@ -324,8 +324,10 @@
     // ----- 레벨 6 (1~2월): 마지막 겨울 -----
     // 한 해의 끝. 1월은 비수기라 숨을 돌리고, 2월 설에 마지막 폭주가 온다.
     // 새로 여는 것: ❆ 냉동 · 일요일 선택 · 퍽과 도감(캠페인을 끝낸 뒤 자유 런에서 쓰는 것들).
-    // 🛃 통관은 캠페인에서 열지 않는다 — 계열이 여섯인데 슬롯이 다섯이라, 마지막 장에서
-    // 새 품목을 둘이나 열면 어느 하나는 받을 길이 아예 없어진다. 통관은 자유 런의 평판 등급이 연다.
+    // 이 장의 진짜 교훈은 따로 있다 — **계약 자리는 넷뿐인데 받아야 할 품목은 그보다 많다.**
+    // 여기서 처음으로 '계약을 하나 더 사는' 길이 막히고, 대신 **특약을 기존 계약에 붙여** 푼다.
+    // 🛃 통관은 캠페인에서 열지 않는다 — 마지막 장에 새 품목을 둘이나 열면 배울 것이 너무 많다.
+    // 통관은 자유 런의 평판 등급이 연다.
     // 이 장 끝에서 잔금을 턴다 — 본계약서에 도장을 찍는 자리다.
     {
       n: 6, cycles: 4, year: 2028, startMonth: 1, monthOffset: 10, grants: ['frozen', 'weekendChoice', 'perks', 'codex'],
@@ -359,7 +361,8 @@
           ['normal 2 mart', 'fragile 2 glass'],
           ['normal 2 anon', 'normal 2 mart'],
         ]),
-          market: { contracts: ['frozen0'], enh: [], item: [], fac: ['freezer1'] } },
+          // 계약 자리가 넷인데 이미 넷을 쓰고 있다 — 여기서는 **계약이 아니라 특약**이 답이다
+          market: { contracts: [], enh: ['optFrozen'], item: [], fac: ['freezer1'] } },
         // 2사이클 = 1월 후반. ❆ 냉동이 온다. 냉동 구역이 없으면 갈 데가 없다
         2: { turns: turns([
           ['normal 2 mart', 'frozen 2 ice'],
@@ -376,7 +379,7 @@
           ['normal 2 anon', 'normal 2 mart'],
           ['normal 2 mart', 'normal 2 anon'],
         ]),
-          market: { contracts: [], enh: ['limit1'], item: ['transitCert'], fac: ['freezer1', 'expand3'] } },
+          market: { contracts: [], enh: ['optFrozen', 'limit1'], item: ['transitCert'], fac: ['freezer1', 'expand3'] } },
         // 3~4사이클(2월)은 대본이 없다 — 설 폭주와 연휴 휴무를 혼자 넘긴다
       },
     },

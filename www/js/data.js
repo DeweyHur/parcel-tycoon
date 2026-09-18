@@ -39,7 +39,7 @@
     MONTH_RELIEF: { min: 1, amount: 2 }, // 월말 휴식: 스트레스 -2
     OPCOST_PER_PARCEL: 4,  // 인건비: 기준(22개)을 넘는 월 입고 1개당 운영비 — 물량이 늘면 지출도 는다
     OPCOST_BASE_ARRIVALS: 22,
-    CONTRACT_SLOTS: 5,      // 마지막 장은 계열이 여섯이다 — 넷이면 어떤 품목은 받을 길이 아예 없다
+    CONTRACT_SLOTS: 4,
     MARKET_MAX_BUY: 5,
     REFRESH_COSTS: [40, 80, 140, 220],
 
