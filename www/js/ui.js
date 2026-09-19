@@ -974,6 +974,13 @@
 
   let pendingCall = null; // 방금 호출 결과 — afterTurn 에서 스토리 비트(첫 호출 등)에 넘긴다
   function doCall(i, ids, trucks) {
+    const contract = game.contracts[i], vehicleCap = game.vehicleCap(contract), sizes = new Map(game.parcels.map(p => [p.id, p.size]));
+    const loads = Array.from({ length: trucks }, () => []); let loadIndex = 0, loadVolume = 0;
+    for (const id of ids) {
+      const size = sizes.get(id) || 1;
+      if (loadVolume + size > vehicleCap && loadIndex < trucks - 1) { loadIndex++; loadVolume = 0; }
+      loads[loadIndex].push(id); loadVolume += size;
+    }
     const r = game.callCarrier(i, ids, trucks);
     if (!r.ok) { toast(r.msg); return; }
     pendingCall = r;
@@ -997,7 +1004,6 @@
     const events = game.takeEvents();
     const delivered = events.filter(e => e.type === 'deliver').map(e => e.parcel.id);
     const topValue = events.filter(e => e.type === 'deliver').reduce((m, e) => Math.max(m, valueTier(e.parcel)), 0);
-    SFX.truck();
     for (const e of events) if (e.type === 'broken') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.broken', { short: D.PARCEL_TYPES[e.parcel.type].short }), true, 30); }
     scene.deliver(delivered, () => {
       if (delivered.length) { SFX.coin(delivered.length); floatText(r.rush ? T('rush.float', { n: r.revenue }) : r.delay ? T('float.delayed', { n: r.revenue, delay: r.delay }) : `+${r.revenue}c`, false, 70); }
@@ -1005,7 +1011,7 @@
       if (r.fee) setTimeout(() => floatText(T('call.fee', { fee: r.fee }), true, 30), 250);
       announceCustomers(events);
       afterTurn(events);
-    });
+    }, { trucks, loads, onTruck: () => SFX.truck() });
     saveGame();
   }
   function announceCustomers(events) { let claim = 0; for (const e of events) { if (e.type === 'claim') claim += e.amount; if (e.type === 'custLevel') toastLater(`${M.CUSTOMERS[e.customer].icon} ${T('log.custLevel', { name: M.CUSTOMERS[e.customer].name, level: e.level })}`, 2200); if (e.type === 'custSuspend') toastLater(`${M.CUSTOMERS[e.customer].icon} ${T('toast.custSuspend', { name: M.CUSTOMERS[e.customer].name })}`, 2600); } if (claim) setTimeout(() => floatText(T('float.claim', { n: claim }), true, 50), 350); }

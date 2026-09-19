@@ -262,9 +262,13 @@ window.Scene3D = (function () {
     }
     _styleTruck(growth) {
       if (!this.truck) return;
-      [...this.truck.children].filter(x => x.userData && x.userData.growthPart).forEach(x => this.truck.remove(x));
+      this.growthState = growth || {};
+      this._decorateTruck(this.truck, this.growthState);
+    }
+    _decorateTruck(truck, growth) {
+      [...truck.children].filter(x => x.userData && x.userData.growthPart).forEach(x => truck.remove(x));
       const fleet = (growth && growth.fleet) || 0, automation = (growth && growth.automation) || 0, branding = (growth && growth.branding) || 0;
-      const add = m => { m.userData.growthPart = true; this.truck.add(m); };
+      const add = m => { m.userData.growthPart = true; truck.add(m); };
       for (let i = 0; i < Math.min(3, fleet); i++) { const lamp = this._box(0.16, 0.12, 0.16, 0xffd166, { emissive: 0x704500 }); lamp.position.set(-1.45 + i * 0.22, 1.34, 0); add(lamp); }
       if (fleet >= 2) { const rail = this._box(2.25, 0.1, 0.1, fleet >= 5 ? 0xffd166 : 0x6fdcff, fleet >= 5 ? { emissive: 0x664100 } : undefined); rail.position.set(0.4, 1.62, 0); add(rail); }
       if (automation > 0) { const scanner = this._box(0.18, 0.18, 1.36, 0x6fdcff, { emissive: 0x184e5b }); scanner.position.set(0.95, 1.35, 0); add(scanner); }
@@ -491,25 +495,46 @@ window.Scene3D = (function () {
       const from = {}; for (const k in to) from[k] = obj[k];
       this.tweens.push({ obj, from, to, dur, fn, t: -delay, onDone });
     }
-    deliver(parcelIds, onDone) {
-      // 트럭 진입 → 박스 적재 → 출발
+    _setTruckTripBadge(current, total) {
+      [...this.truck.children].filter(x => x.userData && x.userData.dispatchPart).forEach(x => this.truck.remove(x));
+      if (total <= 1) return;
+      const c = document.createElement('canvas'); c.width = 128; c.height = 64; const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#11101d'; ctx.fillRect(2, 2, 124, 60); ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, 122, 58);
+      ctx.fillStyle = '#ffd166'; ctx.font = "bold 34px 'Galmuri11', monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${current}/${total}`, 64, 34);
+      const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter;
+      const badge = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })); badge.scale.set(1.25, 0.62, 1); badge.position.set(0.4, 2.05, 0); badge.userData.dispatchPart = true; this.truck.add(badge);
+    }
+    deliver(parcelIds, onDone, options = {}) {
+      // 호출 대수만큼 번호표를 단 트럭이 차례로 진입 → 각자 맡은 박스 적재 → 출발한다.
       this.busy++;
-      const boxes = parcelIds.map(id => this.boxes.get(id)).filter(Boolean);
-      for (const b of boxes) b.userData.locked = true;
-      this.truck.position.x = TRUCK_PARK;
-      this._tween(this.truck.position, { x: TRUCK_DOCK }, 0.7, ease, 0, () => {
-        boxes.forEach((b, i) => {
+      const total = Math.max(1, options.trucks || 1), delivered = new Set(parcelIds);
+      const loads = options.loads && options.loads.length ? options.loads.map(ids => ids.filter(id => delivered.has(id))) : [parcelIds.slice()];
+      while (loads.length < total) loads.push([]);
+      for (const id of parcelIds) { const b = this.boxes.get(id); if (b) b.userData.locked = true; }
+      const roadZ = this.Z ? this.Z.roadZ : this.truck.position.z;
+      const visit = trip => {
+        if (trip >= total) {
+          this._setTruckTripBadge(1, 1); this.truck.position.set(TRUCK_PARK, 0, roadZ); this.truck.visible = true;
+          this.busy--; onDone && onDone(); return;
+        }
+        const boxes = (loads[trip] || []).map(id => this.boxes.get(id)).filter(Boolean);
+        this._setTruckTripBadge(trip + 1, total); this.truck.position.set(TRUCK_PARK, 0, roadZ); this.truck.visible = true;
+        if (options.onTruck) options.onTruck(trip + 1, total);
+        this._tween(this.truck.position, { x: TRUCK_DOCK }, 0.58, ease, 0, () => {
+          boxes.forEach((b, i) => {
           const tx = this.truck.position.x + 0.4 + (i % 3) * 0.3 - 0.3, tz = this.truck.position.z;
-          this._tween(b.position, { y: b.position.y + 2.2 }, 0.22, ease, i * 0.12);
-          this._tween(b.position, { x: tx, z: tz, y: this.truckCargoY }, 0.3, ease, i * 0.12 + 0.22);
-          this._tween(b.scale, { x: 0.01, y: 0.01, z: 0.01 }, 0.15, ease, i * 0.12 + 0.5);
-        });
-        const wait = boxes.length * 0.12 + 0.7;
-        this._tween(this.truck.position, { x: TRUCK_GONE }, 0.8, ease, wait, () => {
+            this._tween(b.position, { y: b.position.y + 2.2 }, 0.2, ease, i * 0.1);
+            this._tween(b.position, { x: tx, z: tz, y: this.truckCargoY }, 0.28, ease, i * 0.1 + 0.2);
+            this._tween(b.scale, { x: 0.01, y: 0.01, z: 0.01 }, 0.14, ease, i * 0.1 + 0.46);
+          });
+          const wait = Math.max(0.38, boxes.length * 0.1 + 0.58);
+          this._tween(this.truck.position, { x: TRUCK_GONE }, 0.68, ease, wait, () => {
           for (const b of boxes) { this.scene.remove(b); this.boxes.delete(b.userData.id); }
-          this.busy--; onDone && onDone();
+            this.truck.visible = false; visit(trip + 1);
+          });
         });
-      });
+      };
+      visit(0);
     }
     discard(parcelId) {
       const b = this.boxes.get(parcelId); if (!b) return;
