@@ -45,6 +45,14 @@
 
     WAREHOUSE: { cap: 24, cold: 6, frozen: 4, xl: 1 },
 
+    // 상시 성장 투자. 초반에는 유기적으로 들어오는 물량만 받고, 홍보에 투자한 만큼 다음 영업일부터 입고가 늘어난다.
+    GROWTH: {
+      organicArrivals: 6,
+      marketing: { costs: [60, 110, 180, 280, 420, 620], parcels: 3 },
+      fleet: { costs: [90, 150, 240, 360, 520, 720], calls: 1 },
+      warehouse: { costs: [80, 140, 220, 340, 500, 700], cap: 6 },
+    },
+
     // 월별 추가 입고 수 (기본 10 + 추가). 7개월차 이후는 무한 모드에서 확장
     EXTRA_ARRIVALS: { 1: 12, 2: 14, 3: 16, 4: 18, 5: 20, 6: 22 }, // 7개월차부터 22 + (m-6)×2
     // 달력: 런은 START_MONTH(3월, 봄)에 시작해 계절대로 흐른다. 달별 편차·이벤트는 META.CALENDARS[나라] (docs/STORY_TUTORIAL_DESIGN.md 5장)

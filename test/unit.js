@@ -12,7 +12,18 @@ const slot = (g, fam) => g.contracts.findIndex(c => c && D.familyOf(c.carrier) =
 
 t('시작 상태: 자금 450, 계약 3개(대량·냉장·프래자일), 준비 없이 play', () => { const g = NG(1); assert.equal(g.cash, 450); assert.equal(g.contracts.filter(Boolean).length, 3); assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk0', 'cold0', 'fragile0']); assert.equal(g.phase, 'play'); assert.equal(g.month, 1); });
 t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.sizeDelta, -1); });
-t('월 입고량 = 영업일 수 + 12×달력 배수 + 고객 단계 추가 (1개월차 3월), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.equal(sp.length, g.turns() + Math.round(12 * g.seasonMods(1).arrivalsMult) + g._customerExtra()); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
+t('초기 입고는 작게 시작하고 소형 위주다', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.ok(sp.length >= 7 && sp.length <= 11, `initial arrivals ${sp.length}`); assert.ok(sp.length < g.turns(), '매일 택배가 오지 않는다'); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
+t('실시간 성장 투자: 홍보는 미래 입고, 트럭은 배차, 창고는 공간을 즉시 늘린다', () => {
+  const g = NG(71); g.cash = 3000;
+  const future0 = g.schedule.slice(g.turn).flat().length;
+  const calls0 = g.contracts.filter(Boolean).map(c => c.maxCalls);
+  const cap0 = g.warehouse.cap;
+  const ad = g.investGrowth('marketing'); assert.ok(ad.ok); assert.equal(g.schedule.slice(g.turn).flat().length, future0 + D.GROWTH.marketing.parcels);
+  const fl = g.investGrowth('fleet'); assert.ok(fl.ok); g.contracts.filter(Boolean).forEach((c, i) => assert.equal(c.maxCalls, calls0[i] + 1));
+  const wh = g.investGrowth('warehouse'); assert.ok(wh.ok); assert.equal(g.warehouse.cap, cap0 + D.GROWTH.warehouse.cap);
+  const fresh = g._makeContract('bulk1'); assert.ok(fresh.maxCalls >= D.CARRIERS.bulk1.trucks + 1, '새 계약에도 차량 투자가 적용된다');
+  const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.deepEqual(h.growth, { marketing: 1, fleet: 1, warehouse: 1 });
+});
 t('조커 업체 없음: 용달·긴급 삭제', () => { assert.ok(!D.CARRIERS.target && !D.CARRIERS.urgent); for (const id in M.COMPANIES) for (const c of M.COMPANIES[id].contracts || []) assert.ok(D.FAMILIES[c.carrier] || D.CARRIERS[c.carrier], id + ' ' + c.carrier); });
 t('대기는 배차를 차감하지 않음', () => { const g = NG(3); const calls = g.contracts.map(c => c && c.calls); adv(g); assert.deepEqual(g.contracts.map(c => c && c.calls), calls); assert.equal(g.turn, 2); });
 

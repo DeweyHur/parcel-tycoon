@@ -124,6 +124,7 @@
       this.market = null;
       this.storage = []; this.offer = null; this.outdoorPref = []; this.weather = []; this.pendingRevenue = []; this.bigCustomer = null; this.feesDue = 0; this.debt = 0;
       this.insurer = 'none'; this.premMult = 1; this.noClaimMonths = 0; this.coverHalf = false; this.items = { transitCert: 0, yardIns: 0, customsBond: 0 };
+      this.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0 }, (cfg.carry && cfg.carry.growth) || {});
       this.monthStats = null;
       this.run = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, discarded: 0 };
       this.stats = Game.emptyStats();
@@ -225,6 +226,7 @@
         contracts: this.contracts.filter(Boolean).map(c => ({ carrier: c.carrier, grade: c.grade, calls: c.calls, enh: { ...c.enh } })),
         customers: Object.keys(this.customers).map(id => [id, this.customerLevel(id)]),
         trust: { ...this.trust },
+        growth: { ...this.growth },
         seen: this.story ? this.story.seen.slice() : [],
         notes: this.story ? this.story.notes.slice() : [],
       };
@@ -338,7 +340,10 @@
       m = m || this.month + (this.phase === 'market' && !(this.market && this.market.prep) ? 1 : 0);
       const sf = this._scriptForecast(m); if (sf) return sf;
       const R = this.rules;
-      const total = Math.round((this.turns() + this._extraArrivals(Math.min(m, 6)) * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0)) * (R.burstTurns ? 1 : 1)) + (R.burstTurns || 0);
+      const organic = Math.min(this.turns(m), D.GROWTH.organicArrivals);
+      const promoted = ((this.growth && this.growth.marketing) || 0) * D.GROWTH.marketing.parcels;
+      const extra = Math.round((this._extraArrivals(Math.min(m, 6)) * 0.25 + promoted) * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
+      const total = organic + extra + (R.burstTurns || 0);
       const w = this._customerWeightsFor(m); const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
       const ratio = this._typeRatio(m);
       return Object.keys(w).map(id => {
@@ -357,6 +362,27 @@
       }).sort((a, b) => b.max - a.max);
     }
     customerSummary() { return Object.keys(this.customers || {}).map(id => ({ id, ...M.CUSTOMERS[id], level: this.customerLevel(id), xp: this.customers[id].xp, suspended: this.customers[id].suspended, month: this.customers[id].month, total: this.customers[id].total, next: this.customerNext(id), slots: this.customers[id].slots })); }
+
+    // ----- 상시 성장 투자: 홍보 · 차량 · 창고 -----
+    growthPlan(kind) {
+      const def = D.GROWTH[kind], level = (this.growth && this.growth[kind]) || 0;
+      if (!def) return null;
+      return { kind, level, max: def.costs.length, cost: def.costs[level] == null ? null : def.costs[level], def };
+    }
+    investGrowth(kind) {
+      if (this.phase !== 'play') return { ok: false, reason: 'phase' };
+      const plan = this.growthPlan(kind);
+      if (!plan || plan.cost == null) return { ok: false, reason: 'max' };
+      if (this.cash < plan.cost) return { ok: false, reason: 'cash', cost: plan.cost };
+      this.cash -= plan.cost; this.run.spent += plan.cost;
+      this.growth[kind]++;
+      let added = 0;
+      if (kind === 'marketing') added = this._injectGrowthDemand(this.schedule, plan.def.parcels, this.turn, this.month);
+      else if (kind === 'fleet') { for (const c of this.contracts) if (c) { c.maxCalls += plan.def.calls; c.calls += plan.def.calls; } }
+      else if (kind === 'warehouse') { this.warehouse.cap += plan.def.cap; this.stats.expansions++; this._assignCold(); }
+      this.emit('growth', { kind, level: this.growth[kind], cost: plan.cost, added });
+      return { ok: true, kind, level: this.growth[kind], cost: plan.cost, added };
+    }
 
     // ----- 보험 (docs/CUSTOMER_DESIGN.md 5장) -----
     coverRate(kind, p) {
@@ -582,7 +608,7 @@
     _makeContract(carrier, grade, calls, isStart) {
       carrier = this.resolveCenter(carrier, grade);
       const c = D.CARRIERS[carrier], R = this.rules; grade = c.grade;
-      const maxCalls = Math.max(1, c.trucks + R.callsDelta + (isStart ? R.startCallsDelta : 0) + (this.trustPerk(carrier, 'trucks') || 0));
+      const maxCalls = Math.max(1, c.trucks + R.callsDelta + (isStart ? R.startCallsDelta : 0) + (this.trustPerk(carrier, 'trucks') || 0) + ((this.growth && this.growth.fleet) || 0) * D.GROWTH.fleet.calls);
       return { id: this.nextId++, carrier, grade, maxCalls, calls: calls == null ? maxCalls : calls,
         enh: { limit: 0, cap: 0, regular: false, express: false, opt: null, capDelta: 0 }, successCalls: 0, totalCalls: 0, delivered: 0 };
     }
@@ -961,15 +987,34 @@
       this.say('log.monthStart', { m: this.monthIndex(m), y: this.yearOf(m), cal: this.calMonth(m), half: this.half(m) });
       this._startTurn();
     }
+    _injectGrowthDemand(sched, count, start, m) {
+      if (!count || !sched.length) return 0;
+      const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
+      const slots = [];
+      for (let i = Math.max(0, start || 0); i < sched.length; i++) if (this.weather[i] !== 'storm') slots.push(i);
+      if (!slots.length) return 0;
+      const order = this.rng.shuffle(slots);
+      for (let i = 0; i < count; i++) sched[order[i % order.length]].push(this._genParcelSpec(ratio, m, cw));
+      return count;
+    }
     _makeSchedule(m) {
       const R = this.rules, turns = this.turns(m);
       const sc = this.script(m);
-      if (sc) { this.burstTurns = []; const rows = sc.turns.map(t => t.map(x => ({ ...x }))); while (rows.length < turns) rows.push([]); return rows.slice(0, turns); }
+      if (sc) {
+        this.burstTurns = [];
+        const rows = sc.turns.map(t => t.map(x => ({ ...x })));
+        while (rows.length < turns) rows.push([]);
+        const out = rows.slice(0, turns);
+        this._injectGrowthDemand(out, ((this.growth && this.growth.marketing) || 0) * D.GROWTH.marketing.parcels, 0, m);
+        return out;
+      }
       const sched = Array.from({ length: turns }, () => []);
       const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
       const gen = () => this._genParcelSpec(ratio, m, cw);
-      for (let t = 0; t < turns; t++) sched[t].push(gen());
-      let extra = Math.round(this._extraArrivals(m) * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult + (R.arrivalsMult > 1 ? 10 * (R.arrivalsMult - 1) : 0));
+      const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
+      for (const t of organicTurns) sched[t].push(gen());
+      const promoted = ((this.growth && this.growth.marketing) || 0) * D.GROWTH.marketing.parcels;
+      let extra = Math.round((this._extraArrivals(m) * 0.25 + promoted) * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
       const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
       for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
       this.burstTurns = [];
@@ -1790,6 +1835,7 @@
       if (!g.storage) { g.storage = []; g.offer = null; g.outdoorPref = []; g.insurer = 'none'; g.premMult = 1; g.noClaimMonths = 0; g.coverHalf = false; g.items = { transitCert: 0, yardIns: 0, customsBond: 0 }; }
       if (!g.weather || !g.weather.length) g.weather = Array(g.turns()).fill('sunny').map((w, i) => g.heatTurns && g.heatTurns.includes(i + 1) ? 'heat' : w);
       if (g.monthStats) for (const k of ['insClaims', 'covered', 'premium', 'storageIncome']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
+      g.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0 }, g.growth || {});
       g._assignCold();
       return g;
     }

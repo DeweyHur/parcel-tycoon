@@ -1494,6 +1494,38 @@
     clearTimeout(smsTimer); smsTimer = setTimeout(() => { el.hidden = true; }, 9000);
     el.onclick = () => { el.hidden = true; };
   }
+  function showGrowth() {
+    if (!game || game.phase !== 'play') return;
+    const g = game, ko = I18n.lang === 'ko';
+    const names = ko
+      ? { marketing: ['📣', '홍보', '더 많은 택배를 유치'], fleet: ['🚚', '트럭', '모든 계약의 배차 추가'], warehouse: ['🏭', '창고', '보관 공간 확장'] }
+      : { marketing: ['📣', 'Marketing', 'Attract more parcels'], fleet: ['🚚', 'Fleet', 'Add dispatches to every contract'], warehouse: ['🏭', 'Warehouse', 'Expand storage capacity'] };
+    const effect = (kind, p) => {
+      if (kind === 'marketing') return ko ? `다음 영업일부터 +${p.def.parcels}건` : `+${p.def.parcels} from next workday`;
+      if (kind === 'fleet') return ko ? `계약마다 배차 +${p.def.calls}회` : `+${p.def.calls} call per contract`;
+      return ko ? `창고 +${p.def.cap}칸` : `+${p.def.cap} warehouse cells`;
+    };
+    const current = kind => kind === 'marketing'
+      ? (ko ? `기본 ${D.GROWTH.organicArrivals}건 + 홍보 ${g.growth.marketing * D.GROWTH.marketing.parcels}건` : `${D.GROWTH.organicArrivals} organic + ${g.growth.marketing * D.GROWTH.marketing.parcels} promoted`)
+      : kind === 'fleet'
+        ? (ko ? `계약당 추가 배차 +${g.growth.fleet}` : `+${g.growth.fleet} calls per contract`)
+        : (ko ? `현재 ${g.usedVolume()}/${g.warehouse.cap}칸` : `${g.usedVolume()}/${g.warehouse.cap} cells used`);
+    const cards = ['marketing', 'fleet', 'warehouse'].map(kind => {
+      const p = g.growthPlan(kind), n = names[kind], max = p.cost == null;
+      const dots = Array.from({ length: p.max }, (_, i) => `<i class="${i < p.level ? 'on' : ''}"></i>`).join('');
+      return `<button class="growth-card ${max ? 'max' : ''}" data-growth="${kind}" ${max ? 'disabled' : ''}>
+        <span class="growth-icon">${n[0]}</span><span class="growth-copy"><b>${n[1]} <em>Lv.${p.level}</em></b><small>${n[2]}</small><span>${current(kind)}</span></span>
+        <span class="growth-buy"><span class="growth-dots">${dots}</span><b>${max ? (ko ? '최고 레벨' : 'MAX') : p.cost + 'c'}</b><small>${max ? '' : effect(kind, p)}</small></span>
+      </button>`;
+    }).join('');
+    const body = `<div class="growth-head"><span>${ko ? '현재 자금' : 'Cash'} <b>${g.cash}c</b></span><small>${ko ? '수익을 세 축에 재투자하세요. 구매 효과는 즉시 적용됩니다.' : 'Reinvest earnings. Every upgrade applies immediately.'}</small></div><div class="growth-grid">${cards}</div>`;
+    const m = modal(ko ? '실시간 성장 투자' : 'Live investment', body, [{ label: T('btn.close'), onClick: closeModal }]);
+    m.querySelectorAll('[data-growth]').forEach(el => el.onclick = () => {
+      const kind = el.dataset.growth, r = g.investGrowth(kind);
+      if (!r.ok) { toast(r.reason === 'cash' ? (ko ? `자금이 ${r.cost}c 필요합니다` : `Need ${r.cost}c`) : (ko ? '지금은 투자할 수 없습니다' : 'Cannot invest now')); return; }
+      SFX.buy(); g.takeEvents(); scene.sync(g, { animate: true }); saveGame(); renderAll(); showGrowth();
+    });
+  }
   function showMenu() {
     const g = game, R = g.rules;
     const info = !g.shows('perks') ? `<div class="d" style="font-size:12px;margin-bottom:6px">${g.company.icon} ${esc(g.companyName())}</div>`
@@ -1515,7 +1547,7 @@
     document.title = T('title.name') + ': ' + T('title.sub');
     document.documentElement.lang = I18n.lang;
     $('#hud-cash-lbl').textContent = T('hud.cashLbl'); $('#usage-lbl').textContent = T('common.warehouse'); $('#cold-lbl').textContent = D.ATTRS.cold.name;
-    $('#cust-btn').textContent = T('company.customers'); $('#log-btn').textContent = T('title.records'); $('#help-btn').textContent = T('btn.help'); $('#menu-btn').textContent = T('menu.title');
+    $('#invest-btn').textContent = I18n.lang === 'ko' ? '투자' : 'Invest'; $('#cust-btn').textContent = T('company.customers'); $('#log-btn').textContent = T('title.records'); $('#help-btn').textContent = T('btn.help'); $('#menu-btn').textContent = T('menu.title');
     if (scene && scene.relabel) scene.relabel();
   }
   function init() {
@@ -1524,6 +1556,7 @@
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) $('#c' + i).onclick = () => onContractTap(i);
     $('#hud-cash-box').onclick = () => { SFX.click(); hudDueOpen = !hudDueOpen; renderAll(); };
     $('#wait-btn').onclick = () => doWait(null);
+    $('#invest-btn').onclick = () => { if (game) { SFX.click(); showGrowth(); } };
     $('#log-btn').onclick = () => { if (game) { SFX.click(); showLog(closeModal); } };
     $('#cust-btn').onclick = () => { if (game) { SFX.click(); showCustomers(closeModal); } };
     $('#help-btn').onclick = () => { SFX.click(); showHelp(closeModal); };
