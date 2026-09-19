@@ -438,6 +438,12 @@ body.cine { background: #000; }
 #scene { flex-basis: 44%; min-height: 220px; }
 #app.warehouse-collapsed #scene { flex-basis: 74%; }
 #app.warehouse-collapsed #actions { margin-top: auto; }
+/* 재고를 접었을 때 창고 화면이 화면의 74%를 '고정'으로 가져가면, 아래 패널(막대·요약·코치·
+   계약·오늘 마감)이 남은 26%에 안 들어가고 그만큼 화면 밖으로 밀린다. 390×800 에서 「오늘 마감」
+   버튼이 절반만 보였다. 접었을 때는 패널이 제 높이를 먼저 갖고, 창고 화면이 남는 자리를 갖는다.
+   (컷신 중에는 손대지 않는다 — intro.js 가 flex-basis 로 화면을 넓혔다 좁힌다) */
+#app.warehouse-collapsed:not(.cine) #scene { flex: 1 1 auto; }
+#app.warehouse-collapsed:not(.cine) #panel { flex: 0 0 auto; }
 #hud { padding: 10px; }
 .hud-box { background: rgba(31, 29, 48, .9); border-width: 2px; box-shadow: 0 4px 0 rgba(15, 14, 26, .72); padding: 6px 9px; backdrop-filter: blur(3px); }
 #hud-left { font-size: 14px; }
