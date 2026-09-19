@@ -29,7 +29,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   await page.click('#t-level'); await page.waitForTimeout(800);
   // 컷씬 뒤(여기선 ?nointro) 장 시작 카드가 한 번 뜬다
   const startCard = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/서장/.test(startCard) && /빈 창고/.test(startCard), '장 시작 카드가 뜬다 — ' + startCard.replace(/\s+/g, ' ').trim());
+  check(/서장/.test(startCard) && /3월/.test(startCard) && !/빈 창고/.test(startCard), '장 시작 카드는 이름과 날짜뿐이다 — ' + startCard.replace(/\s+/g, ' ').trim());
   await page.click('#modal .chcard'); await page.waitForTimeout(500);
   const settle = async () => { await page.waitForFunction(() => !window.PT || !PT.busy, null, { timeout: 15000 }); await page.waitForTimeout(100); };
   const readBeat = async () => {
@@ -118,7 +118,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
 
   console.log('\n서장 다음은 타이틀이 아니라 1장');
   const ch2 = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/1장/.test(ch2) && /두 번째 트럭/.test(ch2) && /후반/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
+  check(/1장/.test(ch2) && /후반/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
   await page.click('#modal .chcard'); await page.waitForTimeout(1000);
   const carried = await page.evaluate(() => { const g = PT.game, P = Profile.get().campaign;
     return { level: g.cfg.level, cash: g.cash, cap: g.warehouse.cap, carryCash: P.carry && P.carry.cash,
@@ -180,8 +180,10 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   if (await page.$('#modal-root.show')) { const cl = await page.$('#modal .foot .btn'); if (cl) { await cl.click(); await page.waitForTimeout(400); } }
   await page.waitForTimeout(300);
   await page.click('#wait-btn', { force: true }); await page.waitForTimeout(1500);
-  for (let k = 0; k < 8; k++) {
+  // 대기 확인 → 정산 → 마켓 → 편지 → 장 끝 카드 → 잔금. 중간에 대사가 끼면 읽고 넘긴다
+  for (let k = 0; k < 14; k++) {
     if (await page.$('#modal .paper .instbar')) break;
+    await readBeat();
     const ch = await page.$('#modal .chcard'); if (ch) { await ch.click(); await page.waitForTimeout(600); continue; }
     const btn = await page.$('#modal .foot .btn.primary'); if (btn) { await btn.click(); await page.waitForTimeout(700); continue; }
     break;

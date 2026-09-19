@@ -31,6 +31,8 @@
     'weekendChoice',// 일요일 선택지
     'perks',        // 퍽·회사·시나리오 선택
     'codex',        // 도감·기록
+    'capBonus',     // 칸 보너스(스킵·대기 누적·이달 첫 호출). 캠페인은 안 연다 — 칸 수가 호출마다 바뀌면
+                    // "왜 지금은 6칸이지"를 먼저 설명해야 하고, 서장이 가르칠 것은 그게 아니다
   ];
 
   const LEVELS = [
@@ -72,7 +74,9 @@
       mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 120, monthlyStress: 0, theftMult: 0, noBankrupt: true },
       seed: 20270316,
       script: {
-        // 8일차에 14칸이 한꺼번에 — 두 대가 자동으로 붙는 자리. 배차는 사이클 끝에 바닥난다
+        // 8일차에 한꺼번에 — 두 대가 자동으로 붙는 자리. 배차는 사이클 끝에 바닥난다.
+        // 칸은 6으로 고정이라(보너스 없음) 배차 일곱 대 × 6칸 = 42칸이 이 장의 천장이다.
+        // 총량은 그 아래로 둔다 — 배차가 모자란 느낌은 주되, 성실히 굴리면 반송은 안 나오게
         1: { turns: turns([
           ['normal 2 anon', 'normal 2 anon'],
           ['normal 2 anon', 'normal 1 anon'],
@@ -81,13 +85,13 @@
           ['normal 2 anon', 'normal 1 anon'],
           ['normal 2 anon', 'normal 2 anon'],
           ['normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 1 anon'],
-          ['normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 1 anon'],
-          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
           ['normal 2 anon', 'normal 1 anon'],
           ['normal 2 anon'],
+          ['normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon'],
+          ['normal 1 anon'],
         ]),
           market: { contracts: [], enh: ['limit1'], fac: ['expand1'] } },
       },

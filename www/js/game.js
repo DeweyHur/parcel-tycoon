@@ -725,9 +725,12 @@
       const R = this.rules;
       let cap = D.CARRIERS[c.carrier].cap + c.enh.cap + c.enh.capDelta + (famVal(R.carrierCapDelta, c.carrier) || 0) + (this.trustPerk(c.carrier, 'cap') || 0);
       for (const id in this.customers || {}) { const cc = this.customerPerk(id, 'carrierCap'); const d = famVal(cc, c.carrier); if (d) cap += d; }
-      if (R.skipBonus && this.waitedLastTurn) cap += R.skipBonus;
-      if (R.waitStack) cap += Math.min(R.waitStack, this.waitStack);
-      if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) cap += R.firstCallBonus;
+      // 칸 보너스는 호출마다 칸 수를 바꾼다 — 캠페인에서는 통째로 꺼 둔다 (levels.js FLAGS: capBonus)
+      if (this.shows('capBonus')) {
+        if (R.skipBonus && this.waitedLastTurn) cap += R.skipBonus;
+        if (R.waitStack) cap += Math.min(R.waitStack, this.waitStack);
+        if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) cap += R.firstCallBonus;
+      }
       return Math.max(1, cap);
     }
     baseCapacity(c) { return this.vehicleCap(c); }
@@ -770,9 +773,11 @@
     trucksNeeded(c, volume) { return Math.max(1, Math.ceil(volume / this.vehicleCap(c))); }
     capacityBonusNote(c) {
       const R = this.rules, notes = [];
-      if (R.skipBonus && this.waitedLastTurn) notes.push(T('note.skip'));
-      if (R.waitStack && this.waitStack) notes.push(T('note.waitStack', { n: Math.min(R.waitStack, this.waitStack) }));
-      if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) notes.push(T('note.firstCall'));
+      if (this.shows('capBonus')) {
+        if (R.skipBonus && this.waitedLastTurn) notes.push(T('note.skip'));
+        if (R.waitStack && this.waitStack) notes.push(T('note.waitStack', { n: Math.min(R.waitStack, this.waitStack) }));
+        if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) notes.push(T('note.firstCall'));
+      }
       if (c.enh.regular && !c.freeUsedMonth) notes.push(T('note.regular'));
       return notes;
     }

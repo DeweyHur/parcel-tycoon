@@ -461,18 +461,17 @@
     card.onclick = () => { if (used) return; used = true; SFX.select(); closeModal(); onTap(); };
     return m;
   }
+  // 장 이름과 날짜뿐이다. 부제·맺음말을 붙이면 카드가 읽을거리가 된다 — 여기는 숨 쉬는 자리다
   function showChapterStart(n, done) {
     BGM.stop(0.6); SFX.thud();
     chapterCard('start', `<h2>${esc(chName(n))}</h2>
-      <div class="subt">${esc(T('lv.sub.' + n))}</div>
       <div class="when">${esc(chWhen(n))}</div>`, done);
   }
   function showChapterEnd(n, nextN, done) {
     const soon = nextN > LEVELS.IMPLEMENTED;
     const next = nextN <= LEVELS.LAST ? `<div class="nx"><span class="lbl">${T('ch.nextLabel')}</span>
-      <b>${esc(chName(nextN))}</b> · ${esc(T('lv.sub.' + nextN))}${soon ? ` <span class="soon">${T('ch.soon')}</span>` : ''}</div>` : '';
-    chapterCard('end', `<h2>${esc(T('ch.endTitle', { ch: chName(n) }))}</h2>
-      <div class="epi">${esc(T('ch.end.' + n))}</div>${next}`, done);
+      <b>${esc(chName(nextN))}</b>${soon ? ` <span class="soon">${T('ch.soon')}</span>` : ''}</div>` : '';
+    chapterCard('end', `<h2>${esc(T('ch.endTitle', { ch: chName(n) }))}</h2>${next}`, done);
   }
   function updateMusic() {
     if (!game) { BGM.play('title'); return; }
@@ -929,7 +928,6 @@
     const trustInfo = (vol, trucks) => { if (!game.shows('trust')) return ''; const g = game.trustGainPreview(c, vol, trucks), nx = game.trustNext(c.carrier); return `<div class="d" style="font-size:11px;margin-bottom:6px">${trustBar(game, c.carrier)} ${T('call.xpGain', { xp: g.xp, parts: g.parts.join(', ') })}${nx ? ` · ${T('call.nextLevel')}: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 1 ? ` · ${esc(D.trustEffectText(c.carrier, game.trustLevel(c.carrier)))}` : ''}<details><summary style="cursor:pointer;color:var(--dim)">${T('call.trackToggle')}</summary>${trustTrack(c.carrier, game.trustXp(c.carrier))}</details></div>`; };
     const sel = new Set();
     let extraTrucks = 0; // 사용자가 '한 대 더'로 늘린 대수
-    let autoTrimmed = false; // 급한 순 자동 선택이 반쯤 빈 차를 빼고 담았는지
     const render = () => {
       const selP = [...sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
       const vol = selP.reduce((s, p) => s + p.size, 0);
@@ -948,16 +946,14 @@
       const riskLine = riskSel.length ? `<div class="d" style="font-size:12px;color:var(--orange);margin-bottom:6px">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
       const capsLine = !game.shows('attrs') ? '' : `<div class="d" style="font-size:11px;color:var(--dim);margin-bottom:4px">${car.badge || ''} ${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</div>`;
       const body = `${capsLine}${gauge}${money}${riskLine}${trustInfo(vol, trucks)}<div id="pick-list" style="display:flex;flex-direction:column;gap:3px"></div>
-        <div style="margin-top:8px;display:flex;gap:6px"><button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button></div>
-        ${autoTrimmed ? `<div class="d" style="font-size:11px;color:var(--dim);margin-top:4px">${T('call.autoTrim')}</div>` : ''}`;
-      const m = modal(game.contractName(c), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: `${T('call.btn')} (${T('fmt.count', { n: sel.size })} · ${T('fmt.trucks', { n: trucks })} · -${callFee}c)`, cls: 'primary', disabled: sel.size === 0, onClick: () => { closeModal(); doCall(i, [...sel], trucks); } }]);
+        <div style="margin-top:8px;display:flex;gap:6px"><button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button></div>`;
+      const m = modal(game.contractName(c), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: T('call.btn'), cls: 'primary', disabled: sel.size === 0, onClick: () => { closeModal(); doCall(i, [...sel], trucks); } }]);
       const ta = m.querySelector('#truck-add'); if (ta) ta.onclick = () => { extraTrucks = trucks; SFX.select(); render(); };
       const td = m.querySelector('#truck-del'); if (td) td.onclick = () => { extraTrucks = Math.max(0, trucks - 2); SFX.cancel(); render(); };
       const list = m.querySelector('#pick-list');
       renderParcels(list, game.parcels, { sel, elig: new Set(elig.map(p => p.id)), risk: new Set(elig.filter(p => game.breakProb(c, p) > 0).map(p => p.id)) });
       list.querySelectorAll('.parcel').forEach(el => el.onclick = () => {
         const id = +el.dataset.id; if (!elig.some(p => p.id === id)) return;
-        autoTrimmed = false;
         if (sel.has(id)) { sel.delete(id); SFX.cancel(); }
         else { const p = elig.find(x => x.id === id); const v = [...sel].reduce((s, q) => s + (game.parcels.find(x => x.id === q) || { size: 0 }).size, 0) + p.size; const maxCap = vcap * Math.min(simul, Math.max(1, c.calls)); if (v > maxCap) { toast(T('call.maxSelect', { cap: maxCap })); return; } sel.add(id); SFX.select(); }
         render();
@@ -966,10 +962,10 @@
         sel.clear();
         const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
         const r = game.autoPick(c, sorted, Math.min(simul, Math.max(1, c.calls)));
-        autoTrimmed = r.trimmed; r.ids.forEach(id => sel.add(id));
+        r.ids.forEach(id => sel.add(id));
         SFX.select(); render();
       };
-      m.querySelector('#pick-clear').onclick = () => { sel.clear(); autoTrimmed = false; SFX.cancel(); render(); };
+      m.querySelector('#pick-clear').onclick = () => { sel.clear(); SFX.cancel(); render(); };
       storyCheck({ kind: 'modal', modal: 'call', sel: sel.size, elig: elig.length, slot: i, trucks, vol });
     };
     render();

@@ -114,7 +114,7 @@ function playLevel(n, carry) {
 
 let carry = null, deal = null;
 for (let n = 1; n <= LV.IMPLEMENTED; n++) {
-  const lv = LV.get(n), name = I18n.t('lv.ch.' + n), sub = I18n.t('lv.sub.' + n);
+  const lv = LV.get(n), name = I18n.t('lv.ch.' + n), sub = '';
   console.log(`\n■ ${name} · ${sub} (레벨 ${n})`);
   const { g, seen } = playLevel(n, carry);
   const on = LV.FLAGS.filter(f => g.shows(f));

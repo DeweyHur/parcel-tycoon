@@ -83,7 +83,7 @@ const say = m => { console.log(m); log.push(m); };
 
   say('\n■ 장 시작 카드');
   const startCard = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/서장/.test(startCard) && /빈 창고/.test(startCard) && /2027/.test(startCard),
+  check(/서장/.test(startCard) && !/빈 창고/.test(startCard) && /2027/.test(startCard),
     '컷씬 뒤에 제목·부제·달력이 뜬다 — ' + startCard.replace(/\s+/g, ' ').trim());
   check(!(await page.$eval('#story', el => !el.hidden).catch(() => false)), '장 카드 동안 대화창이 안 뜬다');
   await shot('00c-chapter');
@@ -238,8 +238,8 @@ const say = m => { console.log(m); log.push(m); };
   check(/한 사장 편지/.test(letTxt) && /한 사장/.test(letTxt), '한 사장 편지가 뜬다 — ' + letTxt.replace(/\s+/g, ' ').slice(0, 44));
   await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(400);
   const endCard = await page.$eval('#modal .chcard.end', el => el.textContent).catch(() => '');
-  check(/서장/.test(endCard) && /셔터/.test(endCard) && /1장/.test(endCard) && /두 번째 트럭/.test(endCard),
-    '장 끝 카드에 맺음말과 다음 장 예고가 있다 — ' + endCard.replace(/\s+/g, ' ').trim());
+  check(/서장/.test(endCard) && /1장/.test(endCard) && !/셔터/.test(endCard),
+    '장 끝 카드는 끝난 장과 다음 장 이름뿐이다 — ' + endCard.replace(/\s+/g, ' ').trim());
   await shot('42b-chapter-end');
   await page.click('#modal .chcard'); await page.waitForTimeout(400);
   await shot('42-name');
@@ -268,7 +268,7 @@ const say = m => { console.log(m); log.push(m); };
   say('\n■ 서장 다음은 타이틀이 아니라 1장');
   await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(1300);   // 창고를 넘겨받는다 → 바로 1장
   const ch2 = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/1장/.test(ch2) && /두 번째 트럭/.test(ch2) && /후반/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
+  check(/1장/.test(ch2) && /후반/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
   await shot('45-ch2');
   await page.click('#modal .chcard'); await page.waitForTimeout(900); await readBeat();
   const l2 = await page.evaluate(() => { const g = PT.game, P = PT.Profile.get().campaign;

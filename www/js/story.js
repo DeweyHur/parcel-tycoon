@@ -94,7 +94,8 @@
     // 설정을 늘리지 않는다. 첫날이 가르치는 건 하나뿐이다 — 배차비는 정액이라 덜 실으면 손해다.
     { id: 'l1intro', kind: 'start', when: () => true, pages: [
       { expr: 'smile' },
-      { speaker: 'yeo', expr: 'neutral', hl: '#c0' },
+      // 칸 수를 말로 읽어 주지 않는다 — 카드에 적힌 그 숫자를 가리킨다
+      { speaker: 'yeo', expr: 'neutral', hl: '#c0 .sub b' },
       { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },
     { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 3, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },

@@ -39,7 +39,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!!a && a.closed && a.front, '오프닝 동안은 벽이 다 있는 완성 건물이다');
   await page.mouse.click(195, 400); await page.waitForTimeout(700);
   const cardTxt = await card();
-  check(/서장/.test(cardTxt) && /빈 창고/.test(cardTxt), '컷씬 뒤에 장 카드가 뜬다 — ' + cardTxt);
+  check(/서장/.test(cardTxt) && /3월/.test(cardTxt) && !/빈 창고/.test(cardTxt), '컷씬 뒤에 장 카드가 뜬다 (이름과 날짜뿐) — ' + cardTxt);
   const c1 = await clean();
   check(c1.gone && !c1.cine && !c1.cls && !c1.bodyCls && c1.basis === '' && c1.truck === 12 && c1.fov === 38, '건너뛰면 원상복구 — ' + JSON.stringify(c1));
   check(!c1.closed && !c1.front, '플레이 화면은 앞면이 벗겨진 단면이다');
