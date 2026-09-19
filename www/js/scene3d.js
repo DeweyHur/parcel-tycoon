@@ -147,16 +147,19 @@ window.Scene3D = (function () {
       if (this.road) { this.road.position.x = Z.x1 + 0.6 + 20; this.road.position.z = Z.roadZ; }   // 도로는 마당 너머, 건물 오른쪽으로
       if (this.truck) this.truck.position.z = Z.roadZ;
       if (this.workers) {
-        // 트럭은 roadZ 근처 차선만 달린다 — 인부는 마당 안쪽(yardZ0~+depth)에서만 움직여 차선과 절대 안 겹치게 한다
-        const pickX = Z.x1 - 1.05, truckX = TRUCK_DOCK - 0.75, yardMidZ = Z.yardZ0 + Z.YARD.depth * CELL * 0.5, laneZ = [yardMidZ - 0.4, yardMidZ + 0.4];
-        this.workers.forEach((w, i) => {
-          w.userData.dockA = { x: pickX, z: laneZ[i] }; w.userData.dockB = { x: truckX, z: laneZ[i] };
-          w.userData.idleA = { x: pickX, z: laneZ[i] }; w.userData.idleB = { x: pickX + 0.4, z: laneZ[i] };
-          w.userData.exitB = { x: pickX, z: laneZ[i] + 2.4 };
-          // 배차 중이 아닐 때만 새 좌표로 다시 세운다 — 창고 크기가 바뀔 때마다(냉장고 추가 등) 그대로 반영되고,
-          // 트럭 왕복·직접 배송처럼 한창 움직이는 중이면 건드리지 않는다.
-          if (!this.busy) this._setWorkerIdle(w, i * 0.4 + Math.random() * 0.3);
-        });
+        // 한 명은 건물 안(진열대 사이)에서 정리하고, 한 명은 밖(도크)에서 트럭·직접 배송을 맡는다 —
+        // 같은 자리를 왕복하는 둘을 붙여 두면 판박이처럼 보인다.
+        const indoor = this.workers[0], outdoor = this.workers[1];
+        const indoorZ = (BACK_Z + Z.frontZ) / 2;
+        indoor.userData.idleA = { x: 0.3, z: indoorZ - 0.4 }; indoor.userData.idleB = { x: 1.1, z: indoorZ + 0.35 };
+        // 트럭은 roadZ 근처 차선만 달린다 — 도크 인부는 마당 안쪽(yardZ0~+depth)에서만 움직여 차선과 절대 안 겹치게 한다
+        const pickX = Z.x1 - 1.05, truckX = TRUCK_DOCK - 0.75, yardMidZ = Z.yardZ0 + Z.YARD.depth * CELL * 0.5;
+        outdoor.userData.dockA = { x: pickX, z: yardMidZ }; outdoor.userData.dockB = { x: truckX, z: yardMidZ };
+        outdoor.userData.idleA = { x: pickX, z: yardMidZ - 0.35 }; outdoor.userData.idleB = { x: pickX, z: yardMidZ + 0.35 };
+        outdoor.userData.exitB = { x: pickX, z: yardMidZ + 2.4 };
+        // 배차 중이 아닐 때만 새 좌표로 다시 세운다 — 창고 크기가 바뀔 때마다(냉장고 추가 등) 그대로 반영되고,
+        // 트럭 왕복·직접 배송처럼 한창 움직이는 중이면 건드리지 않는다.
+        if (!this.busy) { this._setWorkerIdle(indoor, Math.random() * 0.3); this._setWorkerIdle(outdoor, 0.3 + Math.random() * 0.3); }
       }
       this.tileCaps = null;   // 구역이 바뀌었으니 바닥 타일도 다시
       this.resize();
@@ -547,7 +550,7 @@ window.Scene3D = (function () {
       while (loads.length < total) loads.push([]);
       for (const id of parcelIds) { const b = this.boxes.get(id); if (b) b.userData.locked = true; }
       this._ensureTruckFleet(total);
-      if (this.workers) this.workers.forEach((w, i) => this._setWorkerTruckPatrol(w, i * 0.35 + Math.random() * 0.25));
+      if (this.workers) this._setWorkerTruckPatrol(this.workers[1]);
       const roadZ = this.Z ? this.Z.roadZ : this.truck.position.z;
       const gap = total <= 1 ? 0 : total <= 3 ? 0.95 : Math.max(0.55, 2.8 / (total - 1));
       let remaining = total;
@@ -572,26 +575,18 @@ window.Scene3D = (function () {
             for (const b of boxes) { truck.remove(b); this.boxes.delete(b.userData.id); }
             if (trip === 0) truck.position.set(TRUCK_PARK, 0, roadZ); else truck.visible = false;
             remaining--;
-            if (remaining === 0) { if (this.workers) this.workers.forEach((w, i) => this._setWorkerIdle(w, i * 0.3 + Math.random() * 0.2)); this.busy--; onDone && onDone(); }
+            if (remaining === 0) { if (this.workers) this._setWorkerIdle(this.workers[1]); this.busy--; onDone && onDone(); }
           });
         });
       }
     }
     selfDeliver(parcelIds, onDone) {
-      // 직접 배송: 트럭이 아니라 인부가 상자를 들고 뛰어나갔다 온다
+      // 직접 배송: 트럭이 아니라 도크 인부가 상자를 들고 뛰어나갔다 온다 (건물 안 인부는 그대로 정리를 계속한다)
       this.busy++;
       for (const id of parcelIds) { const b = this.boxes.get(id); if (b) { this.scene.remove(b); this.boxes.delete(id); } }
-      const ws = this.workers || [], n = parcelIds.length;
-      if (!ws.length || !n) { this.busy--; onDone && onDone(); return; }
-      const per = Math.ceil(n / ws.length);
-      const jobs = ws.map((w, i) => ({ w, count: Math.max(0, Math.min(per, n - i * per)) })).filter(j => j.count > 0);
-      let remaining = jobs.length;
-      jobs.forEach(({ w, count }, i) => {
-        this._setWorkerErrand(w, count, () => {
-          this._setWorkerIdle(w); remaining--;
-          if (remaining === 0) { this.busy--; onDone && onDone(); }
-        }, i * 0.3 + Math.random() * 0.2);
-      });
+      const w = this.workers && this.workers[1], n = parcelIds.length;
+      if (!w || !n) { this.busy--; onDone && onDone(); return; }
+      this._setWorkerErrand(w, n, () => { this._setWorkerIdle(w); this.busy--; onDone && onDone(); });
     }
     discard(parcelId) {
       const b = this.boxes.get(parcelId); if (!b) return;
