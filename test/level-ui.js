@@ -44,7 +44,9 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
       did = true;
       const t = await page.$('.story-hl'); if (!t) break;
       const box = await t.boundingBox(); if (!box) break;
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      // 대상이 화면 밖으로 잘려 있으면 중심이 뷰포트 밖이라 클릭이 안 먹는다 — 보이는 자리로 당겨서 누른다
+      const vp = page.viewportSize();
+      await page.mouse.click(Math.min(box.x + box.width / 2, vp.width - 4), Math.min(box.y + box.height / 2, vp.height - 6));
       await page.waitForTimeout(280); await readBeat();
     }
     return did;

@@ -30,6 +30,9 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
 
   await page.goto('http://localhost:8765/index.html?nosplash=1');
   await page.waitForTimeout(700);
+  // 컷신이 스스로 치웠는지 보려면 '컷신 전'을 알아야 한다 — 탑차 위치·화각·패널 접힘은 튜닝으로 바뀐다
+  const base = await page.evaluate(() => ({ cls: document.getElementById('app').className,
+    truck: +PT.scene.truck.position.x.toFixed(1), fov: PT.scene.camera.fov }));
 
   console.log('첫 시작');
   await page.click('#t-level'); await page.waitForTimeout(1400);
@@ -41,7 +44,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   const cardTxt = await card();
   check(/서장/.test(cardTxt) && /3월/.test(cardTxt) && !/빈 창고/.test(cardTxt), '컷씬 뒤에 장 카드가 뜬다 (이름과 날짜뿐) — ' + cardTxt);
   const c1 = await clean();
-  check(c1.gone && !c1.cine && !c1.cls && !c1.bodyCls && c1.basis === '' && c1.truck === 12 && c1.fov === 38, '건너뛰면 원상복구 — ' + JSON.stringify(c1));
+  check(c1.gone && !c1.cine && c1.cls === base.cls && !c1.bodyCls && c1.basis === '' && c1.truck === base.truck && c1.fov === base.fov, '건너뛰면 원상복구 — ' + JSON.stringify(c1));
   check(!c1.closed && !c1.front, '플레이 화면은 앞면이 벗겨진 단면이다');
   check(c1.story === false, '건너뛴 직후 박 반장이 말을 건다');
 
@@ -112,7 +115,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!!b && /\S/.test(b.line), '자막이 나온다 — "' + (b && b.line) + '"');
   await skip();
   const c2 = await clean();
-  check(c2.gone && !c2.cine && c2.basis === '' && c2.truck === 12, '두 번째도 깨끗이 끝난다 — ' + JSON.stringify(c2));
+  check(c2.gone && !c2.cine && c2.basis === '' && c2.truck === base.truck, '두 번째도 깨끗이 끝난다 — ' + JSON.stringify(c2));
 
   console.log('\n?nointro');
   await page.goto('http://localhost:8765/index.html?nointro=1&nosplash=1'); await page.waitForTimeout(700);

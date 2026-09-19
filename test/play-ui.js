@@ -57,6 +57,9 @@ const say = m => { console.log(m); log.push(m); };
   check(sig0 === '16/0/0/0', '첫 화면 모델에 냉장·냉동이 없다 — ' + sig0);
   await scene('00s-title-scene');
 
+  // 컷신이 스스로 치운 자리인지 보려면 '컷신 전'을 알아야 한다 — 탑차 위치·화각·패널 접힘은 튜닝으로 바뀐다
+  const scene0 = await page.evaluate(() => ({ cls: document.getElementById('app').className,
+    truck: +PT.scene.truck.position.x.toFixed(1), fov: PT.scene.camera.fov }));
   await page.click('#t-level'); await page.waitForTimeout(1500);
 
   say('\n■ 오프닝 씬');
@@ -77,8 +80,10 @@ const say = m => { console.log(m); log.push(m); };
     cls: document.getElementById('app').className, bodyCls: document.body.className,
     truck: +PT.scene.truck.position.x.toFixed(1), fov: PT.scene.camera.fov,
   }));
-  check(intro1.gone && !intro1.cine && !intro1.cls && !intro1.bodyCls && intro1.basis === '', '건너뛰면 화면이 제자리로 돌아온다 — ' + JSON.stringify(intro1));
-  check(intro1.truck === 12 && intro1.fov === 38, '탑차·화각이 평소대로 — 탑차 x' + intro1.truck + ' · 화각 ' + intro1.fov);
+  check(intro1.gone && !intro1.cine && !/cine|recall/.test(intro1.cls) && intro1.cls === scene0.cls && !intro1.bodyCls && intro1.basis === '',
+    '건너뛰면 화면이 제자리로 돌아온다 — ' + JSON.stringify(intro1));
+  check(intro1.truck === scene0.truck && intro1.fov === scene0.fov,
+    '탑차·화각이 컷신 전으로 돌아온다 — 탑차 x' + intro1.truck + ' · 화각 ' + intro1.fov);
   await page.waitForTimeout(400);
 
   say('\n■ 장 시작 카드');
@@ -98,7 +103,9 @@ const say = m => { console.log(m); log.push(m); };
       if (!(await gateOpen())) return k > 0;
       const t = await page.$('.story-hl'); if (!t) return false;
       const b = await t.boundingBox(); if (!b) return false;
-      await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+      // 대상이 화면 밖으로 잘려 있으면 중심이 뷰포트 밖이라 클릭이 안 먹는다 — 보이는 자리로 당겨서 누른다
+      const vp = page.viewportSize();
+      await page.mouse.click(Math.min(b.x + b.width / 2, vp.width - 4), Math.min(b.y + b.height / 2, vp.height - 6));
       await page.waitForTimeout(220); await readBeat();
     }
     return true;
@@ -129,7 +136,10 @@ const say = m => { console.log(m); log.push(m); };
   check(dl.nodl && !dl.hourglass && !dl.txt.trim(), '첫 사이클 택배는 기한 칸이 아예 비어 있다 — "' + dl.txt.trim() + '"');
   check(!(await page.evaluate(() => PT.game.shows('trust'))) && (await page.$$('.trust')).length === 0, '신뢰도가 화면에 없다');
   // 택배 상세도 같은 기준으로 비어 있어야 한다
-  // 같은 택배는 묶음 줄로 접혀 있다 — 먼저 펼치고 낱줄을 연다
+  // 창고 상세(재고)는 기본으로 접혀 있다 — 먼저 펼친다. 같은 택배는 묶음 줄이라 그것도 펼친다
+  await page.evaluate(() => { const t = document.getElementById('warehouse-toggle');
+    if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); });
+  await page.waitForTimeout(300);
   if (!(await page.$('#parcels .parcel[data-id]'))) { await safeClick('#parcels .parcel.group'); await page.waitForTimeout(300); }
   await safeClick('#parcels .parcel[data-id]'); await page.waitForTimeout(400);
   const pd = await page.evaluate(() => ({ txt: (document.getElementById('modal') || {}).textContent || '',
@@ -171,6 +181,7 @@ const say = m => { console.log(m); log.push(m); };
     const st = await state();
     if (st.phase === 'none' || st.phase === 'win' || st.phase === 'over') break;
     if (st.m !== cyc) { cyc = st.m; say(`  ${cyc}사이클 · 자금 ${st.cash}c · 창고 ${st.used}/${st.cap}`); if (cyc <= 4) await scene(`10-c${cyc}-scene`); }
+    await readBeat(); await passGate();   // 게이트('여기를 눌러')가 떠 있으면 다른 버튼은 안 눌린다
     const key = `${st.phase}${st.m}-${st.t}`;
     if (key === last) { if (++stuck > 30) { await shot('99-stuck'); say('  !! 멈춤: ' + key); break; } } else { stuck = 0; last = key; }
 
