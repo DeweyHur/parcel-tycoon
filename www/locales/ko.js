@@ -56,6 +56,8 @@
     'mission.max': 'A급 달성',
     'mission.up': '{grade}급 달성! +{bonus}c',
     'mission.toast': '미션 {grade}급 승급 · 성장 보너스 +{bonus}c',
+    'warehouse.hide': '재고 접기 ▲',
+    'warehouse.show': '재고 펼치기 ▼',
     'call.simulMax': "동시 최대 {n}대",
     'mk.vehicleLine': "{vehicle} <b>{cap}</b>칸 · 대당 <b>{fee}</b>c · 월 <b>{trucks}</b>대",
     'mk.gradeVs': "표준 대비: 용량 {cap0}→{cap1}칸 · 월 {t0}→{t1}대 · 배차비 {f0}→{f1}c · 신뢰 {lv}단계 즉시",

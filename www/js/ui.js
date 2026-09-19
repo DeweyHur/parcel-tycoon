@@ -12,7 +12,7 @@
   const cycleName = c => { const cy = D.CYCLES_PER_MONTH, mi = Math.ceil(c / cy), half = (c - 1) % cy + 1;
     const cal = ((D.START_MONTH - 1 + mi - 1) % 12) + 1; return T('fmt.cycle', { cal, half: T('fmt.half' + half) }); };
   const demoLocked = () => !!BUILD.demo && !Profile.hasFull();   // 데모 빌드 + 본편 미구매
-  const opts = Object.assign({ sound: true, music: true, musicVol: 0.6, sms: true }, Store.get(OPT_KEY) || {});
+  const opts = Object.assign({ sound: true, music: true, musicVol: 0.6, sms: true, warehouseOpen: true }, Store.get(OPT_KEY) || {});
   SFX.setEnabled(opts.sound); BGM.setEnabled(opts.music); BGM.setVolume(opts.musicVol);
   Profile.load();
 
@@ -544,6 +544,11 @@
   function renderAll() {
     if (!game) return;
     const g = game, R = g.rules;
+    const warehouseDetails = $('#warehouse-details'), warehouseToggle = $('#warehouse-toggle');
+    warehouseDetails.hidden = !opts.warehouseOpen;
+    warehouseToggle.textContent = T(opts.warehouseOpen ? 'warehouse.hide' : 'warehouse.show');
+    warehouseToggle.setAttribute('aria-expanded', String(opts.warehouseOpen));
+    $('#app').classList.toggle('warehouse-collapsed', !opts.warehouseOpen);
     updateMusic();
     $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { y: g.yearOf(), cal: g.calMonth(), n: g.month })}`;
     $('#hud-turn').textContent = T('hud.turn', { d: g.dateOf(g.turn), dow: g.dowName(g.turn) });
@@ -581,7 +586,7 @@
     let sawEnd = false;   // 월말 정산 칩이 두 번 세 번 반복되면 줄만 길어진다 — 한 번만
     // 기획서대로 앞 2턴만 — 3턴 뒤 입고는 지금 결정에 쓰이지 않는데 줄만 세 줄로 늘어난다
     $('#upcoming').innerHTML = `<span>${T('hud.upcoming')}</span>` + up.slice(0, 2).map(u => {
-      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${T('fmt.dayN', { d: g.dateOf(u.turn) })}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}</span>`;
+      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${T('fmt.dayN', { d: g.dateOf(u.turn) })}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}" title="${esc(D.PARCEL_TYPES[s.type].name)}" aria-label="${esc(D.PARCEL_TYPES[s.type].name)}"></i>${s.size}`).join(' ')}</span>`;
       const end = u.turn > g.turns();
       if (end && sawEnd) return '';
       if (end) sawEnd = true;
@@ -840,7 +845,7 @@
     const t = ptype(p), a = attrsOf(p);
     const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (s && s.sel.has(p.id) ? ' sel' : '') + (s && !s.elig.has(p.id) ? ' dis' : '') + (s && s.risk && s.risk.has(p.id) ? ' risk' : '') + ` value-${valueTier(p)}`;
     const cu = M.CUSTOMERS[p.customer || 'anon'];
-    return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust" title="${esc(cu.name)}">${cu.icon}</span>`}<span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`;
+    return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}" title="${esc(t.name)}" aria-label="${esc(t.name)}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust" title="${esc(cu.name)}">${cu.icon}</span>`}${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`;
   }
   // 똑같이 생긴 택배가 여러 줄로 늘어서는 것이 "글이 너무 많다"의 가장 큰 원인이다.
   // 지금 당장 결정에 영향을 주지 않는 것들(급하지 않고, 기한 안 지났고, 밖에 없고, 상할 위험 없는 것)만 한 줄로 묶는다.
@@ -861,7 +866,7 @@
     const cus = [...new Set(ps.map(x => M.CUSTOMERS[x.customer || 'anon'].icon))];
     const open = openGroups.has(key);
     const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '');
-    return `<div class="parcel group${cls} value-${valueTier(p)}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">${esc(t.short)} ×${ps.length}</span>${attrIcons(a)} ${T('fmt.cells', { n: vol })} · ${money}c</div><div class="st">${(st => st ? st + ' ' : '')(parcelStatus(p))}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
+    return `<div class="parcel group${cls} value-${valueTier(p)}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}" title="${esc(t.name)}" aria-label="${esc(t.name)}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">×${ps.length}</span>${attrIcons(a)} · ${T('fmt.cells', { n: vol })} · ${money}c</div><div class="st">${(st => st ? st + ' ' : '')(parcelStatus(p))}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
   }
   function renderParcels(container, parcels, selectable) {
     if (!parcels.length) { container.innerHTML = `<div id="empty">${T('hud.emptyWarehouse')}</div>`; return; }
@@ -1660,6 +1665,7 @@
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) $('#c' + i).onclick = () => onContractTap(i);
     $('#hud-cash-box').onclick = () => { SFX.click(); hudDueOpen = !hudDueOpen; renderAll(); };
     $('#wait-btn').onclick = () => doWait(null);
+    $('#warehouse-toggle').onclick = () => { SFX.click(); opts.warehouseOpen = !opts.warehouseOpen; saveOpts(); renderAll(); if (scene && scene.resize) scene.resize(); };
     $('#invest-btn').onclick = () => { if (game) { SFX.click(); showGrowth(); } };
     $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
     $('#hud-month').onclick = () => { if (game) { SFX.click(); showCalendar(closeModal); } };

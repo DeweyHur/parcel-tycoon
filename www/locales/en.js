@@ -56,6 +56,8 @@
     'mission.max': 'A GRADE',
     'mission.up': '{grade} GRADE! +{bonus}c',
     'mission.toast': 'Mission upgraded to {grade} · growth bonus +{bonus}c',
+    'warehouse.hide': 'Hide stock ▲',
+    'warehouse.show': 'Show stock ▼',
     'call.simulMax': "Max {n} at once",
     'mk.vehicleLine': "{vehicle} <b>{cap}</b> slots · <b>{fee}</b>c per vehicle · <b>{trucks}</b>/month",
     'mk.gradeVs': "vs Standard: capacity {cap0}→{cap1} · {t0}→{t1}/month · fee {f0}→{f1}c · trust lv {lv} immediately",
