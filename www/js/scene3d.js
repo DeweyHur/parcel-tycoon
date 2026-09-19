@@ -23,7 +23,7 @@ window.Scene3D = (function () {
   };
   const SIGN = { bg: '#2a2740', line: '#0f0e1a', hi: '#3d3a5c', alt: '#eef6ff', unit: 0.036, scale: 2 };
   const FOOT = { 1: [1, 1, 0.65], 2: [2, 1, 0.78], 4: [2, 2, 1.18], 7: [3, 2, 1.85] }; // [w, d, h] — 화면에서 상자 크기와 적재량을 즉시 읽을 수 있게 높이를 강조한다.
-  const TRUCK_PARK = 12, TRUCK_DOCK = 6.7, TRUCK_GONE = 17;
+  const TRUCK_PARK = 6.6, TRUCK_DOCK = 4.9, TRUCK_GONE = 12;
 
   function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
   // 지붕·기둥은 그림자를 던지지 않는다 (실내가 통째로 어두워진다). 받기는 한다
@@ -44,6 +44,9 @@ window.Scene3D = (function () {
       this.camera.lookAt(1.3, 0.3, 0.3);
       this.tweens = []; this.boxes = new Map(); this.clock = new THREE.Clock(); this.time = 0;
       this.busy = 0;
+      this.raycaster = new THREE.Raycaster(); this.pointer = new THREE.Vector2(); this.onInspect = null;
+      this.renderer.domElement.style.cursor = 'pointer';
+      this.renderer.domElement.addEventListener('pointerup', e => this._inspectAt(e));
       this.parts = {};                     // 착탈식 모듈: shell · cold · yard · van
       this.Z = this._zonesFor(BARE);   // 첫 프레임: 냉장·냉동 없는 맨 창고 (sync 가 곧 진짜 창고로 덮는다)
       this._buildTerrain();
@@ -74,9 +77,26 @@ window.Scene3D = (function () {
       const k = Math.max(0.96, Math.min(1, Math.max(spanX, spanZ)));   // 작아져도 너무 붙지는 않는다 — 건물이 자라는 게 보여야 하니까
       if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.15 * k; this.camY = 0.45 + 6.45 * k; this.camZ = 0.65 + 8.2 * k; this.camLook = [fx, 0.45, 0.65]; }
       else { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a); const kk = Math.max(1, need / 12.1); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.45 + 6.45 * kk * k; this.camZ = 0.65 + 8.2 * kk * k; this.camLook = [fx, 0.45, 0.65]; }
+      // 재고 서랍을 접으면 화면은 커지지만 카메라가 모델에 붙어 버리지 않게 한 걸음 물러나 전체 창고·마당·차량을 담는다.
+      const collapsed = !!(this.container.closest('#app') && this.container.closest('#app').classList.contains('warehouse-collapsed'));
+      if (collapsed) {
+        const pad = 2.05;
+        this.camX = this.camLook[0] + (this.camX - this.camLook[0]) * pad;
+        this.camY = this.camLook[1] + (this.camY - this.camLook[1]) * pad;
+        this.camZ = this.camLook[2] + (this.camZ - this.camLook[2]) * pad;
+      }
       // 오프닝 중에는 카메라를 intro.js 가 몬다 — 여기서는 자리만 계산해 두고 건드리지 않는다
       if (!this.cine) { this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(this.camLook[0], this.camLook[1], this.camLook[2]); }
       this.camera.updateProjectionMatrix();
+    }
+    setOnInspect(fn) { this.onInspect = typeof fn === 'function' ? fn : null; }
+    _inspectAt(e) {
+      if (!this.onInspect || this.busy) return;
+      const r = this.renderer.domElement.getBoundingClientRect();
+      this.pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      this.raycaster.setFromCamera(this.pointer, this.camera);
+      const hits = this.raycaster.intersectObjects(this.scene.children, true);
+      for (const hit of hits) { let o = hit.object; while (o && !o.userData.inspect) o = o.parent; if (o && o.userData.inspect) { this.onInspect({ ...o.userData.inspect }); return; } }
     }
     _mat(color, opts = {}) { return new THREE.MeshLambertMaterial({ color, flatShading: true, ...opts }); }
     _box(w, h, d, color, opts) {
@@ -138,6 +158,7 @@ window.Scene3D = (function () {
     // 앞벽(셔터)과 앞지붕은 _makeFront 가 따로 만든다 — 평소엔 벗겨 놓고(단면), 오프닝에선 씌운다(완성 건물).
     _makeShell(Z) {
       const g = new THREE.Group();
+      g.userData.inspect = { kind: 'warehouse' };
       const w = Z.x1 - Z.x0, cx = (Z.x0 + Z.x1) / 2;
       const depth = Z.frontZ - BACK_Z;
       const floor = this._box(w, 0.12, depth + 0.2, 0x9a9aa8); floor.position.set(cx, 0.0, (BACK_Z + Z.frontZ) / 2); g.add(floor);
@@ -172,6 +193,7 @@ window.Scene3D = (function () {
     // 냉장실: 냉장 구역이 0칸이면 아예 안 붙는다
     _makeColdRoom(Z) {
       const g = new THREE.Group(), C = Z.COLD;
+      g.userData.inspect = { kind: 'cold' };
       const d = C.depth * CELL + 0.2, zc = ROW_Z + C.depth * CELL / 2;
       const cf = this._box(C.cells * CELL + 0.2, 0.06, d, 0x6cabbd); cf.position.set(C.x0 + C.cells * CELL / 2 - 0.1, 0.1, zc); g.add(cf);
       const cw = this._box(0.12, 0.5, d, 0x47869a); cw.position.set(C.x0 + C.cells * CELL + 0.06, 0.3, zc); g.add(cw);
@@ -181,6 +203,7 @@ window.Scene3D = (function () {
     }
     _makeYardPad(Z) {
       const g = new THREE.Group(), Y = Z.YARD;
+      g.userData.inspect = { kind: 'yard' };
       const pad = this._box(Y.cells * CELL + 0.3, 0.05, Y.depth * CELL + 0.3, 0x7d6f56);
       pad.position.set(Y.x0 + Y.cells * CELL / 2 - 0.15, 0.09, Y.z0 + Y.depth * CELL / 2 - 0.05); g.add(pad);
       return g;
@@ -189,6 +212,7 @@ window.Scene3D = (function () {
     _makeVan(Z, kind) {
       const color = kind === 'coldvan' ? 0x5ee0d8 : kind === 'padvan' ? 0xf0a04b : 0xb08bd8;
       const g = new THREE.Group();
+      g.userData.inspect = { kind: 'vehicle', vehicle: kind };
       const body = this._box(1.1, 0.5, 0.6, color); body.position.set(0, 0.42, 0); g.add(body);
       const cabin = this._box(0.4, 0.4, 0.55, 0xe8e8f0); cabin.position.set(0.72, 0.37, 0); g.add(cabin);
       for (const [x, z] of [[-0.3, 0.32], [-0.3, -0.32], [0.62, 0.32], [0.62, -0.32]]) { const w = this._box(0.18, 0.18, 0.1, 0x2a2740); w.position.set(x, 0.17, z); g.add(w); }
@@ -203,6 +227,7 @@ window.Scene3D = (function () {
       const first = this.growthSig == null; this.growthSig = sig;
       if (this.parts.growth) this.scene.remove(this.parts.growth);
       const Z = this.Z, g = new THREE.Group();
+      g.userData.inspect = { kind: 'growth' };
       const marketing = growth.marketing || 0, fleet = growth.fleet || 0, warehouse = growth.warehouse || 0;
       const automation = growth.automation || 0, branding = growth.branding || 0, coldchain = growth.coldchain || 0;
 
@@ -367,6 +392,7 @@ window.Scene3D = (function () {
     }
     _makeTruck() {
       const g = new THREE.Group();
+      g.userData.inspect = { kind: 'truck' };
       const cargo = this._box(2.2, 1.3, 1.3, 0xf2ecd8); cargo.position.set(0.4, 0.95, 0); g.add(cargo);
       const cab = this._box(1.0, 1.0, 1.2, 0xe0553d); cab.position.set(-1.25, 0.75, 0); g.add(cab);
       const glass = this._box(0.2, 0.45, 1.0, 0x9ad8ff, { emissive: 0x224466 }); glass.position.set(-1.75, 0.9, 0); g.add(glass);
@@ -435,7 +461,7 @@ window.Scene3D = (function () {
           if (p.type === 'fragile') { const mark = this._box(0.12, h * 0.5, 0.05, 0xb8453b); mark.position.set(0, 0, d * CELL / 2 - 0.02); b.add(mark); }
           if (p.type === 'intl') { const mark = this._box(w * CELL * 0.4, 0.05, 0.16, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
           if (p.type === 'fresh') { const mark = this._box(w * CELL * 0.5, 0.04, d * CELL * 0.5, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
-          b.userData = { h, id: p.id, valueTier };
+          b.userData = { h, id: p.id, valueTier, inspect: { kind: 'parcel', id: p.id } };
           if (!p.storage) { const cu = (window.META && window.META.CUSTOMERS[p.customer || 'anon']); if (cu) b.add(this._iconMark(cu.icon, w, h, d)); }
           this.scene.add(b); this.boxes.set(p.id, b);
           const t = pos.get(p.id);
