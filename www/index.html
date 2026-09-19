@@ -18,6 +18,18 @@
           <div id="hud-perks" style="color:var(--dim);font-size:11px"></div>
         </div>
       </div>
+      <div id="ops-status" aria-live="polite">
+        <div class="ops-verdict">
+          <span class="ops-signal" id="ops-signal"></span>
+          <div><small id="ops-kicker"></small><b id="ops-title"></b></div>
+        </div>
+        <div class="ops-metrics">
+          <div class="ops-metric"><span>📦</span><b id="ops-delivered">0</b><small id="ops-delivered-label"></small></div>
+          <div class="ops-metric"><span>⚡</span><b id="ops-risk">0</b><small id="ops-risk-label"></small></div>
+          <div class="ops-metric"><span>★</span><b id="ops-next">0</b><small id="ops-next-label"></small></div>
+        </div>
+        <div class="ops-progress"><i id="ops-progress-fill"></i><span id="ops-progress-label"></span></div>
+      </div>
       <div id="float-layer"></div>
       <div id="toast"></div>
     </div>
@@ -32,17 +44,21 @@
       <div id="parcels"></div>
       <div id="coach" hidden></div>
       <div id="actions">
-        <button class="btn contract" id="c0"></button>
-        <button class="btn contract" id="c1"></button>
-        <button class="btn contract" id="c2"></button>
-        <button class="btn contract" id="c3"></button>
-        <button class="btn contract" id="c4"></button>
-        <button class="btn primary" id="wait-btn" style="grid-column:1/-1"></button>
-        <div id="bottom-bar">
-          <button class="btn small" id="cust-btn">고객</button>
-          <button class="btn small" id="log-btn">기록</button>
-          <button class="btn small" id="help-btn">도움말</button>
-          <button class="btn small" id="menu-btn">메뉴</button>
+        <div id="contract-strip">
+          <button class="btn contract" id="c0"></button>
+          <button class="btn contract" id="c1"></button>
+          <button class="btn contract" id="c2"></button>
+          <button class="btn contract" id="c3"></button>
+          <button class="btn contract" id="c4"></button>
+        </div>
+        <div id="action-main">
+          <button class="btn primary" id="wait-btn"></button>
+          <div id="bottom-bar">
+            <button class="btn small" id="cust-btn">고객</button>
+            <button class="btn small" id="log-btn">기록</button>
+            <button class="btn small" id="help-btn">도움말</button>
+            <button class="btn small" id="menu-btn">메뉴</button>
+          </div>
         </div>
       </div>
     </div>

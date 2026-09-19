@@ -1,100 +1,85 @@
-# 상하차의 신 (God of the Dock) — 택배 창고 타이쿤
+# 상하차의 신 (God of the Dock)
 
-> Doo'In Studio · 레포·빌드 산출물 이름은 `parcel-tycoon` 그대로다 (내부 식별자)
+택배 창고를 운영하며 입고 물량, 보관 공간, 배송 계약, 현금과 평판을 관리하는 모바일 우선 물류 경영 게임입니다. HTML5와 Three.js로 동작하며 Capacitor를 통해 Android 앱으로 패키징할 수 있습니다.
 
-턴제 물류 경영 로그라이크. 기획서 `GAME_DESIGN.md` v0.2의 **20장 프로토타입 범위**를 구현한 모바일(안드로이드) 게임입니다.
-HTML5 + Three.js(로우폴리 창고) + 픽셀아트 UI(Galmuri 폰트)로 만들었고 Capacitor로 안드로이드 앱으로 패키징합니다.
+## 게임의 핵심
 
-## 바로 플레이 (브라우저)
+- 매 영업일 들어오는 택배를 창고와 냉장·냉동 구역에 배치합니다.
+- 배송 업체를 골라 차량을 호출하고 적재 효율과 배송 기한을 관리합니다.
+- 과적, 반송, 파손, 날씨, 도난 위험을 피하면서 현금과 평판을 성장시킵니다.
+- 캠페인을 진행하며 새 기능, 고객, 배송 수단과 운영 선택지를 해금합니다.
+
+화면은 3D 창고를 중심으로 구성됩니다. 실제 상자 적재 상태와 차량 이동을 크게 보여 주고, 운영 HUD에서 현재 위험, 이번 달 배송량, 다음 평판 등급, 캠페인 진행률을 즉시 확인할 수 있습니다. 배송 계약은 하단의 가로 카드 레일에서 선택합니다.
+
+## 로컬 실행
+
+요구 사항: Node.js 18 이상, Python 3
 
 ```bash
-npm run serve        # http://localhost:8765
+npm install
+npm run serve
 ```
-`www/index.html`을 그대로 열어도 됩니다 (모바일 크기 창 권장).
 
-## 안드로이드 APK 빌드 (맥)
+브라우저에서 `http://localhost:8765`를 엽니다. 게임 데이터는 브라우저의 `localStorage`에 자동 저장됩니다.
 
-필요: Node 18+, Android Studio (SDK + JBR 포함). 처음 한 번은 Gradle이 의존성을 받느라 몇 분 걸립니다.
+## 테스트
 
 ```bash
-bash build-apk.sh    # → dist/parcel-tycoon-debug.apk (USB 연결된 폰이 있으면 자동 설치)
+npm test
 ```
-직접 하려면: `npm install` → `npx cap add android` → `npx cap sync android` → `npx cap open android` (Android Studio에서 Run).
 
-폰에 설치할 때는 "출처를 알 수 없는 앱 설치"를 허용해야 합니다 (디버그 서명 APK).
+`npm test`는 게임 규칙 단위 테스트와 200회 자동 시뮬레이션을 실행합니다.
 
-## 구조
+## 웹 빌드
 
-| 경로 | 내용 |
+```bash
+npm run web
+```
+
+웹 배포용 산출물과 아카이브를 생성합니다.
+
+## Android APK
+
+요구 사항: Android Studio, Android SDK, JDK
+
+```bash
+bash build-apk.sh
+```
+
+처음 직접 구성할 때는 다음 순서로 Capacitor 프로젝트를 준비할 수 있습니다.
+
+```bash
+npm install
+npx cap add android
+npx cap sync android
+npx cap open android
+```
+
+## 프로젝트 구조
+
+| 경로 | 역할 |
 |---|---|
-| `www/js/data.js` | 밸런스 수치 (기획서 표를 그대로 옮김) — 튜닝은 여기서 |
-| `www/js/game.js` | 코어 규칙 상태 머신 (브라우저/Node 공용). 시나리오·회사·퍽 설정 → `rules` 객체 → 규칙 적용 |
-| `www/js/meta.js` | 회사 9 · 퍽 24 · 시나리오 · 한국 달력(`CALENDARS.kr`, 달별 이벤트) · 데일리 변형 8 · 도전과제 정의 (`docs/META_DESIGN.md`, `docs/STORY_TUTORIAL_DESIGN.md`) |
-| `www/js/story.js` | 스토리 모드(창고장 안내): 전임 창고장 박 반장의 비트 23개 + 계절 문자 + 스프라이트 (`docs/STORY_TUTORIAL_DESIGN.md`) |
-| `www/js/storage.js` | 저장소 어댑터 (localStorage. 구글 플레이 게임즈 등으로 백엔드 교체 지점) |
-| `www/js/profile.js` | 프로필: 해금·도전과제·누적 통계·기록. 이전 기록 마이그레이션 |
-| `www/js/ui.js` | 화면/모달/저장/기록 |
-| `www/js/scene3d.js` | Three.js 로우폴리 창고·트럭 연출 |
-| `www/js/sfx.js` | WebAudio 8비트 효과음 |
-| `www/js/bgm.js` | BGM 시스템 (WebAudio 끊김 없는 루프, 크로스페이드, 원샷) |
-| `www/audio/` | 게임용 BGM (루프 가공본). 원본은 `audio-src/` |
-| `tools/make_loops.py` | Suno 원본 → 루프 가공 (루프 지점 자동 탐색, 라우드니스 정규화) |
-| `test/unit.js` | 규칙 단위 테스트 `node test/unit.js` |
-| `test/sim.js` | 봇 밸런스 시뮬레이션 `node test/sim.js 300` |
-| `test/shot.js` | Playwright UI 스모크 테스트 + 스크린샷 |
-| `test/story-shot.js` · `test/story-run.js` | 스토리 모드 UI 스모크 (1개월차 · 5개월차까지 진행) |
+| `www/index.html` | 게임 화면 구조와 HUD |
+| `www/css/style.css` | 반응형 레이아웃, 픽셀 UI, 운영 상태 시각화 |
+| `www/js/game.js` | 핵심 규칙과 게임 상태 머신 |
+| `www/js/ui.js` | 화면 렌더링, 입력, 모달, 피드백 |
+| `www/js/scene3d.js` | Three.js 창고, 상자, 차량, 날씨 연출 |
+| `www/js/levels.js` | 캠페인 챕터와 단계별 기능 해금 |
+| `www/js/meta.js` | 회사, 특전, 시나리오, 달력 데이터 |
+| `www/locales/` | 한국어·영어 문자열 |
+| `test/unit.js` | 규칙 단위 테스트 |
+| `test/sim.js` | 자동 플레이 밸런스 시뮬레이션 |
+| `docs/` | 게임 및 시스템 설계 문서 |
 
-## 음악 (BGM)
+## UI 원칙
 
-Suno로 만든 칩튠 6곡. `audio-src/`의 원본을 `python3 tools/make_loops.py`로 가공해 `www/audio/`에 넣는다 (ffmpeg, numpy 필요).
-
-| 곡 | 용도 | 전환 조건 |
-|---|---|---|
-| title | 타이틀·Perk 선택 | 게임 밖 |
-| warehouse | 영업 단계 | 창고 사용률 ≤ 90%, 스트레스 < 16 |
-| overflow | 위기 | 사용률 > 90% 또는 스트레스 ≥ 16 (크로스페이드 1.2초) |
-| market | 월말 마켓 | 마켓 화면 |
-| fanfare | 월말 정산, 런 성공 | 원샷 |
-| gameover | 게임오버 | 원샷 |
-
-루프 이음새가 어색하면 `tools/make_loops.py`의 `OVERRIDE`에 곡별 루프 끝 지점(초)을 넣고 다시 실행. 음악 켜기/끄기와 볼륨은 타이틀·메뉴에서.
-
-## 메타 진행 (v0.3)
-
-런 준비는 **시나리오 → 회사 → 퍽** 순서. 회사·퍽·시나리오는 도전과제로만 해금되며 메인 메뉴의 **도감**에서 조건과 진행 상황을 볼 수 있다. 상세는 `docs/META_DESIGN.md`.
-프로필(`Store` 키 `pt_profile_v1`)은 기기 localStorage에 저장된다. `Store.setBackend()`로 클라우드 저장소(구글 플레이 게임즈 Saved Games 등)로 교체할 수 있게 어댑터를 분리해 두었다.
-
-시뮬레이션: `node test/sim.js 200 companies` / `node test/sim.js 200 scenarios` — 균형형 봇 기준 회사·시나리오별 생존률. 봇이 전문 업체를 잘 안 사서 항만·반기는 실제보다 낮게 나온다.
-
-## 구현 범위 (프로토타입)
-
-- 택배 4종(일반·신선·파손주의·국제), 크기 1/2/4/7, 보상 = 25 + 크기×15 + 특수 보너스
-- 시작 업체 4종(일반 라인·용달·냉장 물류·대량 분류) + 마켓 전용 전문 업체 2종(프래자일 전문·국제 특송)
-- 대기 행동, 계약 최대 호출 횟수, 계약 교체 시 잔여 횟수·신뢰도·강화 소멸
-- 등급 2단계(일반·신뢰), 강화 4종(호출 한도 +2·처리 용량 강화 I·정기 배차·신뢰도 인장), 창고 확장 2종
-- 신뢰도 시스템(5/12/20xp), 월말 마켓(5슬롯, 최대 3개 구매, 새로고침), 3개월 진행, Perk 5종 중 2개 선택
-- 자동 저장/이어하기, 최고 기록·최근 10런 기록 (localStorage)
-
-## 기획서와 다르게 해석한 부분
-
-- 프로토타입엔 프래자일/국제 업체가 없어서 파손·국제 택배 처리 수단이 타겟(1개/회)뿐이었고, 시뮬레이션에서 기한 초과 페널티가 과다했습니다. 그래서 두 전문 업체를 **마켓 전용**으로 추가했습니다 (2개월차 "계약 공백" 압박과 맞물림).
-- 용달은 모든 종류를 처리하지만 특수 운송 보너스는 없습니다 (신뢰 3단계에서 보너스 해금).
-- 월말 "미처리 부피 3당 +1"은 **기한 초과 상태인 택배**의 부피 기준입니다. 전체 보관 부피로 하면 목표 사용률 55~80%에서도 매달 +4~6이 나와 "월말 페널티 1~3" 목표와 충돌합니다.
-- 냉장 구역이 가득 차면 넘친 신선식품은 상온 보관이 되어 신선도가 2배 속도로 떨어집니다.
-- 초대형(7) 화물이 적재장 수를 넘기면 개당 임시 공간 3을 추가로 차지합니다.
-- 파산(월말 운영비를 못 내 자금 < 0)은 게임오버입니다.
-
-## 봇 시뮬레이션 결과 (300 시드)
-
-| 전략 | 3개월 생존 | 월평균 호출 | 월평균 대기 | 평균 스트레스 |
-|---|---:|---:|---:|---:|
-| 매 턴 호출(greedy) | 68% | 7.4 | 2.6 | 13.7 |
-| 균형형 | 85% | 5.9 | 4.1 | 9.4 |
-| 절약형 | 86% | 6.3 | 3.7 | 9.4 |
-| 대기만 | 0% (2개월차 붕괴) | 0 | 10 | 22 |
-
-기획서의 성공 기준(대기 위주로 1개월차 통과, 일괄 처리가 유리, 대기만 하면 2개월차 붕괴)을 만족합니다.
+1. 실제 창고 상태가 가장 큰 화면을 차지한다.
+2. 위험은 빨강, 주의는 노랑, 안정은 초록으로 즉시 구분한다.
+3. 매 턴 성과와 성장 진행률을 숫자와 게이지로 보여 준다.
+4. 상세 설명은 필요할 때만 열고, 기본 화면의 텍스트 밀도를 낮춘다.
+5. 모바일에서도 주요 조작이 한두 번의 탭 안에 있어야 한다.
 
 ## 라이선스
-- three.js (MIT) — `www/js/THREE-LICENSE`
-- Galmuri 폰트 (SIL OFL 1.1) — `www/fonts/GALMURI-LICENSE.md`
+
+- Three.js: MIT — `www/js/THREE-LICENSE`
+- Galmuri 폰트: SIL Open Font License 1.1 — `www/fonts/GALMURI-LICENSE.md`

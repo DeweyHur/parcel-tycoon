@@ -22,7 +22,7 @@ window.Scene3D = (function () {
     rain: ['...XXX...', '.XXXXXXX.', 'XXXXXXXXX', 'XXXXXXXXX', '.........', '..X..X..X', '.X..X..X.', 'X..X..X..'],
   };
   const SIGN = { bg: '#2a2740', line: '#0f0e1a', hi: '#3d3a5c', alt: '#eef6ff', unit: 0.036, scale: 2 };
-  const FOOT = { 1: [1, 1, 0.5], 2: [2, 1, 0.6], 4: [2, 2, 0.95], 7: [3, 2, 1.5] }; // [w, d, h]
+  const FOOT = { 1: [1, 1, 0.65], 2: [2, 1, 0.78], 4: [2, 2, 1.18], 7: [3, 2, 1.85] }; // [w, d, h] — 화면에서 상자 크기와 적재량을 즉시 읽을 수 있게 높이를 강조한다.
   const TRUCK_PARK = 12, TRUCK_DOCK = 6.7, TRUCK_GONE = 17;
 
   function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
@@ -62,7 +62,7 @@ window.Scene3D = (function () {
       this.camera.aspect = w / h;
       const a = w / h;
       // 세로형/가로형에서 화각이 다르다. 오프닝 중에는 intro.js 가 두 값 사이를 부드럽게 건너간다 (여기서 바꾸면 딱 끊긴다)
-      const fov = a < 0.9 ? 46 : 38; this.camFov = fov;
+      const fov = a < 0.9 ? 42 : 34; this.camFov = fov;
       if (!this.cine) this.camera.fov = fov;
       // 넓은 화면(가로형)이면 카메라를 왼쪽으로 옮겨 냉장 구역이 잘리지 않게
       // 장면 가로 범위는 x -5.2(냉장 벽)~5.7(도크). 세로형(a<0.9)은 창고 중앙(2.6) 기준, 그 외는 가운데(0.3)를 보되 다 들어올 때까지 카메라를 뒤로
@@ -72,8 +72,8 @@ window.Scene3D = (function () {
       const dx = (Z.x0 - FULL.x0) / 2;
       const spanX = (Z.x1 + 1.2 - Z.x0) / 11, spanZ = (Z.yardZ0 + Z.YARD.depth * CELL + 0.3 - BACK_Z) / 6.35;
       const k = Math.max(0.96, Math.min(1, Math.max(spanX, spanZ)));   // 작아져도 너무 붙지는 않는다 — 건물이 자라는 게 보여야 하니까
-      if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.3 * k; this.camY = 0.3 + 7.5 * k; this.camZ = 0.55 + 9.5 * k; this.camLook = [fx, 0.3, 0.55]; }
-      else { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a); const kk = Math.max(1, need / 12.1); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.3 + 7.5 * kk * k; this.camZ = 0.55 + 9.5 * kk * k; this.camLook = [fx, 0.3, 0.55]; }
+      if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.15 * k; this.camY = 0.45 + 6.45 * k; this.camZ = 0.65 + 8.2 * k; this.camLook = [fx, 0.45, 0.65]; }
+      else { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a); const kk = Math.max(1, need / 12.1); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.45 + 6.45 * kk * k; this.camZ = 0.65 + 8.2 * kk * k; this.camLook = [fx, 0.45, 0.65]; }
       // 오프닝 중에는 카메라를 intro.js 가 몬다 — 여기서는 자리만 계산해 두고 건드리지 않는다
       if (!this.cine) { this.camera.position.set(this.camX, this.camY, this.camZ); this.camera.lookAt(this.camLook[0], this.camLook[1], this.camLook[2]); }
       this.camera.updateProjectionMatrix();

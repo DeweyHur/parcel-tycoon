@@ -474,6 +474,41 @@
     else if (g.phase === 'market') BGM.play('market');
   }
   let hudDueOpen = false;   // HUD 자금 분해 펼침 여부 (기본 접힘)
+  function renderOps(g, forecast) {
+    const ko = I18n.lang === 'ko';
+    const risky = new Set(g.parcels.filter(p => p.overdue).map(p => p.id));
+    g.parcels.filter(p => {
+      const a = attrsOf(p);
+      return (a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen);
+    }).forEach(p => risky.add(p.id));
+    try { g.unhandled().filter(p => !(p.customs > 0)).forEach(p => risky.add(p.id)); } catch (e) { /* early tutorial */ }
+    const overflow = forecast && forecast.used > forecast.cap ? forecast.used - forecast.cap : 0;
+    const risk = risky.size + overflow;
+    const usage = g.usage();
+    const state = risk > 0 ? 'danger' : usage >= 0.75 ? 'watch' : 'good';
+    const title = state === 'danger'
+      ? (ko ? '즉시 배송 필요' : 'Dispatch now')
+      : state === 'watch'
+        ? (ko ? '곧 정리할 타이밍' : 'Plan the next call')
+        : (ko ? '안정적으로 성장 중' : 'Growing steadily');
+    const root = $('#ops-status');
+    root.className = state;
+    $('#ops-kicker').textContent = ko ? '현재 운영 판단' : 'OPERATION STATUS';
+    $('#ops-title').textContent = title;
+    $('#ops-delivered').textContent = g.monthStats ? g.monthStats.delivered : 0;
+    $('#ops-delivered-label').textContent = ko ? '이번 달 배송' : 'delivered';
+    $('#ops-risk').textContent = risk;
+    $('#ops-risk-label').textContent = ko ? (risk ? '지금 위험' : '위험 없음') : (risk ? 'at risk' : 'no risk');
+    const repVisible = g.shows('rep');
+    $('#ops-next').textContent = repVisible ? (g.repToNext() || (ko ? '최고' : 'MAX')) : Math.max(0, g.turns() - g.turn);
+    $('#ops-next-label').textContent = repVisible ? (ko ? '다음 등급까지' : 'to next tier') : (ko ? '남은 영업일' : 'days left');
+    const turns = Math.max(1, g.turns());
+    const total = Math.max(1, (g.rules.months || 1) * turns);
+    const done = Math.min(total, Math.max(0, (g.month - 1) * turns + g.turn));
+    const pct = Math.round(done / total * 100);
+    $('#ops-progress-fill').style.width = pct + '%';
+    $('#ops-progress-label').textContent = `${ko ? (g.level ? '챕터' : '운영') : (g.level ? 'Chapter' : 'Run')} ${pct}%`;
+  }
   function renderAll() {
     if (!game) return;
     const g = game, R = g.rules;
@@ -556,6 +591,7 @@
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
     const f = g.forecast();
+    renderOps(g, f);
     const warn = [];
     if (f.overdue) warn.push(T('wait.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wait.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wait.frozenOver', { n: f.frozenOver }));
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
