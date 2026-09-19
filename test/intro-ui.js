@@ -51,8 +51,9 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
 
   console.log('\n세피아 · 인물 카드 · 탑차 입장 (한 번 더 틀어서 추적)');
   await page.reload(); await page.waitForTimeout(700);
-  await page.click('#t-level'); await page.waitForTimeout(350);
-  const yes0 = await page.$('#modal .foot .btn.warn'); if (yes0) { await yes0.click(); await page.waitForTimeout(500); }
+  // 세이브가 있으면 타이틀은 「이어하기」다 — 장을 골라 「새로 하기」로 바꾼 뒤 눌러야 컷씬이 다시 돈다
+  const chip0 = await page.$('#modal .chpick .chip[data-ch="1"]'); if (chip0) { await chip0.click(); await page.waitForTimeout(350); }
+  await page.click('#t-level'); await page.waitForTimeout(500);
   const t0 = Date.now(); const rows = [];
   while (Date.now() - t0 < 45000) {
     const st = await page.evaluate(() => {
@@ -98,10 +99,14 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
 
   console.log('\n다시 시작 (두 번째 서장)');
   await page.reload(); await page.waitForTimeout(800);
-  await page.click('#t-level'); await page.waitForTimeout(400);     // 세이브가 있으니 확인 팝업 (예 = .btn.warn)
-  const yes = await page.$('#modal .foot .btn.warn');
-  check(!!yes, '「새로 시작」 확인 팝업이 뜬다');
-  if (yes) { await yes.click(); await page.waitForTimeout(1500); }
+  // 세이브가 있으면 「이어하기」다. 장을 고르면 버튼이 「새로 하기」로 바뀌고, 확인 팝업 없이 그대로 시작한다
+  const chip = await page.$('#modal .chpick .chip[data-ch="1"]');
+  check(!!chip, '진행 중인 런이 있어도 장 고르기가 있다');
+  if (chip) { await chip.click(); await page.waitForTimeout(350); }
+  const cta = await page.$eval('#t-level', el => el.textContent).catch(() => '');
+  check(/새로/.test(cta), '장을 고르면 버튼이 「새로 하기」가 된다 — ' + cta);
+  await page.click('#t-level'); await page.waitForTimeout(1500);
+  check(!(await page.$('#modal .foot .btn.warn')), '확인 팝업은 없다');
   const b = await playing();
   check(!!b, '두 번째 서장에도 오프닝이 다시 나온다');
   check(!!b && /\S/.test(b.line), '자막이 나온다 — "' + (b && b.line) + '"');
@@ -111,8 +116,8 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
 
   console.log('\n?nointro');
   await page.goto('http://localhost:8765/index.html?nointro=1&nosplash=1'); await page.waitForTimeout(700);
-  const go = await page.$('#t-level'); await go.click(); await page.waitForTimeout(400);
-  const cf = await page.$('#modal .foot .btn.warn'); if (cf) { await cf.click(); await page.waitForTimeout(900); }
+  const chip2 = await page.$('#modal .chpick .chip[data-ch="1"]'); if (chip2) { await chip2.click(); await page.waitForTimeout(350); }
+  await page.click('#t-level'); await page.waitForTimeout(900);
   check(!(await playing()), '?nointro 면 바로 1턴');
   const ncCard = await card();
   check(/서장/.test(ncCard), '컷씬을 꺼도 장 카드는 뜬다 — ' + ncCard);

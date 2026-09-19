@@ -98,43 +98,41 @@
 
   // ---------- 캠페인 (레벨) ----------
   // 첫 화면에 있는 것이 적을수록 좋다. 캠페인 중에는 시작 · 소리 · 언어뿐 — 자유 런·도감·기록은 캠페인을 끝내면 열린다.
-  // sel: 장 고르기에서 **고른** 장. 칩은 고르기만 하고, 시작은 큰 버튼 하나가 한다 —
-  // 칩 하나에 '고르기'와 '시작'을 같이 걸면, 골라 놓고 시작을 누른 사람이 엉뚱한 장으로 들어간다.
+  // sel: 장 고르기에서 **고른** 장. 아무것도 안 고르면 이어하기, 장을 고르면 그 장을 새로 시작한다.
+  // 확인창은 띄우지 않는다 — 타이틀이 사라지고 게임 판 위에 작은 창이 뜨는 꼴이 되어 여기가 어디인지 흐려진다.
+  // 대신 버튼 글씨가 「이어하기」에서 「새로 하기」로 바뀐다. 무엇을 누르는지는 버튼이 말한다.
   function showTitleCampaign(save, camp, sel) {
     const cur = Math.min(camp.level || 1, LEVELS.IMPLEMENTED);
     // 지나온 장은 언제든 다시 할 수 있다 — 한 장을 넘기고 나면 앞 장으로 돌아갈 길이 없으면 안 된다.
     // 고를 수 있는 것은 깬 장 + 지금 장까지. 한 장뿐이면 아예 안 그린다.
     const open = Math.min(Math.max(camp.cleared || 0, 0) + 1, LEVELS.IMPLEMENTED);
-    const n = Math.min(Math.max(sel || cur, 1), open);
-    // 이어하기는 '지금 장'일 때만이다. 다른 장을 고르면 그 장을 처음부터 하는 것 말고 할 수 있는 게 없다
-    const cont = save && n === cur;
-    const again = () => showTitleCampaign(loadSave(), Profile.get().campaign, n);
+    const pick = sel ? Math.min(Math.max(sel, 1), open) : 0;   // 0 = 고른 것 없음
+    const n = pick || cur;
+    const cont = !!save && !pick;                              // 이어하기는 아무것도 안 골랐을 때
+    const again = k => showTitleCampaign(loadSave(), Profile.get().campaign, k);
     // 칩만 놓으면 '지금 몇 장인지' 알려 주는 표시로 읽힌다 — 누를 수 있는 것임을 한 줄로 말해 준다
-    const picker = open <= 1 ? '' : `<div class="chlbl">${T('lv.pick')}</div><div class="chpick">${Array.from({ length: open }, (_, i) => i + 1)
-      .map(k => `<span class="chip${k === n ? ' on' : ''}" data-ch="${k}">${T('lv.ch.' + k)}</span>`).join('')}</div>`;
+    // 장이 하나뿐이어도 진행 중인 런이 있으면 칩을 보여 준다 — 그래야 「다시 하기」 길이 생긴다
+    const picker = (open <= 1 && !save) ? '' : `<div class="chlbl">${T('lv.pick')}</div><div class="chpick">${Array.from({ length: open }, (_, i) => i + 1)
+      .map(k => `<span class="chip${k === pick ? ' on' : ''}" data-ch="${k}">${T('lv.ch.' + k)}</span>`).join('')}</div>`;
     // 메인 메뉴는 버튼 하나다. 소리·음악·언어는 아래 텍스트 한 줄 (아이콘으로 바꾸지 않는다)
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
       ${cont ? `<button class="btn cta" id="t-continue">${T('lv.continue')}</button>`
-             : `<button class="btn cta" id="t-level">${T('lv.start')}</button>`}
-      <div class="ch">${T('lv.ch.' + n)}${cont ? ` · <span class="lnk" id="t-level">${T('lv.restart')}</span>` : ''}</div>
+             : `<button class="btn cta" id="t-level">${T(save ? 'lv.new' : 'lv.start')}</button>`}
+      <div class="ch">${T('lv.ch.' + n)}</div>
       ${picker}
       ${optRow()}
       <div class="studio">${T('title.studio')} · v0.3</div></div>`;
     const m = modal('', body, null);
     m.classList.add('titlecard'); $('#modal-root').classList.add('title-mode');
     if (cont) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
-    // 고른 장을 그 장의 시작 판(carryAt)으로 처음부터 한다. 진행 중인 런이 있으면 사라지므로 확인부터
-    m.querySelector('#t-level').onclick = () => {
-      SFX.resume(); SFX.select();
-      const go = () => { const P = Profile.get(); P.campaign = Object.assign({}, P.campaign, { level: n }); Profile.save(); Store.remove(SAVE_KEY); startLevel(n); };
-      if (save) return askConfirm(T('lv.pickAsk', { ch: T('lv.ch.' + n) }), go, T('lv.pickGo'), again);
-      go();
-    };
-    // 칩은 고르기만 한다 — 아무것도 지우지 않으므로 확인을 묻지 않는다
-    m.querySelectorAll('.chpick .chip').forEach(el => el.onclick = () => { SFX.resume(); SFX.click(); showTitleCampaign(save, camp, +el.dataset.ch); });
-    m.querySelector('#t-sound').onclick = () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); SFX.resume(); SFX.click(); again(); };
-    m.querySelector('#t-music').onclick = () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); SFX.resume(); BGM.resume(); SFX.click(); again(); };
-    m.querySelector('#t-lang').onclick = () => { const ids = I18n.languages().map(l => l.id); I18n.setLang(ids[(ids.indexOf(I18n.lang) + 1) % ids.length]); SFX.click(); applyStaticText(); again(); };
+    // 고른 장을 그 장의 시작 판(carryAt)으로 처음부터 한다. 진행 중인 런은 여기서 사라진다
+    else m.querySelector('#t-level').onclick = () => { SFX.resume(); SFX.select();
+      const P = Profile.get(); P.campaign = Object.assign({}, P.campaign, { level: n }); Profile.save(); Store.remove(SAVE_KEY); startLevel(n); };
+    // 칩은 고르기만 한다. 고른 칩을 다시 누르면 고르기를 푼다 (= 이어하기로 돌아온다)
+    m.querySelectorAll('.chpick .chip').forEach(el => el.onclick = () => { const k = +el.dataset.ch; SFX.resume(); SFX.click(); again(k === pick ? 0 : k); });
+    m.querySelector('#t-sound').onclick = () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); SFX.resume(); SFX.click(); again(pick); };
+    m.querySelector('#t-music').onclick = () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); SFX.resume(); BGM.resume(); SFX.click(); again(pick); };
+    m.querySelector('#t-lang').onclick = () => { const ids = I18n.languages().map(l => l.id); I18n.setLang(ids[(ids.indexOf(I18n.lang) + 1) % ids.length]); SFX.click(); applyStaticText(); again(pick); };
     BGM.play('title');
   }
   // 레벨 런: 난이도·회사·퍽을 묻지 않는다. 소개는 박 반장이 게임 안에서 한다
