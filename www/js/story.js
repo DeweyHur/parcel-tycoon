@@ -264,6 +264,12 @@
     ] },
     // 쇼핑 행사 폭주
     { id: 'l5rush', kind: 'turn', when: g => g.isRushTurn && g.isRushTurn(), pages: [{ expr: 'worry', hl: '#upcoming' }] },
+    // 이 장의 진짜 교훈 — 자리가 다 찼을 때는 계약이 아니라 특약이다
+    { id: 'l5full', kind: 'market', when: g => g.contracts.filter(Boolean).length >= root.DATA.CONTRACT_SLOTS && !!optItem(g), pages: [
+      { expr: 'think', hl: '#mk-mine' },
+      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt') },
+      { expr: 'smile', hl: g => cardSel(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt') },
+    ] },
     { id: 'l5last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }, { expr: 'think' }] },
   ];
 
@@ -285,12 +291,6 @@
     ] },
     // ❆ 냉동 — 오기 전에 마켓이 먼저. 그런데 이번엔 계약 자리가 없다
     { id: 'l6frozenWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!optItem(g), pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
-    // 이 장의 진짜 교훈 — 자리가 다 찼을 때는 계약이 아니라 특약이다
-    { id: 'l6full', kind: 'market', when: g => g.contracts.filter(Boolean).length >= root.DATA.CONTRACT_SLOTS && !!optItem(g), pages: [
-      { expr: 'think', hl: '#mk-mine' },
-      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt') },
-      { expr: 'smile', hl: g => cardSel(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt') },
-    ] },
     { id: 'l6frozenCar', kind: 'market', when: g => !!frozenCar(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen') }] },
     { id: 'l6freezer', kind: 'market', when: g => !!freezerFac(g), pages: [
       { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'fac' && /^freezer/.test(it.fac || '')) },

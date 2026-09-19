@@ -132,10 +132,9 @@
   // 레벨 런: 난이도·회사·퍽을 묻지 않는다. 소개는 박 반장이 게임 안에서 한다
   function startLevel(n) {
     const P = Profile.get();
-    // 장은 한 사이클이라 정산 뒤 마켓이 없다 — 대신 **장을 준비 마켓으로 연다**.
-    // "오기 전에 준비한다"가 이 게임의 핵심인데, 그걸 가르칠 자리가 여기 말고는 없다. 서장은 마켓 자체가 안 열린다.
-    game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n,
-      prep: n > 1, companyName: P.campaign.name || '', carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
+    // 마켓은 장 **끝**에 온다 (정산 직후). 배차를 다 쓴 그 자리에서 충전을 배우고, 예보로 다음 장을 준비한다.
+    game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false,
+      companyName: P.campaign.name || '', carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
     closeModal(); startPlay({ intro: n === 1, chapter: n });
   }

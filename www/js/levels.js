@@ -176,7 +176,8 @@
           ['normal 2 mart', 'normal 2 anon', 'normal 2 mart'],
           ['normal 2 anon', 'normal 2 mart', 'fragile 2 glass'],
         ]),
-          market: { contracts: ['large0'], enh: ['limit1'], item: ['transitCert'], fac: ['expand2'] } },
+          // 다음 보름에 ❆ 가 온다. 계약 자리는 이미 넷이 다 찼으니 답은 계약이 아니라 **특약**이다
+          market: { contracts: [], enh: ['optFrozen', 'limit1'], item: ['transitCert'], fac: ['expand2', 'freezer1'] } },
       },
     },
     // ----- 5장 (5월 후반): 마지막 봄. ❆ 냉동 · 일요일 선택 · 그리고 자리가 없을 때 '붙이는' 법 -----

@@ -7,7 +7,7 @@ const Story = require('../www/js/story.js');
 const LV = require('../www/js/levels.js');
 
 const level = +process.argv[2] || 1, diff = process.argv[3] || 'rookie';
-const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: diff, story: true, level, prep: level > 1 });
+const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: diff, story: true, level, prep: false });
 const hit = {}; const note = k => { hit[k] = (hit[k] || 0) + 1; };
 function beats(ctx) { let b, n = 0; while ((b = Story.check(g, ctx)) && n++ < 10) note('beat:' + b.id); }
 

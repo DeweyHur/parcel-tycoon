@@ -131,24 +131,34 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(carried.contracts.join() === 'bulk0' && carried.cap === 16, '계약·창고가 그대로 넘어왔다 — ' + carried.contracts.join() + ' · ' + carried.cap + '칸');
   check(carried.seen > 0, '서장에서 들은 대사는 다시 안 한다 (본 비트 ' + carried.seen + '개)');
 
-  console.log('\n1장은 준비 마켓으로 열리고, 그 마켓이 번잡하지 않다');
-  // 한 사이클 장에는 정산 뒤 마켓이 없다 — 장을 준비 마켓으로 연다. 카드를 넘기면 바로 여기다.
-  await readBeat(); await passGate(); await readBeat();     // 마켓 위에 뜬 대화창부터 닫는다
+  console.log('\n1장 마켓은 장 끝에 온다 (배차를 다 쓴 자리에서 충전을 배운다)');
+  await readBeat(); await passGate(); await readBeat();
+  // 마지막 날 직전까지 감고, 마지막 하루는 UI 로 눌러 정산 → 마켓을 연다
+  await page.evaluate(() => { const g = PT.game; g.story.off = true; let n = 0;
+    while (g.phase === 'play' && g.turn < g.turns() && n++ < 40) { g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents(); } 
+    // 한 장을 다 굴린 플레이어를 대신한다 — 배차는 바닥나 있어야 마켓의 첫 수업(충전)이 뜬다
+    g.contracts.forEach(c => { if (c) c.calls = 0; });
+    PT.renderAll(); });
+  await page.waitForTimeout(300);
+  await page.click('#wait-btn', { force: true }); await page.waitForTimeout(1100);
+  for (let k = 0; k < 4; k++) { if (await page.evaluate(() => PT.game.phase === 'market')) break;
+    const b = await page.$('#modal .foot .btn.primary'); if (!b) break; await b.click(); await page.waitForTimeout(700); }
+  await readBeat(); await passGate(); await readBeat();
+  await page.waitForTimeout(400);
   await page.screenshot({ path: 'shots/L07-market.png' });
   const mk = await page.evaluate(() => ({
-    phase: PT.game.phase, prep: !!(PT.game.market && PT.game.market.prep),
+    phase: PT.game.phase,
     txt: (document.getElementById('modal') || {}).textContent || '',
+    refillCard: !!document.querySelector('[id^="mk-refill-"]'),
     ins: !!document.getElementById('mk-ins'), cust: !!document.getElementById('mk-cust'),
     mine: !!document.getElementById('mk-mine'), refresh: !!document.getElementById('mk-refresh'),
     empty: ((document.getElementById('modal') || {}).textContent || '').split('빈 슬롯').length - 1 }));
-  check(mk.phase === 'market' && mk.prep, '장이 준비 마켓으로 열린다 — ' + mk.phase);
+  check(mk.phase === 'market', '장 끝에 마켓이 열린다 — ' + mk.phase);
+  check(mk.refillCard, '배차 충전 카드가 있다 (마켓의 첫 수업)');
   check(!/냉장|초대형/.test(mk.txt), '창고 줄에 냉장·초대형이 없다');
   check(!mk.ins && !mk.cust && !mk.mine, '보험·고객·내 계약 버튼이 없다');
   check(!mk.refresh && !/가격 ×/.test(mk.txt), '새로고침·가격 배수가 없다');
   check(mk.empty === 0, '빈 계약 슬롯이 없다 (지금: ' + mk.empty + '칸)');
-  await page.click('#modal .foot .btn.primary', { force: true }); await page.waitForTimeout(900);
-  await readBeat();
-  check(await page.evaluate(() => PT.game.phase === 'play'), '마켓을 닫으면 첫날이 시작된다');
 
   console.log('\n장이 끝나면 잔금을 한 회차 낸다');
   await page.evaluate(() => { const P = PT.Profile.get();

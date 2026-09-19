@@ -1414,8 +1414,14 @@
       if (this.phase !== 'summary') return false;
       const dm = this.cfg.demoMonths || 0;
       if (dm && this.month >= dm && this.month < this.rules.months) return this._finishDemo();
-      if (!this.rules.endless && this.month >= this.rules.months) return this._finish();
-      if (!this.shows('market')) { this._startMonth(this.month + 1); return true; }   // 마켓이 열리기 전(레벨 1)엔 정산 다음이 바로 다음 사이클
+      if (!this.shows('market')) {                                   // 마켓이 열리기 전(서장)엔 정산 다음이 바로 다음 사이클
+        if (!this.rules.endless && this.month >= this.rules.months) return this._finish();
+        this._startMonth(this.month + 1); return true;
+      }
+      // 캠페인은 한 장이 한 사이클이라, 마지막 사이클에도 마켓을 연다 — 여기서 안 열면
+      // **배차를 다 쓴 직후에 충전한다**는 연결이 통째로 사라진다 (그게 마켓의 첫 수업이다).
+      // 마켓을 닫을 때 장이 끝난다. 자유 런은 그대로 — 마지막 정산이 곧 결과다.
+      if (!this.rules.endless && this.month >= this.rules.months && !this.level) return this._finish();
       this._openMarket();
       return true;
     }
@@ -1570,7 +1576,9 @@
     _genMarketItems() {
       const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(m))] * R.itemPriceMult * R.priceMult;
       const sc = this.script(m);
-      if (sc && sc.market) return this._scriptedMarketItems(sc.market).filter(it => this._marketAllowed(it));
+      // 대본이 명시한 매물은 거르지 않는다. 플래그 문은 **무작위 마켓**이 안 열린 기능의 물건을 파는 것을 막는 장치지,
+      // 작가가 일부러 놓은 것까지 막으면 안 된다 — '다음 장에 ❆ 가 오니 지금 특약을 사 둬라' 같은 자리가 통째로 사라진다.
+      if (sc && sc.market) return this._scriptedMarketItems(sc.market);
       const items = [];
       const gp = this._gradeProb(m);
       const weights = this._carrierWeights(); // 계열 가중치
@@ -1738,6 +1746,8 @@
       const prep = this.market.prep;
       this.market = null;
       if (prep) { this.phase = 'play'; this.say('log.monthStart', { m: 1, y: this.yearOf(1), cal: this.calMonth(1), half: 1 }); this._startTurn(); return true; }
+      // 캠페인: 마지막 사이클의 마켓을 닫으면 그때 장이 끝난다 (충전을 배우고 나서 결과가 나온다)
+      if (!this.rules.endless && this.month >= this.rules.months) return this._finish(), true;
       this._startMonth(this.month + 1);
       return true;
     }

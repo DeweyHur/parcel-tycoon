@@ -35,7 +35,7 @@ function bestCall(g) {
 
 function playLevel(n, carry) {
   const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: diff,
-    story: true, level: n, prep: n > 1, carry: carry || null });
+    story: true, level: n, prep: false, carry: carry || null });
   const seen = new Set();
   const beats = ctx => { let b, k = 0; while ((b = Story.check(g, ctx)) && k++ < 10) seen.add(b.id); };
   beats({ kind: 'start' });
