@@ -386,7 +386,8 @@ body.cine { background: #000; }
 @keyframes chblink { 0%, 100% { opacity: .25; } 50% { opacity: .85; } }
 
 /* 타이틀의 장 고르기 — 지나온 장은 언제든 다시 할 수 있다 */
-.modal.titlecard .title .chpick { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 14px; }
+.modal.titlecard .title .chlbl { margin-top: 16px; font-size: 10px; letter-spacing: 3px; color: var(--dim); }
+.modal.titlecard .title .chpick { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 6px; }
 .modal.titlecard .title .chpick .chip { padding: 5px 10px; font-size: 11px; color: var(--dim); border: 2px solid var(--line); cursor: pointer; }
 .modal.titlecard .title .chpick .chip.on { color: var(--gold); border-color: var(--gold); }
 .modal.titlecard .title .chpick .chip:active { transform: translate(1px, 1px); }

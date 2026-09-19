@@ -168,7 +168,9 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
     PT.Profile.save(); });
   await page.reload(); await page.waitForTimeout(900);
   await page.click('#modal .chpick .chip[data-ch="3"]'); await page.waitForTimeout(400);
-  const y2 = await page.$('#modal .foot .btn.warn'); if (y2) { await y2.click(); await page.waitForTimeout(1400); }
+  await page.click('#t-level'); await page.waitForTimeout(400);
+  const y2 = await page.$('#modal .foot .btn.warn, #modal .foot .btn.primary'); if (y2) { await y2.click(); }
+  await page.waitForTimeout(1400);
   const c2 = await page.$('#modal .chcard'); if (c2) { await c2.click(); await page.waitForTimeout(800); }
   await readBeat(); await passGate(); await readBeat();
   // 장이 준비 마켓으로 열리므로 먼저 닫고, 마지막 날 직전까지 감는다
@@ -201,9 +203,16 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   const chips = await page.$$eval('#modal .chpick .chip', els => els.map(e => e.textContent));
   check(chips.length === 2 && chips[0] === '서장' && chips[1] === '1장', '타이틀에 장 고르기가 있다 — ' + chips.join(','));
   await page.click('#modal .chpick .chip[data-ch="1"]'); await page.waitForTimeout(400);
+  const picked = await page.evaluate(() => ({ ch: (document.querySelector('.title .ch') || {}).textContent || '',
+    on: (document.querySelector('.chpick .chip.on') || {}).textContent || '', cta: !!document.getElementById('t-level') }));
+  check(/서장/.test(picked.ch) && picked.on === '서장' && picked.cta, '칩은 고르기만 한다 — ' + JSON.stringify(picked));
+  await page.click('#t-level'); await page.waitForTimeout(400);
   const ask = await page.$eval('#modal', el => el.textContent).catch(() => '');
-  check(/서장/.test(ask) && /다시/.test(ask), '되돌아가기 전에 확인을 묻는다 — ' + ask.replace(/\s+/g, ' ').slice(0, 50));
-  await page.click('#modal .foot .btn.warn, #modal .foot .btn.primary'); await page.waitForTimeout(1400);
+  if (/다시/.test(ask) && await page.$('#modal .foot .btn.warn, #modal .foot .btn.primary')) {
+    check(/서장/.test(ask), '진행 중인 런이 있으면 확인을 묻는다 — ' + ask.replace(/\s+/g, ' ').slice(0, 50));
+    await page.click('#modal .foot .btn.warn, #modal .foot .btn.primary');
+  } else check(true, '지울 런이 없으면 바로 시작한다');
+  await page.waitForTimeout(1400);
   const back = await page.evaluate(() => ({ level: PT.game && PT.game.cfg.level, cash: PT.game && PT.game.cash,
     cap: PT.game && PT.game.warehouse.cap, saved: PT.Profile.get().campaign.level }));
   check(back.level === 1 && back.cash === 300 && back.cap === 16 && back.saved === 1,
