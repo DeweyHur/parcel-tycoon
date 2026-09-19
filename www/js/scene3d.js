@@ -641,9 +641,9 @@ window.Scene3D = (function () {
       w.position.set(homeA.x, 0, homeA.z); w.rotation.y = Math.atan2(homeB.x - homeA.x, homeB.z - homeA.z);
       u.box.visible = u.carrying;
     }
-    _setWorkerIdle(w) { this._setWorkerRoute(w, w.userData.idleA, w.userData.idleB, 0.16, -1); w.userData.carrying = false; w.userData.box.visible = false; }
-    _setWorkerTruckPatrol(w) { this._setWorkerRoute(w, w.userData.dockA, w.userData.dockB, 0.55, -1); }
-    _setWorkerErrand(w, count, onDone) { this._setWorkerRoute(w, w.userData.dockA, w.userData.exitB, 0.95, Math.max(1, count) * 2, onDone); }
+    _setWorkerIdle(w) { this._setWorkerRoute(w, w.userData.idleA, w.userData.idleB, 0.55, -1); w.userData.carrying = false; w.userData.box.visible = false; }
+    _setWorkerTruckPatrol(w) { this._setWorkerRoute(w, w.userData.dockA, w.userData.dockB, 1.7, -1); }
+    _setWorkerErrand(w, count, onDone) { this._setWorkerRoute(w, w.userData.dockA, w.userData.exitB, 2.8, Math.max(1, count) * 2, onDone); }
     _poseWorkerMood(w, mood) {
       const u = w.userData, ph = this.time * (mood === 1 ? 11 : 2.2) + u.phase;
       w.position.y = Math.max(0, Math.sin(ph)) * (mood === 1 ? 0.11 : 0);
