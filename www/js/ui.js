@@ -1664,13 +1664,35 @@
       </button>`;
     }).join('');
     const total = kinds.reduce((s, k) => s + (g.growth[k] || 0), 0);
-    const body = `<div class="growth-head"><span>${ko ? '성장 단계' : 'Growth'} <b>Lv.${total}</b></span><span class="growth-cash">${g.cash}c</span></div><div class="growth-tip">${ko ? '투자할수록 창고와 트럭이 실제로 바뀝니다.' : 'Every upgrade visibly changes your depot and trucks.'}</div><div class="growth-grid">${cards}</div>`;
+    const rc = g.realtimeContracts();
+    const hireCards = rc.map(it => { const car = D.CARRIERS[it.carrier]; return `<button class="growth-card" data-hire="${it.carrier}">
+        <span class="growth-icon">${car.badge || '🚚'}</span><span class="growth-copy"><b>${esc(car.name)}</b><span>${T('call.size', { min: car.sizeMin, max: car.sizeMax })} · ${T('fmt.cells', { n: car.cap })}</span></span>
+        <span class="growth-buy"><b>${it.price}c</b><small>${it.upgrade ? T('hire.upgrade', { name: it.ownedName }) : T('hire.btn')}</small></span>
+      </button>`; }).join('');
+    const hireSection = rc.length ? `<div class="growth-head" style="margin-top:14px"><span>${T('hire.title')}</span></div><div class="growth-tip">${T('hire.desc')}</div><div class="growth-grid">${hireCards}</div>` : '';
+    const body = `<div class="growth-head"><span>${ko ? '성장 단계' : 'Growth'} <b>Lv.${total}</b></span><span class="growth-cash">${g.cash}c</span></div><div class="growth-tip">${ko ? '투자할수록 창고와 트럭이 실제로 바뀝니다.' : 'Every upgrade visibly changes your depot and trucks.'}</div><div class="growth-grid">${cards}</div>${hireSection}`;
     const m = modal(ko ? '사업 확장' : 'Business growth', body, [{ label: T('btn.close'), onClick: closeModal }]);
     m.querySelectorAll('[data-growth]').forEach(el => el.onclick = () => {
       const kind = el.dataset.growth, r = g.investGrowth(kind);
       if (!r.ok) { toast(r.reason === 'cash' ? (ko ? `${r.cost}c가 필요합니다` : `Need ${r.cost}c`) : (ko ? '아직 잠겨 있습니다' : 'Still locked')); return; }
       SFX.buy(); rewardBurst(ko ? `${info[kind][1]} Lv.${r.level}` : `${info[kind][1]} Lv.${r.level}`, Math.min(3, Math.ceil(r.level / 2)));
       g.takeEvents(); scene.sync(g, { animate: true }); saveGame(); renderAll(); showGrowth();
+    });
+    m.querySelectorAll('[data-hire]').forEach(el => el.onclick = () => { SFX.click(); hireContractFlow(el.dataset.hire, showGrowth); });
+  }
+  // 실시간 계약: 슬롯을 골라 즉시 고용한다 (마켓의 chooseSlot과 같은 카드 목록, 단 game.hireContract 로 처리)
+  function hireContractFlow(carrier, back) {
+    const car = D.CARRIERS[carrier], price = game.hireContractPrice(carrier);
+    const body = `<p style="font-size:12px;color:var(--dim)">${T('slot.pickReplace')}</p>` + game.contracts.slice(0, game.visibleSlots()).map((c, s) => {
+      if (!c) return `<div class="card" data-s="${s}"><div class="t">${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>`;
+      const tb = trustBar(game, c.carrier);
+      return `<div class="card" data-s="${s}"><div class="t">${esc(game.contractName(c))}</div><div class="d">${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}</div></div>`;
+    }).join('');
+    const m = modal(`${car.badge || ''} ${esc(car.name)}`, body, [{ label: T('btn.cancel'), onClick: back }], T('hire.confirmSub', { price }));
+    m.querySelectorAll('.card').forEach(el => el.onclick = () => {
+      const s = +el.dataset.s, r = game.hireContract(carrier, s);
+      if (!r.ok) { toast(r.msg); return; }
+      SFX.buy(); saveGame(); scene.sync(game, { animate: true }); renderAll(); back();
     });
   }
   function showMenu() {

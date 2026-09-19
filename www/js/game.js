@@ -1800,6 +1800,31 @@
     itemTrucks(it) { return Math.max(1, D.CARRIERS[it.carrier].trucks + this.rules.callsDelta); }
     // 가득 충전 가격: 센터 정액 × 물가. 남은 배차와 무관(그래서 다 쓰고 충전하는 게 이득)
     refillPrice(c) { return Math.round(D.CARRIERS[c.carrier].refill * this.rules.priceMult * this.inflation()); }
+    // 실시간 계약 — 철도·해상처럼 원래 마켓에서만 팔던 계약을, 달이 끝나길 기다리지 않고 지금 웃돈을 얹어 들인다.
+    // 아직 안 열린 계열(_familyOpen)은 마켓과 똑같이 안 나온다 — 진도를 건너뛰게 하지 않는다.
+    realtimeContracts() {
+      const have = this.contracts.filter(Boolean);
+      return Object.keys(D.FAMILIES).filter(fam => this._familyOpen(fam)).map(fam => {
+        const owned = have.find(c => FAM(c.carrier) === fam);
+        const tier = owned ? D.CARRIERS[owned.carrier].tier + 1 : 0;
+        const key = D.centerFor(fam, tier);
+        if (!key || (owned && D.CARRIERS[key].tier <= D.CARRIERS[owned.carrier].tier)) return null; // 이미 그 계열 최고 등급을 갖고 있다
+        return { carrier: key, family: fam, price: this.hireContractPrice(key), upgrade: !!owned, ownedName: owned ? this.contractName(owned) : null };
+      }).filter(Boolean).sort((a, b) => a.price - b.price);
+    }
+    hireContractPrice(carrier) { return Math.round(this.contractPrice({ price: D.CARRIERS[carrier].price }) * 1.5); }
+    hireContract(carrier, target) {
+      if (this.phase !== 'play') return { ok: false, msg: T('err.notPlay') };
+      const car = D.CARRIERS[carrier];
+      if (!car || !this._familyOpen(FAM(carrier))) return { ok: false, msg: T('err.sold') };
+      if (target == null || target < 0 || target >= D.CONTRACT_SLOTS) return { ok: false, msg: T('err.pickSlot') };
+      const price = this.hireContractPrice(carrier);
+      if (this.cash < price) return { ok: false, msg: T('err.noCash') };
+      const old = this.contracts[target], nc = this._makeContract(carrier);
+      this.contracts[target] = nc; this.cash -= price; this.run.spent += price; this.stats.contractsBought = (this.stats.contractsBought || 0) + 1;
+      this.say('log.hireContract', { name: this.contractName(nc), price, old: old ? MSG('log.buyContractOld', { name: this.contractName(old), calls: old.calls }) : '' });
+      return { ok: true, price };
+    }
     refill(contractId) {
       if (this.phase !== 'market') return { ok: false, msg: T('err.notMarket') };
       const c = this.contracts.find(x => x && x.id === contractId); if (!c) return { ok: false, msg: T('err.emptySlot') };
