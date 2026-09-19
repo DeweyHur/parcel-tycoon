@@ -263,7 +263,14 @@ window.Scene3D = (function () {
     _styleTruck(growth) {
       if (!this.truck) return;
       this.growthState = growth || {};
-      this._decorateTruck(this.truck, this.growthState);
+      for (const t of this.trucks) this._decorateTruck(t, this.growthState);
+    }
+    _ensureTruckFleet(n) {
+      while (this.trucks.length < n) {
+        const t = this._makeTruck(); t.visible = false;
+        this._decorateTruck(t, this.growthState || {});
+        this.scene.add(t); this.trucks.push(t);
+      }
     }
     _decorateTruck(truck, growth) {
       [...truck.children].filter(x => x.userData && x.userData.growthPart).forEach(x => truck.remove(x));
@@ -283,8 +290,9 @@ window.Scene3D = (function () {
       // 바닥 (콘크리트) + 잔디
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), this._mat(0x6b8f4e)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; s.add(ground);
       // 건물(바닥·벽·지붕·냉장실·마당)은 착탈식이라 _syncBuilding 이 짓는다
-      // 트럭
+      // 트럭 — this.truck 은 평소 마당에 서 있는 대표 차량, this.trucks 는 동시 배차용 풀 (필요할 때 늘어난다)
       this.truck = this._makeTruck(); this.truck.position.set(TRUCK_PARK, 0, 3.6); s.add(this.truck);   // z 는 _syncBuilding 이 도로에 맞춘다
+      this.trucks = [this.truck];
       // 도로
       const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 3.4), this._mat(0x4a4a52)); road.rotation.x = -Math.PI / 2; road.position.set(14, -0.02, 3.6); road.receiveShadow = true; s.add(road); this.road = road;
       // 나무 몇 그루 (장식)
@@ -495,46 +503,39 @@ window.Scene3D = (function () {
       const from = {}; for (const k in to) from[k] = obj[k];
       this.tweens.push({ obj, from, to, dur, fn, t: -delay, onDone });
     }
-    _setTruckTripBadge(current, total) {
-      [...this.truck.children].filter(x => x.userData && x.userData.dispatchPart).forEach(x => this.truck.remove(x));
-      if (total <= 1) return;
-      const c = document.createElement('canvas'); c.width = 128; c.height = 64; const ctx = c.getContext('2d');
-      ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#11101d'; ctx.fillRect(2, 2, 124, 60); ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, 122, 58);
-      ctx.fillStyle = '#ffd166'; ctx.font = "bold 34px 'Galmuri11', monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${current}/${total}`, 64, 34);
-      const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter;
-      const badge = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })); badge.scale.set(1.25, 0.62, 1); badge.position.set(0.4, 2.05, 0); badge.userData.dispatchPart = true; this.truck.add(badge);
-    }
     deliver(parcelIds, onDone, options = {}) {
-      // 호출 대수만큼 번호표를 단 트럭이 차례로 진입 → 각자 맡은 박스 적재 → 출발한다.
+      // 호출 대수만큼 트럭을 동시에 풀어 나란히 진입 → 각자 맡은 박스 적재 → 출발시킨다.
       this.busy++;
       const total = Math.max(1, options.trucks || 1), delivered = new Set(parcelIds);
       const loads = options.loads && options.loads.length ? options.loads.map(ids => ids.filter(id => delivered.has(id))) : [parcelIds.slice()];
       while (loads.length < total) loads.push([]);
       for (const id of parcelIds) { const b = this.boxes.get(id); if (b) b.userData.locked = true; }
+      this._ensureTruckFleet(total);
       const roadZ = this.Z ? this.Z.roadZ : this.truck.position.z;
-      const visit = trip => {
-        if (trip >= total) {
-          this._setTruckTripBadge(1, 1); this.truck.position.set(TRUCK_PARK, 0, roadZ); this.truck.visible = true;
-          this.busy--; onDone && onDone(); return;
-        }
+      const gap = total <= 1 ? 0 : total <= 3 ? 0.95 : Math.max(0.55, 2.8 / (total - 1));
+      let remaining = total;
+      for (let trip = 0; trip < total; trip++) {
+        const truck = this.trucks[trip];
         const boxes = (loads[trip] || []).map(id => this.boxes.get(id)).filter(Boolean);
-        this._setTruckTripBadge(trip + 1, total); this.truck.position.set(TRUCK_PARK, 0, roadZ); this.truck.visible = true;
-        if (options.onTruck) options.onTruck(trip + 1, total);
-        this._tween(this.truck.position, { x: TRUCK_DOCK }, 0.58, ease, 0, () => {
+        const z = roadZ + (trip - (total - 1) / 2) * gap, startDelay = trip * 0.12;
+        truck.position.set(TRUCK_PARK, 0, z); truck.visible = true;
+        if (options.onTruck) this._tween({}, {}, 0.001, ease, startDelay, () => options.onTruck(trip + 1, total));
+        this._tween(truck.position, { x: TRUCK_DOCK }, 0.58, ease, startDelay, () => {
           boxes.forEach((b, i) => {
-          const tx = this.truck.position.x + 0.4 + (i % 3) * 0.3 - 0.3, tz = this.truck.position.z;
+            const tx = truck.position.x + 0.4 + (i % 3) * 0.3 - 0.3, tz = truck.position.z;
             this._tween(b.position, { y: b.position.y + 2.2 }, 0.2, ease, i * 0.1);
             this._tween(b.position, { x: tx, z: tz, y: this.truckCargoY }, 0.28, ease, i * 0.1 + 0.2);
             this._tween(b.scale, { x: 0.01, y: 0.01, z: 0.01 }, 0.14, ease, i * 0.1 + 0.46);
           });
           const wait = Math.max(0.38, boxes.length * 0.1 + 0.58);
-          this._tween(this.truck.position, { x: TRUCK_GONE }, 0.68, ease, wait, () => {
-          for (const b of boxes) { this.scene.remove(b); this.boxes.delete(b.userData.id); }
-            this.truck.visible = false; visit(trip + 1);
+          this._tween(truck.position, { x: TRUCK_GONE }, 0.68, ease, wait, () => {
+            for (const b of boxes) { this.scene.remove(b); this.boxes.delete(b.userData.id); }
+            if (trip === 0) truck.position.set(TRUCK_PARK, 0, roadZ); else truck.visible = false;
+            remaining--;
+            if (remaining === 0) { this.busy--; onDone && onDone(); }
           });
         });
-      };
-      visit(0);
+      }
     }
     discard(parcelId) {
       const b = this.boxes.get(parcelId); if (!b) return;
@@ -600,8 +601,8 @@ window.Scene3D = (function () {
         if (b.userData.warm && !b.userData.locked) b.rotation.y = Math.sin(this.time * 6 + b.userData.id) * 0.06; else b.rotation.y = 0;
       }
       this._tickWeather(dt);
-      // 트럭 바퀴 흔들림
-      if (this.truck.position.x < TRUCK_PARK - 0.1 && this.truck.position.x > TRUCK_DOCK + 0.1) this.truck.position.y = Math.abs(Math.sin(this.time * 30)) * 0.03; else this.truck.position.y = 0;
+      // 트럭 바퀴 흔들림 — 동시에 달리는 트럭 전부
+      for (const t of this.trucks) t.position.y = (t.position.x < TRUCK_PARK - 0.1 && t.position.x > TRUCK_DOCK + 0.1) ? Math.abs(Math.sin(this.time * 30)) * 0.03 : 0;
       const cy = this.camY || 7.8;
       // 오프닝: 카메라는 intro.js 가 놓는다. 반드시 render 직전에 불러야 한다 —
       // 따로 rAF 를 돌리면 setSize 로 캔버스를 비운 프레임이 그대로 찍혀 장면이 깜빡인다

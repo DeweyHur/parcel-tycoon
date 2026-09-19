@@ -224,6 +224,8 @@ hr { border: 0; border-top: 2px solid var(--line); margin: 8px 0; }
 .truck-stack { display: flex; flex-direction: column; gap: 10px; }
 .truck-shell { position: relative; min-height: 92px; padding: 8px 28px 8px 8px; background: #34324b; border: 3px solid #11101d; box-shadow: inset -8px 0 0 #e0553d, 3px 3px 0 #11101d; }
 .truck-shell::before { content: ''; position: absolute; right: -3px; top: 20px; width: 25px; height: 42px; background: #e0553d; border: 3px solid #11101d; }
+.truck-shell.van { box-shadow: inset -8px 0 0 #6fdcff, 3px 3px 0 #11101d; }
+.truck-shell.van::before { background: #6fdcff; }
 .truck-shell::after { content: ''; position: absolute; left: 12px; right: 22px; bottom: -8px; height: 8px; background: radial-gradient(circle at 12px 4px, #111 0 5px, transparent 6px), radial-gradient(circle at calc(100% - 12px) 4px, #111 0 5px, transparent 6px); }
 .truck-cells { display: grid; grid-template-columns: repeat(var(--cols), 1fr); gap: 3px; min-height: 72px; }
 .truck-cell { position: relative; min-width: 16px; min-height: 22px; background: #171624; border: 2px solid #57536f; }

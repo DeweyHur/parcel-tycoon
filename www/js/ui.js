@@ -1043,20 +1043,26 @@
     let picked = [];
     const render = () => {
       const elig = sortByUrgency(g.selfEligible());
-      const cost = picked.reduce((s, id) => { const p = g.parcels.find(x => x.id === id); return s + (p ? g.selfCost(p) : 0); }, 0);
+      const pickedP = picked.map(id => g.parcels.find(x => x.id === id)).filter(Boolean);
+      const cost = pickedP.reduce((s, p) => s + g.selfCost(p), 0), income = pickedP.reduce((s, p) => s + p.reward, 0), net = income - cost;
       const vans = ['coldvan', 'padvan', 'bigvan'].filter(v => g.warehouse[v]).map(v => D.FACILITIES[v].name).join(', ');
+      const cells = Array.from({ length: n }, (_, i) => { const p = pickedP[i]; return `<i class="truck-cell ${p ? 'filled' : ''}"${p ? ` style="background:${ptype(p).css}" title="${esc(ptype(p).name)}"` : ''}></i>`; }).join('');
+      const gauge = `<div class="load-visual"><div class="truck-stack"><div class="truck-shell van"><div class="truck-cells" style="--cols:${Math.min(6, n)}">${cells}</div></div></div><div class="load-money"><span class="money-chip">${T('call.earn')}<b>+${income}c</b></span><span class="money-chip cost">${T('call.cost')}<b>−${cost}c</b></span><span class="money-chip net">${T('call.net')}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div><div class="load-hint">${picked.length}/${n} · ${T('wm.selfHead2', { size: g.selfSizeMax(), base: D.SELF_DELIVERY.costBase, per: D.SELF_DELIVERY.costPerSize })}</div></div>
+        <div class="tbtn"><button class="btn small" id="wm-auto">${T('call.pickUrgent')}</button>${picked.length ? `<button class="btn small" id="wm-clear">${T('call.pickClear')}</button>` : ''}</div>`;
       const rows = elig.map(p => { const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], on = picked.includes(p.id); return `<div class="parcel ${on ? 'sel' : ''} ${p.overdue ? 'overdue' : ''}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${T('wm.rewardCost', { reward: p.reward, cost: g.selfCost(p) })}</div><div class="st">${parcelStatus(p)}</div></div>`; }).join('');
       const blocked = g.parcels.filter(p => !g.selfCan(p)).length;
       const warn = []; if (f.overdue) warn.push(T('wm.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wm.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wm.frozenOver', { n: f.frozenOver }));
       const body = `<div class="pickinfo"><span>${T('hud.cashLbl')} <b>${g.projectedCash().total}</b>c</span><span>${T('wm.nextWarehouse')} <b class="${f.used > f.cap ? 'bad' : ''}">${f.used}/${f.cap}</b></span>${nextWx ? `<span>${M.WEATHER[nextWx].icon} ${M.WEATHER[nextWx].name}</span>` : `<span>${T('hud.monthEnd')}</span>`}</div>
         ${warn.length ? `<div class="d" style="color:var(--red);margin-bottom:4px">${T('wm.ifWait')}: ${warn.join(' · ')}</div>` : ''}
         ${g.outdoorVolume() > 0 ? `<div class="d" style="margin-bottom:4px">${T('wm.outdoor', { vol: g.outdoorVolume(), pct: Math.round(g.theftProb() * 100) })} <button class="btn small" id="wm-reorder">${T('re.title')}</button></div>` : ''}
-        <div style="font-size:12px;color:var(--gold);margin:6px 0 3px">${T('wm.selfHead', { n, size: g.selfSizeMax(), base: D.SELF_DELIVERY.costBase, per: D.SELF_DELIVERY.costPerSize })}</div>
-        <div class="d" style="color:var(--dim);margin-bottom:4px">${vans ? `${T('wm.vans')}: ${esc(vans)}` : T('wm.noVans')}${blocked ? ` · ${T('wm.blocked', { n: blocked })}` : ''}</div>
+        ${gauge}
+        <div class="d" style="color:var(--dim);margin:4px 0">${vans ? `${T('wm.vans')}: ${esc(vans)}` : T('wm.noVans')}${blocked ? ` · ${T('wm.blocked', { n: blocked })}` : ''}</div>
         <div class="zone">${rows || `<div id="empty">${T('err.nothingSelf')}</div>`}</div>`;
       const m = modal(T('wm.title'), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: picked.length ? T('wm.selfWait', { n: picked.length, cost }) : T('wm.justWait'), cls: 'primary', onClick: () => { closeModal(); doWait(picked.slice()); } }], T('wm.sub'));
       m.querySelectorAll('.parcel[data-id]').forEach(el => el.onclick = () => { const id = +el.dataset.id; SFX.click(); if (picked.includes(id)) picked = picked.filter(x => x !== id); else { if (picked.length >= n) { toast(T('wm.limit', { n })); return; } picked.push(id); } render(); });
       const rb = m.querySelector('#wm-reorder'); if (rb) rb.onclick = () => { SFX.click(); showReorder(() => { render(); }); };
+      m.querySelector('#wm-auto').onclick = () => { picked = elig.slice(0, n).map(p => p.id); SFX.select(); render(); };
+      const cb = m.querySelector('#wm-clear'); if (cb) cb.onclick = () => { picked = []; SFX.cancel(); render(); };
       storyCheck({ kind: 'modal', modal: 'wait', picked: picked.length, elig: elig.length, outdoor: g.outdoorVolume() });
     };
     render();
