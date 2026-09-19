@@ -147,12 +147,15 @@ window.Scene3D = (function () {
       if (this.road) { this.road.position.x = Z.x1 + 0.6 + 20; this.road.position.z = Z.roadZ; }   // 도로는 마당 너머, 건물 오른쪽으로
       if (this.truck) this.truck.position.z = Z.roadZ;
       if (this.workers) {
-        const pickX = Z.x1 - 1.05, truckX = TRUCK_DOCK - 0.5, laneZ = [Z.roadZ - 0.55, Z.roadZ + 0.6];
+        // 트럭은 roadZ 근처 차선만 달린다 — 인부는 마당 안쪽(yardZ0~+depth)에서만 움직여 차선과 절대 안 겹치게 한다
+        const pickX = Z.x1 - 1.05, truckX = TRUCK_DOCK - 0.75, yardMidZ = Z.yardZ0 + Z.YARD.depth * CELL * 0.5, laneZ = [yardMidZ - 0.4, yardMidZ + 0.4];
         this.workers.forEach((w, i) => {
           w.userData.dockA = { x: pickX, z: laneZ[i] }; w.userData.dockB = { x: truckX, z: laneZ[i] };
           w.userData.idleA = { x: pickX, z: laneZ[i] }; w.userData.idleB = { x: pickX + 0.4, z: laneZ[i] };
-          w.userData.exitB = { x: pickX, z: laneZ[i] + 2.1 };
-          if (!w.userData.routeSet) { w.userData.routeSet = true; this._setWorkerIdle(w); }
+          w.userData.exitB = { x: pickX, z: laneZ[i] + 2.4 };
+          // 배차 중이 아닐 때만 새 좌표로 다시 세운다 — 창고 크기가 바뀔 때마다(냉장고 추가 등) 그대로 반영되고,
+          // 트럭 왕복·직접 배송처럼 한창 움직이는 중이면 건드리지 않는다.
+          if (!this.busy) this._setWorkerIdle(w, i * 0.4 + Math.random() * 0.3);
         });
       }
       this.tileCaps = null;   // 구역이 바뀌었으니 바닥 타일도 다시
@@ -544,7 +547,7 @@ window.Scene3D = (function () {
       while (loads.length < total) loads.push([]);
       for (const id of parcelIds) { const b = this.boxes.get(id); if (b) b.userData.locked = true; }
       this._ensureTruckFleet(total);
-      if (this.workers) for (const w of this.workers) this._setWorkerTruckPatrol(w);
+      if (this.workers) this.workers.forEach((w, i) => this._setWorkerTruckPatrol(w, i * 0.35 + Math.random() * 0.25));
       const roadZ = this.Z ? this.Z.roadZ : this.truck.position.z;
       const gap = total <= 1 ? 0 : total <= 3 ? 0.95 : Math.max(0.55, 2.8 / (total - 1));
       let remaining = total;
@@ -569,7 +572,7 @@ window.Scene3D = (function () {
             for (const b of boxes) { truck.remove(b); this.boxes.delete(b.userData.id); }
             if (trip === 0) truck.position.set(TRUCK_PARK, 0, roadZ); else truck.visible = false;
             remaining--;
-            if (remaining === 0) { if (this.workers) for (const w of this.workers) this._setWorkerIdle(w); this.busy--; onDone && onDone(); }
+            if (remaining === 0) { if (this.workers) this.workers.forEach((w, i) => this._setWorkerIdle(w, i * 0.3 + Math.random() * 0.2)); this.busy--; onDone && onDone(); }
           });
         });
       }
@@ -583,12 +586,12 @@ window.Scene3D = (function () {
       const per = Math.ceil(n / ws.length);
       const jobs = ws.map((w, i) => ({ w, count: Math.max(0, Math.min(per, n - i * per)) })).filter(j => j.count > 0);
       let remaining = jobs.length;
-      for (const { w, count } of jobs) {
+      jobs.forEach(({ w, count }, i) => {
         this._setWorkerErrand(w, count, () => {
           this._setWorkerIdle(w); remaining--;
           if (remaining === 0) { this.busy--; onDone && onDone(); }
-        });
-      }
+        }, i * 0.3 + Math.random() * 0.2);
+      });
     }
     discard(parcelId) {
       const b = this.boxes.get(parcelId); if (!b) return;
@@ -634,16 +637,18 @@ window.Scene3D = (function () {
     camHome() { return { p: [this.camX, this.camY, this.camZ], l: (this.camLook || [1.3, 0.3, 0.3]).slice(), fov: this.camFov || this.camera.fov }; }
     // ---------- 도크 인부: 걷기(구간 왕복) + 기분(mood) ----------
     // homeA↔homeB 를 왕복한다. legsLeft: -1 무한 순찰, N 이면 N번 왕복(2N 구간) 뒤 onDone 을 부르고 멈춘다.
-    _setWorkerRoute(w, homeA, homeB, speed, legsLeft, onDone) {
+    // speed 에 ±15% 무작위 편차를 주고 시작을 delay 만큼 늦춰서, 같은 경로를 걷는 두 인부가 거울처럼 딱 맞춰
+    // 움직이지 않게 한다 (그대로 두면 로봇처럼 보인다).
+    _setWorkerRoute(w, homeA, homeB, speed, legsLeft, onDone, delay = 0) {
       const u = w.userData;
-      u.homeA = homeA; u.homeB = homeB; u.speed = speed; u.legsLeft = legsLeft; u.onDone = onDone || null;
-      u.t = 0; u.dir = 1; u.carrying = legsLeft !== 0;
+      u.homeA = homeA; u.homeB = homeB; u.speed = speed * (0.85 + Math.random() * 0.3); u.legsLeft = legsLeft; u.onDone = onDone || null;
+      u.t = 0; u.dir = 1; u.carrying = legsLeft !== 0; u.wait = delay;
       w.position.set(homeA.x, 0, homeA.z); w.rotation.y = Math.atan2(homeB.x - homeA.x, homeB.z - homeA.z);
       u.box.visible = u.carrying;
     }
-    _setWorkerIdle(w) { this._setWorkerRoute(w, w.userData.idleA, w.userData.idleB, 0.55, -1); w.userData.carrying = false; w.userData.box.visible = false; }
-    _setWorkerTruckPatrol(w) { this._setWorkerRoute(w, w.userData.dockA, w.userData.dockB, 1.7, -1); }
-    _setWorkerErrand(w, count, onDone) { this._setWorkerRoute(w, w.userData.dockA, w.userData.exitB, 2.8, Math.max(1, count) * 2, onDone); }
+    _setWorkerIdle(w, delay = 0) { this._setWorkerRoute(w, w.userData.idleA, w.userData.idleB, 0.55, -1, null, delay); w.userData.carrying = false; w.userData.box.visible = false; }
+    _setWorkerTruckPatrol(w, delay = 0) { this._setWorkerRoute(w, w.userData.dockA, w.userData.dockB, 1.7, -1, null, delay); }
+    _setWorkerErrand(w, count, onDone, delay = 0) { this._setWorkerRoute(w, w.userData.dockA, w.userData.exitB, 2.8, Math.max(1, count) * 2, onDone, delay); }
     _poseWorkerMood(w, mood) {
       const u = w.userData, ph = this.time * (mood === 1 ? 11 : 2.2) + u.phase;
       w.position.y = Math.max(0, Math.sin(ph)) * (mood === 1 ? 0.11 : 0);
@@ -659,6 +664,12 @@ window.Scene3D = (function () {
       for (const w of this.workers) {
         if (mood !== 0) { this._poseWorkerMood(w, mood); continue; }
         const u = w.userData; if (!u.homeA) continue;
+        if (u.wait > 0) {
+          u.wait -= dt; u.legPivotL.rotation.x = u.legPivotR.rotation.x = 0; w.position.y = 0;
+          const idleSwing = Math.sin(this.time * 1.1 + u.phase) * 0.08;
+          u.armPivotL.rotation.x = -idleSwing; u.armPivotR.rotation.x = idleSwing; u.armPivotL.rotation.z = u.armPivotR.rotation.z = 0;
+          continue;
+        }
         const from = u.dir > 0 ? u.homeA : u.homeB, to = u.dir > 0 ? u.homeB : u.homeA;
         const len = Math.hypot(to.x - from.x, to.z - from.z) || 1;
         let moving = false;
