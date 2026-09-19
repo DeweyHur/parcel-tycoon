@@ -197,9 +197,9 @@
         const c = this._makeContract(this.resolveCenter(s.carrier, s.grade || 'normal'), null, null, true);
         if (s.enh) Object.assign(c.enh, s.enh);
         if (s.calls != null) c.calls = Math.min(c.maxCalls, s.calls + R.startCallsDelta);
-        // 장 사이에는 두 달의 공백이 있다. 앞 장을 배차 0으로 끝냈다고 다음 장의 첫 사이클을 통째로
-        // 못 보내면 안 된다 — 마켓은 사이클 끝에만 열리니까 그 열흘은 손쓸 방법이 아예 없다.
-        // 공백 동안 새로 끊어 둔 것으로 치고 바닥을 보장한다.
+        // 앞 장을 배차 0으로 끝냈다고 다음 장을 통째로 못 보내면 안 된다 — 한 장이 한 사이클이고
+        // 마켓은 그 끝에만 열리니까, 바닥난 채로 시작하면 열흘 동안 손쓸 방법이 아예 없다.
+        // 장이 바뀌는 사이에 새로 끊어 둔 것으로 치고 바닥을 보장한다.
         if (carried) c.calls = Math.max(c.calls, Math.ceil(c.maxCalls * D.CARRY_CALLS_FLOOR));
         if (this.level && this.level.minCalls != null) c.calls = Math.max(c.calls, Math.min(c.maxCalls, this.level.minCalls));
         return c;
@@ -209,7 +209,7 @@
     }
 
     // 장이 끝날 때 다음 장으로 넘길 판. 한 런이 이어지는 것처럼 보이려면 자금·창고·계약·고객·신뢰가 같이 가야 한다.
-    // (택배·기한·달력은 안 넘긴다 — 장 사이는 두 달의 공백이고, 남은 물건은 리포트에서 정리된 것으로 친다)
+    // (택배·기한은 안 넘긴다 — 장이 바뀌면 판을 새로 깔고, 남은 물건은 리포트에서 정리된 것으로 친다)
     // 화면에 보여 줄 계약 슬롯 수. 특수 품목이 오기 전에는 슬롯이 하나면 충분하다 —
     // 빈 슬롯 세 칸은 "여기를 채워야 한다"는 잘못된 숙제처럼 보인다.
     visibleSlots() {
@@ -1403,7 +1403,7 @@
       if (this.debt > 0) { loan.interest = Math.ceil(this.debt * D.LOAN.interest); loan.repaid = this.debt; this.cash -= this.debt + loan.interest; this.run.spent += loan.interest; this.stats.interestPaid += loan.interest; this.debt = 0; }
       if (this.cash < 0) { loan.borrowed = -this.cash; this.debt = loan.borrowed; this.cash = 0; this.stats.loans++; }
       loan.debt = this.debt; this.summary.loan = loan; this.summary.cash = this.cash;
-      this.say('log.settle', { month: this.month, revenue: ms.revenue, opCost, fees: feesDue, closing: closing ? MSG('log.settleClosing', { closing }) : '' });
+      this.say('log.settle', { cal: this.calMonth(), half: this.half(), revenue: ms.revenue, opCost, fees: feesDue, closing: closing ? MSG('log.settleClosing', { closing }) : '' });
       if (loan.repaid) this.say('log.loanRepaid', { n: loan.repaid, interest: loan.interest });
       if (loan.borrowed) this.say('log.loan', { n: loan.borrowed, interest: Math.ceil(loan.borrowed * D.LOAN.interest) });
       // 레벨 1은 실패가 없다 — 배우는 자리에서 부도로 끊지 않는다 (levels.js noBankrupt)
@@ -1473,7 +1473,7 @@
     _openMarket() {
       this.phase = 'market';
       this.market = { items: this._genMarketItems(), bought: 0, refreshes: 0, month: this.month, freeRefresh: this.rules.freeRefresh };
-      this.say('log.marketOpen', { month: this.month, max: this.rules.marketMaxBuy });
+      this.say('log.marketOpen', { cal: this.calMonth(), half: this.half(), max: this.rules.marketMaxBuy });
     }
     _carrierWeights() {
       const R = this.rules, w = {};

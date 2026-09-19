@@ -302,14 +302,7 @@ body.cine { background: #000; }
 #app.cine.recall #scene { filter: sepia(.8) contrast(.92) brightness(.94) saturate(.8); }
 #intro.recall .iline span { background: #171208d9; border-color: #4a3c22; color: #e8dcbe; }
 
-/* ---------- 장 마무리: 리포트 · 편지 · 계약서 ---------- */
-.rpt-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-.rpt-head img { border: 3px solid var(--line); background: #1b1a2e; }
-.rpt { border: 3px solid var(--line); background: #1b1a2e; }
-.rpt-row { display: flex; justify-content: space-between; padding: 7px 10px; border-bottom: 2px solid #2a2740; font-size: 14px; }
-.rpt-row:last-child { border-bottom: 0; }
-.rpt-row b { color: var(--gold); }
-.rpt-say { margin: 12px 2px 2px; line-height: 1.6; }
+/* ---------- 장 마무리: 편지 · 계약서 ---------- */
 /* 편지: 낡은 종이 */
 .letter { background: #efe4c8; color: #2b2418; border: 3px solid #b8a67e; box-shadow: 4px 4px 0 var(--shadow); padding: 14px 14px 10px; line-height: 1.75; font-size: 14px; }
 .letter .to { margin: 0 0 10px; font-weight: 700; border-bottom: 2px solid #cbb98f; padding-bottom: 6px; }

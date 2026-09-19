@@ -229,12 +229,10 @@ const say = m => { console.log(m); log.push(m); };
   const seenAll = await page.evaluate(() => (PT.game && PT.game.story ? PT.game.story.seen.slice() : []));
   check(!firstSeen.includes('l1due'), '서장은 통째로 무기한이라 기한 안내가 없다 — ' + firstSeen.join(',') );
 
-  say('\n■ 장 마무리: 리포트 → 편지 → 상호 → 계약서');
-  await page.waitForTimeout(500); await shot('40-report');
+  say('\n■ 장 마무리: 편지 → 상호 → 계약서');
+  await page.waitForTimeout(500);
   const rptTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
-  check(/서장 리포트/.test(rptTxt) && /박 반장/.test(rptTxt), '박 반장 리포트가 뜬다 — ' + rptTxt.replace(/\s+/g, ' ').slice(0, 44));
-  check(/처리/.test(rptTxt) && /정시/.test(rptTxt), '두 달치 숫자가 들어 있다');
-  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(350);
+  check(!/리포트/.test(rptTxt) && !/정시/.test(rptTxt), '숫자 리포트는 없다 — ' + rptTxt.replace(/\s+/g, ' ').slice(0, 44));
   await shot('41-letter');
   const letTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
   check(/한 사장님 편지/.test(letTxt) && /한종수/.test(letTxt), '영감님 편지가 뜬다 — ' + letTxt.replace(/\s+/g, ' ').slice(0, 44));

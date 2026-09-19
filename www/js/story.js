@@ -111,7 +111,7 @@
     { id: 'l1last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }, { expr: 'think' }] },
   ];
 
-  // ----- 레벨 2 전용 비트 (1장 · 5~6월) -----
+  // ----- 레벨 2 전용 비트 (1장 · 3월 후반) -----
   // 새로 여는 것은 셋뿐이다: 배차가 소모품이라는 것, 그래서 마켓이 있다는 것, 그리고 두 대.
   // 서장에서 가르친 것(쌓기·적재율·기한)은 다시 말하지 않는다.
   const capItem = g => mkItem(g, it => it.kind === 'fac' && /^expand/.test(it.fac || ''));
@@ -145,7 +145,7 @@
     { id: 'l2last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }] },
   ];
 
-  // ----- 레벨 3 전용 비트 (2장 · 7~8월 · 장마) -----
+  // ----- 레벨 3 전용 비트 (2장 · 4월 전반 · 봄비) -----
   // 새로 여는 것: 날씨·예보 · 야외 적재와 젖음·도난 · 직접 배송 · 신뢰도의 정체.
   // 신뢰도는 새 규칙이 아니라 '줄곧 돌고 있던 것'의 공개다 — 두 대가 붙은 것도, 배차비가 싼 것도 그거였다.
   const wetSoon = g => g.outdoorVolume() > 0 && (g.weatherNow() === 'rain' || g.upcoming().some(u => u.weather === 'rain'));
@@ -190,7 +190,7 @@
     { id: 'l3last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }] },
   ];
 
-  // ----- 레벨 4 전용 비트 (3장 · 9~10월) -----
+  // ----- 레벨 4 전용 비트 (3장 · 4월 후반 · 이사철) -----
   // 다섯 달 내내 일반 택배만 왔다. 여기서 품목 문이 처음 열린다 — ❄ 찬 것, ⚠ 깨지는 것, 🌾 상하는 것.
   // ❄ 는 둘 곳과 보낼 곳이 둘 다 있어야 한다. 그래서 오기 전에 마켓이 먼저 온다.
   const coldItem = g => mkItem(g, it => it.kind === 'fac' && /^cold/.test(it.fac || ''));
@@ -229,7 +229,7 @@
     { id: 'l4last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }] },
   ];
 
-  // ----- 레벨 5 전용 비트 (4장 · 11~12월 · 소문) -----
+  // ----- 레벨 5 전용 비트 (4장 · 5월 전반 · 가정의 달) -----
   // 여기서 처음으로 **끝날 수 있는 판**이 된다. 평판은 지금까지 쌓기만 하던 것들의 총합이고,
   // 0이 되면 아무도 안 맡긴다. 같이 열리는 것: 사고와 보험 · 보관 계약 · 4칸 대형.
   const bigItem = g => mkItem(g, it => it.kind === 'contract' && ['large', 'rail', 'sea'].includes(root.DATA.familyOf(it.carrier)));
@@ -273,7 +273,7 @@
     { id: 'l5last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }, { expr: 'think' }] },
   ];
 
-  // ----- 레벨 6 전용 비트 (5장 · 1~2월 · 마지막 겨울) -----
+  // ----- 레벨 6 전용 비트 (5장 · 5월 후반 · 마지막 봄) -----
   // 마지막 장. 새로 여는 것은 ❆ 냉동과 일요일 선택뿐이고, 나머지는 한 해를 마무리하는 이야기다.
   const frozenCar = g => mkItem(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen');
   const optItem = g => mkItem(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt');

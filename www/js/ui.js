@@ -144,26 +144,20 @@
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
     closeModal(); startPlay({ intro: n === 1, chapter: n });
   }
-  // 장을 끝내면 세 화면이 이어진다: 박 반장 리포트 → 한 사장님 편지 → (마지막 장이면) 상호 · 계약서
+  // 장이 끝나면 두 화면이 이어진다: 한 사장님 편지 → 장 끝 카드 (→ 마지막 장이면 상호 · 계약서)
+  // 숫자 리포트는 두지 않는다 — 정산 화면에서 이미 숫자를 봤고, 장이 끝나는 자리는 편지 한 장이면 된다.
   function showLevelDone(r) {
     if (!r.recorded) { r.recorded = true; Store.remove(SAVE_KEY); BGM.stop(0.5); SFX.win(); BGM.oneShot('fanfare'); }
-    showChapterReport(r);
+    showLetter(r, verdictOf(r));
   }
   const chName = n => T('lv.ch.' + Math.min(n, LEVELS.LAST));
   const faceImg = (who, expr, size) => `<img src="${who === 'park' ? Story.sprite('park', expr) : Story.sprite(who, expr)}" width="${size || 56}" height="${size || 56}" alt="" style="image-rendering:pixelated;flex:0 0 auto">`;
-
-  // 두 달치를 숫자로 정리해 준다. 영감님한테 보낼 보고서의 초안이기도 하다
-  function showChapterReport(r) {
+  // 한 장을 어떻게 끝냈는가 — 편지 문장을 고르는 데만 쓴다
+  function verdictOf(r) {
     const done = r.deliveredCount || r.delivered || 0;
     const rate = done ? Math.round((r.onTimeCount || 0) / done * 100) : 100;
     const bad = (r.returned || 0) + (r.discarded || 0);
-    const verdict = bad === 0 && rate >= 95 ? 'good' : rate >= 80 ? 'ok' : 'bad';
-    const row = (k, v, warn) => `<div class="rpt-row"><span>${esc(k)}</span><b${warn ? ' style="color:var(--orange)"' : ''}>${esc(v)}</b></div>`;
-    const body = `<div class="rpt-head">${faceImg('park', verdict === 'bad' ? 'worry' : 'think')}
-        <div><b>${esc(T('rpt.by'))}</b><br><span style="color:var(--dim);font-size:12px">${esc(T('rpt.sub', { months: Math.round(r.monthsDone / D.CYCLES_PER_MONTH) }))}</span></div></div>
-      <div class="rpt">${row(T('rpt.delivered'), T('rpt.unit', { n: done }))}${row(T('rpt.onTime'), rate + '%')}${row(T('rpt.trouble'), T('rpt.unit', { n: bad }), bad > 0)}${row(T('rpt.cash'), r.cash + 'c')}</div>
-      <p class="rpt-say">${T('rpt.' + verdict)}</p>`;
-    modal(T('rpt.title', { ch: chName(r.level) }), body, [{ label: T('rpt.next'), cls: 'primary', onClick: () => showLetter(r, verdict) }]);
+    return bad === 0 && rate >= 95 ? 'good' : rate >= 80 ? 'ok' : 'bad';
   }
 
   // 한 사장님(영감님)의 손편지. 장이 올라갈수록 문장이 달라진다
@@ -200,7 +194,7 @@
 
   // ---------- 잔금 회차 ----------
   // 장이 끝날 때마다 한 회차를 낸다. 한 번에 다 갚는 구조면 중간 장에서는 돈을 쌓기만 하면 돼서
-  // 계산할 것이 없다 — 회차가 있어야 "이번 두 달에 얼마를 남겨야 하나"가 매 장의 질문이 된다.
+  // 계산할 것이 없다 — 회차가 있어야 "이번 장에 얼마를 남겨야 하나"가 매 장의 질문이 된다.
   function showInstalment(r, done) {
     const P = Profile.get(), deal = P.campaign.deal;
     if (!deal) return done();                          // 가계약을 안 거친 판(장 건너뛰기 등)은 그냥 넘어간다
@@ -443,7 +437,7 @@
   // 영화 챕터 카드다. 컷씬이 끝나고 첫날이 시작되기 전에 한 번, 장이 끝나고 다음 장으로 넘어가기 전에 한 번.
   // 규칙을 말하지 않는다 — 제목·부제·달력, 그것뿐이다.
   // 그 장이 도는 달력 구간. 장마다 런이 새로 시작하므로 그 런의 1..cycles 로 읽는다
-  // (캠페인 전체의 사이클 번호 startCycle 로 읽으면 startMonth 위에 또 더해져 두 달씩 밀린다)
+  // (캠페인 전체의 사이클 번호로 읽으면 startMonth 위에 또 더해져 달이 밀린다)
   function chWhen(n) {
     const lv = LEVELS.get(n); if (!game || !lv) return '';
     const c1 = lv.cycles || 1;
@@ -1090,7 +1084,9 @@
       const fcLine = `<div class="d"><a class="hl" id="mk-fctoggle">${T(mk.prep ? 'mk.forecastSumNow' : 'mk.forecastSum', { m: game.cycleLabel(nm), min: fcTot.min, max: fcTot.max })} ${fcOpen ? '▴' : '▾'}</a></div>${fcOpen ? `<div class="d fcline" id="mk-fc">${fcRows}</div>` : ''}${fcWarn}${seasonLine}`;
       const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span><span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>${whLine}${contracts}${fcLine}${prepLine}${items}
         ${R.noRefresh || !game.shows('attrs') ? '' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
-      const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), body, [{ label: T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], game.shows('attrs') ? T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(6, Math.max(1, mk.month))] * R.itemPriceMult * R.priceMult).toFixed(2) }) : '');
+      // 마지막 사이클의 마켓을 닫으면 다음 사이클이 아니라 **장**이 끝난다
+      const lastCycle = !game.rules.endless && mk.month >= game.rules.months;
+      const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), body, [{ label: lastCycle ? T('mk.endChapter') : T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], game.shows('attrs') ? T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(12, Math.max(1, game.tableMonth(mk.month)))] * R.itemPriceMult * R.priceMult).toFixed(2) }) : '');
       const ft = m.querySelector('#mk-fctoggle'); if (ft) ft.onclick = () => { SFX.click(); fcOpen = !fcOpen; render(); };
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
       storyCheck({ kind: 'market', bought: mk.bought, fcOpen });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
