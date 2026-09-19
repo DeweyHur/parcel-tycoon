@@ -448,8 +448,10 @@ window.Scene3D = (function () {
       const armPivotR = new THREE.Group(); armPivotR.position.set(0.23, 0.82, 0); g.add(armPivotR);
       const armR = this._box(0.11, 0.34, 0.11, shirt || 0x3d6fbf); armR.position.set(0, -0.17, 0); armPivotR.add(armR);
       const box = this._box(0.22, 0.2, 0.22, 0xd8b47a); box.position.set(0, 0.64, 0.22); box.visible = false; noShadow(box); g.add(box);
+      const moodSprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false, opacity: 0 }));
+      moodSprite.scale.set(0.32, 0.32, 1); moodSprite.position.set(0, 1.3, 0); moodSprite.visible = false; moodSprite.renderOrder = 10; g.add(moodSprite);
       g.userData.armPivotL = armPivotL; g.userData.armPivotR = armPivotR; g.userData.legPivotL = legPivotL; g.userData.legPivotR = legPivotR;
-      g.userData.box = box; g.userData.phase = Math.random() * 10;
+      g.userData.box = box; g.userData.moodSprite = moodSprite; g.userData.phase = Math.random() * 10;
       return g;
     }
 
@@ -595,8 +597,17 @@ window.Scene3D = (function () {
       this._tween(b.position, { y: b.position.y - 0.4 }, 0.4, ease);
     }
     shake(amount = 0.15) { this.shakeT = 0.35; this.shakeA = amount; }
-    cheer(power = 1) { this.workerMood = 1; this.workerMoodT = 1.4 + power * 0.5; }
-    mope(power = 1) { this.workerMood = -1; this.workerMoodT = 1.4 + power * 0.5; }
+    cheer(power = 1) { const d = 1.4 + power * 0.5; this.workerMood = 1; this.workerMoodT = d; this.workerMoodDur = d; }
+    mope(power = 1) { const d = 1.4 + power * 0.5; this.workerMood = -1; this.workerMoodT = d; this.workerMoodDur = d; }
+    // 이모지는 한 번 그린 캔버스 텍스처를 재사용한다 (기분이 바뀔 때마다 다시 그리지 않는다)
+    _emojiTexture(char) {
+      this._emojiCache = this._emojiCache || {};
+      if (this._emojiCache[char]) return this._emojiCache[char];
+      const c = document.createElement('canvas'); c.width = c.height = 64; const ctx = c.getContext('2d');
+      ctx.font = '46px "Noto Color Emoji", "Segoe UI Emoji", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(char, 32, 34);
+      const tex = new THREE.CanvasTexture(c); this._emojiCache[char] = tex; return tex;
+    }
     // ---------- 오프닝 카메라 (intro.js 가 밖에서 몬다) ----------
     // this.cine = true 인 동안 resize()·_loop() 는 카메라를 건드리지 않는다.
     // ---------- 완성 건물 ↔ 단면 ----------
@@ -651,6 +662,15 @@ window.Scene3D = (function () {
       w.rotation.y = 0; u.legPivotL.rotation.x = u.legPivotR.rotation.x = 0; u.box.visible = false;
       if (mood === 1) { u.armPivotL.rotation.z = -2.5 + Math.sin(ph) * 0.35; u.armPivotR.rotation.z = 2.5 - Math.sin(ph) * 0.35; u.armPivotL.rotation.x = u.armPivotR.rotation.x = 0; }
       else { u.armPivotL.rotation.z = 0.35; u.armPivotR.rotation.z = -0.35; u.armPivotL.rotation.x = u.armPivotR.rotation.x = 0.45; }
+      // 머리 위 이모지 — 튀어 오르듯 나타났다 둥실거리고, 기분이 가실 때 즈음 사라진다 (만화적 연출)
+      const sp = u.moodSprite, dur = this.workerMoodDur || 1.4, elapsed = dur - this.workerMoodT;
+      const popIn = Math.min(1, elapsed / 0.2), fadeOut = Math.min(1, this.workerMoodT / 0.35);
+      const overshoot = elapsed < 0.28 ? 1 + Math.sin(Math.min(1, elapsed / 0.28) * Math.PI) * 0.35 : 1;
+      const tex = this._emojiTexture(mood === 1 ? '❤️' : '😓'); if (sp.material.map !== tex) { sp.material.map = tex; sp.material.needsUpdate = true; }
+      sp.material.opacity = Math.min(popIn, fadeOut);
+      sp.visible = sp.material.opacity > 0.01;
+      const scale = 0.3 * overshoot; sp.scale.set(scale, scale, 1);
+      sp.position.set(0, 1.28 + (1 - popIn) * 0.18 + Math.sin(this.time * 4.5 + u.phase) * 0.035, 0);
     }
     _tickWorkers(dt) {
       if (!this.workers) return;
@@ -659,6 +679,7 @@ window.Scene3D = (function () {
       for (const w of this.workers) {
         if (mood !== 0) { this._poseWorkerMood(w, mood); continue; }
         const u = w.userData; if (!u.homeA) continue;
+        if (u.moodSprite.visible) u.moodSprite.visible = false;
         if (u.wait > 0) {
           u.wait -= dt; u.legPivotL.rotation.x = u.legPivotR.rotation.x = 0; w.position.y = 0;
           const idleSwing = Math.sin(this.time * 1.1 + u.phase) * 0.08;
