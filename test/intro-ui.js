@@ -71,7 +71,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   let mid = 0, prev = null;
   for (const r of rows) { if (prev && prev.line === r.line && r.a > 0.5 && prev.a > 0.5 && prev.recall !== r.recall) mid++; prev = r; }
   const secs = rows.length * 0.2;
-  check(secs > 20 && secs < 34, '오프닝이 25초쯤 간다 (4컷 · 여덟 줄) — ' + secs.toFixed(0) + '초');
+  check(secs > 20 && secs < 34, '오프닝이 25초쯤 간다 (4컷 · 일곱 줄) — ' + secs.toFixed(0) + '초');
   // 타자: 같은 줄 안에서 글자가 늘어나는 '중간 상태' 프레임이 있어야 한다
   let partial = 0, caret = 0, pv = '';
   for (const r of rows) {
@@ -80,12 +80,12 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
     if (/caret/.test(r.html || '')) caret++;
     pv = txt;
   }
-  check(partial > 30, '자막이 한 글자씩 쳐진다 (중간 상태 ' + partial + '프레임)');
+  check(partial > 20, '자막이 한 글자씩 쳐진다 (중간 상태 ' + partial + '프레임)');
   check(caret > 10, '치는 동안 커서가 붙는다 (' + caret + '프레임)');
   check(mid === 0, '대사 도중에 세피아가 바뀌지 않는다 (위반 ' + mid + '건)');
   check(rows.some(r => r.recall) && rows.some(r => !r.recall), '회상 구간과 오늘 구간이 둘 다 있다');
   const cards = [...new Set(rows.map(r => r.card).filter(Boolean))];
-  check(cards.length === 2, '인물 카드가 둘 나온다 — ' + cards.join(' / '));
+  check(cards.length === 1 && /한 사장/.test(cards[0]), '인물 카드는 한 사장 하나다 — ' + cards.join(' / '));
   const tr = rows.map(r => r.truck), tmin = Math.min(...tr);   // 마지막 한 프레임은 끝난 뒤 복귀값(12)이 잡힌다
   check(tr[0] > 20 && tmin < 9, '탑차가 화면 밖에서 들어와 도크 앞에 선다 — x' + tr[0] + ' → x' + tmin);
   await skip();

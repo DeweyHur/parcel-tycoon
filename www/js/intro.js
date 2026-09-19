@@ -23,28 +23,27 @@ window.Intro = (function () {
   // recall = 회상. 세피아는 샷이 아니라 자막에 걸린다 — 대사 중간에 색이 변하면 안 되니까
   const SEQ = [
     // S1 오늘 아침 · 길 건너. 마당은 비어 있다
-    { from: { p: [15.0, 4.9, 15.8], l: [3.4, 1.0, 1.4] }, to: { p: [12.9, 4.5, 14.7], l: [3.0, 1.0, 1.2] }, keys: ['intro.1', 'intro.2'] },
+    { from: { p: [15.0, 4.9, 15.8], l: [3.4, 1.0, 1.4] }, to: { p: [12.9, 4.5, 14.7], l: [3.0, 1.0, 1.2] }, keys: ['intro.1'] },
     // S2 회상 · 창고 옆구리, 오래 드나든 자리
-    { cut: true, recall: true, from: { p: [-8.8, 3.1, 10.2], l: [0.2, 1.2, 0.2] }, to: { p: [-6.2, 2.9, 11.2], l: [0.9, 1.2, 0.3] }, keys: ['intro.3', 'intro.4'] },
+    { cut: true, recall: true, from: { p: [-8.8, 3.1, 10.2], l: [0.2, 1.2, 0.2] }, to: { p: [-6.2, 2.9, 11.2], l: [0.9, 1.2, 0.3] }, keys: ['intro.2', 'intro.3'] },
     // S3 회상 · 로우앵글로 지붕선을 올려다본다. 한 사장이 넘기겠다고 한 그날
-    { cut: true, recall: true, from: { p: [5.2, 0.9, 9.6], l: [1.4, 2.5, 0.1] }, to: { p: [4.0, 1.2, 8.5], l: [1.3, 2.3, 0.0] }, keys: ['intro.5', 'intro.6'] },
-    // S4 오늘 · 색이 돌아오고, 탑차가 들어온다
-    { cut: true, truck: true, from: { p: [11.4, 3.5, 13.4], l: [2.0, 1.0, 0.8] }, to: { p: [8.8, 3.6, 11.9], l: [1.6, 0.95, 0.4] }, keys: ['intro.7'] },
+    { cut: true, recall: true, from: { p: [5.2, 0.9, 9.6], l: [1.4, 2.5, 0.1] }, to: { p: [4.0, 1.2, 8.5], l: [1.3, 2.3, 0.0] }, keys: ['intro.4', 'intro.5', 'intro.6'] },
+    // S4 오늘 · 색이 돌아오고 탑차가 들어온다. 자막 없이 소리만 — 말할 것이 남지 않았다
+    { cut: true, truck: true, min: 3.6, from: { p: [11.4, 3.5, 13.4], l: [2.0, 1.0, 0.8] }, to: { p: [8.8, 3.6, 11.9], l: [1.6, 0.95, 0.4] }, keys: [] },
     // 착지 — 컷이 아니라 S4 가 그대로 제자리로 내려온다. 앞면이 들리고 화면이 게임으로
-    { home: true, min: 4.6, keys: ['intro.8'] },
+    { home: true, min: 4.6, keys: ['intro.7'] },
   ];
   // 인물 소개 — 대화창이 아니라 영화 자막처럼 옆에서 밀려 들어왔다 빠진다. 샷 시작 기준 초
-  // 이름만 띄운다. 직책 한 줄을 붙이면 컷신이 설정 설명으로 바뀐다
+  // 이름만, 한 사장 하나뿐이다. 박 반장은 컷신에 나오지 않는다 — 첫날 창고에서 직접 만난다
   const CARDS = [
     { shot: 1, at: 0.7, d: 4.4, who: 'han', expr: 'smile', name: 'card.han.name' },
-    { shot: 3, at: 1.4, d: 4.4, who: 'park', expr: 'neutral', name: 'card.park.name' },
   ];
   // 소리: 회상에 들고 나는 숨, 탑차, 셔터. 샷 시작 기준 초
   const CUES = [
     { shot: 1, at: 0.02, f: () => SFX.recallIn() },
     { shot: 3, at: 0.02, f: () => SFX.recallOut() },
     { shot: 3, at: 0.45, f: () => SFX.truck() },
-    { shot: 3, at: 3.1, f: () => SFX.horn() },
+    { shot: 3, at: 2.4, f: () => SFX.horn() },
     { shot: 4, at: 0.25, f: () => SFX.shutter() },
   ];
 
