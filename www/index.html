@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1b1a2e">
   <title>God of the Dock</title>   <!-- applyStaticText() 가 언어에 맞는 제목으로 덮어쓴다 -->
   <link rel="icon" href="img/mark-icon.png">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=0.4.0">
 </head>
 <body>
   <div id="app">
@@ -32,6 +32,12 @@
         <div class="rush-meter" id="rush-meter" hidden>
           <span id="rush-icon">🔥</span><b id="rush-title"></b>
           <div><i id="rush-fill"></i></div><strong id="rush-label"></strong>
+        </div>
+        <div class="chain-meter" id="chain-meter" hidden>
+          <span>⚡</span><b id="chain-title"></b><div><i id="chain-fill"></i></div><strong id="chain-label"></strong>
+        </div>
+        <div class="mission-meter" id="mission-meter">
+          <b id="mission-grade">D</b><span id="mission-copy"></span><div><i id="mission-fill"></i></div><strong id="mission-next"></strong>
         </div>
       </div>
       <div id="float-layer"></div>
@@ -72,22 +78,22 @@
 
   <script src="js/three.min.js"></script>
   <script src="js/build.js"></script>
-  <script src="js/data.js"></script>
+  <script src="js/data.js?v=0.4.0"></script>
   <script src="js/meta.js"></script>
-  <script src="locales/ko.js"></script>
-  <script src="locales/en.js"></script>
+  <script src="locales/ko.js?v=0.4.0"></script>
+  <script src="locales/en.js?v=0.4.0"></script>
   <script src="js/i18n.js"></script>
   <script src="js/levels.js"></script>
   <script src="js/tutorial.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/story.js"></script>
+  <script src="js/game.js?v=0.4.0"></script>
+  <script src="js/story.js?v=0.4.0"></script>
   <script src="js/storage.js"></script>
   <script src="js/profile.js"></script>
-  <script src="js/sfx.js"></script>
+  <script src="js/sfx.js?v=0.4.0"></script>
   <script src="js/bgm.js"></script>
   <script src="js/splash.js"></script>
-  <script src="js/scene3d.js"></script>
+  <script src="js/scene3d.js?v=0.4.0"></script>
   <script src="js/intro.js"></script>
-  <script src="js/ui.js"></script>
+  <script src="js/ui.js?v=0.4.0"></script>
 </body>
 </html>

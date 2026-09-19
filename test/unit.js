@@ -22,7 +22,25 @@ t('실시간 성장 투자: 홍보는 미래 입고, 트럭은 배차, 창고는
   const fl = g.investGrowth('fleet'); assert.ok(fl.ok); g.contracts.filter(Boolean).forEach((c, i) => assert.equal(c.maxCalls, calls0[i] + 1));
   const wh = g.investGrowth('warehouse'); assert.ok(wh.ok); assert.equal(g.warehouse.cap, cap0 + D.GROWTH.warehouse.cap);
   const fresh = g._makeContract('bulk1'); assert.ok(fresh.maxCalls >= D.CARRIERS.bulk1.trucks + 1, '새 계약에도 차량 투자가 적용된다');
-  const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.deepEqual(h.growth, { marketing: 1, fleet: 1, warehouse: 1 });
+  const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.deepEqual(h.growth, { marketing: 1, fleet: 1, warehouse: 1, automation: 0, branding: 0, coldchain: 0 });
+});
+t('성장 트리: 차량→자동화→브랜드와 창고→저온 물류가 단계적으로 해금된다', () => {
+  const g = EMPTY(72); g.cash = 9999;
+  assert.ok(g.growthPlan('automation').locked); assert.ok(g.growthPlan('branding').locked); assert.ok(g.growthPlan('coldchain').locked);
+  g.investGrowth('fleet'); g.investGrowth('fleet');
+  const c = g.contracts.find(Boolean), fee0 = g.callFee(c, 1);
+  assert.ok(g.investGrowth('automation').ok); assert.ok(g.callFee(c, 1) < fee0);
+  g.investGrowth('marketing'); g.investGrowth('marketing'); assert.ok(!g.growthPlan('branding').locked);
+  assert.ok(g.investGrowth('branding').ok); const base = g.baseReward('normal', 2); assert.equal(g._spawnParcel({ type: 'normal', size: 2 }).reward, Math.round(base * 1.03));
+  g.investGrowth('warehouse'); g.investGrowth('warehouse'); const cold0 = g.warehouse.cold, frozen0 = g.warehouse.frozen;
+  assert.ok(g.investGrowth('coldchain').ok); assert.equal(g.warehouse.cold, cold0 + 2); assert.equal(g.warehouse.frozen, frozen0 + 1);
+});
+t('월간 미션: 수익이 D→C→B→A 등급을 넘을 때 성장 보너스를 지급한다', () => {
+  const g = EMPTY(73); const i = slot(g, 'bulk'); g.monthStats.missionTarget = 200;
+  g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2)];
+  const cash = g.cash, r = g.callCarrier(i, [1, 2, 3]);
+  assert.equal(r.missionUp.grade, 'C'); assert.equal(r.missionUp.bonus, 15); assert.equal(g.missionState().grade, 'C');
+  assert.equal(g.cash, cash + r.revenue + r.missionUp.bonus);
 });
 t('조커 업체 없음: 용달·긴급 삭제', () => { assert.ok(!D.CARRIERS.target && !D.CARRIERS.urgent); for (const id in M.COMPANIES) for (const c of M.COMPANIES[id].contracts || []) assert.ok(D.FAMILIES[c.carrier] || D.CARRIERS[c.carrier], id + ' ' + c.carrier); });
 t('대기는 배차를 차감하지 않음', () => { const g = NG(3); const calls = g.contracts.map(c => c && c.calls); adv(g); assert.deepEqual(g.contracts.map(c => c && c.calls), calls); assert.equal(g.turn, 2); });
@@ -33,7 +51,7 @@ t('차량: 부피 합으로 대수 결정, 배차비 즉시 차감, 대수만큼
   g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2)];
   const cash = g.cash, trucks = c.calls, fee = g.truckFee(c); assert.equal(fee, D.FAMILIES.bulk.fee);
   const r = g.callCarrier(i, [1, 2, 3]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 1); assert.equal(r.fee, D.FAMILIES.bulk.fee); assert.equal(c.calls, trucks - 1);
-  assert.equal(g.cash, cash + r.revenue); assert.equal(g.feesDue, D.FAMILIES.bulk.fee); assert.equal(r.revenue, 35 * 3); assert.ok(r.fill >= 0.8);
+  assert.equal(g.cash, cash + r.revenue + ((r.missionUp && r.missionUp.bonus) || 0)); assert.equal(g.feesDue, D.FAMILIES.bulk.fee); assert.equal(r.revenue, 35 * 3); assert.ok(r.fill >= 0.8);
 });
 t('차량: 용량을 넘기면 동시 대수 한도(기본 1)에서 거부, 신뢰 1단계 대량은 2대', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
@@ -51,6 +69,16 @@ t('도크 러시: 창고를 72% 이상 채우면 임시 트럭 +2, 2대 이상�
   const r = g.callCarrier(i, g.parcels.map(p => p.id), 2);
   assert.ok(r.ok, r.msg); assert.ok(r.rush); assert.equal(r.revenue, Math.round(base * D.RUSH.bonus));
   assert.equal(r.rushBonus, r.revenue - base); assert.equal(g.stats.rushes, 1); assert.equal(g.stats.rushBonus, r.rushBonus);
+});
+t('퍼펙트 로드: 80% 적재 출고를 연속하면 2회부터 보상이 커지고 대기하면 연쇄가 끊긴다', () => {
+  const g = EMPTY(203); const i = slot(g, 'bulk'), c = g.contracts[i];
+  const load = base => [0, 1, 2].map(n => P(base + n, 'normal', 2));
+  g.parcels = load(10); const first = g.callCarrier(i, g.parcels.map(p => p.id));
+  assert.ok(first.ok); assert.equal(first.chain, 1); assert.equal(first.chainMult, 1); assert.equal(first.chainBonus, 0);
+  g.parcels = load(20); const base = g.parcels.reduce((sum, p) => sum + p.reward, 0); const second = g.callCarrier(i, g.parcels.map(p => p.id));
+  assert.ok(second.ok); assert.equal(second.chain, 2); assert.equal(second.chainMult, 1.08); assert.equal(second.revenue, Math.round(base * 1.08)); assert.ok(second.chainBonus > 0);
+  assert.equal(g.stats.maxLoadChain, 2); assert.equal(g.stats.chainBonus, second.chainBonus);
+  adv(g); assert.equal(g.loadChain, 0);
 });
 t('차량: 배차비는 후불이라 자금 0이어도 호출 가능, 남은 배차보다 많이 못 부름', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i]; g.parcels = [P(1, 'normal', 1)];

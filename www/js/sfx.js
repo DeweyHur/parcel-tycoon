@@ -62,6 +62,7 @@ window.SFX = (function () {
     arrive() { tone(220, 0.08, 'triangle', 0.7, 0, -100); noise(0.08, 0.3, 0.02); },
     thud() { tone(120, 0.12, 'triangle', 0.9, 0, -80); noise(0.1, 0.35); },
     coin(n = 1) { for (let i = 0; i < Math.min(n, 5); i++) { tone(1046, 0.07, 'square', 0.35, i * 0.08); tone(1318, 0.12, 'square', 0.3, i * 0.08 + 0.06); } },
+    combo(n = 2) { const top = Math.min(5, n); for (let i = 0; i < top; i++) tone(659 * Math.pow(1.122, i), 0.1, 'square', 0.28, i * 0.055, 80); },
     truck() { tone(70, 0.6, 'sawtooth', 0.5, 0, 30); noise(0.5, 0.25); tone(90, 0.5, 'sawtooth', 0.4, 0.5, -30); },
     horn() { tone(392, 0.18, 'square', 0.5); tone(523, 0.25, 'square', 0.5, 0.18); },
     wait() { tone(330, 0.1, 'triangle', 0.5); tone(262, 0.15, 'triangle', 0.4, 0.1); },

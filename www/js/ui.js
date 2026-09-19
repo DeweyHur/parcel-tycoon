@@ -33,6 +33,12 @@
     el.style.left = xPct + '%'; el.style.top = '45%'; el.style.transform = 'translateX(-50%)';
     $('#float-layer').appendChild(el); setTimeout(() => el.remove(), 1300);
   }
+  function rewardBurst(label, tier = 1) {
+    const layer = $('#float-layer'); if (!layer) return;
+    const n = 10 + tier * 3, burst = document.createElement('div'); burst.className = `reward-burst tier-${tier}`;
+    burst.innerHTML = `<b>${esc(label)}</b>` + Array.from({ length: n }, (_, i) => `<i style="--i:${i};--a:${Math.round(i * 360 / n)}deg"></i>`).join('');
+    layer.appendChild(burst); setTimeout(() => burst.remove(), 1150);
+  }
   function announce(got) {
     for (const a of got) {
       toastLater(T('ach.done', { name: a.name }), 2200);
@@ -307,10 +313,11 @@
       <div class="line" style="bottom:44px"><b>MAX</b></div>`;
     if (n === 2) return `<div class="tg2" style="top:6px"><i style="width:28%;background:var(--red)"></i><u style="color:var(--red)">16c</u></div>
       <div class="tg2" style="top:34px"><i style="width:100%;background:var(--green)"></i><u style="color:var(--line)">4c</u></div>`;
-    return `<div class="cal">${Array.from({ length: 12 }, (_, i) => `<s class="${i === 11 ? 'last' : i < 3 ? 'on' : ''}"></s>`).join('')}</div>`;
+    if (n === 3) return `<div class="cal">${Array.from({ length: 12 }, (_, i) => `<s class="${i === 11 ? 'last' : i < 3 ? 'on' : ''}"></s>`).join('')}</div>`;
+    return `<div class="grade-art"><b>D</b><b>C</b><b>B</b><b>A</b><i></i></div>`;
   }
   function showHowTo(next, back) {
-    const cards = [1, 2, 3].map(n => `<div class="hc"><div class="art">${howArt(n)}</div><div class="tx"><h3>${T('how.' + n + '.t')}</h3><p>${T('how.' + n + '.d')}</p></div></div>`).join('');
+    const cards = [1, 2, 3, 4].map(n => `<div class="hc"><div class="art">${howArt(n)}</div><div class="tx"><h3>${T('how.' + n + '.t')}</h3><p>${T('how.' + n + '.d')}</p></div></div>`).join('');
     const body = `<div class="how">${cards}<div class="foot-note">${T('how.note')}</div></div>`;
     const btns = back ? [{ label: T('btn.close'), onClick: back }] : [{ label: T('how.go'), cls: 'primary', onClick: next }];
     modal(T('how.title'), body, btns);
@@ -518,6 +525,21 @@
         ? (ko ? `준비 완료 · 보상 ×${rush.mult}` : `READY · REWARD ×${rush.mult}`)
         : (ko ? `${Math.round(rush.ratio * 100)}% · 더 쌓아라` : `${Math.round(rush.ratio * 100)}% · STOCKPILE`);
     }
+    const chain = g.chainState();
+    const cm = $('#chain-meter');
+    cm.hidden = chain.count < 1;
+    if (chain.count > 0) {
+      $('#chain-title').textContent = T('chain.title');
+      $('#chain-fill').style.width = Math.min(100, chain.level / chain.max * 100) + '%';
+      $('#chain-label').textContent = chain.count >= 2 ? T('chain.mult', { n: chain.count, mult: chain.mult.toFixed(2) }) : T('chain.armed');
+      cm.className = 'chain-meter' + (chain.level >= chain.max ? ' max' : '');
+    }
+    const mission = g.missionState();
+    $('#mission-grade').textContent = mission.grade;
+    $('#mission-copy').textContent = T('mission.amount', { now: mission.earned, target: mission.target });
+    $('#mission-fill').style.width = Math.round(mission.progress * 100) + '%';
+    $('#mission-next').textContent = mission.nextGrade ? T('mission.next', { grade: mission.nextGrade, left: mission.left }) : T('mission.max');
+    $('#mission-meter').className = 'mission-meter grade-' + mission.grade.toLowerCase();
   }
   function renderAll() {
     if (!game) return;
@@ -789,6 +811,8 @@
     return `<div class="ttrack">${rows}</div>`;
   }
   function attrsOf(p) { return p.attrs || D.PARCEL_TYPES[p.type].attrs; }
+  function valueTier(p) { const r = p.reward || 0; return p.premium || r >= 130 ? 3 : r >= 90 ? 2 : r >= 60 ? 1 : 0; }
+  function valueBadge(p) { const v = valueTier(p); return v ? `<span class="vbadge v${v}" title="${esc(T('value.tier.' + v))}">${v === 3 ? '✦' : v === 2 ? '◆' : '▲'}</span>` : ''; }
   function attrIcons(attrs) { return attrs.map(a => `<span class="attr ${a}" title="${D.ATTRS[a].name}">${D.ATTRS[a].icon}</span>`).join(''); }
   function urgencyOf(p) {
     const a = attrsOf(p);
@@ -814,9 +838,9 @@
   function urgDot(p) { const u = urgencyOf(p); return `<span class="urg ${u <= 0 ? 'r' : u <= 1 ? 'r' : u <= 2 ? 'o' : u <= 3 ? 'y' : 'g'}"></span>`; }
   function parcelRow(p, s) {
     const t = ptype(p), a = attrsOf(p);
-    const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (s && s.sel.has(p.id) ? ' sel' : '') + (s && !s.elig.has(p.id) ? ' dis' : '') + (s && s.risk && s.risk.has(p.id) ? ' risk' : '');
+    const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (s && s.sel.has(p.id) ? ' sel' : '') + (s && !s.elig.has(p.id) ? ' dis' : '') + (s && s.risk && s.risk.has(p.id) ? ' risk' : '') + ` value-${valueTier(p)}`;
     const cu = M.CUSTOMERS[p.customer || 'anon'];
-    return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${game && !game.shows('customers') ? '' : `<span class="cust" title="${esc(cu.name)}">${cu.icon}</span>`}<span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`;
+    return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust" title="${esc(cu.name)}">${cu.icon}</span>`}<span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`;
   }
   // 똑같이 생긴 택배가 여러 줄로 늘어서는 것이 "글이 너무 많다"의 가장 큰 원인이다.
   // 지금 당장 결정에 영향을 주지 않는 것들(급하지 않고, 기한 안 지났고, 밖에 없고, 상할 위험 없는 것)만 한 줄로 묶는다.
@@ -827,6 +851,7 @@
   // 상태 문구까지 키에 넣으므로 묶여도 잃는 정보가 없고, 누르면 개별 줄로 펼쳐진다.
   function groupKeyOf(p) {
     let st = ''; try { st = parcelStatus(p); } catch (e) { return null; }
+    st = valueTier(p) + '|' + st;
     return `${p.type}|${attrsOf(p).join(',')}|${p.outdoor ? 'o' : ''}|${st}`;   // 크기는 합계로 보여 준다 — 펼치면 개별 크기가 나온다
   }
   function groupRow(key, ps) {
@@ -836,7 +861,7 @@
     const cus = [...new Set(ps.map(x => M.CUSTOMERS[x.customer || 'anon'].icon))];
     const open = openGroups.has(key);
     const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '');
-    return `<div class="parcel group${cls}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">${esc(t.short)} ×${ps.length}</span>${attrIcons(a)} ${T('fmt.cells', { n: vol })} · ${money}c</div><div class="st">${(st => st ? st + ' ' : '')(parcelStatus(p))}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
+    return `<div class="parcel group${cls} value-${valueTier(p)}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">${esc(t.short)} ×${ps.length}</span>${attrIcons(a)} ${T('fmt.cells', { n: vol })} · ${money}c</div><div class="st">${(st => st ? st + ' ' : '')(parcelStatus(p))}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
   }
   function renderParcels(container, parcels, selectable) {
     if (!parcels.length) { container.innerHTML = `<div id="empty">${T('hud.emptyWarehouse')}</div>`; return; }
@@ -878,9 +903,10 @@
       const trucks = Math.min(Math.max(need, 1 + extraTrucks), Math.min(simul, Math.max(1, c.calls + (c.calls === 0 ? 1 : 0))));
       const cap = vcap * trucks, callFee = game.callFee(c, trucks), baseIncome = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
       const fill = vol / cap;
-      const rush = game.rushPreview(vol, trucks, fill), income = rush ? Math.round(baseIncome * D.RUSH.bonus) : baseIncome;
+      const chain = game.chainPreview(fill), chainIncome = Math.round(baseIncome * chain.mult);
+      const rush = game.rushPreview(vol, trucks, fill), income = rush ? Math.round(chainIncome * D.RUSH.bonus) : chainIncome;
       const gauge = `<div class="truckgauge"><div class="tg"><i style="width:${Math.min(100, fill * 100)}%" class="${fill >= 0.8 ? 'good' : ''}"></i><span>${T('call.trucks', { n: trucks, vol, cap })}</span></div><div class="tbtn">${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : game.shows('simul') ? `<span class="d" style="color:var(--dim)">${T('call.simulMax', { n: Math.min(simul, Math.max(1, c.calls)) })}</span>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}</div></div>`;
-      const money = `${rush ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - baseIncome })}</div>` : ''}<div class="pickinfo"><span>+${income}c − ${callFee}c = <b class="${income - callFee >= 0 ? '' : 'bad'}">${T('call.net', { net: income - callFee })}</b></span>${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<span style="color:var(--green)">${T('call.fillOk')}</span>` : vol ? `<span style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</span>` : ''}</div>`;
+      const money = `${chain.count >= 2 ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}<div class="pickinfo"><span>+${income}c − ${callFee}c = <b class="${income - callFee >= 0 ? '' : 'bad'}">${T('call.net', { net: income - callFee })}</b></span>${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<span style="color:var(--green)">${T('call.fillOk')}</span>` : vol ? `<span style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</span>` : ''}</div>`;
       const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
       const riskLine = riskSel.length ? `<div class="d" style="font-size:12px;color:var(--orange);margin-bottom:6px">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
       const capsLine = !game.shows('attrs') ? '' : `<div class="d" style="font-size:11px;color:var(--dim);margin-bottom:4px">${car.badge || ''} ${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</div>`;
@@ -918,6 +944,16 @@
     const r = game.callCarrier(i, ids, trucks);
     if (!r.ok) { toast(r.msg); return; }
     pendingCall = r;
+    if (r.chain === 1) {
+      SFX.select(); toastLater(T('chain.start'), 1800); rewardBurst(T('chain.perfect'), 1);
+    }
+    if (r.chain >= 2) {
+      document.body.classList.remove('chain-hit'); void document.body.offsetWidth; document.body.classList.add('chain-hit');
+      SFX.combo(r.chain);
+      toastLater(T(r.chain >= D.LOAD_CHAIN.max ? 'chain.toastMax' : 'chain.toast', { n: r.chain, bonus: r.chainBonus }), 2200);
+      rewardBurst(T(r.chain >= D.LOAD_CHAIN.max ? 'chain.max' : 'chain.count', { n: r.chain }), Math.min(3, r.chain));
+      setTimeout(() => document.body.classList.remove('chain-hit'), 700);
+    }
     if (r.rush) {
       document.body.classList.add('rush-hit');
       scene.shake(.38); SFX.levelup();
@@ -927,10 +963,12 @@
     busy = true; renderAll();
     const events = game.takeEvents();
     const delivered = events.filter(e => e.type === 'deliver').map(e => e.parcel.id);
+    const topValue = events.filter(e => e.type === 'deliver').reduce((m, e) => Math.max(m, valueTier(e.parcel)), 0);
     SFX.truck();
     for (const e of events) if (e.type === 'broken') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.broken', { short: D.PARCEL_TYPES[e.parcel.type].short }), true, 30); }
     scene.deliver(delivered, () => {
       if (delivered.length) { SFX.coin(delivered.length); floatText(r.rush ? T('rush.float', { n: r.revenue }) : r.delay ? T('float.delayed', { n: r.revenue, delay: r.delay }) : `+${r.revenue}c`, false, 70); }
+      if (topValue >= 2) setTimeout(() => { rewardBurst(T('value.delivered.' + topValue), topValue); SFX.combo(topValue + 1); }, 180);
       if (r.fee) setTimeout(() => floatText(T('call.fee', { fee: r.fee }), true, 30), 250);
       announceCustomers(events);
       afterTurn(events);
@@ -987,6 +1025,7 @@
   function afterTurn(events) {
     for (const e of events) if (e.type === 'discard') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.discard', { why: I18n.text(e.why) }), true, 30); }
     for (const e of events) if (e.type === 'paid') { SFX.coin(e.count); floatText(T('float.paid', { name: e.name, n: e.amount }), false, 70); }
+    for (const e of events) if (e.type === 'missionUp') { SFX.levelup(); rewardBurst(T('mission.up', { grade: e.grade, bonus: e.bonus }), e.grade === 'A' ? 3 : e.grade === 'B' ? 2 : 1); toastLater(T('mission.toast', { grade: e.grade, bonus: e.bonus }), 2300); }
     announceCustomers(events);
     for (const e of events) { if (e.type === 'storageEnd') { SFX.coin(1); floatText(T('float.storageEnd', { pay: e.pay ? `+${e.pay}c` : '' }), false, 70); } if (e.type === 'storageStolen') { SFX.discard(); floatText(T('float.storageStolen', { n: e.amount }), true, 30); } if (e.type === 'offer') toastLater(`${M.CUSTOMERS[e.offer.customer].icon} ${T('toast.offer')}`, 2000); }
     for (const e of events) if (e.type === 'returned') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.returned', { short: D.PARCEL_TYPES[e.parcel.type].short }), true, 30); }
@@ -1515,7 +1554,7 @@
     clearTimeout(smsTimer); smsTimer = setTimeout(() => { el.hidden = true; }, 9000);
     el.onclick = () => { el.hidden = true; };
   }
-  function showGrowth() {
+  function showGrowthLegacy() {
     if (!game || game.phase !== 'play') return;
     const g = game, ko = I18n.lang === 'ko';
     const names = ko
@@ -1545,6 +1584,47 @@
       const kind = el.dataset.growth, r = g.investGrowth(kind);
       if (!r.ok) { toast(r.reason === 'cash' ? (ko ? `자금이 ${r.cost}c 필요합니다` : `Need ${r.cost}c`) : (ko ? '지금은 투자할 수 없습니다' : 'Cannot invest now')); return; }
       SFX.buy(); g.takeEvents(); scene.sync(g, { animate: true }); saveGame(); renderAll(); showGrowth();
+    });
+  }
+  function showGrowth() {
+    if (!game || game.phase !== 'play') return;
+    const g = game, ko = I18n.lang === 'ko';
+    const info = {
+      marketing: ['📣', ko ? '홍보' : 'Marketing', ko ? '입고 +3' : '+3 arrivals'],
+      fleet: ['🚚', ko ? '차량' : 'Fleet', ko ? '계약마다 배차 +1' : '+1 call / contract'],
+      warehouse: ['🏭', ko ? '창고' : 'Warehouse', ko ? '보관 공간 +6' : '+6 storage'],
+      automation: ['⚙', ko ? '자동화' : 'Automation', ko ? '배차비 -4% · 인건비 -8%' : 'Fees -4% · labor -8%'],
+      branding: ['✦', ko ? '브랜드' : 'Brand', ko ? '화물값 +3% · 특급 확률 +4%' : 'Value +3% · premium +4%'],
+      coldchain: ['❄', ko ? '저온 물류' : 'Cold chain', ko ? '냉장 +2 · 냉동 +1' : 'Cold +2 · frozen +1'],
+    };
+    const kinds = ['marketing', 'fleet', 'warehouse', 'automation', 'branding'].concat(g.shows('cold') ? ['coldchain'] : []);
+    const nameOf = k => info[k][1];
+    const current = k => {
+      const lv = g.growth[k] || 0, d = D.GROWTH[k];
+      if (k === 'marketing') return ko ? `추가 입고 ${lv * d.parcels}건` : `${lv * d.parcels} extra arrivals`;
+      if (k === 'fleet') return ko ? `추가 배차 ${lv}대` : `${lv} extra calls`;
+      if (k === 'warehouse') return ko ? `현재 ${g.warehouse.cap}칸` : `${g.warehouse.cap} cells now`;
+      if (k === 'automation') return ko ? `비용 절감 ${lv * d.feeCut * 100}%` : `${lv * d.feeCut * 100}% fee cut`;
+      if (k === 'branding') return ko ? `화물값 +${lv * d.reward * 100}%` : `Cargo value +${lv * d.reward * 100}%`;
+      return ko ? `냉장 ${g.warehouse.cold} · 냉동 ${g.warehouse.frozen || 0}` : `Cold ${g.warehouse.cold} · frozen ${g.warehouse.frozen || 0}`;
+    };
+    const cards = kinds.map(kind => {
+      const p = g.growthPlan(kind), n = info[kind], max = p.cost == null;
+      const lock = p.locked ? p.missing.map(([k, lv]) => `${nameOf(k)} Lv.${lv}`).join(' + ') : '';
+      const dots = Array.from({ length: p.max }, (_, i) => `<i class="${i < p.level ? 'on' : ''}"></i>`).join('');
+      return `<button class="growth-card ${max ? 'max' : ''} ${p.locked ? 'locked' : ''}" data-growth="${kind}" ${max || p.locked ? 'disabled' : ''}>
+        <span class="growth-icon">${n[0]}</span><span class="growth-copy"><b>${n[1]} <em>Lv.${p.level}</em></b><span>${current(kind)}</span></span>
+        <span class="growth-buy"><span class="growth-dots">${dots}</span><b>${p.locked ? '🔒' : max ? 'MAX' : p.cost + 'c'}</b><small>${p.locked ? lock : max ? (ko ? '완성' : 'Complete') : n[2]}</small></span>
+      </button>`;
+    }).join('');
+    const total = kinds.reduce((s, k) => s + (g.growth[k] || 0), 0);
+    const body = `<div class="growth-head"><span>${ko ? '성장 단계' : 'Growth'} <b>Lv.${total}</b></span><span class="growth-cash">${g.cash}c</span></div><div class="growth-tip">${ko ? '투자할수록 창고와 트럭이 실제로 바뀝니다.' : 'Every upgrade visibly changes your depot and trucks.'}</div><div class="growth-grid">${cards}</div>`;
+    const m = modal(ko ? '사업 확장' : 'Business growth', body, [{ label: T('btn.close'), onClick: closeModal }]);
+    m.querySelectorAll('[data-growth]').forEach(el => el.onclick = () => {
+      const kind = el.dataset.growth, r = g.investGrowth(kind);
+      if (!r.ok) { toast(r.reason === 'cash' ? (ko ? `${r.cost}c가 필요합니다` : `Need ${r.cost}c`) : (ko ? '아직 잠겨 있습니다' : 'Still locked')); return; }
+      SFX.buy(); rewardBurst(ko ? `${info[kind][1]} Lv.${r.level}` : `${info[kind][1]} Lv.${r.level}`, Math.min(3, Math.ceil(r.level / 2)));
+      g.takeEvents(); scene.sync(g, { animate: true }); saveGame(); renderAll(); showGrowth();
     });
   }
   function showMenu() {

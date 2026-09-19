@@ -124,9 +124,10 @@
       this.market = null;
       this.storage = []; this.offer = null; this.outdoorPref = []; this.weather = []; this.pendingRevenue = []; this.bigCustomer = null; this.feesDue = 0; this.debt = 0;
       this.insurer = 'none'; this.premMult = 1; this.noClaimMonths = 0; this.coverHalf = false; this.items = { transitCert: 0, yardIns: 0, customsBond: 0 };
-      this.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0 }, (cfg.carry && cfg.carry.growth) || {});
+      this.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0, automation: 0, branding: 0, coldchain: 0 }, (cfg.carry && cfg.carry.growth) || {});
       this.monthStats = null;
       this.run = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, discarded: 0 };
+      this.loadChain = 0;
       this.stats = Game.emptyStats();
       this.summary = null; this.result = null;
       this.strikeCarrier = null; this.heatTurns = []; this.burstTurns = [];
@@ -148,7 +149,7 @@
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
         overdueDelivered: 0, returned: 0, stolen: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
-        brokeMonthEnd: false, maxMonthDelivered: 0, distinctCarriersAtEnd: 0, monthsDone: 0, selfCalls: 0, urgentCalls: 0, bigDelivered: 0, feesPaid: 0, fullTrucks: 0, trucksCalled: 0, rushes: 0, rushBonus: 0 };
+        brokeMonthEnd: false, maxMonthDelivered: 0, distinctCarriersAtEnd: 0, monthsDone: 0, selfCalls: 0, urgentCalls: 0, bigDelivered: 0, feesPaid: 0, fullTrucks: 0, trucksCalled: 0, rushes: 0, rushBonus: 0, maxLoadChain: 0, chainBonus: 0 };
     }
     _buildRules() {
       const c = this.cfg;
@@ -367,12 +368,35 @@
     growthPlan(kind) {
       const def = D.GROWTH[kind], level = (this.growth && this.growth[kind]) || 0;
       if (!def) return null;
-      return { kind, level, max: def.costs.length, cost: def.costs[level] == null ? null : def.costs[level], def };
+      const missing = Object.entries(def.unlock || {}).filter(([k, n]) => (this.growth[k] || 0) < n);
+      return { kind, level, max: def.costs.length, cost: def.costs[level] == null ? null : def.costs[level], def, locked: missing.length > 0, missing };
+    }
+    missionState() {
+      const M2 = D.MISSION, ms = this.monthStats || {};
+      const target = Math.max(1, ms.missionTarget || 1), earned = ms.missionEarned || 0;
+      let rank = 0; for (let i = 1; i < M2.ratios.length; i++) if (earned >= Math.round(target * M2.ratios[i])) rank = i;
+      const next = Math.min(M2.grades.length - 1, rank + 1), nextAt = Math.round(target * M2.ratios[next]);
+      return { grade: M2.grades[rank], rank, earned, target, nextGrade: rank >= M2.grades.length - 1 ? null : M2.grades[next], nextAt, left: Math.max(0, nextAt - earned), progress: Math.min(1, earned / target) };
+    }
+    _missionTarget(schedule) {
+      const total = (schedule || []).flat().reduce((sum, s) => sum + Math.round(this.baseReward(s.type, s.size) * (s.premium ? 1.5 : 1)), 0);
+      return Math.max(200, Math.round(total * 0.72 / 10) * 10);
+    }
+    _missionEarn(amount) {
+      const ms = this.monthStats; if (!ms || !amount) return null;
+      const before = ms.missionRank || 0; ms.missionEarned = (ms.missionEarned || 0) + amount;
+      const now = this.missionState().rank; if (now <= before) return null;
+      let bonus = 0; for (let i = before + 1; i <= now; i++) bonus += D.MISSION.bonuses[i] || 0;
+      ms.missionRank = now; ms.missionBonus = (ms.missionBonus || 0) + bonus;
+      this.cash += bonus; ms.revenue += bonus; this.run.revenue += bonus;
+      const state = this.missionState(); this.emit('missionUp', { grade: state.grade, bonus, earned: state.earned, target: state.target });
+      return { grade: state.grade, bonus };
     }
     investGrowth(kind) {
       if (this.phase !== 'play') return { ok: false, reason: 'phase' };
       const plan = this.growthPlan(kind);
       if (!plan || plan.cost == null) return { ok: false, reason: 'max' };
+      if (plan.locked) return { ok: false, reason: 'locked', missing: plan.missing };
       if (this.cash < plan.cost) return { ok: false, reason: 'cash', cost: plan.cost };
       this.cash -= plan.cost; this.run.spent += plan.cost;
       this.growth[kind]++;
@@ -380,6 +404,7 @@
       if (kind === 'marketing') added = this._injectGrowthDemand(this.schedule, plan.def.parcels, this.turn, this.month);
       else if (kind === 'fleet') { for (const c of this.contracts) if (c) { c.maxCalls += plan.def.calls; c.calls += plan.def.calls; } }
       else if (kind === 'warehouse') { this.warehouse.cap += plan.def.cap; this.stats.expansions++; this._assignCold(); }
+      else if (kind === 'coldchain') { this.warehouse.cold += plan.def.cold; this.warehouse.frozen = (this.warehouse.frozen || 0) + plan.def.frozen; this._assignCold(); }
       this.emit('growth', { kind, level: this.growth[kind], cost: plan.cost, added });
       return { ok: true, kind, level: this.growth[kind], cost: plan.cost, added };
     }
@@ -709,6 +734,16 @@
       const s = this.rushState(), used = this.usedVolume();
       return s.ready && trucks >= D.RUSH.minTrucks && fill >= D.RUSH.minFill && used > 0 && volume / used >= D.RUSH.clearShare;
     }
+    chainState() {
+      const C = D.LOAD_CHAIN;
+      const level = Math.min(this.loadChain || 0, C.max);
+      return { count: this.loadChain || 0, level, max: C.max, mult: level >= 2 ? 1 + (level - 1) * C.step : 1, minFill: C.minFill };
+    }
+    chainPreview(fill) {
+      const C = D.LOAD_CHAIN, count = fill >= C.minFill ? (this.loadChain || 0) + 1 : 0;
+      const level = Math.min(count, C.max);
+      return { count, mult: level >= 2 ? 1 + (level - 1) * C.step : 1, qualifies: count > 0 };
+    }
     // 한 호출에 부를 수 있는 최대 대수
     simulMax(c) {
       if (!this.shows('simul')) return 1;
@@ -724,7 +759,7 @@
       return Math.max(0, Math.round(fee));
     }
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
-    callFee(c, trucks) { const free = c.enh.regular && !c.freeUsedMonth ? 1 : 0; return Math.max(0, trucks - free) * this.truckFee(c); }
+    callFee(c, trucks) { const free = c.enh.regular && !c.freeUsedMonth ? 1 : 0; const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut; return Math.round(Math.max(0, trucks - free) * this.truckFee(c) * Math.max(0.7, 1 - cut)); }
     trucksNeeded(c, volume) { return Math.max(1, Math.ceil(volume / this.vehicleCap(c))); }
     capacityBonusNote(c) {
       const R = this.rules, notes = [];
@@ -955,7 +990,8 @@
       const contracts = this.contracts.filter(Boolean).reduce((s, c) => s + (D.OPCOST_CONTRACT[c.grade] != null ? D.OPCOST_CONTRACT[c.grade] : D.OPCOST_CONTRACT.normal), 0);
       let facilities = 0; for (const f of Object.keys(D.FACILITIES)) if (this.warehouse[f]) facilities += D.FACILITIES[f].upkeep || 0;
       const arrivals = this.schedule ? this.schedule.reduce((s, t) => s + t.length, 0) : 0;
-      const labor = Math.round(Math.max(0, arrivals - D.OPCOST_BASE_ARRIVALS) * D.OPCOST_PER_PARCEL * this.inflation(m));
+      const laborCut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.laborCut;
+      const labor = Math.round(Math.max(0, arrivals - D.OPCOST_BASE_ARRIVALS) * D.OPCOST_PER_PARCEL * this.inflation(m) * Math.max(0.55, 1 - laborCut));
       return { rent, contracts, facilities, labor, arrivals, total: rent + contracts + facilities + labor };
     }
     _opCost(m) {
@@ -967,9 +1003,9 @@
     // ----- flow -----
     _startMonth(m) {
       const R = this.rules;
-      this.month = m; this.turn = 0; this._bdCache = null;
+      this.month = m; this.turn = 0; this._bdCache = null; this.loadChain = 0;
       if (this.customers) for (const id in this.customers) { const c = this.customers[id]; if (c.suspended && m > 1) { c.suspended = false; c.xp = 0; this.say('log.custResume', { name: M.CUSTOMERS[id].name }); } c.month = this._emptyCustMonth(); c.month.lvStart = this.customerLevel(id); }
-      this.monthStats = { repStart: this.rep, revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false, cashStart: this.cash };
+      this.monthStats = { repStart: this.rep, revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false, cashStart: this.cash, missionEarned: 0, missionRank: 0, missionBonus: 0, missionTarget: 1 };
       // 월 배차 한도 리셋 (계약은 만료되지 않는다 — 마켓은 업그레이드·새 업체용)
       // v1.5: 배차는 소모품 — 월초 리셋 없음. 마켓의 '가득 충전'으로만 채운다
       for (const c of this.contracts) if (c) { c.successCalls = 0; c.freeUsedMonth = false; }
@@ -978,6 +1014,7 @@
       this.heatTurns = heatN ? this.rng.shuffle([...Array(this.turns(m)).keys()].map(i => i + 1)).slice(0, heatN).sort((a, b) => a - b) : [];
       this.weather = this._genWeather(m);
       this.schedule = this._makeSchedule(m);
+      this.monthStats.missionTarget = this._missionTarget(this.schedule);
       if (m > 1 && this.insurer !== 'none') for (const id of M.INSURERS[this.insurer].fans) if (this.customers[id]) this._custXp(id, 1, MSG('why.fanInsurer'));
       if (R.strike) {
         const owned = [...new Set(this.contracts.filter(Boolean).map(c => c.carrier))];
@@ -1075,6 +1112,7 @@
       // 대형(4칸 이상)이 아직 안 열린 장에는 어떤 품목도 4칸으로 오지 않는다 —
       // 그걸 실을 수 있는 계열(대형·철도·해상)도 마켓에 안 나오기 때문이다
       if (!this.shows('bigsize')) { const sm = {}; for (const k in w) if (+k < 4) sm[k] = w[k]; if (Object.keys(sm).length) { for (const k in w) delete w[k]; Object.assign(w, sm); } }
+      if (!premium && ((this.growth && this.growth.branding) || 0) > 0 && this.rng.next() < this.growth.branding * D.GROWTH.branding.premiumChance) premium = true;
       const spec = { type, size: +this.rng.weighted(w), customer };
       if (attrs) spec.attrs = attrs; if (premium) spec.premium = true;
       return spec;
@@ -1090,6 +1128,7 @@
       const burstD = spec.burst ? R.burstDeadlineDelta : 0;
       if (spec.size >= 7 && this.trustPerkAny('xlDelta')) size = Math.max(1, size - 1);
       let reward = this.baseReward(spec.type, spec.size); if (spec.premium) reward = Math.round(reward * 1.5);
+      reward = Math.round(reward * (1 + ((this.growth && this.growth.branding) || 0) * D.GROWTH.branding.reward));
       if (spec.rewardDelta && spec.rewardDelta[spec.type]) reward += spec.rewardDelta[spec.type];
       const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, attrs, customer,
         deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + burstD + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1,
@@ -1143,6 +1182,7 @@
       let self = null;
       if (selfIds && selfIds.length) { self = this.selfDeliver(selfIds); if (!self.ok) return self; }
       this.monthStats.waits++; this.run.waits++; this.stats.waits++;
+      this.loadChain = 0;
       if (self) { this.stats.callStreak++; this.stats.maxCallStreak = Math.max(this.stats.maxCallStreak, this.stats.callStreak); } else this.stats.callStreak = 0;
       this.waitStack++;
       if (self) this.say('log.waitSelf', { count: self.count, revenue: self.revenue, cost: self.cost }); else this.say('log.wait');
@@ -1211,7 +1251,7 @@
         if (!this.shows('calls')) { /* 무제한 */ } else if (useSpare) { this.monthStats.spareUsed = true; c.calls = Math.max(0, c.calls - (trucks - 1)); } else c.calls -= trucks;
         c.totalCalls++;
         this.monthStats.calls++; this.run.calls++; this.stats.calls++;
-        this.waitStack = 0; this._assignCold();
+        this.waitStack = 0; this.loadChain = 0; this._assignCold();
         this.say('log.callAllBroken', { name: this.contractName(c), broken });
         this.emit('call', { contract: c, count: 0, revenue: 0, broken, trucks, fee });
         this._endTurn(false, false); return { ok: true, revenue: 0, count: 0, broken, trucks, fee };
@@ -1221,6 +1261,20 @@
       if (R.bigCallBonus && chosen.length >= R.bigCallBonus.min) revenue = Math.round(revenue * R.bigCallBonus.mult);
       revenue = Math.round(revenue * R.revenueMult);
       const deliveredVolume = chosen.reduce((sum, p) => sum + p.size, 0);
+      const actualFill = deliveredVolume / (vcap * trucks);
+      const chainQualified = actualFill >= D.LOAD_CHAIN.minFill && broken === 0;
+      this.loadChain = chainQualified ? (this.loadChain || 0) + 1 : 0;
+      const chainLevel = Math.min(this.loadChain, D.LOAD_CHAIN.max);
+      const chainMult = chainLevel >= 2 ? 1 + (chainLevel - 1) * D.LOAD_CHAIN.step : 1;
+      let chainBonus = 0;
+      if (chainMult > 1) {
+        const beforeChain = revenue;
+        revenue = Math.round(revenue * chainMult);
+        chainBonus = revenue - beforeChain;
+        this.stats.chainBonus += chainBonus;
+        if (this.loadChain === D.LOAD_CHAIN.repAt) this.addRep(D.LOAD_CHAIN.rep, MSG('why.loadChain'));
+      }
+      this.stats.maxLoadChain = Math.max(this.stats.maxLoadChain, this.loadChain);
       const rush = rushReady && trucks >= D.RUSH.minTrucks && fill >= D.RUSH.minFill && usedBefore > 0 && deliveredVolume / usedBefore >= D.RUSH.clearShare;
       let rushBonus = 0;
       if (rush) {
@@ -1246,6 +1300,7 @@
       const delay = pd != null ? pd : (car.delay || 0);
       if (delay > 0) { (this.pendingRevenue = this.pendingRevenue || []).push({ turn: (this.totalTurn || 0) + delay + 1, amount: revenue, count: chosen.length, name: car.name }); }
       else { this.cash += revenue; this.monthStats.revenue += revenue; this.run.revenue += revenue; }
+      const missionUp = this._missionEarn(revenue);
       this.monthStats.calls++; this.monthStats.delivered += chosen.length;
       this.run.calls++; this.run.delivered += chosen.length;
       this.stats.calls++; this.stats.callStreak++; this.stats.maxCallStreak = Math.max(this.stats.maxCallStreak, this.stats.callStreak);
@@ -1255,10 +1310,10 @@
       this._assignCold();
       const freezeFresh = !!this.trustPerk(c.carrier, 'freezeOnCall');
       this.say('log.call', { name: this.contractName(c), count: chosen.length, revenue, delay: delay ? MSG('log.callDelay', { delay }) : '', broken: broken ? MSG('log.callBroken', { broken }) : '', refund: refunded ? MSG('log.callRefund') : '', calls: c.calls, fee });
-      this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, trucks, fee, fill, rush, rushBonus });
+      this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus });
       this._updateTrustStats();
       this._endTurn(false, freezeFresh);
-      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill, rush, rushBonus };
+      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, missionUp };
     }
     // 직접 배송(대기 턴의 부가 행동): 고른 택배를 배송비를 내고 처리. 보상 그대로. wait()에서 호출
     selfDeliver(ids) {
@@ -1839,6 +1894,7 @@
       delete g.rngCalls;
       g.events = [];
       if (!g.stats) g.stats = Game.emptyStats();
+      if (g.loadChain == null) g.loadChain = 0;
       if (!g.trust) g.trust = {};
       // 세이브 마이그레이션 (v0.4: 속성·특약·냉동·통관)
       const es = Game.emptyStats(); for (const k in es) if (g.stats[k] == null) g.stats[k] = es[k];
@@ -1849,6 +1905,7 @@
       for (const p of g.parcels) { if (!p.attrs) p.attrs = D.PARCEL_TYPES[p.type].attrs.slice(); if (p.warm == null) p.warm = 0; if (p.customs == null) p.customs = 0; if (p.inFrozen == null) p.inFrozen = false; delete p.fresh; }
       if (g.warehouse && g.warehouse.frozen == null) g.warehouse.frozen = g.warehouse.cold > 0 ? D.WAREHOUSE.frozen : 0;
       if (g.monthStats) for (const k of ['returned', 'stolen', 'broken']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
+      if (g.monthStats) { if (g.monthStats.missionEarned == null) g.monthStats.missionEarned = g.monthStats.revenue || 0; if (g.monthStats.missionRank == null) g.monthStats.missionRank = 0; if (g.monthStats.missionBonus == null) g.monthStats.missionBonus = 0; if (!g.monthStats.missionTarget) g.monthStats.missionTarget = g._missionTarget(g.schedule); }
       if (!g.pendingRevenue) g.pendingRevenue = []; if (g.feesDue == null) g.feesDue = 0; if (g.debt == null) g.debt = 0; if (g.totalTurn == null) g.totalTurn = (g.month - 1) * D.TURNS_PER_MONTH + g.turn;
       if (!g.customers) { g._initCustomers(); for (const p of g.parcels) if (!p.customer) p.customer = 'anon'; }
       for (const id in g.customers) { const c = g.customers[id]; if (!c.total) c.total = { delivered: 0, revenue: 0, claims: 0, discarded: 0 }; if (!c.month) c.month = g._emptyCustMonth(); }
@@ -1857,7 +1914,7 @@
       if (!g.storage) { g.storage = []; g.offer = null; g.outdoorPref = []; g.insurer = 'none'; g.premMult = 1; g.noClaimMonths = 0; g.coverHalf = false; g.items = { transitCert: 0, yardIns: 0, customsBond: 0 }; }
       if (!g.weather || !g.weather.length) g.weather = Array(g.turns()).fill('sunny').map((w, i) => g.heatTurns && g.heatTurns.includes(i + 1) ? 'heat' : w);
       if (g.monthStats) for (const k of ['insClaims', 'covered', 'premium', 'storageIncome']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
-      g.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0 }, g.growth || {});
+      g.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0, automation: 0, branding: 0, coldchain: 0 }, g.growth || {});
       g._assignCold();
       return g;
     }

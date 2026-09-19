@@ -51,10 +51,15 @@
       marketing: { costs: [60, 110, 180, 280, 420, 620], parcels: 3 },
       fleet: { costs: [90, 150, 240, 360, 520, 720], calls: 1 },
       warehouse: { costs: [80, 140, 220, 340, 500, 700], cap: 6 },
+      automation: { costs: [140, 240, 380, 560], feeCut: 0.04, laborCut: 0.08, unlock: { fleet: 2 } },
+      branding: { costs: [170, 290, 460, 680], premiumChance: 0.04, reward: 0.03, unlock: { marketing: 2, automation: 1 } },
+      coldchain: { costs: [180, 320, 520, 760], cold: 2, frozen: 1, unlock: { warehouse: 2 } },
     },
 
     // 창고를 채운 뒤 여러 대를 한 번에 빼는 폭발형 출고 보너스.
     RUSH: { chargeAt: 0.45, readyAt: 0.72, criticalAt: 0.95, bonus: 1.35, extraTrucks: 2, clearShare: 0.55, minFill: 0.72, minTrucks: 2, rep: 2 },
+    LOAD_CHAIN: { minFill: 0.8, step: 0.08, max: 4, repAt: 3, rep: 1 },
+    MISSION: { ratios: [0, 0.35, 0.65, 1], grades: ['D', 'C', 'B', 'A'], bonuses: [0, 15, 30, 60] },
 
     // 월별 추가 입고 수 (기본 10 + 추가). 7개월차 이후는 무한 모드에서 확장
     EXTRA_ARRIVALS: { 1: 12, 2: 14, 3: 16, 4: 18, 5: 20, 6: 22 }, // 7개월차부터 22 + (m-6)×2

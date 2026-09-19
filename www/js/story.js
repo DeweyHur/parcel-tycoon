@@ -101,6 +101,8 @@
     { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
+    { id: 'l1chainHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.chain >= 2, pages: [{ expr: 'shock', hl: '#chain-meter' }, { expr: 'laugh', hl: '#mission-meter' }] },
+    { id: 'l1progress', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile', hl: '#mission-meter' }, { expr: 'neutral', hl: '#chain-meter' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
     { id: 'l1sunday', kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
     { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
@@ -332,6 +334,8 @@
     { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#pick-list' }, { expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'rushHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.rush, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'laugh', hl: '#contract-strip' }] },
     { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
+    { id: 'chainHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.chain >= 2, pages: [{ expr: 'shock', hl: '#chain-meter' }, { expr: 'laugh', hl: '#mission-meter' }] },
+    { id: 'progressHud', kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile', hl: '#mission-meter' }, { expr: 'neutral', hl: '#chain-meter' }] },
     // 안내가 끝났다는 걸 말로 못 박아 준다. 이게 없으면 언제까지 시키는 대로 해야 하는지 알 수 없다.
     { id: 'handOff', months: [1], kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile' }] },
     // 배차 소진: 이 게임에서 제일 많이 막히는 지점 — 배차는 월초에 안 채워진다

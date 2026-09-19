@@ -195,6 +195,56 @@ window.Scene3D = (function () {
       g.position.set(Math.max(Z.x0 + 0.9, Z.YARD.x0 - 0.6), 0, Z.yardZ0 + Z.YARD.depth * CELL - 0.35);   // 마당 왼쪽 끝에 세워 둔다
       return g;
     }
+    _syncGrowthVisuals(growth) {
+      growth = growth || {};
+      const keys = ['marketing', 'fleet', 'warehouse', 'automation', 'branding', 'coldchain'];
+      const sig = keys.map(k => growth[k] || 0).join('/');
+      if (sig === this.growthSig) return;
+      const first = this.growthSig == null; this.growthSig = sig;
+      if (this.parts.growth) this.scene.remove(this.parts.growth);
+      const Z = this.Z, g = new THREE.Group();
+      const marketing = growth.marketing || 0, fleet = growth.fleet || 0, warehouse = growth.warehouse || 0;
+      const automation = growth.automation || 0, branding = growth.branding || 0, coldchain = growth.coldchain || 0;
+
+      if (marketing > 0) {
+        const x = Z.x0 + 0.75, z = Z.frontZ + 0.42, h = 1.25 + marketing * 0.16;
+        const post = this._box(0.12, h, 0.12, 0x35314f); post.position.set(x, h / 2, z); g.add(post);
+        const board = this._box(1.35 + marketing * 0.08, 0.55, 0.12, marketing >= 4 ? 0xffd166 : 0x6c8cff, marketing >= 4 ? { emissive: 0x5a3b00 } : undefined); board.position.set(x, h, z); g.add(board);
+        for (let i = 0; i < Math.min(6, marketing); i++) { const lamp = this._box(0.09, 0.09, 0.08, 0xfff2a8, { emissive: 0x8a6510 }); lamp.position.set(x - 0.52 + i * 0.21, h, z + 0.09); g.add(lamp); }
+      }
+      for (let i = 0; i < Math.min(6, warehouse); i++) {
+        const unit = this._box(0.5, 0.2, 0.42, i >= 3 ? 0x6fdcff : 0xb9b9c6, i >= 3 ? { emissive: 0x173d44 } : undefined);
+        unit.position.set(Z.x0 + 1 + (i % 3) * 1.15, 3.42, BACK_Z + 0.45 + Math.floor(i / 3) * 0.55); g.add(unit);
+      }
+      if (automation > 0) {
+        const len = 1.5 + automation * 0.55, x = Z.MAIN.x0 + Z.MAIN.cells * CELL - 0.45, z = ROW_Z + 0.35 + len / 2;
+        const belt = this._box(0.55, 0.14, len, 0x31485d, { emissive: automation >= 3 ? 0x102c40 : 0x000000 }); belt.position.set(x, 0.32, z); g.add(belt);
+        for (let i = 0; i < 2 + automation * 2; i++) { const roller = this._box(0.62, 0.08, 0.08, i % 2 ? 0x6fdcff : 0xdfefff); roller.position.set(x, 0.42, z - len / 2 + 0.18 + i * (len - 0.36) / (1 + automation * 2)); g.add(roller); }
+      }
+      if (branding > 0) {
+        const x = Z.x1 - 0.65, z = Z.frontZ + 0.36, h = 1.05 + branding * 0.18;
+        const tower = this._box(0.18, h, 0.18, 0x51304e); tower.position.set(x, h / 2, z); g.add(tower);
+        const gem = this._box(0.48 + branding * 0.08, 0.48 + branding * 0.08, 0.16, branding >= 3 ? 0xff70d2 : 0xffd166, { emissive: branding >= 3 ? 0x74175c : 0x6b4700 }); gem.position.set(x, h, z); gem.rotation.z = Math.PI / 4; g.add(gem);
+      }
+      if (coldchain > 0 && Z.COLD.depth) {
+        for (let i = 0; i < Math.min(4, coldchain); i++) { const tank = this._box(0.3, 0.65 + i * 0.05, 0.3, i >= 2 ? 0x9ad7ff : 0x5ee0d8, { emissive: 0x123d4b }); tank.position.set(Z.COLD.x0 + 0.35 + i * 0.42, 0.4, Z.COLD.z0 + Z.COLD.depth * CELL - 0.25); g.add(tank); }
+      }
+      if (fleet >= 3) {
+        for (let i = 0; i < Math.min(3, Math.floor(fleet / 2)); i++) { const crate = this._box(0.62, 0.34, 0.42, i === 2 ? 0xffd166 : 0xe0553d); crate.position.set(Z.YARD.x0 + 0.55 + i * 0.75, 0.22, Z.yardZ0 + Z.YARD.depth * CELL - 0.45); g.add(crate); }
+      }
+      this.parts.growth = g; this.scene.add(g); if (!first) this._dropIn(g, 1.2);
+      this._styleTruck(growth);
+    }
+    _styleTruck(growth) {
+      if (!this.truck) return;
+      [...this.truck.children].filter(x => x.userData && x.userData.growthPart).forEach(x => this.truck.remove(x));
+      const fleet = (growth && growth.fleet) || 0, automation = (growth && growth.automation) || 0, branding = (growth && growth.branding) || 0;
+      const add = m => { m.userData.growthPart = true; this.truck.add(m); };
+      for (let i = 0; i < Math.min(3, fleet); i++) { const lamp = this._box(0.16, 0.12, 0.16, 0xffd166, { emissive: 0x704500 }); lamp.position.set(-1.45 + i * 0.22, 1.34, 0); add(lamp); }
+      if (fleet >= 2) { const rail = this._box(2.25, 0.1, 0.1, fleet >= 5 ? 0xffd166 : 0x6fdcff, fleet >= 5 ? { emissive: 0x664100 } : undefined); rail.position.set(0.4, 1.62, 0); add(rail); }
+      if (automation > 0) { const scanner = this._box(0.18, 0.18, 1.36, 0x6fdcff, { emissive: 0x184e5b }); scanner.position.set(0.95, 1.35, 0); add(scanner); }
+      if (branding > 0) { const crown = this._box(0.42, 0.26, 0.08, branding >= 3 ? 0xff70d2 : 0xffd166, { emissive: branding >= 3 ? 0x6b174e : 0x6b4700 }); crown.position.set(0.4, 1.63, -0.68); crown.rotation.z = Math.PI / 4; add(crown); }
+    }
     _buildTerrain() {
       const s = this.scene;
       this.hemi = new THREE.HemisphereLight(0xdfefff, 0x6b8f4e, 0.9); s.add(this.hemi);
@@ -339,11 +389,20 @@ window.Scene3D = (function () {
       return out;
     }
     _visSize(p) { return p.size >= 7 ? 7 : p.size >= 4 ? 4 : p.size >= 2 ? 2 : 1; }
+    _valueTier(p) {
+      if (p.storage) return 0;
+      const reward = p.reward || 0;
+      if (p.premium || reward >= 130) return 3;
+      if (reward >= 90) return 2;
+      if (reward >= 60) return 1;
+      return 0;
+    }
     sync(game, opts = {}) {
       const D = window.DATA;
       if (game.weatherNow) this.setWeather(game.weatherNow());
       // 창고가 바뀌었으면 건물부터 다시 짓는다 (착탈식 모듈) — 그 다음 바닥 타일
       if (game.warehouse) { this._syncBuilding(game.warehouse, { silent: !this._synced }); this._synced = true; }
+      this._syncGrowthVisuals(game.growth);
       { const wh = game.warehouse, caps = [wh.cap, wh.cold, wh.frozen || 0]; if (!this.tiles || !this.tileCaps || caps.some((v, i) => v !== this.tileCaps[i])) this._buildTiles(...caps); }
       if (game.upcoming) { const u = game.upcoming()[0]; this._syncGhosts(u && u.specs ? u.specs : [], D); }
       const cold = [], main = [], yard = [];
@@ -361,13 +420,22 @@ window.Scene3D = (function () {
         let b = this.boxes.get(p.id);
         const [w, d, h] = FOOT[p.baseSizeVis];
         if (!b) {
-          b = this._box(w * CELL - 0.08, h, d * CELL - 0.08, p.storage ? 0xa8845a : D.PARCEL_TYPES[p.type].color);
+          const valueTier = this._valueTier(p);
+          const accents = [0xf7e9c5, 0x6fdcff, 0xffd166, 0xff70d2];
+          const bodyColor = new THREE.Color(p.storage ? 0xa8845a : D.PARCEL_TYPES[p.type].color);
+          if (valueTier) bodyColor.lerp(new THREE.Color(accents[valueTier]), valueTier === 3 ? 0.32 : 0.16);
+          b = this._box(w * CELL - 0.08, h, d * CELL - 0.08, bodyColor.getHex());
           // 테이프
-          const tape = this._box(w * CELL - 0.06, h * 0.18, 0.12, 0xf7e9c5); tape.position.y = h * 0.42; b.add(tape);
+          const tape = this._box(w * CELL - 0.06, h * (valueTier >= 2 ? 0.25 : 0.18), 0.12, accents[valueTier], valueTier === 3 ? { emissive: 0x6b174e } : undefined); tape.position.y = h * 0.42; b.add(tape);
+          if (valueTier >= 1) { const top = this._box(w * CELL * 0.62, 0.045, d * CELL * 0.62, accents[valueTier], valueTier === 3 ? { emissive: 0x5b1548 } : undefined); top.position.set(0, h / 2 + 0.025, 0); b.add(top); }
+          if (valueTier >= 2) {
+            const strap = this._box(0.1, h + 0.025, d * CELL - 0.035, accents[valueTier]); b.add(strap);
+            const seal = this._box(0.24, 0.055, 0.24, valueTier === 3 ? 0xffffff : 0xfff1a8, valueTier === 3 ? { emissive: 0x7a4d00 } : undefined); seal.position.set(0, h / 2 + 0.055, 0); seal.rotation.y = Math.PI / 4; b.add(seal);
+          }
           if (p.type === 'fragile') { const mark = this._box(0.12, h * 0.5, 0.05, 0xb8453b); mark.position.set(0, 0, d * CELL / 2 - 0.02); b.add(mark); }
           if (p.type === 'intl') { const mark = this._box(w * CELL * 0.4, 0.05, 0.16, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
           if (p.type === 'fresh') { const mark = this._box(w * CELL * 0.5, 0.04, d * CELL * 0.5, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
-          b.userData = { h, id: p.id };
+          b.userData = { h, id: p.id, valueTier };
           if (!p.storage) { const cu = (window.META && window.META.CUSTOMERS[p.customer || 'anon']); if (cu) b.add(this._iconMark(cu.icon, w, h, d)); }
           this.scene.add(b); this.boxes.set(p.id, b);
           const t = pos.get(p.id);
@@ -380,6 +448,7 @@ window.Scene3D = (function () {
         // 상태 색상
         const m = b.material;
         const base = new THREE.Color(p.storage ? 0xa8845a : D.PARCEL_TYPES[p.type].color);
+        const vt = this._valueTier(p); if (vt) base.lerp(new THREE.Color([0, 0x6fdcff, 0xffd166, 0xff70d2][vt]), vt === 3 ? 0.32 : 0.16);
         if (p.wet) base.multiplyScalar(0.7);
         m.color.copy(base);
         b.userData.overdue = p.overdue || (p.type === 'fresh' && p.fresh <= 1) || false;
@@ -474,7 +543,9 @@ window.Scene3D = (function () {
         const m = b.material;
         if (b.userData.overdue) m.emissive.setRGB(0.5 * pulse, 0.05, 0.05);
         else if (b.userData.urgent) m.emissive.setRGB(0.42 * pulse, 0.26 * pulse, 0.02);
-        else if (b.userData.exposed) m.emissive.setRGB(0.05, 0.18 * pulse, 0.34 * pulse); else m.emissive.setRGB(0, 0, 0);
+        else if (b.userData.exposed) m.emissive.setRGB(0.05, 0.18 * pulse, 0.34 * pulse);
+        else if (b.userData.valueTier === 3) m.emissive.setRGB(0.26 * pulse, 0.04, 0.2 * pulse);
+        else if (b.userData.valueTier === 2) m.emissive.setRGB(0.13 * pulse, 0.09 * pulse, 0.01); else m.emissive.setRGB(0, 0, 0);
         if (b.userData.warm && !b.userData.locked) b.rotation.y = Math.sin(this.time * 6 + b.userData.id) * 0.06; else b.rotation.y = 0;
       }
       this._tickWeather(dt);
