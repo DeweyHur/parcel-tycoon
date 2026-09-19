@@ -536,10 +536,13 @@
     }
     const mission = g.missionState();
     $('#mission-grade').textContent = mission.grade;
-    $('#mission-copy').textContent = T('mission.amount', { now: mission.earned, target: mission.target });
+    $('#mission-copy').textContent = T('mission.amount', { now: mission.earned, target: mission.maxAt });
     $('#mission-fill').style.width = Math.round(mission.progress * 100) + '%';
+    $('#mission-tick-c').style.left = Math.round(mission.ticks[0] * 100) + '%';
+    $('#mission-tick-b').style.left = Math.round(mission.ticks[1] * 100) + '%';
     $('#mission-next').textContent = mission.nextGrade ? T('mission.next', { grade: mission.nextGrade, left: mission.left }) : T('mission.max');
-    $('#mission-meter').className = 'mission-meter grade-' + mission.grade.toLowerCase();
+    const hot = mission.nextGrade && mission.segProgress >= 0.8;
+    $('#mission-meter').className = 'mission-meter grade-' + mission.grade.toLowerCase() + (hot ? ' hot' : '');
   }
   function renderAll() {
     if (!game) return;

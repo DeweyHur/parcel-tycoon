@@ -376,7 +376,14 @@
       const target = Math.max(1, ms.missionTarget || 1), earned = ms.missionEarned || 0;
       let rank = 0; for (let i = 1; i < M2.ratios.length; i++) if (earned >= Math.round(target * M2.ratios[i])) rank = i;
       const next = Math.min(M2.grades.length - 1, rank + 1), nextAt = Math.round(target * M2.ratios[next]);
-      return { grade: M2.grades[rank], rank, earned, target, nextGrade: rank >= M2.grades.length - 1 ? null : M2.grades[next], nextAt, left: Math.max(0, nextAt - earned), progress: Math.min(1, earned / target) };
+      const at = Math.round(target * M2.ratios[rank]), maxAt = Math.round(target * M2.ratios[M2.ratios.length - 1]) || 1;
+      return {
+        grade: M2.grades[rank], rank, earned, target, maxAt,
+        nextGrade: rank >= M2.grades.length - 1 ? null : M2.grades[next], nextAt, left: Math.max(0, nextAt - earned),
+        progress: Math.min(1, earned / maxAt),                                     // A 문턱(막대 끝) 기준 전체 진행률
+        segProgress: nextAt > at ? Math.min(1, (earned - at) / (nextAt - at)) : 1,  // 지금 등급 구간 안에서 다음 등급까지 얼마나 왔는지 (막 올라가기 직전 펄스용)
+        ticks: M2.ratios.slice(1).map(r => Math.round(target * r) / maxAt),         // 막대 위 등급 경계 눈금 (0~1)
+      };
     }
     _missionTarget(schedule) {
       const total = (schedule || []).flat().reduce((sum, s) => sum + Math.round(this.baseReward(s.type, s.size) * (s.premium ? 1.5 : 1)), 0);

@@ -491,13 +491,20 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 @keyframes chainPulse { 50% { filter: brightness(1.6); transform: scale(1.025); } }
 @keyframes chainBlast { from { opacity: .95; } to { opacity: 0; transform: scale(1.08); } }
 .mission-meter { grid-column: 1 / -1; display: grid; grid-template-columns: 27px auto minmax(70px, 1fr) auto; gap: 7px; align-items: center; min-height: 22px; font-size: 11px; }
-.mission-meter > b { display: grid; place-items: center; width: 27px; height: 22px; color: #17121a; background: #a39ec2; border: 2px solid #0f0e1a; font-size: 15px; }
+.mission-meter > b { display: grid; place-items: center; width: 27px; height: 22px; color: #17121a; background: #a39ec2; border: 2px solid #0f0e1a; font-size: 15px; transition: transform .15s; }
 .mission-meter > span { white-space: nowrap; color: var(--ink); }
-.mission-meter > div { height: 10px; overflow: hidden; background: #11111c; border: 1px solid var(--line); }
-.mission-meter > div i { display: block; height: 100%; background: linear-gradient(90deg, #8f86b8, #6fdcff); transition: width .35s steps(8); }
+.mission-meter > .mtrack { position: relative; height: 10px; overflow: hidden; background: #11111c; border: 1px solid var(--line); }
+.mission-meter > .mtrack i#mission-fill { display: block; height: 100%; background: linear-gradient(90deg, #8f86b8, #6fdcff); transition: width .35s steps(8); }
+.mission-meter > .mtrack i.tick { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(0,0,0,.5); box-shadow: 0 0 0 1px rgba(255,255,255,.28); pointer-events: none; }
 .mission-meter > strong { min-width: 92px; color: var(--dim); text-align: right; }
 .mission-meter.grade-c > b { background: #6fdcff; } .mission-meter.grade-b > b { background: #ffd166; } .mission-meter.grade-a > b { background: #ff70d2; box-shadow: 0 0 9px #ff70d2; }
-.mission-meter.grade-a > div i { background: linear-gradient(90deg, #ffd166, #ff70d2); }
+.mission-meter.grade-c > .mtrack i#mission-fill { background: linear-gradient(90deg, #6fdcff, #8fe6ff); }
+.mission-meter.grade-b > .mtrack i#mission-fill { background: linear-gradient(90deg, #6fdcff, #ffd166); }
+.mission-meter.grade-a > .mtrack i#mission-fill { background: linear-gradient(90deg, #ffd166, #ff70d2); }
+.mission-meter.hot > b { animation: missionPulse .5s steps(2) infinite; }
+.mission-meter.hot > .mtrack i#mission-fill { animation: missionGlow .5s steps(2) infinite; }
+@keyframes missionPulse { 50% { transform: scale(1.15); filter: brightness(1.4); } }
+@keyframes missionGlow { 50% { filter: brightness(1.6); box-shadow: 0 0 8px currentColor; } }
 
 #panel { border-top-width: 3px; }
 .bars { padding: 5px 8px 1px; }
@@ -589,4 +596,5 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
   .ops-progress i { transition: none; }
   .chain-meter.max, body.chain-hit #scene::before { animation: none; }
   .parcel.value-3 .sw, .reward-burst b, .reward-burst i { animation: none; }
+  .mission-meter.hot > b, .mission-meter.hot > .mtrack i#mission-fill { animation: none; }
 }
