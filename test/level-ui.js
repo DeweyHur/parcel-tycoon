@@ -99,7 +99,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   await page.waitForTimeout(400);
   await page.screenshot({ path: 'shots/L02-done.png' });
   const doneTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
-  check(/한 사장님 편지/.test(doneTxt), '장이 끝나면 숫자 리포트 없이 편지가 온다');
+  check(/한 사장 편지/.test(doneTxt), '장이 끝나면 숫자 리포트 없이 편지가 온다');
 
   await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);   // 장 끝 카드
   const endCard = await page.$eval('#modal .chcard.end', el => el.textContent).catch(() => '');

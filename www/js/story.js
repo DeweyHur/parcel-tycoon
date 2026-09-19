@@ -90,13 +90,10 @@
   // ----- 레벨 1 전용 비트 (docs/STORY_TUTORIAL_DESIGN.md 부록 R) -----
   // 레벨 1 화면에는 계약 하나 · 고객 하나 · 맑음뿐이다. 설명할 것이 적으니 비트도 짧다 — 열두 개, 대부분 한 장.
   const BEATS_L1 = [
-    // 서장 오프닝 — 인사 · 왜 이 창고를 넘겨받는가 · 한길 물류 담당자 인사. 규칙은 맨 마지막 한 장뿐이다
-    // 첫날은 '시키는 대로 눌러'가 아니라 '왜 지금 보내면 손해인지'를 숫자로 본다.
-    // 여 실장이 인사차 들러 실제 배차비와 지금 실을 수 있는 값을 계산해 준다 — 보내지는 않는다.
+    // 서장 오프닝 — 세 쪽이다. 박 반장 인사 · 여 실장이 숫자를 놓고 감 · 그래서 오늘은 기다린다.
+    // 설정을 늘리지 않는다. 첫날이 가르치는 건 하나뿐이다 — 배차비는 정액이라 덜 실으면 손해다.
     { id: 'l1intro', kind: 'start', when: () => true, pages: [
       { expr: 'smile' },
-      { speaker: 'yeo', expr: 'smile' },
-      { speaker: 'yeo', expr: 'neutral', hl: '#c0' },
       { speaker: 'yeo', expr: 'neutral', hl: '#c0' },
       { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },

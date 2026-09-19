@@ -235,7 +235,7 @@ const say = m => { console.log(m); log.push(m); };
   check(!/리포트/.test(rptTxt) && !/정시/.test(rptTxt), '숫자 리포트는 없다 — ' + rptTxt.replace(/\s+/g, ' ').slice(0, 44));
   await shot('41-letter');
   const letTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
-  check(/한 사장님 편지/.test(letTxt) && /한종수/.test(letTxt), '영감님 편지가 뜬다 — ' + letTxt.replace(/\s+/g, ' ').slice(0, 44));
+  check(/한 사장 편지/.test(letTxt) && /한 사장/.test(letTxt), '한 사장 편지가 뜬다 — ' + letTxt.replace(/\s+/g, ' ').slice(0, 44));
   await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(400);
   const endCard = await page.$eval('#modal .chcard.end', el => el.textContent).catch(() => '');
   check(/서장/.test(endCard) && /셔터/.test(endCard) && /1장/.test(endCard) && /두 번째 트럭/.test(endCard),

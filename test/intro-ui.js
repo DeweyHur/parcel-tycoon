@@ -71,7 +71,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   let mid = 0, prev = null;
   for (const r of rows) { if (prev && prev.line === r.line && r.a > 0.5 && prev.a > 0.5 && prev.recall !== r.recall) mid++; prev = r; }
   const secs = rows.length * 0.2;
-  check(secs > 32 && secs < 50, '오프닝이 35초쯤 간다 — ' + secs.toFixed(0) + '초');
+  check(secs > 20 && secs < 34, '오프닝이 25초쯤 간다 (4컷 · 여덟 줄) — ' + secs.toFixed(0) + '초');
   // 타자: 같은 줄 안에서 글자가 늘어나는 '중간 상태' 프레임이 있어야 한다
   let partial = 0, caret = 0, pv = '';
   for (const r of rows) {
