@@ -474,6 +474,16 @@
     else if (g.phase === 'market') BGM.play('market');
   }
   let hudDueOpen = false;   // HUD 자금 분해 펼침 여부 (기본 접힘)
+  let utilityOpen = false;  // 매일 쓰지 않는 고객·기록·도움말·설정은 한 서랍에 접는다.
+  let opsExpanded = false;  // 운영 상태판은 기본 한 줄, 탭했을 때만 세부 수치를 펼친다.
+  function renderUtilityDrawer() {
+    const drawer = $('#utility-drawer'), more = $('#more-btn');
+    if (!drawer || !more) return;
+    drawer.hidden = !utilityOpen;
+    more.setAttribute('aria-expanded', String(utilityOpen));
+    more.textContent = I18n.lang === 'ko' ? (utilityOpen ? '접기 ▲' : '더보기 ☰') : (utilityOpen ? 'Less ▲' : 'More ☰');
+  }
+  function closeUtilityDrawer() { utilityOpen = false; renderUtilityDrawer(); }
   function renderOps(g, forecast) {
     const ko = I18n.lang === 'ko';
     const risky = new Set(g.parcels.filter(p => p.overdue).map(p => p.id));
@@ -493,7 +503,8 @@
         : (ko ? '안정적으로 성장 중' : 'Growing steadily');
     const root = $('#ops-status');
     const rush = g.rushState();
-    root.className = state + (rush.ready ? ' rush-ready' : '') + (rush.critical ? ' rush-critical' : '');
+    root.className = state + (opsExpanded ? ' expanded' : '') + (rush.ready ? ' rush-ready' : '') + (rush.critical ? ' rush-critical' : '');
+    root.setAttribute('aria-expanded', String(opsExpanded));
     $('#ops-kicker').textContent = ko ? '현재 운영 판단' : 'OPERATION STATUS';
     $('#ops-title').textContent = title;
     $('#ops-delivered').textContent = g.monthStats ? g.monthStats.delivered : 0;
@@ -609,6 +620,7 @@
     wb.innerHTML = `${T(g.shows('self') ? 'wait.btn' : 'wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
     $('#cust-btn').hidden = !g.shows('customers');
     $('#log-btn').hidden = !g.shows('market');   // 레벨 1은 화면에 버튼 셋이면 충분하다
+    renderUtilityDrawer();
     renderCoach();
   }
   // ---------- 스토리 모드 코치 한 줄 ----------
@@ -631,6 +643,12 @@
   function renderCoach() {
     const el = $('#coach'), g = game;
     if (!g || !window.Story || !Story.active(g) || g.phase !== 'play') { el.hidden = true; return; }
+    // 인수인계 뒤의 평시 조언은 숨긴다. 꽉 찼거나, 막혔거나, 트럭이 찼을 때만 다시 등장한다.
+    if (g.story.seen.includes('handOff')) {
+      const b = Story.bestSlot(g);
+      const urgent = g.unhandled().some(p => !(p.customs > 0)) || g.usage() >= 0.9 || (b.slot >= 0 && b.fill >= 0.8);
+      if (!urgent) { el.hidden = true; return; }
+    }
     let hint = null; try { hint = coachHint(g); } catch (e) { hint = null; }
     if (!hint) { el.hidden = true; return; }
     el.innerHTML = `<img src="${Story.sprite('park', 'neutral', false)}" alt=""><span>${hint}</span>`;
@@ -1564,7 +1582,7 @@
     document.title = T('title.name') + ': ' + T('title.sub');
     document.documentElement.lang = I18n.lang;
     $('#hud-cash-lbl').textContent = T('hud.cashLbl'); $('#usage-lbl').textContent = T('common.warehouse'); $('#cold-lbl').textContent = D.ATTRS.cold.name;
-    $('#invest-btn').textContent = I18n.lang === 'ko' ? '투자' : 'Invest'; $('#cust-btn').textContent = T('company.customers'); $('#log-btn').textContent = T('title.records'); $('#help-btn').textContent = T('btn.help'); $('#menu-btn').textContent = T('menu.title');
+    $('#invest-btn').textContent = I18n.lang === 'ko' ? '투자' : 'Invest'; $('#cust-btn').textContent = T('company.customers'); $('#log-btn').textContent = T('title.records'); $('#help-btn').textContent = T('btn.help'); $('#menu-btn').textContent = T('menu.title'); renderUtilityDrawer();
     if (scene && scene.relabel) scene.relabel();
   }
   function init() {
@@ -1574,10 +1592,14 @@
     $('#hud-cash-box').onclick = () => { SFX.click(); hudDueOpen = !hudDueOpen; renderAll(); };
     $('#wait-btn').onclick = () => doWait(null);
     $('#invest-btn').onclick = () => { if (game) { SFX.click(); showGrowth(); } };
-    $('#log-btn').onclick = () => { if (game) { SFX.click(); showLog(closeModal); } };
-    $('#cust-btn').onclick = () => { if (game) { SFX.click(); showCustomers(closeModal); } };
-    $('#help-btn').onclick = () => { SFX.click(); showHelp(closeModal); };
-    $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
+    $('#more-btn').onclick = () => { SFX.click(); utilityOpen = !utilityOpen; renderUtilityDrawer(); };
+    $('#log-btn').onclick = () => { if (game) { SFX.click(); closeUtilityDrawer(); showLog(closeModal); } };
+    $('#cust-btn').onclick = () => { if (game) { SFX.click(); closeUtilityDrawer(); showCustomers(closeModal); } };
+    $('#help-btn').onclick = () => { SFX.click(); closeUtilityDrawer(); showHelp(closeModal); };
+    $('#menu-btn').onclick = () => { if (game) { SFX.click(); closeUtilityDrawer(); showMenu(); } };
+    const toggleOps = () => { SFX.click(); opsExpanded = !opsExpanded; if (game) renderAll(); };
+    $('#ops-status').onclick = toggleOps;
+    $('#ops-status').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleOps(); } };
     $('#hud-month').onclick = () => { if (game) { SFX.click(); showCalendar(closeModal); } };
     document.addEventListener('touchstart', () => { SFX.resume(); BGM.resume(); }, { once: true });
     document.addEventListener('click', () => { SFX.resume(); BGM.resume(); }, { once: true });
