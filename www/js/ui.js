@@ -474,16 +474,6 @@
     else if (g.phase === 'market') BGM.play('market');
   }
   let hudDueOpen = false;   // HUD 자금 분해 펼침 여부 (기본 접힘)
-  let utilityOpen = false;  // 매일 쓰지 않는 고객·기록·도움말·설정은 한 서랍에 접는다.
-  let opsExpanded = false;  // 운영 상태판은 기본 한 줄, 탭했을 때만 세부 수치를 펼친다.
-  function renderUtilityDrawer() {
-    const drawer = $('#utility-drawer'), more = $('#more-btn');
-    if (!drawer || !more) return;
-    drawer.hidden = !utilityOpen;
-    more.setAttribute('aria-expanded', String(utilityOpen));
-    more.textContent = I18n.lang === 'ko' ? (utilityOpen ? '접기 ▲' : '더보기 ☰') : (utilityOpen ? 'Less ▲' : 'More ☰');
-  }
-  function closeUtilityDrawer() { utilityOpen = false; renderUtilityDrawer(); }
   function renderOps(g, forecast) {
     const ko = I18n.lang === 'ko';
     const risky = new Set(g.parcels.filter(p => p.overdue).map(p => p.id));
@@ -503,8 +493,7 @@
         : (ko ? '안정적으로 성장 중' : 'Growing steadily');
     const root = $('#ops-status');
     const rush = g.rushState();
-    root.className = state + (opsExpanded ? ' expanded' : '') + (rush.ready ? ' rush-ready' : '') + (rush.critical ? ' rush-critical' : '');
-    root.setAttribute('aria-expanded', String(opsExpanded));
+    root.className = state + (rush.ready ? ' rush-ready' : '') + (rush.critical ? ' rush-critical' : '');
     $('#ops-kicker').textContent = ko ? '현재 운영 판단' : 'OPERATION STATUS';
     $('#ops-title').textContent = title;
     $('#ops-delivered').textContent = g.monthStats ? g.monthStats.delivered : 0;
@@ -618,9 +607,6 @@
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
     // 오늘 영업을 마치면 받게 될 다음 입고 — 매 턴 가장 중요한 결정을 흐리거나 자르지 않는다.
     wb.innerHTML = `${T(g.shows('self') ? 'wait.btn' : 'wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
-    $('#cust-btn').hidden = !g.shows('customers');
-    $('#log-btn').hidden = !g.shows('market');   // 레벨 1은 화면에 버튼 셋이면 충분하다
-    renderUtilityDrawer();
     renderCoach();
   }
   // ---------- 스토리 모드 코치 한 줄 ----------
@@ -1567,6 +1553,9 @@
       : `<div class="d" style="font-size:12px;margin-bottom:6px">${esc(M.SCENARIOS[g.cfg.scenario].name)} · ${g.company.icon} ${esc(g.company.name)}<br><span style="color:var(--green)">＋ ${esc(g.company.passive)}</span><br><span style="color:var(--orange)">－ ${esc(g.company.weakness)}</span>${g.perks.length ? `<br>${T('company.perks')}: ` + g.perks.map(p => esc(M.PERKS[p].name + ' — ' + M.PERKS[p].desc)).join(`<br>${T('company.perks')}: `) : ''}${(g.cfg.variants || []).length ? `<br>${T('prep.variants')}: ` + g.cfg.variants.map(v => esc(M.DAILY_VARIANTS[v].name + ' — ' + M.DAILY_VARIANTS[v].desc)).join(', ') : ''}</div>`;
     const m = modal(T('menu.title'), `${info}<p style="font-size:12px;color:var(--dim)">${T('menu.autosave')}</p><label style="display:flex;align-items:center;gap:8px;font-size:12px">${T('menu.volume')} <input type="range" id="vol" min="0" max="1" step="0.05" value="${opts.musicVol}" style="flex:1"></label>`, [
       { label: T('menu.continue'), cls: 'primary', onClick: closeModal },
+      ...(g.shows('customers') ? [{ label: T('company.customers'), onClick: () => showCustomers(showMenu) }] : []),
+      ...(g.shows('market') ? [{ label: T('title.records'), onClick: () => showLog(showMenu) }] : []),
+      { label: T('btn.help'), onClick: () => showHelp(showMenu) },
       { label: T('opt.sound', { v: T(opts.sound ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); closeModal(); } },
       { label: T('opt.music', { v: T(opts.music ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); closeModal(); } },
       { label: T('menu.story', { v: T(g.story && !g.story.off ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { if (!g.story) g.story = { seen: [], notes: [] }; g.story.off = !g.story.off; saveGame(); closeModal(); if (!g.story.off && g.phase === 'play') storyCheck({ kind: 'turn' }); } },
@@ -1582,7 +1571,7 @@
     document.title = T('title.name') + ': ' + T('title.sub');
     document.documentElement.lang = I18n.lang;
     $('#hud-cash-lbl').textContent = T('hud.cashLbl'); $('#usage-lbl').textContent = T('common.warehouse'); $('#cold-lbl').textContent = D.ATTRS.cold.name;
-    $('#invest-btn').textContent = I18n.lang === 'ko' ? '투자' : 'Invest'; $('#cust-btn').textContent = T('company.customers'); $('#log-btn').textContent = T('title.records'); $('#help-btn').textContent = T('btn.help'); $('#menu-btn').textContent = T('menu.title'); renderUtilityDrawer();
+    $('#invest-btn').textContent = I18n.lang === 'ko' ? '투자' : 'Invest'; $('#menu-btn').textContent = T('menu.title');
     if (scene && scene.relabel) scene.relabel();
   }
   function init() {
@@ -1592,14 +1581,7 @@
     $('#hud-cash-box').onclick = () => { SFX.click(); hudDueOpen = !hudDueOpen; renderAll(); };
     $('#wait-btn').onclick = () => doWait(null);
     $('#invest-btn').onclick = () => { if (game) { SFX.click(); showGrowth(); } };
-    $('#more-btn').onclick = () => { SFX.click(); utilityOpen = !utilityOpen; renderUtilityDrawer(); };
-    $('#log-btn').onclick = () => { if (game) { SFX.click(); closeUtilityDrawer(); showLog(closeModal); } };
-    $('#cust-btn').onclick = () => { if (game) { SFX.click(); closeUtilityDrawer(); showCustomers(closeModal); } };
-    $('#help-btn').onclick = () => { SFX.click(); closeUtilityDrawer(); showHelp(closeModal); };
-    $('#menu-btn').onclick = () => { if (game) { SFX.click(); closeUtilityDrawer(); showMenu(); } };
-    const toggleOps = () => { SFX.click(); opsExpanded = !opsExpanded; if (game) renderAll(); };
-    $('#ops-status').onclick = toggleOps;
-    $('#ops-status').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleOps(); } };
+    $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
     $('#hud-month').onclick = () => { if (game) { SFX.click(); showCalendar(closeModal); } };
     document.addEventListener('touchstart', () => { SFX.resume(); BGM.resume(); }, { once: true });
     document.addEventListener('click', () => { SFX.resume(); BGM.resume(); }, { once: true });
