@@ -146,7 +146,15 @@ window.Scene3D = (function () {
       if (this.parts.front) { this.parts.front.visible = !!this.closed; this._setAlpha(this.parts.front, 1); }
       if (this.road) { this.road.position.x = Z.x1 + 0.6 + 20; this.road.position.z = Z.roadZ; }   // 도로는 마당 너머, 건물 오른쪽으로
       if (this.truck) this.truck.position.z = Z.roadZ;
-      if (this.workers) { this.workers[0].position.set(TRUCK_DOCK - 0.6, 0, Z.roadZ - 0.55); this.workers[1].position.set(TRUCK_DOCK - 0.35, 0, Z.roadZ + 0.6); }
+      if (this.workers) {
+        const pickX = Z.x1 - 1.05, truckX = TRUCK_DOCK - 0.5, laneZ = [Z.roadZ - 0.55, Z.roadZ + 0.6];
+        this.workers.forEach((w, i) => {
+          w.userData.dockA = { x: pickX, z: laneZ[i] }; w.userData.dockB = { x: truckX, z: laneZ[i] };
+          w.userData.idleA = { x: pickX, z: laneZ[i] }; w.userData.idleB = { x: pickX + 0.4, z: laneZ[i] };
+          w.userData.exitB = { x: pickX, z: laneZ[i] + 2.1 };
+          if (!w.userData.routeSet) { w.userData.routeSet = true; this._setWorkerIdle(w); }
+        });
+      }
       this.tileCaps = null;   // 구역이 바뀌었으니 바닥 타일도 다시
       this.resize();
       return true;
@@ -296,9 +304,9 @@ window.Scene3D = (function () {
       this.trucks = [this.truck];
       // 도로
       const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 3.4), this._mat(0x4a4a52)); road.rotation.x = -Math.PI / 2; road.position.set(14, -0.02, 3.6); road.receiveShadow = true; s.add(road); this.road = road;
-      // 도크 인부 — 상하차 연출에 생기를 준다. 기분(mood)에 따라 팔·자세가 바뀐다
+      // 도크 인부 — 상하차 연출에 생기를 준다. 트럭이 있으면 도크↔트럭을 오가며 상자를 나르고,
+      // 직접 배송은 트럭 없이 사람이 상자를 들고 뛰어나갔다 온다. 기분(mood)에 따라 팔·자세가 바뀐다.
       this.workers = [this._makeWorker(0x3d6fbf), this._makeWorker(0x5c9a5c)];
-      this.workers[0].position.set(TRUCK_DOCK - 0.6, 0, 2.05); this.workers[1].position.set(TRUCK_DOCK - 0.35, 0, 4.2);
       for (const w of this.workers) s.add(w);
       this.workerMood = 0; this.workerMoodT = 0;   // -1 풀죽음 · 0 평소 · 1 신남
       // 나무 몇 그루 (장식)
@@ -421,8 +429,10 @@ window.Scene3D = (function () {
     }
     _makeWorker(shirt) {
       const g = new THREE.Group(), skin = 0xe0a877, pants = 0x2c2b38, vest = 0xffb238;
-      const legL = this._box(0.15, 0.46, 0.16, pants); legL.position.set(-0.09, 0.23, 0); g.add(legL);
-      const legR = this._box(0.15, 0.46, 0.16, pants); legR.position.set(0.09, 0.23, 0); g.add(legR);
+      const legPivotL = new THREE.Group(); legPivotL.position.set(-0.09, 0.46, 0); g.add(legPivotL);
+      const legL = this._box(0.15, 0.46, 0.16, pants); legL.position.set(0, -0.23, 0); legPivotL.add(legL);
+      const legPivotR = new THREE.Group(); legPivotR.position.set(0.09, 0.46, 0); g.add(legPivotR);
+      const legR = this._box(0.15, 0.46, 0.16, pants); legR.position.set(0, -0.23, 0); legPivotR.add(legR);
       const torso = this._box(0.34, 0.4, 0.22, shirt || 0x3d6fbf); torso.position.set(0, 0.66, 0); g.add(torso);
       const vestStripe = this._box(0.36, 0.13, 0.24, vest, { emissive: 0x553600 }); vestStripe.position.set(0, 0.66, 0); g.add(vestStripe);
       const head = this._box(0.2, 0.2, 0.2, skin); head.position.set(0, 0.96, 0); g.add(head);
@@ -431,7 +441,9 @@ window.Scene3D = (function () {
       const armL = this._box(0.11, 0.34, 0.11, shirt || 0x3d6fbf); armL.position.set(0, -0.17, 0); armPivotL.add(armL);
       const armPivotR = new THREE.Group(); armPivotR.position.set(0.23, 0.82, 0); g.add(armPivotR);
       const armR = this._box(0.11, 0.34, 0.11, shirt || 0x3d6fbf); armR.position.set(0, -0.17, 0); armPivotR.add(armR);
-      g.userData.armPivotL = armPivotL; g.userData.armPivotR = armPivotR; g.userData.phase = Math.random() * 10;
+      const box = this._box(0.22, 0.2, 0.22, 0xd8b47a); box.position.set(0, 0.64, 0.22); box.visible = false; noShadow(box); g.add(box);
+      g.userData.armPivotL = armPivotL; g.userData.armPivotR = armPivotR; g.userData.legPivotL = legPivotL; g.userData.legPivotR = legPivotR;
+      g.userData.box = box; g.userData.phase = Math.random() * 10;
       return g;
     }
 
@@ -532,6 +544,7 @@ window.Scene3D = (function () {
       while (loads.length < total) loads.push([]);
       for (const id of parcelIds) { const b = this.boxes.get(id); if (b) b.userData.locked = true; }
       this._ensureTruckFleet(total);
+      if (this.workers) for (const w of this.workers) this._setWorkerTruckPatrol(w);
       const roadZ = this.Z ? this.Z.roadZ : this.truck.position.z;
       const gap = total <= 1 ? 0 : total <= 3 ? 0.95 : Math.max(0.55, 2.8 / (total - 1));
       let remaining = total;
@@ -545,16 +558,35 @@ window.Scene3D = (function () {
           boxes.forEach((b, i) => {
             const tx = truck.position.x + 0.4 + (i % 3) * 0.3 - 0.3, tz = truck.position.z;
             this._tween(b.position, { y: b.position.y + 2.2 }, 0.2, ease, i * 0.1);
-            this._tween(b.position, { x: tx, z: tz, y: this.truckCargoY }, 0.28, ease, i * 0.1 + 0.2);
-            this._tween(b.scale, { x: 0.01, y: 0.01, z: 0.01 }, 0.14, ease, i * 0.1 + 0.46);
+            this._tween(b.position, { x: tx, z: tz, y: this.truckCargoY }, 0.28, ease, i * 0.1 + 0.2, () => {
+              // 적재가 끝나면 트럭의 자식으로 옮겨 붙인다 — 실은 채 같이 움직이며, 꽉 찬 트럭과 빈 트럭이 눈에 다르게 보인다
+              const localX = 0.4 + (i % 3) * 0.3 - 0.3, localZ = ((i / 3 | 0) - 0.5) * 0.34, localY = this.truckCargoY - truck.position.y;
+              this.scene.remove(b); b.position.set(localX, localY, localZ); b.scale.set(0.6, 0.6, 0.6); truck.add(b);
+            });
           });
           const wait = Math.max(0.38, boxes.length * 0.1 + 0.58);
           this._tween(truck.position, { x: TRUCK_GONE }, 0.68, ease, wait, () => {
-            for (const b of boxes) { this.scene.remove(b); this.boxes.delete(b.userData.id); }
+            for (const b of boxes) { truck.remove(b); this.boxes.delete(b.userData.id); }
             if (trip === 0) truck.position.set(TRUCK_PARK, 0, roadZ); else truck.visible = false;
             remaining--;
-            if (remaining === 0) { this.busy--; onDone && onDone(); }
+            if (remaining === 0) { if (this.workers) for (const w of this.workers) this._setWorkerIdle(w); this.busy--; onDone && onDone(); }
           });
+        });
+      }
+    }
+    selfDeliver(parcelIds, onDone) {
+      // 직접 배송: 트럭이 아니라 인부가 상자를 들고 뛰어나갔다 온다
+      this.busy++;
+      for (const id of parcelIds) { const b = this.boxes.get(id); if (b) { this.scene.remove(b); this.boxes.delete(id); } }
+      const ws = this.workers || [], n = parcelIds.length;
+      if (!ws.length || !n) { this.busy--; onDone && onDone(); return; }
+      const per = Math.ceil(n / ws.length);
+      const jobs = ws.map((w, i) => ({ w, count: Math.max(0, Math.min(per, n - i * per)) })).filter(j => j.count > 0);
+      let remaining = jobs.length;
+      for (const { w, count } of jobs) {
+        this._setWorkerErrand(w, count, () => {
+          this._setWorkerIdle(w); remaining--;
+          if (remaining === 0) { this.busy--; onDone && onDone(); }
         });
       }
     }
@@ -600,20 +632,52 @@ window.Scene3D = (function () {
     dropTween(tag) { this.tweens = this.tweens.filter(t => t.tag !== tag); }
     camSet(p, l) { this.camera.position.set(p[0], p[1], p[2]); this.camera.lookAt(l[0], l[1], l[2]); }
     camHome() { return { p: [this.camX, this.camY, this.camZ], l: (this.camLook || [1.3, 0.3, 0.3]).slice(), fov: this.camFov || this.camera.fov }; }
-    // 도크 인부 애니메이션 — mood: 1 신남(팔 번쩍+통통), -1 풀죽음(팔 축 처짐+고개 숙임), 0 평소(적재 중이면 팔 흔들기, 아니면 가벼운 흔들림)
+    // ---------- 도크 인부: 걷기(구간 왕복) + 기분(mood) ----------
+    // homeA↔homeB 를 왕복한다. legsLeft: -1 무한 순찰, N 이면 N번 왕복(2N 구간) 뒤 onDone 을 부르고 멈춘다.
+    _setWorkerRoute(w, homeA, homeB, speed, legsLeft, onDone) {
+      const u = w.userData;
+      u.homeA = homeA; u.homeB = homeB; u.speed = speed; u.legsLeft = legsLeft; u.onDone = onDone || null;
+      u.t = 0; u.dir = 1; u.carrying = legsLeft !== 0;
+      w.position.set(homeA.x, 0, homeA.z); w.rotation.y = Math.atan2(homeB.x - homeA.x, homeB.z - homeA.z);
+      u.box.visible = u.carrying;
+    }
+    _setWorkerIdle(w) { this._setWorkerRoute(w, w.userData.idleA, w.userData.idleB, 0.16, -1); w.userData.carrying = false; w.userData.box.visible = false; }
+    _setWorkerTruckPatrol(w) { this._setWorkerRoute(w, w.userData.dockA, w.userData.dockB, 0.55, -1); }
+    _setWorkerErrand(w, count, onDone) { this._setWorkerRoute(w, w.userData.dockA, w.userData.exitB, 0.95, Math.max(1, count) * 2, onDone); }
+    _poseWorkerMood(w, mood) {
+      const u = w.userData, ph = this.time * (mood === 1 ? 11 : 2.2) + u.phase;
+      w.position.y = Math.max(0, Math.sin(ph)) * (mood === 1 ? 0.11 : 0);
+      w.rotation.x = (mood === -1 ? 0.32 : 0) + Math.sin(this.time * (mood === -1 ? 1.6 : 2.2) + u.phase) * (mood === -1 ? 0.03 : 0.015);
+      w.rotation.y = 0; u.legPivotL.rotation.x = u.legPivotR.rotation.x = 0; u.box.visible = false;
+      if (mood === 1) { u.armPivotL.rotation.z = -2.5 + Math.sin(ph) * 0.35; u.armPivotR.rotation.z = 2.5 - Math.sin(ph) * 0.35; u.armPivotL.rotation.x = u.armPivotR.rotation.x = 0; }
+      else { u.armPivotL.rotation.z = 0.35; u.armPivotR.rotation.z = -0.35; u.armPivotL.rotation.x = u.armPivotR.rotation.x = 0.45; }
+    }
     _tickWorkers(dt) {
       if (!this.workers) return;
       if (this.workerMoodT > 0) { this.workerMoodT -= dt; if (this.workerMoodT <= 0) { this.workerMoodT = 0; this.workerMood = 0; } }
-      const mood = this.workerMood, working = this.busy > 0;
+      const mood = this.workerMood;
       for (const w of this.workers) {
-        const ph = this.time * (mood === 1 ? 11 : working ? 7 : 2.2) + w.userData.phase;
-        w.position.y = Math.max(0, Math.sin(ph)) * (mood === 1 ? 0.11 : mood === -1 ? 0 : working ? 0.045 : 0.015);
-        w.rotation.x = (mood === -1 ? 0.32 : 0) + Math.sin(this.time * (mood === -1 ? 1.6 : 2.2) + w.userData.phase) * (mood === -1 ? 0.03 : 0.015);
-        const pL = w.userData.armPivotL, pR = w.userData.armPivotR;
-        if (mood === 1) { pL.rotation.z = -2.5 + Math.sin(ph) * 0.35; pR.rotation.z = 2.5 - Math.sin(ph) * 0.35; pL.rotation.x = pR.rotation.x = 0; }
-        else if (mood === -1) { pL.rotation.z = 0.35; pR.rotation.z = -0.35; pL.rotation.x = pR.rotation.x = 0.45; }
-        else if (working) { pL.rotation.z = pR.rotation.z = 0; pL.rotation.x = Math.sin(ph) * 0.85 + 0.3; pR.rotation.x = -Math.sin(ph) * 0.85 + 0.3; }
-        else { pL.rotation.z = pR.rotation.z = 0; pL.rotation.x = Math.sin(this.time * 1.1 + w.userData.phase) * 0.08; pR.rotation.x = -pL.rotation.x; }
+        if (mood !== 0) { this._poseWorkerMood(w, mood); continue; }
+        const u = w.userData; if (!u.homeA) continue;
+        const from = u.dir > 0 ? u.homeA : u.homeB, to = u.dir > 0 ? u.homeB : u.homeA;
+        const len = Math.hypot(to.x - from.x, to.z - from.z) || 1;
+        let moving = false;
+        if (u.legsLeft !== 0 && u.t < 1) {
+          u.t = Math.min(1, u.t + (u.speed / len) * dt); moving = true;
+          w.position.x = from.x + (to.x - from.x) * u.t; w.position.z = from.z + (to.z - from.z) * u.t;
+          w.rotation.y = Math.atan2(to.x - from.x, to.z - from.z);
+        } else if (u.legsLeft !== 0) {
+          u.dir *= -1; u.t = 0;
+          if (u.legsLeft > 0) { u.legsLeft--; u.carrying = u.legsLeft !== 0 ? u.dir > 0 : false; if (u.legsLeft === 0) { const cb = u.onDone; u.onDone = null; cb && cb(); } }
+          else u.carrying = u.dir > 0;
+        }
+        u.box.visible = u.carrying;
+        const ph = this.time * (3 + u.speed * 6) + u.phase;
+        w.position.y = moving ? Math.abs(Math.sin(ph)) * (u.speed > 0.7 ? 0.05 : 0.025) : 0;
+        const swing = moving ? Math.sin(ph) * (u.speed > 0.7 ? 0.8 : 0.5) : Math.sin(this.time * 1.1 + u.phase) * 0.08;
+        u.legPivotL.rotation.x = swing; u.legPivotR.rotation.x = -swing;
+        u.armPivotL.rotation.x = u.carrying ? 0.95 : -swing; u.armPivotR.rotation.x = u.carrying ? 0.95 : swing;
+        u.armPivotL.rotation.z = u.armPivotR.rotation.z = 0;
       }
     }
 

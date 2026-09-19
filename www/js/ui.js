@@ -1039,7 +1039,7 @@
     busy = true; renderAll();
     const events = game.takeEvents();
     saveGame();
-    if (selfIds.length && r && r.ids) { SFX.truck(); const rev = r.revenue, cost = r.cost; scene.deliver(r.ids, () => { SFX.coin(r.ids.length); floatText(T('float.self', { rev, cost }), false, 70); afterTurn(events); }); }
+    if (selfIds.length && r && r.ids) { SFX.select(); const rev = r.revenue, cost = r.cost; scene.selfDeliver(r.ids, () => { SFX.coin(r.ids.length); floatText(T('float.self', { rev, cost }), false, 70); afterTurn(events); }); }
     else { SFX.wait(); setTimeout(() => afterTurn(events), 250); }
   }
   // ---------- 대기 화면: 직접 배송 선택 + 적재 정리 + 다음 턴 예보 ----------
