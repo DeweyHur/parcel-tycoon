@@ -208,6 +208,11 @@ t('i18n: ko/en UI 키와 자리표시자가 일치', () => {
   for (const k in KO.ui) { assert.ok(k in EN.ui, 'en 누락: ' + k); for (const x of ph(KO.ui[k])) assert.ok(ph(EN.ui[k]).has(x), `en ${k} 자리표시자 {${x}} 누락`); }
   for (const k in EN.ui) assert.ok(k in KO.ui, 'ko 누락: ' + k);
 });
+t('턴 종료 UX: 대기 대신 오늘 마감과 다음 입고를 능동적인 행동으로 안내한다', () => {
+  assert.equal(KO.ui['wait.btnPlain'], '📦 오늘 마감');
+  assert.ok(KO.ui['wait.next'].includes('다음 입고')); assert.ok(KO.ui['wm.justWait'].includes('다음 입고 받기'));
+  assert.ok(KO.ui['help.body'].includes('<b>오늘 마감</b>')); assert.ok(EN.ui['wait.btnPlain'].includes('End Day'));
+});
 t('i18n: ko/en data·meta 텍스트 필드 모양이 일치', () => {
   const walk = (a, b, p) => { for (const k in a) { assert.ok(k in b, 'en 누락: ' + p + '.' + k); if (a[k] && typeof a[k] === 'object' && !Array.isArray(a[k])) walk(a[k], b[k], p + '.' + k); } for (const k in b) assert.ok(k in a, 'ko 누락: ' + p + '.' + k); };
   walk(KO.data, EN.data, 'data'); walk(KO.meta, EN.meta, 'meta');
@@ -394,7 +399,7 @@ t('대본: 배차 0 + 보낼 택배가 있으면 callsOut 비트', () => {
 t('스토리: cfg.story 가 있어야 비트가 나오고, 1개월차 1턴 시작에 intro, 같은 상황을 다시 물어도 한 번만', () => {
   assert.equal(Story.check(NG(1), { kind: 'start' }), null);
   const g = NG(1, { story: true }); const b = Story.check(g, { kind: 'start' });
-  assert.ok(b && b.id === 'intro' && b.pages.length === 3 && b.pages[2].hl === '#wait-btn' && /기다려/.test(b.pages[2].text), JSON.stringify(b && b.id));
+  assert.ok(b && b.id === 'intro' && b.pages.length === 3 && b.pages[2].hl === '#wait-btn' && /오늘.*마감/.test(b.pages[2].text), JSON.stringify(b && b.id));
   assert.equal(Story.check(g, { kind: 'start' }), null); assert.deepEqual(g.story.seen, ['intro']); assert.equal(g.story.notes.length, 1);
   // 2턴: 창고 게이지 비트. 호출 턴(kind call)에도 turn 비트는 나온다
   adv(g); const u = Story.check(g, { kind: 'call', result: { ok: true } }); assert.ok(u && ['usage', 'firstCall', 'rain'].includes(u.id), u && u.id);

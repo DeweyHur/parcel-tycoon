@@ -605,7 +605,7 @@
     const warn = [];
     if (f.overdue) warn.push(T('wait.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wait.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wait.frozenOver', { n: f.frozenOver }));
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
-    // 기다리면 어떻게 되는지 — 이 게임에서 매 턴 제일 중요한 한 줄. 흐리게 두거나 잘리게 두지 않는다.
+    // 오늘 영업을 마치면 받게 될 다음 입고 — 매 턴 가장 중요한 결정을 흐리거나 자르지 않는다.
     wb.innerHTML = `${T(g.shows('self') ? 'wait.btn' : 'wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
     $('#cust-btn').hidden = !g.shows('customers');
     $('#log-btn').hidden = !g.shows('market');   // 레벨 1은 화면에 버튼 셋이면 충분하다
