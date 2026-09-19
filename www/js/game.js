@@ -148,7 +148,7 @@
         xlOnTime: 0, callStreak: 0, maxCallStreak: 0, calls: 0, waits: 0, discarded: 0, maxSingleCall: 0, contractsBought: 0, replacedWithCalls: 0,
         trustL3: 0, maxTrustL2Simul: 0, maxTrustL3Simul: 0, zeroCallsMonthEnd: false, overflowTurns: 0, maxOverflowTurns: 0, expansions: 0, coldUpgrades: 0, maxXlSimul: 0,
         overdueDelivered: 0, returned: 0, stolen: 0, urgentClutch: false, specialistTypes: [], tidyMonths: 0, perfectMonths: 0, fullNoPenalty: false, masterOwned: false, maxCash: 0,
-        brokeMonthEnd: false, maxMonthDelivered: 0, distinctCarriersAtEnd: 0, monthsDone: 0, selfCalls: 0, urgentCalls: 0, bigDelivered: 0, feesPaid: 0, fullTrucks: 0, trucksCalled: 0 };
+        brokeMonthEnd: false, maxMonthDelivered: 0, distinctCarriersAtEnd: 0, monthsDone: 0, selfCalls: 0, urgentCalls: 0, bigDelivered: 0, feesPaid: 0, fullTrucks: 0, trucksCalled: 0, rushes: 0, rushBonus: 0 };
     }
     _buildRules() {
       const c = this.cfg;
@@ -700,9 +700,21 @@
     }
     baseCapacity(c) { return this.vehicleCap(c); }
     callCapacity(c) { return this.vehicleCap(c) * this.simulMax(c); }
+    rushState() {
+      const R = D.RUSH, ratio = this.warehouse.cap ? this.usedVolume() / this.warehouse.cap : 0;
+      const unlocked = this.shows('simul');
+      return { unlocked, ratio, charge: unlocked ? Math.max(0, Math.min(1, ratio / R.readyAt)) : 0, ready: unlocked && ratio >= R.readyAt, critical: unlocked && ratio >= R.criticalAt, mult: R.bonus, extraTrucks: R.extraTrucks };
+    }
+    rushPreview(volume, trucks, fill) {
+      const s = this.rushState(), used = this.usedVolume();
+      return s.ready && trucks >= D.RUSH.minTrucks && fill >= D.RUSH.minFill && used > 0 && volume / used >= D.RUSH.clearShare;
+    }
     // 한 호출에 부를 수 있는 최대 대수
     simulMax(c) {
-      if (!this.shows('simul')) return 1; return Math.max(1, Math.max(D.CARRIERS[c.carrier].simul || 1, this.trustPerk(c.carrier, 'simul') || 1) + (c.enh.express ? 1 : 0)); }
+      if (!this.shows('simul')) return 1;
+      const base = Math.max(1, Math.max(D.CARRIERS[c.carrier].simul || 1, this.trustPerk(c.carrier, 'simul') || 1) + (c.enh.express ? 1 : 0));
+      return base + (this.rushState().ready ? D.RUSH.extraTrucks : 0);
+    }
     // 대당 배차비
     truckFee(c) {
       const R = this.rules, car = D.CARRIERS[c.carrier];
@@ -1147,7 +1159,7 @@
       if (this.isOffTurn()) return { ok: false, msg: T('err.holidayOff') };
       const useSpare = c.calls <= 0;
       if (useSpare && !(R.spareCall && !this.monthStats.spareUsed)) return { ok: false, msg: T('err.noCalls') };
-      const car = D.CARRIERS[c.carrier];
+      const car = D.CARRIERS[c.carrier], usedBefore = this.usedVolume(), rushReady = this.rushState().ready;
       const elig = this.eligibleParcels(c);
       let chosen = (pickIds || []).map(id => elig.find(p => p.id === id)).filter(Boolean);
       if (chosen.length === 0) return { ok: false, msg: T('err.nothingToShip') };
@@ -1208,6 +1220,16 @@
       if (R.bigCallPenalty && chosen.length >= R.bigCallPenalty) revenue = Math.round(revenue * 0.9);
       if (R.bigCallBonus && chosen.length >= R.bigCallBonus.min) revenue = Math.round(revenue * R.bigCallBonus.mult);
       revenue = Math.round(revenue * R.revenueMult);
+      const deliveredVolume = chosen.reduce((sum, p) => sum + p.size, 0);
+      const rush = rushReady && trucks >= D.RUSH.minTrucks && fill >= D.RUSH.minFill && usedBefore > 0 && deliveredVolume / usedBefore >= D.RUSH.clearShare;
+      let rushBonus = 0;
+      if (rush) {
+        const beforeRush = revenue;
+        revenue = Math.round(revenue * D.RUSH.bonus);
+        rushBonus = revenue - beforeRush;
+        this.stats.rushes++; this.stats.rushBonus += rushBonus;
+        this.addRep(D.RUSH.rep, MSG('why.rush'));
+      }
       if (onTime === 0) xp = 0;
       if (xp > 0 && fill >= 0.8) xp += 1;
       if (xp > 0 && c.carrier === 'cold' && R.coldTrustBonus) xp += R.coldTrustBonus;
@@ -1233,10 +1255,10 @@
       this._assignCold();
       const freezeFresh = !!this.trustPerk(c.carrier, 'freezeOnCall');
       this.say('log.call', { name: this.contractName(c), count: chosen.length, revenue, delay: delay ? MSG('log.callDelay', { delay }) : '', broken: broken ? MSG('log.callBroken', { broken }) : '', refund: refunded ? MSG('log.callRefund') : '', calls: c.calls, fee });
-      this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, trucks, fee, fill });
+      this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, trucks, fee, fill, rush, rushBonus });
       this._updateTrustStats();
       this._endTurn(false, freezeFresh);
-      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill };
+      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill, rush, rushBonus };
     }
     // 직접 배송(대기 턴의 부가 행동): 고른 택배를 배송비를 내고 처리. 보상 그대로. wait()에서 호출
     selfDeliver(ids) {

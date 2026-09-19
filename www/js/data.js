@@ -53,6 +53,9 @@
       warehouse: { costs: [80, 140, 220, 340, 500, 700], cap: 6 },
     },
 
+    // 창고를 채운 뒤 여러 대를 한 번에 빼는 폭발형 출고 보너스.
+    RUSH: { chargeAt: 0.45, readyAt: 0.72, criticalAt: 0.95, bonus: 1.35, extraTrucks: 2, clearShare: 0.55, minFill: 0.72, minTrucks: 2, rep: 2 },
+
     // 월별 추가 입고 수 (기본 10 + 추가). 7개월차 이후는 무한 모드에서 확장
     EXTRA_ARRIVALS: { 1: 12, 2: 14, 3: 16, 4: 18, 5: 20, 6: 22 }, // 7개월차부터 22 + (m-6)×2
     // 달력: 런은 START_MONTH(3월, 봄)에 시작해 계절대로 흐른다. 달별 편차·이벤트는 META.CALENDARS[나라] (docs/STORY_TUTORIAL_DESIGN.md 5장)

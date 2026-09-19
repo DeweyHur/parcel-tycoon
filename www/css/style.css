@@ -417,6 +417,20 @@ body.cine { background: #000; }
 .ops-progress { position: relative; grid-column: 1 / -1; height: 12px; overflow: hidden; background: #11111c; border: 1px solid var(--line); }
 .ops-progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--blue), var(--cyan)); transition: width .35s steps(6); }
 .ops-progress span { position: absolute; inset: 0 5px; color: #fff; font-size: 9px; line-height: 10px; text-align: right; text-shadow: 1px 1px 0 #000; }
+.rush-meter { grid-column: 1 / -1; display: grid; grid-template-columns: auto auto minmax(72px, 1fr) auto; gap: 6px; align-items: center; min-height: 20px; color: #ffbc42; font-size: 10px; }
+.rush-meter[hidden] { display: none; }
+.rush-meter > span { font-size: 16px; filter: grayscale(.55); }
+.rush-meter > div { height: 9px; overflow: hidden; border: 1px solid #8c5522; background: #17121a; }
+.rush-meter > div i { display: block; width: 0; height: 100%; background: linear-gradient(90deg, #ff8c32, #ffe66d); transition: width .25s steps(8); }
+.rush-meter strong { min-width: 90px; color: #ffc85c; text-align: right; }
+#ops-status.rush-ready { border-color: #ff8c32; box-shadow: 0 0 20px rgba(255, 111, 30, .34), 0 5px 0 rgba(15, 14, 26, .72); }
+#ops-status.rush-ready .rush-meter > span { filter: none; animation: rushPulse .55s steps(2) infinite; }
+#ops-status.rush-ready .rush-meter > div i { background: linear-gradient(90deg, #ff592f, #fff26b); }
+.rush-preview { margin: 5px 0; padding: 7px 9px; color: #fff6b0; background: linear-gradient(90deg, #7d251b, #c16b19); border: 2px solid #ffcf55; font-weight: 900; text-align: center; animation: rushPulse .55s steps(2) infinite; }
+body.rush-hit #scene::after { content: ''; position: absolute; z-index: 20; inset: 0; pointer-events: none; background: radial-gradient(circle, rgba(255,255,180,.8), rgba(255,92,20,.25) 45%, transparent 72%); animation: rushBlast .85s ease-out both; }
+body.rush-hit #ops-status { transform: scale(1.025); }
+@keyframes rushPulse { 50% { transform: scale(1.07); filter: brightness(1.35); } }
+@keyframes rushBlast { from { opacity: 1; transform: scale(.25); } to { opacity: 0; transform: scale(1.5); } }
 
 #panel { border-top-width: 3px; }
 .bars { padding: 5px 8px 1px; }

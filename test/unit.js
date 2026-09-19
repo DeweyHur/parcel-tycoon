@@ -42,6 +42,16 @@ t('차량: 용량을 넘기면 동시 대수 한도(기본 1)에서 거부, 신�
   g.trust.bulk0 = 3; assert.equal(g.simulMax(c), 2);
   r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 2); assert.equal(r.fee, D.FAMILIES.bulk.fee * 2);
 });
+t('도크 러시: 창고를 72% 이상 채우면 임시 트럭 +2, 2대 이상으로 55%를 비우면 보상 35% 폭발', () => {
+  const g = EMPTY(202); const i = slot(g, 'bulk'), c = g.contracts[i];
+  g.warehouse.cap = 12;
+  g.parcels = [1, 2, 3, 4, 5, 6].map(id => P(id, 'normal', 2));
+  assert.ok(g.rushState().ready); assert.equal(g.simulMax(c), 3);
+  const base = g.parcels.reduce((sum, p) => sum + p.reward, 0);
+  const r = g.callCarrier(i, g.parcels.map(p => p.id), 2);
+  assert.ok(r.ok, r.msg); assert.ok(r.rush); assert.equal(r.revenue, Math.round(base * D.RUSH.bonus));
+  assert.equal(r.rushBonus, r.revenue - base); assert.equal(g.stats.rushes, 1); assert.equal(g.stats.rushBonus, r.rushBonus);
+});
 t('차량: 배차비는 후불이라 자금 0이어도 호출 가능, 남은 배차보다 많이 못 부름', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i]; g.parcels = [P(1, 'normal', 1)];
   g.cash = 0; let r = g.callCarrier(i, [1]); assert.ok(r.ok); assert.equal(g.feesDue, D.FAMILIES.bulk.fee);

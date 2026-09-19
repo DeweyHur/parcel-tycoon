@@ -492,7 +492,8 @@
         ? (ko ? '곧 정리할 타이밍' : 'Plan the next call')
         : (ko ? '안정적으로 성장 중' : 'Growing steadily');
     const root = $('#ops-status');
-    root.className = state;
+    const rush = g.rushState();
+    root.className = state + (rush.ready ? ' rush-ready' : '') + (rush.critical ? ' rush-critical' : '');
     $('#ops-kicker').textContent = ko ? '현재 운영 판단' : 'OPERATION STATUS';
     $('#ops-title').textContent = title;
     $('#ops-delivered').textContent = g.monthStats ? g.monthStats.delivered : 0;
@@ -508,6 +509,15 @@
     const pct = Math.round(done / total * 100);
     $('#ops-progress-fill').style.width = pct + '%';
     $('#ops-progress-label').textContent = `${ko ? (g.level ? '챕터' : '운영') : (g.level ? 'Chapter' : 'Run')} ${pct}%`;
+    const rm = $('#rush-meter');
+    rm.hidden = !rush.unlocked;
+    if (rush.unlocked) {
+      $('#rush-fill').style.width = Math.round(rush.charge * 100) + '%';
+      $('#rush-title').textContent = ko ? '도크 러시' : 'DOCK RUSH';
+      $('#rush-label').textContent = rush.ready
+        ? (ko ? `준비 완료 · 보상 ×${rush.mult}` : `READY · REWARD ×${rush.mult}`)
+        : (ko ? `${Math.round(rush.ratio * 100)}% · 더 쌓아라` : `${Math.round(rush.ratio * 100)}% · STOCKPILE`);
+    }
   }
   function renderAll() {
     if (!game) return;
@@ -862,10 +872,11 @@
       const vol = selP.reduce((s, p) => s + p.size, 0);
       const need = vol ? game.trucksNeeded(c, vol) : 1;
       const trucks = Math.min(Math.max(need, 1 + extraTrucks), Math.min(simul, Math.max(1, c.calls + (c.calls === 0 ? 1 : 0))));
-      const cap = vcap * trucks, callFee = game.callFee(c, trucks), income = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
+      const cap = vcap * trucks, callFee = game.callFee(c, trucks), baseIncome = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
       const fill = vol / cap;
+      const rush = game.rushPreview(vol, trucks, fill), income = rush ? Math.round(baseIncome * D.RUSH.bonus) : baseIncome;
       const gauge = `<div class="truckgauge"><div class="tg"><i style="width:${Math.min(100, fill * 100)}%" class="${fill >= 0.8 ? 'good' : ''}"></i><span>${T('call.trucks', { n: trucks, vol, cap })}</span></div><div class="tbtn">${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : game.shows('simul') ? `<span class="d" style="color:var(--dim)">${T('call.simulMax', { n: Math.min(simul, Math.max(1, c.calls)) })}</span>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}</div></div>`;
-      const money = `<div class="pickinfo"><span>+${income}c − ${callFee}c = <b class="${income - callFee >= 0 ? '' : 'bad'}">${T('call.net', { net: income - callFee })}</b></span>${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<span style="color:var(--green)">${T('call.fillOk')}</span>` : vol ? `<span style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</span>` : ''}</div>`;
+      const money = `${rush ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - baseIncome })}</div>` : ''}<div class="pickinfo"><span>+${income}c − ${callFee}c = <b class="${income - callFee >= 0 ? '' : 'bad'}">${T('call.net', { net: income - callFee })}</b></span>${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<span style="color:var(--green)">${T('call.fillOk')}</span>` : vol ? `<span style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</span>` : ''}</div>`;
       const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
       const riskLine = riskSel.length ? `<div class="d" style="font-size:12px;color:var(--orange);margin-bottom:6px">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
       const capsLine = !game.shows('attrs') ? '' : `<div class="d" style="font-size:11px;color:var(--dim);margin-bottom:4px">${car.badge || ''} ${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</div>`;
@@ -903,13 +914,19 @@
     const r = game.callCarrier(i, ids, trucks);
     if (!r.ok) { toast(r.msg); return; }
     pendingCall = r;
+    if (r.rush) {
+      document.body.classList.add('rush-hit');
+      scene.shake(.38); SFX.levelup();
+      toast(T('rush.toast', { n: r.count, bonus: r.rushBonus }), 2800);
+      setTimeout(() => document.body.classList.remove('rush-hit'), 900);
+    }
     busy = true; renderAll();
     const events = game.takeEvents();
     const delivered = events.filter(e => e.type === 'deliver').map(e => e.parcel.id);
     SFX.truck();
     for (const e of events) if (e.type === 'broken') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.broken', { short: D.PARCEL_TYPES[e.parcel.type].short }), true, 30); }
     scene.deliver(delivered, () => {
-      if (delivered.length) { SFX.coin(delivered.length); floatText(r.delay ? T('float.delayed', { n: r.revenue, delay: r.delay }) : `+${r.revenue}c`, false, 70); }
+      if (delivered.length) { SFX.coin(delivered.length); floatText(r.rush ? T('rush.float', { n: r.revenue }) : r.delay ? T('float.delayed', { n: r.revenue, delay: r.delay }) : `+${r.revenue}c`, false, 70); }
       if (r.fee) setTimeout(() => floatText(T('call.fee', { fee: r.fee }), true, 30), 250);
       announceCustomers(events);
       afterTurn(events);
