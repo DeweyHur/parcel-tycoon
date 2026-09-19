@@ -50,7 +50,7 @@
     noBankrupt: false, noDeadlineCycles: 0, storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, eventGoods: false, storageAnon: false,
     // 4단계: 난이도·시나리오 고객 규칙
     feeMult: 1, feeFixed: null, feeDelta: 0,
-    noRepEnd: false, gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, burstDeadlineDelta: 0, customerClaimMult: {}, storageOfferEvery: 0, winStorage: 0, bigCustomer: false, winBigCustomer: false,
+    cycleOffset: 0, noRepEnd: false, gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, burstDeadlineDelta: 0, customerClaimMult: {}, storageOfferEvery: 0, winStorage: 0, bigCustomer: false, winBigCustomer: false,
   };
   const MULT_KEYS = ['theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
   const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'burstTurns', 'selfCapDelta', 'allStartTrust'];
@@ -156,7 +156,7 @@
       const df = M.DIFFICULTIES[c.difficulty] || M.DIFFICULTIES.normal;
       const mods = [{ months: sc.months }, sc.mods, df.mods, co.mods];
       // 레벨은 시나리오 위에 얹는다 — 길이(사이클)·해·시작 달과 그 레벨만의 보정
-      if (this.level) { mods.push({ months: this.level.cycles }); if (this.level.year) mods.push({ year: this.level.year }); if (this.level.startMonth) mods.push({ startMonth: this.level.startMonth }); if (this.level.monthOffset) mods.push({ monthOffset: this.level.monthOffset }); if (this.level.mods) mods.push(this.level.mods); }
+      if (this.level) { mods.push({ months: this.level.cycles }); if (this.level.year) mods.push({ year: this.level.year }); if (this.level.startMonth) mods.push({ startMonth: this.level.startMonth }); if (this.level.monthOffset) mods.push({ monthOffset: this.level.monthOffset }); if (this.level.cycleOffset) mods.push({ cycleOffset: this.level.cycleOffset }); if (this.level.mods) mods.push(this.level.mods); }
       if (c.startMonth) mods.push({ startMonth: c.startMonth }); // 데일리: 그날 지정된 달력 달
       for (const p of c.perks) if (M.PERKS[p]) mods.push(M.PERKS[p].mods);
       for (const v of c.variants || []) if (M.DAILY_VARIANTS[v]) mods.push(M.DAILY_VARIANTS[v].mods);
@@ -177,8 +177,11 @@
         wh = { ...((cy && cy.warehouse) || (lc && lc.warehouse) || co.warehouse) };
         contracts = (cy && cy.contracts) || (lc && lc.contracts) || co.contracts;
       }
-      // 앞 장을 망쳐도(확장을 못 샀어도) 그 장의 대본이 성립하도록 바닥값을 보장한다
+      // 앞 장을 망쳐도(확장을 못 샀어도) 그 장의 대본이 성립하도록 바닥값을 보장한다.
+      // 냉장·냉동 칸도 같이 봐야 한다 — 칸만 보장하고 냉장을 안 보장하면 ❄·❆ 가 갈 데가 없다.
       if (this.level && this.level.minCap != null) wh.cap = Math.max(wh.cap, this.level.minCap);
+      const mw = this.level && this.level.minWarehouse;
+      if (mw) for (const k of ['cap', 'cold', 'frozen', 'xl']) if (mw[k] != null) wh[k] = Math.max(wh[k] || 0, mw[k]);
       wh.cap += R.capDelta; wh.xl += R.xlDelta;
       if (R.coldCapMax != null) wh.cold = Math.min(wh.cold, R.coldCapMax);
       if (wh.frozen == null) wh.frozen = R.coldCapMax === 0 ? 0 : (wh.cold > 0 ? D.WAREHOUSE.frozen : 0);
@@ -479,12 +482,30 @@
     isOffTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.noCalls); }
     isRushTurn(turn, m) { return this.eventsAt(turn, m).some(e => e.arrivalsMult && e.arrivalsMult > 1); }
     // 런 전체의 달력: 개월차 순서대로 [{ m, cal, icon, events }]
-    calendarMonths() { const out = []; const n = this.rules.endless ? 12 : Math.min(12, Math.ceil(this.rules.months / D.CYCLES_PER_MONTH)); for (let i = 1; i <= n; i++) { const c = i * D.CYCLES_PER_MONTH, cal = this.calMonth(c), sm = this.seasonMods(c); out.push({ m: i, cal, icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1, events: (sm.events || []).map(e => ({ id: e.id, turns: e.turns, half: e.half || 0, days: [this.dateOf(e.turns[0], (i - 1) * D.CYCLES_PER_MONTH + (e.half || 1)), this.dateOf(e.turns[1], (i - 1) * D.CYCLES_PER_MONTH + (e.half || 1))] })) }); } return out; }
+    // 이 런이 지나가는 달들. 장마다 cycleOffset 이 다르므로 사이클을 실제로 훑어 개월차를 모은다
+    // (예전에는 1..12 개월차를 가정해서, 3월 후반만 도는 장이 4월로 찍혔다)
+    calendarMonths() {
+      const out = [], seen = new Set(), total = this.rules.endless ? 24 : this.rules.months;
+      for (let c = 1; c <= total; c++) {
+        const m = this.monthIndex(c); if (seen.has(m)) continue; seen.add(m);
+        const sm = this.seasonMods(c);
+        const cycleOf = half => { for (let k = 1; k <= total; k++) if (this.monthIndex(k) === m && this.half(k) === half) return k; return c; };
+        out.push({ m, cal: this.calMonth(c), icon: sm.icon || '', arrivalsMult: sm.arrivalsMult || 1,
+          events: (sm.events || []).map(e => { const ec = cycleOf(e.half || 1);
+            return { id: e.id, turns: e.turns, half: e.half || 0, days: [this.dateOf(e.turns[0], ec), this.dateOf(e.turns[1], ec)] }; }) });
+        if (out.length >= 12) break;
+      }
+      return out;
+    }
     // ----- 시간 · 달력 -----
     // 1턴 = 하루(영업일). 월~토 엿새 뒤 일요일 휴무. 달력은 진짜 — 달마다 길이가 다르고, 정산은 반월 두 번.
     // 요일은 게임 달력으로 고정: 런 첫날(시작 달 1일)이 언제나 월요일. 연도가 달라도 같은 판이 나온다.
-    monthIndex(c) { return Math.ceil((c || this.month || 1) / D.CYCLES_PER_MONTH); }   // 몇 개월차
-    half(c) { return ((c || this.month || 1) - 1) % D.CYCLES_PER_MONTH + 1; }          // 1 전반 · 2 후반
+    // 캠페인은 장마다 런이 새로 시작하지만 달력은 이어져야 한다.
+    // cycleOffset 이 그 장이 한 해(캠페인)의 몇 번째 사이클에서 시작하는지를 말해 준다 —
+    // 이 하나로 개월차·전후반·달·해·물량표가 전부 따라온다.
+    cycleAbs(c) { return (c || this.month || 1) + (this.rules.cycleOffset || 0); }
+    monthIndex(c) { return Math.ceil(this.cycleAbs(c) / D.CYCLES_PER_MONTH); }          // 몇 개월차
+    half(c) { return (this.cycleAbs(c) - 1) % D.CYCLES_PER_MONTH + 1; }                 // 1 전반 · 2 후반
     calMonth(c) { const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return ((start - 1 + this.monthIndex(c) - 1) % 12) + 1; }
     yearOf(c) { const start = this.rules.startMonth || this.calendar().startMonth || D.START_MONTH; return this.year + Math.floor((start - 1 + this.monthIndex(c) - 1) / 12); }
     // 진짜 달력: 그 해 그 달의 실제 길이(윤년 포함)와 실제 요일을 쓴다
@@ -842,7 +863,8 @@
     shows(k) { return !this._shows || this._shows.has(k); }
     // 상호: 레벨 1을 끝내면 플레이어가 붙인 이름이 회사 이름을 대신한다
     companyName() { return this.cfg.companyName || this.company.name; }
-    script(m) { if (this.level && this.level.script) return this.level.script[m || this.month] || null; if (!this.cfg.scripted || !TUT) return null; return TUT.months[m || this.month] || null; }
+    // 준비 마켓은 아직 사이클 0 이다 — 그 장의 대본(사이클 1)을 보게 한다
+    script(m) { if (this.level && this.level.script) return this.level.script[(m || this.month) || 1] || null; if (!this.cfg.scripted || !TUT) return null; return TUT.months[m || this.month] || null; }
     scripted() { return !!this.script(); }
     _extraArrivals(m) { const tm = this.tableMonth(m); return Math.round((tm <= 6 ? D.EXTRA_ARRIVALS[tm] : D.EXTRA_ARRIVALS[6] + (tm - 6) * 2) * this.seasonMods(m).arrivalsMult) + this._customerExtra(); }
     _typeRatio(m) {

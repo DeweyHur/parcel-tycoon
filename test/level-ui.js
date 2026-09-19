@@ -119,43 +119,40 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
 
   console.log('\n서장 다음은 타이틀이 아니라 1장');
   const ch2 = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/1장/.test(ch2) && /두 번째 트럭/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
-  await page.click('#modal .chcard'); await page.waitForTimeout(900);
+  check(/1장/.test(ch2) && /두 번째 트럭/.test(ch2) && /후반/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
+  await page.click('#modal .chcard'); await page.waitForTimeout(1000);
   const carried = await page.evaluate(() => { const g = PT.game, P = Profile.get().campaign;
     return { level: g.cfg.level, cash: g.cash, cap: g.warehouse.cap, carryCash: P.carry && P.carry.cash,
       contracts: g.contracts.filter(Boolean).map(c => c.carrier), name: g.companyName ? g.companyName() : '',
       seen: g.story.seen.length, market: g.shows('market'), calls: g.shows('calls'), attrs: g.shows('attrs') }; });
   check(carried.level === 2 && carried.market && carried.calls && !carried.attrs, '1장에서 마켓·배차가 열리고 특수 품목은 아직 — ' + JSON.stringify(carried));
-  check(!!deal && deal.paid > 0 && carried.cash === carried.carryCash, '계약금이 빠진 돈으로 1장을 시작한다 — 계약금 ' + (deal && deal.paid) + 'c · 시작 자금 ' + carried.cash + 'c');
+  check(!!deal && deal.paid > 0 && carried.cash > 0 && carried.cash <= Math.max(carried.carryCash, 300),
+    '계약금이 빠진 돈으로 1장을 시작한다 — 계약금 ' + (deal && deal.paid) + 'c · 시작 자금 ' + carried.cash + 'c');
   check(carried.contracts.join() === 'bulk0' && carried.cap === 16, '계약·창고가 그대로 넘어왔다 — ' + carried.contracts.join() + ' · ' + carried.cap + '칸');
   check(carried.seen > 0, '서장에서 들은 대사는 다시 안 한다 (본 비트 ' + carried.seen + '개)');
 
-  console.log('\n1장 마켓이 번잡하지 않다');
-  // 1사이클 끝까지 빨리 감고 마켓을 UI 로 연다 (열려 있는 대화창부터 닫는다 — 안 닫으면 버튼 클릭을 가로챈다)
-  await readBeat(); await passGate(); await readBeat();
-  await page.evaluate(() => { const g = PT.game; g.story.off = true; let n = 0;
-    while (g.phase === 'play' && g.turn < g.turns() && n++ < 40) { g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents(); } PT.renderAll(); });
-  await page.waitForTimeout(300);
-  await page.click('#wait-btn', { force: true }); await page.waitForTimeout(1000);
-  for (let k = 0; k < 4; k++) { if (await page.evaluate(() => PT.game.phase === 'market')) break;
-    const b = await page.$('#modal .foot .btn.primary'); if (!b) break; await b.click(); await page.waitForTimeout(600); }
-  await page.waitForTimeout(500);
+  console.log('\n1장은 준비 마켓으로 열리고, 그 마켓이 번잡하지 않다');
+  // 한 사이클 장에는 정산 뒤 마켓이 없다 — 장을 준비 마켓으로 연다. 카드를 넘기면 바로 여기다.
+  await readBeat(); await passGate(); await readBeat();     // 마켓 위에 뜬 대화창부터 닫는다
   await page.screenshot({ path: 'shots/L07-market.png' });
   const mk = await page.evaluate(() => ({
+    phase: PT.game.phase, prep: !!(PT.game.market && PT.game.market.prep),
     txt: (document.getElementById('modal') || {}).textContent || '',
-    slots: document.querySelectorAll('#modal .card').length,
     ins: !!document.getElementById('mk-ins'), cust: !!document.getElementById('mk-cust'),
     mine: !!document.getElementById('mk-mine'), refresh: !!document.getElementById('mk-refresh'),
-    empty: (document.getElementById('modal').textContent.match(/빈 슬롯/g) || []).length }));
-  check(await page.evaluate(() => PT.game.phase === 'market'), '마켓이 열렸다');
+    empty: ((document.getElementById('modal') || {}).textContent || '').split('빈 슬롯').length - 1 }));
+  check(mk.phase === 'market' && mk.prep, '장이 준비 마켓으로 열린다 — ' + mk.phase);
   check(!/냉장|초대형/.test(mk.txt), '창고 줄에 냉장·초대형이 없다');
   check(!mk.ins && !mk.cust && !mk.mine, '보험·고객·내 계약 버튼이 없다');
   check(!mk.refresh && !/가격 ×/.test(mk.txt), '새로고침·가격 배수가 없다');
   check(mk.empty === 0, '빈 계약 슬롯이 없다 (지금: ' + mk.empty + '칸)');
+  await page.click('#modal .foot .btn.primary', { force: true }); await page.waitForTimeout(900);
+  await readBeat();
+  check(await page.evaluate(() => PT.game.phase === 'play'), '마켓을 닫으면 첫날이 시작된다');
 
   console.log('\n장이 끝나면 잔금을 한 회차 낸다');
   await page.evaluate(() => { const P = PT.Profile.get();
-    P.campaign = { level: 3, cleared: 2, name: '한길택배', deal: { price: 11000, paid: 1385, rest: 9615 },
+    P.campaign = { level: 3, cleared: 2, name: '한길택배', deal: { price: 1200, paid: 400, rest: 800 },
       carryAt: { 3: { cash: 2000, warehouse: { cap: 24, cold: 0, frozen: 0, xl: 0 },
         contracts: [{ carrier: 'bulk0', grade: 'normal', calls: 8 }], customers: [['anon', 0]], trust: { bulk0: 80 }, seen: ['l1intro'], notes: [] } } };
     PT.Profile.save(); });
@@ -164,11 +161,14 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   const y2 = await page.$('#modal .foot .btn.warn'); if (y2) { await y2.click(); await page.waitForTimeout(1400); }
   const c2 = await page.$('#modal .chcard'); if (c2) { await c2.click(); await page.waitForTimeout(800); }
   await readBeat(); await passGate(); await readBeat();
-  await page.evaluate(() => { const g = PT.game; g.story.off = true; g.cash = 3000; let n = 0;
+  // 장이 준비 마켓으로 열리므로 먼저 닫고, 마지막 날 직전까지 감는다
+  await page.evaluate(() => { const g = PT.game; g.story.off = true; if (g.phase === 'market') g.closeMarket(); g.cash = 3000; let n = 0;
     while (n++ < 500 && !(g.phase === 'play' && g.month === g.rules.months && g.turn === g.turns())) {
       if (g.phase === 'play') g.wait(); else if (g.phase === 'summary') g.closeSummary();
       else if (g.phase === 'market') g.closeMarket(); else if (g.phase === 'weekend') g.weekendChoose('rest'); else break; g.takeEvents(); }
     g.cash = 3000; PT.renderAll(); });
+  await page.waitForTimeout(200);
+  if (await page.$('#modal-root.show')) { const cl = await page.$('#modal .foot .btn'); if (cl) { await cl.click(); await page.waitForTimeout(400); } }
   await page.waitForTimeout(300);
   await page.click('#wait-btn', { force: true }); await page.waitForTimeout(1500);
   for (let k = 0; k < 8; k++) {
@@ -179,10 +179,10 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   }
   await page.screenshot({ path: 'shots/L08-instalment.png' });
   const inst = await page.$eval('#modal', el => el.textContent.replace(/\s+/g, ' ')).catch(() => '');
-  check(/잔 금 영 수 증/.test(inst) && /11000c/.test(inst) && /700c/.test(inst), '잔금 회차 화면이 뜬다 — ' + inst.slice(0, 70));
+  check(/잔 금 영 수 증/.test(inst) && /1200c/.test(inst) && /120c/.test(inst), '잔금 회차 화면이 뜬다 — ' + inst.slice(0, 70));
   await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(1400);
   const afterPay = await page.evaluate(() => { const d = PT.Profile.get().campaign.deal; return { paid: d.paid, rest: d.rest, cash: PT.game && PT.game.cash }; });
-  check(afterPay.paid === 2085 && afterPay.rest === 8915, '회차만큼 잔금이 줄어든다 — ' + JSON.stringify(afterPay));
+  check(afterPay.paid === 520 && afterPay.rest === 680, '회차만큼 잔금이 줄어든다 — ' + JSON.stringify(afterPay));
   check(afterPay.cash > 0 && afterPay.cash < 3000, '낸 만큼 덜어진 돈으로 다음 장을 시작한다 — ' + afterPay.cash + 'c');
 
   console.log('\n1장에서 서장으로 돌아갈 수 있다');

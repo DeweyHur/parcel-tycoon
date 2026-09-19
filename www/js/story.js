@@ -105,16 +105,10 @@
     { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
-    // 첫 사이클은 전부 무기한이었다. 기한 있는 택배가 처음 들어온 날, 그걸 가져온 사람이 직접 말한다
-    { id: 'l1due', kind: 'turn', when: g => g.parcels.some(p => !p.noDeadline), pages: [
-      { expr: 'neutral', hl: '#parcels' },
-      { expr: 'neutral', hl: '#parcels' },
-    ] },
-    { id: 'l1deadline', kind: 'turn', when: g => g.story.seen.includes('l1due') && g.parcels.some(p => !p.overdue && !p.noDeadline && p.deadline <= 1), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'l1sunday', kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
     { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
     { id: 'l1usage', kind: 'turn', when: g => usage(g) >= 0.75, pages: [{ expr: 'worry', hl: '#bar-usage' }] },
-    { id: 'l1last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'think' }] },
+    { id: 'l1last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }, { expr: 'think' }] },
   ];
 
   // ----- 레벨 2 전용 비트 (1장 · 5~6월) -----
@@ -122,6 +116,12 @@
   // 서장에서 가르친 것(쌓기·적재율·기한)은 다시 말하지 않는다.
   const capItem = g => mkItem(g, it => it.kind === 'fac' && /^expand/.test(it.fac || ''));
   const BEATS_L2 = [
+    // 서장은 통째로 무기한이었다. 기한은 여기 첫날에 처음 붙는다 (문구는 서장 때 쓰던 것 그대로)
+    { id: 'l1due', kind: 'turn', when: g => g.parcels.some(p => !p.noDeadline), pages: [
+      { expr: 'neutral', hl: '#parcels' },
+      { expr: 'neutral', hl: '#parcels' },
+    ] },
+    { id: 'l1deadline', kind: 'turn', when: g => g.story.seen.includes('l1due') && g.parcels.some(p => !p.overdue && !p.noDeadline && p.deadline <= 1), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'l2intro', kind: 'start', when: () => true, pages: [
       { expr: 'smile' },
       { expr: 'neutral', hl: '#c0' },
@@ -142,7 +142,7 @@
     // 넘쳐 본 다음에 확장을 판다
     { id: 'l2cap', kind: 'market', when: g => !!capItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'fac' && /^expand/.test(it.fac || '')) }] },
     { id: 'l2usage', kind: 'turn', when: g => usage(g) >= 0.9, pages: [{ expr: 'worry', hl: '#bar-usage' }] },
-    { id: 'l2last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
+    { id: 'l2last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }] },
   ];
 
   // ----- 레벨 3 전용 비트 (2장 · 7~8월 · 장마) -----
@@ -187,7 +187,7 @@
       { expr: 'worry' },
     ] },
     { id: 'l3yardBuy', kind: 'market', when: g => !!mkItem(g, it => it.kind === 'fac' && it.fac === 'yard'), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'fac' && it.fac === 'yard') }] },
-    { id: 'l3last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
+    { id: 'l3last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }] },
   ];
 
   // ----- 레벨 4 전용 비트 (3장 · 9~10월) -----
@@ -226,7 +226,7 @@
     { id: 'l4produce', kind: 'turn', when: g => !!firstOf(g, 'produce'), pages: [{ expr: 'neutral', hl: '#parcels' }] },
     { id: 'l4break', kind: 'any', when: (g, ctx) => hasEvent(ctx, ['broken']), pages: [{ expr: 'shock' }, { expr: 'neutral' }] },
     { id: 'l4custUp', kind: 'any', when: (g, ctx) => hasEvent(ctx, ['custLevel']), pages: [{ expr: 'laugh' }, { expr: 'smile' }] },
-    { id: 'l4last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }] },
+    { id: 'l4last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }] },
   ];
 
   // ----- 레벨 5 전용 비트 (4장 · 11~12월 · 소문) -----
@@ -264,7 +264,7 @@
     ] },
     // 쇼핑 행사 폭주
     { id: 'l5rush', kind: 'turn', when: g => g.isRushTurn && g.isRushTurn(), pages: [{ expr: 'worry', hl: '#upcoming' }] },
-    { id: 'l5last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [{ expr: 'smile' }, { expr: 'think' }] },
+    { id: 'l5last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }, { expr: 'think' }] },
   ];
 
   // ----- 레벨 6 전용 비트 (5장 · 1~2월 · 마지막 겨울) -----
@@ -310,7 +310,7 @@
       { expr: 'worry', hl: '#parcels' },
       { expr: 'neutral', hl: '#parcels' },
     ] },
-    { id: 'l6last', kind: 'turn', when: g => g.month === g.rules.months && g.turn === 1, pages: [
+    { id: 'l6last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [
       { expr: 'smile' },
       { expr: 'think' },
       { expr: 'smile' },

@@ -132,8 +132,10 @@
   // 레벨 런: 난이도·회사·퍽을 묻지 않는다. 소개는 박 반장이 게임 안에서 한다
   function startLevel(n) {
     const P = Profile.get();
-    game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false,
-      companyName: P.campaign.name || '', carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
+    // 장은 한 사이클이라 정산 뒤 마켓이 없다 — 대신 **장을 준비 마켓으로 연다**.
+    // "오기 전에 준비한다"가 이 게임의 핵심인데, 그걸 가르칠 자리가 여기 말고는 없다. 서장은 마켓 자체가 안 열린다.
+    game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n,
+      prep: n > 1, companyName: P.campaign.name || '', carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
     closeModal(); startPlay({ intro: n === 1, chapter: n });
   }
@@ -439,7 +441,10 @@
   // (캠페인 전체의 사이클 번호 startCycle 로 읽으면 startMonth 위에 또 더해져 두 달씩 밀린다)
   function chWhen(n) {
     const lv = LEVELS.get(n); if (!game || !lv) return '';
-    const c1 = lv.cycles || 4;
+    const c1 = lv.cycles || 1;
+    // 한 사이클짜리 장은 '3월 전반'처럼 반달로 적는다 — '3월 — 3월'은 아무 말도 아니다
+    if (game.calMonth(1) === game.calMonth(c1) && game.half(1) === game.half(c1))
+      return T('ch.whenHalf', { y: game.yearOf(1), cal: game.calMonth(1), half: T('fmt.half' + game.half(1)) });
     return T('ch.when', { y: game.yearOf(1), a: game.calMonth(1), b: game.calMonth(c1) });
   }
   function chapterCard(cls, inner, onTap) {

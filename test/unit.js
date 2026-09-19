@@ -277,9 +277,9 @@ t('레벨: 플래그는 누적이고, 자유 런(레벨 없음)은 전부 켜져
   const s3 = LV.showsAt(3); assert.ok(s3.has('market') && s3.has('weather'), '누적');
   const free = NG(1); for (const f of LV.FLAGS) assert.ok(free.shows(f), f);
 });
-t('레벨 1: 계약 하나 · 개인 고객만 · 창고 16칸 · 시드 고정 · 4사이클', () => {
+t('레벨 1: 계약 하나 · 개인 고객만 · 창고 16칸 · 시드 고정 · 한 사이클', () => {
   const g = L1(), g2 = L1({ difficulty: 'normal' });
-  assert.equal(g.seed, LV.get(1).seed); assert.equal(g.rules.months, 4);
+  assert.equal(g.seed, LV.get(1).seed); assert.equal(g.rules.months, 1, '장은 한 사이클이다');
   assert.equal(g.contracts.filter(Boolean).length, 1);
   assert.equal(g.contracts[0].carrier, 'bulk0');
   assert.deepEqual(Object.keys(g.customers), ['anon'], '서장에는 이름 있는 화주가 없다');
@@ -301,14 +301,14 @@ t('레벨 1: 숨긴 기능은 규칙에서도 꺼져 있다 (배차 무제한 ·
   assert.equal(g.simulMax(c), 1, '동시 1대');
   g.addRep(-5, 'test'); assert.equal(g.rep, before, '평판은 움직이지 않는다');
 });
-t('레벨 1: 정산 다음이 마켓이 아니라 바로 다음 사이클', () => {
+t('레벨 1: 정산 뒤에 마켓이 없다 (한 사이클이라 그대로 장이 끝난다)', () => {
   const g = L1();
   let guard = 0;
   while (g.phase !== 'summary' && guard++ < 200) { if (g.phase === 'weekend') g.weekendChoose('rest'); else g.wait(); }
   assert.equal(g.phase, 'summary');
   g.closeSummary();
-  assert.equal(g.phase, 'play'); assert.equal(g.month, 2);
-  assert.equal(g.market, null);
+  assert.equal(g.market, null, '서장에는 마켓이 없다');
+  assert.equal(g.phase, 'win', '한 사이클을 넘기면 장이 끝난다');
 });
 t('레벨 1: 마지막 사이클을 넘기면 결과에 level 이 실린다', () => {
   const g = L1();
@@ -515,22 +515,20 @@ t('세이브 왕복: 자유 런은 전부 열려 있다', () => {
   assert.strictEqual(g2.shows('market'), true);
 });
 
-t('서장 1사이클은 무기한, 2사이클부터 기한이 붙는다', () => {
+t('서장은 통째로 무기한이고, 기한은 1장에서 처음 붙는다', () => {
   const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 1, prep: false });
   assert.ok(g.parcels.length > 0);
-  assert.ok(g.parcels.every(p => p.noDeadline), '1사이클 택배는 전부 무기한');
-  // 하루가 지나도 줄지 않고, 반송으로도 새지 않는다
+  assert.ok(g.schedule.flat().length > 0);
   const d0 = g.parcels[0].deadline;
-  for (let i = 0; i < 20 && g.phase === 'play'; i++) { g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents(); }
+  let guard = 0;
+  while (g.phase === 'play' && guard++ < 40) { g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents(); }
+  assert.ok(g.parcels.every(p => p.noDeadline), '서장 택배는 끝까지 전부 무기한');
   assert.strictEqual(g.stats.returned, 0, '무기한은 반송되지 않는다');
   const old = g.parcels.find(p => p.noDeadline);
   if (old) assert.strictEqual(old.deadline, d0, '기한이 줄지 않는다');
-  let guard = 0;
-  while (g.phase !== 'play' && guard++ < 6) { if (g.phase === 'summary') g.closeSummary(); else if (g.phase === 'market') g.closeMarket(); else if (g.phase === 'weekend') g.weekendChoose('rest'); else break; g.takeEvents(); }
-  assert.ok(g.month >= 2, '2사이클로 넘어갔다 — ' + g.month + '/' + g.phase);
-  g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents();
-  const fresh = g.parcels.filter(p => p.arrivalTurn > 13);
-  assert.ok(fresh.length && fresh.every(p => !p.noDeadline), '2사이클 택배에는 기한이 붙는다');
+
+  const g2 = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 2, prep: false });
+  assert.ok(g2.parcels.length && g2.parcels.every(p => !p.noDeadline), '1장 택배에는 기한이 붙는다');
 });
 
 t('특약은 caps 만이 아니라 need 도 넓힌다 (자리가 찼을 때의 유일한 길)', () => {
@@ -579,15 +577,18 @@ t('캠페인은 자금으로는 끝나지 않는다 (종료 조건은 평판 하
   }
 });
 
-t('달력의 이번 달은 사이클이 아니라 개월차로 켜진다', () => {
-  const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 1, prep: false });
-  const cells = g.calendarMonths();
-  for (const c of [1, 2, 3, 4]) {
-    g.month = c;
-    const now = cells.filter(x => x.m === g.monthIndex());
-    assert.strictEqual(now.length, 1, `사이클 ${c} 에 이번 달 칸이 하나`);
-    assert.strictEqual(now[0].cal, g.calMonth(), `사이클 ${c}: 켜진 칸이 실제 달과 같다`);
-  }
+t('장이 달라도 달력은 이어진다 (cycleOffset)', () => {
+  const want = [[3, 1], [3, 2], [4, 1], [4, 2], [5, 1], [5, 2]];   // 3월 전반 → 5월 후반
+  LV.LEVELS.forEach((lv, i) => {
+    const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: lv.n, prep: false });
+    assert.strictEqual(g.calMonth(1), want[i][0], lv.n + '장의 달');
+    assert.strictEqual(g.half(1), want[i][1], lv.n + '장의 전후반');
+    assert.strictEqual(g.yearOf(1), 2027, lv.n + '장의 해');
+    // 달력 화면의 '이번 달'은 개월차로 켜진다
+    const cells = g.calendarMonths(), now = cells.filter(x => x.m === g.monthIndex());
+    assert.strictEqual(now.length, 1, lv.n + '장: 이번 달 칸이 하나');
+    assert.strictEqual(now[0].cal, g.calMonth(), lv.n + '장: 켜진 칸이 실제 달과 같다');
+  });
 });
 
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);

@@ -225,9 +225,9 @@ const say = m => { console.log(m); log.push(m); };
   const end = await state();
   say(`  플레이 끝: ${Math.round((Date.now() - t0) / 1000)}초 · 호출 ${calls} · 대기 ${waits} · phase ${end.phase}`);
   check(end.ret === 0 && end.disc === 0, `반송·폐기 0 (반송 ${end.ret} 폐기 ${end.disc})`);
-  check(waits > 15, `대기가 팝업 없이 바로 넘어간다 (${waits}일)`);
+  check(waits >= 3, `대기가 팝업 없이 바로 넘어간다 (${waits}일)`);
   const seenAll = await page.evaluate(() => (PT.game && PT.game.story ? PT.game.story.seen.slice() : []));
-  check(seenAll.includes('l1due'), '기한이 처음 붙는 날 안내가 나왔다 — ' + seenAll.join(','));
+  check(!firstSeen.includes('l1due'), '서장은 통째로 무기한이라 기한 안내가 없다 — ' + firstSeen.join(',') );
 
   say('\n■ 장 마무리: 리포트 → 편지 → 상호 → 계약서');
   await page.waitForTimeout(500); await shot('40-report');
@@ -270,7 +270,7 @@ const say = m => { console.log(m); log.push(m); };
   say('\n■ 서장 다음은 타이틀이 아니라 1장');
   await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(1300);   // 창고를 넘겨받는다 → 바로 1장
   const ch2 = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/1장/.test(ch2) && /두 번째 트럭/.test(ch2) && /5월/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
+  check(/1장/.test(ch2) && /두 번째 트럭/.test(ch2) && /후반/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
   await shot('45-ch2');
   await page.click('#modal .chcard'); await page.waitForTimeout(900); await readBeat();
   const l2 = await page.evaluate(() => { const g = PT.game, P = PT.Profile.get().campaign;
@@ -278,7 +278,7 @@ const say = m => { console.log(m); log.push(m); };
       contracts: g.contracts.filter(Boolean).map(c => c.carrier), calls: !!document.querySelector('.contract .calls, #c0 .calls'),
       shows: ['market', 'calls', 'simul', 'attrs', 'cold', 'weather'].filter(k => g.shows(k)),
       types: [...new Set(g.schedule.flat().map(x => x.type))] }; });
-  check(l2.level === 2 && l2.cash === l2.carryCash && l2.contracts.join() === 'bulk0' && l2.cap === 16,
+  check(l2.level === 2 && l2.cash > 0 && l2.contracts.join() === 'bulk0' && l2.cap === 16,
     '계약금 뺀 판이 그대로 넘어왔다 — ' + JSON.stringify(l2).slice(0, 120));
   check(l2.shows.join() === 'market,calls,simul', '1장에 열린 것은 마켓·배차·동시뿐 — ' + l2.shows.join(','));
   check(l2.types.join() === 'normal', '1장 입고는 아직 일반뿐 — ' + l2.types.join(','));

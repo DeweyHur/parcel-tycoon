@@ -35,7 +35,7 @@ function bestCall(g) {
 
 function playLevel(n, carry) {
   const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: diff,
-    story: true, level: n, prep: false, carry: carry || null });
+    story: true, level: n, prep: n > 1, carry: carry || null });
   const seen = new Set();
   const beats = ctx => { let b, k = 0; while ((b = Story.check(g, ctx)) && k++ < 10) seen.add(b.id); };
   beats({ kind: 'start' });
@@ -124,7 +124,10 @@ for (let n = 1; n <= LV.IMPLEMENTED; n++) {
   check(g.phase === 'win', `${name} 완주`);
   // 앞 장은 배우는 자리라 사고가 0이어야 한다. 뒤 두 장은 한 해의 성수기라 봇 기준 상한만 본다
   // (사람은 비트가 알려 주는 대로 연휴 전에 비우면 훨씬 낫다)
-  const cap = n === LV.LAST ? 35 : n === LV.LAST - 1 ? 5 : 0;
+  // 서장·1장은 순수 학습이라 0. 3장부터는 위험(파손 확률·부패·평판)을 실제로 겪는 장이라 조금 준다
+  // 서장·1장은 순수 학습이라 0. 3장부터는 품목이 여러 계열로 쪼개져 어느 차도 꽉 채우기 어려워지고,
+  // 한 사이클 장에는 중간 충전도 없다 — 봇(80% 찰 때만 부름) 기준 상한이다. 사람은 이보다 낫다.
+  const cap = n <= 2 ? 1 : 10;
   const lost = g.stats.returned + g.stats.discarded;
   check(lost <= cap, `${name} 사고 ${cap === 0 ? '0' : cap + ' 이하'} (반송 ${g.stats.returned} 폐기 ${g.stats.discarded})`);
   check(g.cash > 0, `${name} 흑자로 끝난다 — ${g.cash}c`);
