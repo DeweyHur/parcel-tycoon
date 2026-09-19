@@ -1007,7 +1007,9 @@
     const events = game.takeEvents();
     const delivered = events.filter(e => e.type === 'deliver').map(e => e.parcel.id);
     const topValue = events.filter(e => e.type === 'deliver').reduce((m, e) => Math.max(m, valueTier(e.parcel)), 0);
-    for (const e of events) if (e.type === 'broken') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.broken', { short: D.PARCEL_TYPES[e.parcel.type].short }), true, 30); }
+    let broke = false;
+    for (const e of events) if (e.type === 'broken') { broke = true; scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.broken', { short: D.PARCEL_TYPES[e.parcel.type].short }), true, 30); }
+    if (broke) scene.mope(); else if (r.chain >= 2 || r.rush || topValue >= 2) scene.cheer(Math.max(r.chain || 0, r.rush ? 3 : 0, topValue));
     scene.deliver(delivered, () => {
       if (delivered.length) { SFX.coin(delivered.length); floatText(r.rush ? T('rush.float', { n: r.revenue }) : r.delay ? T('float.delayed', { n: r.revenue, delay: r.delay }) : `+${r.revenue}c`, false, 70); }
       if (topValue >= 2) setTimeout(() => { rewardBurst(T('value.delivered.' + topValue), topValue); SFX.combo(topValue + 1); }, 180);
@@ -1073,13 +1075,13 @@
   function afterTurn(events) {
     for (const e of events) if (e.type === 'discard') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.discard', { why: I18n.text(e.why) }), true, 30); }
     for (const e of events) if (e.type === 'paid') { SFX.coin(e.count); floatText(T('float.paid', { name: e.name, n: e.amount }), false, 70); }
-    for (const e of events) if (e.type === 'missionUp') { SFX.levelup(); rewardBurst(T('mission.up', { grade: e.grade, bonus: e.bonus }), e.grade === 'A' ? 3 : e.grade === 'B' ? 2 : 1); toastLater(T('mission.toast', { grade: e.grade, bonus: e.bonus }), 2300); }
+    for (const e of events) if (e.type === 'missionUp') { SFX.levelup(); scene.cheer(e.grade === 'A' ? 3 : e.grade === 'B' ? 2 : 1); rewardBurst(T('mission.up', { grade: e.grade, bonus: e.bonus }), e.grade === 'A' ? 3 : e.grade === 'B' ? 2 : 1); toastLater(T('mission.toast', { grade: e.grade, bonus: e.bonus }), 2300); }
     announceCustomers(events);
     for (const e of events) { if (e.type === 'storageEnd') { SFX.coin(1); floatText(T('float.storageEnd', { pay: e.pay ? `+${e.pay}c` : '' }), false, 70); } if (e.type === 'storageStolen') { SFX.discard(); floatText(T('float.storageStolen', { n: e.amount }), true, 30); } if (e.type === 'offer') toastLater(`${M.CUSTOMERS[e.offer.customer].icon} ${T('toast.offer')}`, 2000); }
     for (const e of events) if (e.type === 'returned') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.returned', { short: D.PARCEL_TYPES[e.parcel.type].short }), true, 30); }
     for (const e of events) if (e.type === 'stolen') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.stolen', { short: D.PARCEL_TYPES[e.parcel.type].short, size: e.parcel.size }), true, 30); }
     const pen = events.find(e => e.type === 'penalty');
-    if (pen) { scene.shake(); SFX.penalty(); floatText(T('float.rep', { n: pen.amount }), true, 50); toast(pen.reasons.map(I18n.text).join(' · '), 2600); }
+    if (pen) { scene.shake(); scene.mope(); SFX.penalty(); floatText(T('float.rep', { n: pen.amount }), true, 50); toast(pen.reasons.map(I18n.text).join(' · '), 2600); }
     setTimeout(() => {
       scene.sync(game, { animate: true });
       if (events.some(e => e.type === 'arrive')) SFX.thud();

@@ -146,6 +146,7 @@ window.Scene3D = (function () {
       if (this.parts.front) { this.parts.front.visible = !!this.closed; this._setAlpha(this.parts.front, 1); }
       if (this.road) { this.road.position.x = Z.x1 + 0.6 + 20; this.road.position.z = Z.roadZ; }   // 도로는 마당 너머, 건물 오른쪽으로
       if (this.truck) this.truck.position.z = Z.roadZ;
+      if (this.workers) { this.workers[0].position.set(TRUCK_DOCK - 0.6, 0, Z.roadZ - 0.55); this.workers[1].position.set(TRUCK_DOCK - 0.35, 0, Z.roadZ + 0.6); }
       this.tileCaps = null;   // 구역이 바뀌었으니 바닥 타일도 다시
       this.resize();
       return true;
@@ -295,6 +296,11 @@ window.Scene3D = (function () {
       this.trucks = [this.truck];
       // 도로
       const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 3.4), this._mat(0x4a4a52)); road.rotation.x = -Math.PI / 2; road.position.set(14, -0.02, 3.6); road.receiveShadow = true; s.add(road); this.road = road;
+      // 도크 인부 — 상하차 연출에 생기를 준다. 기분(mood)에 따라 팔·자세가 바뀐다
+      this.workers = [this._makeWorker(0x3d6fbf), this._makeWorker(0x5c9a5c)];
+      this.workers[0].position.set(TRUCK_DOCK - 0.6, 0, 2.05); this.workers[1].position.set(TRUCK_DOCK - 0.35, 0, 4.2);
+      for (const w of this.workers) s.add(w);
+      this.workerMood = 0; this.workerMoodT = 0;   // -1 풀죽음 · 0 평소 · 1 신남
       // 나무 몇 그루 (장식)
       [[-7.5, -3], [8.5, -3.5], [-8, 3.5]].forEach(([x, z]) => { const t = new THREE.Group(); const trunk = this._box(0.3, 0.8, 0.3, 0x8a5a3a); trunk.position.y = 0.4; const leaf = this._box(1.2, 1.2, 1.2, 0x4f9a4a); leaf.position.y = 1.4; t.add(trunk, leaf); t.position.set(x, 0, z); s.add(t); });
     }
@@ -411,6 +417,21 @@ window.Scene3D = (function () {
       const stripe = this._box(2.22, 0.22, 1.32, 0x6c8cff); stripe.position.set(0.4, 0.7, 0); g.add(stripe);
       for (const [x, z] of [[-1.15, 0.7], [-1.15, -0.7], [1.05, 0.7], [1.05, -0.7]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.22, 8), this._mat(0x222230)); w.rotation.x = Math.PI / 2; w.position.set(x, 0.28, z); w.castShadow = true; g.add(w); }
       this.truckCargoY = 0.95;
+      return g;
+    }
+    _makeWorker(shirt) {
+      const g = new THREE.Group(), skin = 0xe0a877, pants = 0x2c2b38, vest = 0xffb238;
+      const legL = this._box(0.15, 0.46, 0.16, pants); legL.position.set(-0.09, 0.23, 0); g.add(legL);
+      const legR = this._box(0.15, 0.46, 0.16, pants); legR.position.set(0.09, 0.23, 0); g.add(legR);
+      const torso = this._box(0.34, 0.4, 0.22, shirt || 0x3d6fbf); torso.position.set(0, 0.66, 0); g.add(torso);
+      const vestStripe = this._box(0.36, 0.13, 0.24, vest, { emissive: 0x553600 }); vestStripe.position.set(0, 0.66, 0); g.add(vestStripe);
+      const head = this._box(0.2, 0.2, 0.2, skin); head.position.set(0, 0.96, 0); g.add(head);
+      const cap = this._box(0.22, 0.08, 0.22, 0x2b2a38); cap.position.set(0, 1.07, 0); noShadow(cap); g.add(cap);
+      const armPivotL = new THREE.Group(); armPivotL.position.set(-0.23, 0.82, 0); g.add(armPivotL);
+      const armL = this._box(0.11, 0.34, 0.11, shirt || 0x3d6fbf); armL.position.set(0, -0.17, 0); armPivotL.add(armL);
+      const armPivotR = new THREE.Group(); armPivotR.position.set(0.23, 0.82, 0); g.add(armPivotR);
+      const armR = this._box(0.11, 0.34, 0.11, shirt || 0x3d6fbf); armR.position.set(0, -0.17, 0); armPivotR.add(armR);
+      g.userData.armPivotL = armPivotL; g.userData.armPivotR = armPivotR; g.userData.phase = Math.random() * 10;
       return g;
     }
 
@@ -544,6 +565,8 @@ window.Scene3D = (function () {
       this._tween(b.position, { y: b.position.y - 0.4 }, 0.4, ease);
     }
     shake(amount = 0.15) { this.shakeT = 0.35; this.shakeA = amount; }
+    cheer(power = 1) { this.workerMood = 1; this.workerMoodT = 1.4 + power * 0.5; }
+    mope(power = 1) { this.workerMood = -1; this.workerMoodT = 1.4 + power * 0.5; }
     // ---------- 오프닝 카메라 (intro.js 가 밖에서 몬다) ----------
     // this.cine = true 인 동안 resize()·_loop() 는 카메라를 건드리지 않는다.
     // ---------- 완성 건물 ↔ 단면 ----------
@@ -577,6 +600,22 @@ window.Scene3D = (function () {
     dropTween(tag) { this.tweens = this.tweens.filter(t => t.tag !== tag); }
     camSet(p, l) { this.camera.position.set(p[0], p[1], p[2]); this.camera.lookAt(l[0], l[1], l[2]); }
     camHome() { return { p: [this.camX, this.camY, this.camZ], l: (this.camLook || [1.3, 0.3, 0.3]).slice(), fov: this.camFov || this.camera.fov }; }
+    // 도크 인부 애니메이션 — mood: 1 신남(팔 번쩍+통통), -1 풀죽음(팔 축 처짐+고개 숙임), 0 평소(적재 중이면 팔 흔들기, 아니면 가벼운 흔들림)
+    _tickWorkers(dt) {
+      if (!this.workers) return;
+      if (this.workerMoodT > 0) { this.workerMoodT -= dt; if (this.workerMoodT <= 0) { this.workerMoodT = 0; this.workerMood = 0; } }
+      const mood = this.workerMood, working = this.busy > 0;
+      for (const w of this.workers) {
+        const ph = this.time * (mood === 1 ? 11 : working ? 7 : 2.2) + w.userData.phase;
+        w.position.y = Math.max(0, Math.sin(ph)) * (mood === 1 ? 0.11 : mood === -1 ? 0 : working ? 0.045 : 0.015);
+        w.rotation.x = (mood === -1 ? 0.32 : 0) + Math.sin(this.time * (mood === -1 ? 1.6 : 2.2) + w.userData.phase) * (mood === -1 ? 0.03 : 0.015);
+        const pL = w.userData.armPivotL, pR = w.userData.armPivotR;
+        if (mood === 1) { pL.rotation.z = -2.5 + Math.sin(ph) * 0.35; pR.rotation.z = 2.5 - Math.sin(ph) * 0.35; pL.rotation.x = pR.rotation.x = 0; }
+        else if (mood === -1) { pL.rotation.z = 0.35; pR.rotation.z = -0.35; pL.rotation.x = pR.rotation.x = 0.45; }
+        else if (working) { pL.rotation.z = pR.rotation.z = 0; pL.rotation.x = Math.sin(ph) * 0.85 + 0.3; pR.rotation.x = -Math.sin(ph) * 0.85 + 0.3; }
+        else { pL.rotation.z = pR.rotation.z = 0; pL.rotation.x = Math.sin(this.time * 1.1 + w.userData.phase) * 0.08; pR.rotation.x = -pL.rotation.x; }
+      }
+    }
 
     _loop() {
       requestAnimationFrame(() => this._loop());
@@ -603,6 +642,7 @@ window.Scene3D = (function () {
       this._tickWeather(dt);
       // 트럭 바퀴 흔들림 — 동시에 달리는 트럭 전부
       for (const t of this.trucks) t.position.y = (t.position.x < TRUCK_PARK - 0.1 && t.position.x > TRUCK_DOCK + 0.1) ? Math.abs(Math.sin(this.time * 30)) * 0.03 : 0;
+      this._tickWorkers(dt);
       const cy = this.camY || 7.8;
       // 오프닝: 카메라는 intro.js 가 놓는다. 반드시 render 직전에 불러야 한다 —
       // 따로 rAF 를 돌리면 setSize 로 캔버스를 비운 프레임이 그대로 찍혀 장면이 깜빡인다
