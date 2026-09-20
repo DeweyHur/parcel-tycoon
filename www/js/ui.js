@@ -584,8 +584,13 @@
     const up = g.upcoming();
     let sawEnd = false;   // 월말 정산 칩이 두 번 세 번 반복되면 줄만 길어진다 — 한 번만
     // 기획서대로 앞 2턴만 — 3턴 뒤 입고는 지금 결정에 쓰이지 않는데 줄만 세 줄로 늘어난다
-    $('#upcoming').innerHTML = `<span>${T('hud.upcoming')}</span>` + up.slice(0, 2).map(u => {
-      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${T('fmt.dayN', { d: g.dateOf(u.turn) })}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}: ${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}" title="${esc(D.PARCEL_TYPES[s.type].name)}" aria-label="${esc(D.PARCEL_TYPES[s.type].name)}"></i>${s.size}`).join(' ')}</span>`;
+    // 한 줄에 칩 둘 — 내일(▸)·모레(▸▸). 각 칩이 그날의 날씨와 입고를 같이 들고 있다.
+    // 날짜도, '입고 예정'이라는 말도, 따로 서 있던 예보 줄도 뺐다 — 전부 중복이었다.
+    const AHEAD = ['▸', '▸▸'];
+    $('#upcoming').innerHTML = up.slice(0, 2).map((u, i) => {
+      const mark = `<b class="ahead" title="${esc(T(i ? 'hud.dayAfter' : 'hud.tomorrow'))}">${AHEAD[i] || '▸'}</b>`;
+      const wx = u.weather && g.shows('weather') ? `${M.WEATHER[u.weather].icon} ` : '';
+      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${mark} ${wx}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}" title="${esc(D.PARCEL_TYPES[s.type].name)}" aria-label="${esc(D.PARCEL_TYPES[s.type].name)}"></i>${s.size}`).join(' ')}</span>`;
       const end = u.turn > g.turns();
       if (end && sawEnd) return '';
       if (end) sawEnd = true;
@@ -593,8 +598,7 @@
     }).join('');
     if (g.isWeekendAfter(g.turn)) $('#upcoming').innerHTML += `<span class="chip none">🛌 ${T('hud.weekend')}</span>`;
     const wxNow = g.weatherNow(), W = M.WEATHER[wxNow], showWx = g.shows('weather');
-    const fc = up.filter(u => u.weather && u.turn > g.turn).map(u => `${T('fmt.dayN', { d: g.dateOf(u.turn) })} ${M.WEATHER[u.weather].icon}`).join(' · ');
-    if (showWx) $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.desc)}">${W.icon} ${W.name}${fc ? ` <small style="color:var(--dim)">→ ${fc}</small>` : ''}</span>` + $('#upcoming').innerHTML;
+    if (showWx) $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.name + (W.desc ? ' — ' + W.desc : ''))}">${W.icon}</span>` + $('#upcoming').innerHTML;
     $('#upcoming').querySelectorAll('.chip.wx').forEach(el => el.onclick = () => { SFX.click(); showWeatherInfo(); });
     $('#upcoming').querySelectorAll('.chip.up').forEach(el => el.onclick = () => { SFX.click(); showUpcomingInfo(+el.dataset.turn); });
     $('#wxline').onclick = () => { SFX.click(); showWeatherInfo(); };
@@ -703,10 +707,13 @@
   }
   function showWeatherInfo() {
     const g = game, now = g.weatherNow();
-    const known = []; for (let t = 1; t <= g.turns(); t++) { const k = t <= g.turn ? 'past' : t <= g.turn + g.rules.forecastTurns ? 'known' : 'unknown'; known.push(`<span class="chip wx ${k === 'unknown' ? '' : g.weatherAt(t)} ${t === g.turn ? 'now' : ''}" style="${k === 'past' ? 'opacity:.5' : ''}">${T('fmt.dayN', { d: g.dateOf(t) })} ${k === 'unknown' ? '?' : M.WEATHER[g.weatherAt(t)].icon}</span>`); }
+    // 예보는 이틀 앞까지다. 나머지 날을 '?' 로 늘어놓는 것은 정보가 아니라 줄이다.
+    const known = [];
+    for (let t = g.turn; t <= Math.min(g.turns(), g.turn + g.rules.forecastTurns); t++)
+      known.push(`<span class="chip wx ${g.weatherAt(t)} ${t === g.turn ? 'now' : ''}">${t === g.turn ? T('hud.today') : `<b class="ahead">${t === g.turn + 1 ? '▸' : '▸▸'}</b>`} ${M.WEATHER[g.weatherAt(t)].icon}</span>`);
     const rows = Object.keys(M.WEATHER).map(k => { const W = M.WEATHER[k]; return `<div class="ttrow ${k === now ? 'on' : ''}"><span class="lv">${W.icon}</span><span class="ef"><b>${esc(W.name)}</b>${W.desc ? ' — ' + esc(W.desc) : ' — ' + T('weather.noEffect')}</span></div>`; }).join('');
     const season = T('season.' + g.season());
-    modal(T('weather.title'), `<div class="d">${T('weather.head', { season: `<b>${season}</b>`, n: g.rules.forecastTurns })}${g.rules.tent ? ` · ${T('weather.tent')}` : ''}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">${known.join('')}</div><div class="ttrack">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">${T('weather.note')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]);
+    modal(T('weather.title'), `<div class="d">${T('weather.season', { season: `<b>${season}</b>` })}${g.rules.tent ? ` · ${T('weather.tent')}` : ''}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">${known.join('')}</div><div class="ttrack">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">${T('weather.note')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]);
     storyCheck({ kind: 'modal', modal: 'weather' });
   }
   function showUpcomingInfo(turn) {
