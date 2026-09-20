@@ -586,9 +586,8 @@
     // 기획서대로 앞 2턴만 — 3턴 뒤 입고는 지금 결정에 쓰이지 않는데 줄만 세 줄로 늘어난다
     // 한 줄에 칩 둘 — 내일(▸)·모레(▸▸). 각 칩이 그날의 날씨와 입고를 같이 들고 있다.
     // 날짜도, '입고 예정'이라는 말도, 따로 서 있던 예보 줄도 뺐다 — 전부 중복이었다.
-    const AHEAD = ['▸', '▸▸'];
     $('#upcoming').innerHTML = up.slice(0, 2).map((u, i) => {
-      const mark = `<b class="ahead" title="${esc(T(i ? 'hud.dayAfter' : 'hud.tomorrow'))}">${AHEAD[i] || '▸'}</b>`;
+      const mark = `<b class="ahead">${T(i ? 'hud.dayAfter' : 'hud.tomorrow')}</b>`;
       const wx = u.weather && g.shows('weather') ? `${M.WEATHER[u.weather].icon} ` : '';
       if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${mark} ${wx}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}" title="${esc(D.PARCEL_TYPES[s.type].name)}" aria-label="${esc(D.PARCEL_TYPES[s.type].name)}"></i>${s.size}`).join(' ')}</span>`;
       const end = u.turn > g.turns();
@@ -628,10 +627,15 @@
       const pd = g.trustPerk(c.carrier, 'delay'), delay = pd != null ? pd : (car.delay || 0);
       // 지금 한 대 부르면 얼마를 받고 얼마를 내는가 — 이 게임의 핵심 숫자를 카드에 직접 띄운다.
       const pv = loadPreview(g, c, elig);
-      const extras = [simul > 1 ? T('hud.simulN', { n: simul }) : '', delay ? T('call.payLater', { n: delay }) : '', c.enh.regular && !c.freeUsedMonth ? T('hud.regular') : ''].filter(Boolean);
-      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${caps.length ? ` <small>${attrIcons(caps)}</small>` : ''}</span><span class="calls ${c.calls === 0 && g.shows('calls') ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : T('fmt.trucks', { n: c.calls })}</span></div>
-        <div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>
-        <div class="sub"><b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b> · <span class="per ${pv.n ? (pv.net >= 0 ? 'good' : 'bad') : ''}">${pv.n ? T('hud.netLine', { rev: pv.rev, fee: pv.fee, net: (pv.net >= 0 ? '+' : '−') + Math.abs(pv.net) }) : T('hud.perNone')}</span>${extras.length ? ' · ' + extras.join(' · ') : ''}</div>`;
+      const extras = [delay ? T('call.payLater', { n: delay }) : '', c.enh.regular && !c.freeUsedMonth ? T('hud.regular') : ''].filter(Boolean);
+      const callPips = c.calls > 0 && c.calls <= 15
+        ? `<span class="pips calls">${Array.from({ length: c.calls }, (_, k) => `${k && k % 5 === 0 ? '<i class="gap"></i>' : ''}<i class="on"></i>`).join('')}</span>`
+        : T('fmt.trucks', { n: c.calls });
+      const cells = pips(pv.vol, vcap, Math.max(0, eligVol - pv.vol)) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
+      const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
+      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${takesDots(g, c)}</span><span class="calls ${c.calls === 0 && g.shows('calls') ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips}</span></div>
+        ${bar}
+        <div class="sub">${cells}${pv.n ? ` · <span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>` : ` · <span class="per">${T('hud.perNone')}</span>`}${extras.length ? ' · ' + extras.join(' · ') : ''}</div>`;
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
     const f = g.forecast();
@@ -710,7 +714,7 @@
     // 예보는 이틀 앞까지다. 나머지 날을 '?' 로 늘어놓는 것은 정보가 아니라 줄이다.
     const known = [];
     for (let t = g.turn; t <= Math.min(g.turns(), g.turn + g.rules.forecastTurns); t++)
-      known.push(`<span class="chip wx ${g.weatherAt(t)} ${t === g.turn ? 'now' : ''}">${t === g.turn ? T('hud.today') : `<b class="ahead">${t === g.turn + 1 ? '▸' : '▸▸'}</b>`} ${M.WEATHER[g.weatherAt(t)].icon}</span>`);
+      known.push(`<span class="chip wx ${g.weatherAt(t)} ${t === g.turn ? 'now' : ''}">${t === g.turn ? T('hud.today') : `<b class="ahead">${T(t === g.turn + 1 ? 'hud.tomorrow' : 'hud.dayAfter')}</b>`} ${M.WEATHER[g.weatherAt(t)].icon}</span>`);
     const rows = Object.keys(M.WEATHER).map(k => { const W = M.WEATHER[k]; return `<div class="ttrow ${k === now ? 'on' : ''}"><span class="lv">${W.icon}</span><span class="ef"><b>${esc(W.name)}</b>${W.desc ? ' — ' + esc(W.desc) : ' — ' + T('weather.noEffect')}</span></div>`; }).join('');
     const season = T('season.' + g.season());
     modal(T('weather.title'), `<div class="d">${T('weather.season', { season: `<b>${season}</b>` })}${g.rules.tent ? ` · ${T('weather.tent')}` : ''}</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">${known.join('')}</div><div class="ttrack">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">${T('weather.note')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]);
@@ -827,6 +831,28 @@
       m.querySelectorAll('[data-pre]').forEach(el => el.onclick = () => { SFX.select(); pref = g.presetOutdoor(el.dataset.pre, el.dataset.cust); render(); });
     };
     render();
+  }
+  // 이 계약이 받아 주는 품목 — 색 점 하나가 한 종류다. 속성이 안 열린 장에서는 전부 일반이라 안 그린다.
+  function takesDots(g, c) {
+    if (!g.shows('attrs')) return '';
+    const dots = Object.keys(D.PARCEL_TYPES).filter(t => {
+      const T2 = D.PARCEL_TYPES[t], size = T2.sizes.find(sz => sz >= D.CARRIERS[c.carrier].sizeMin && sz <= g.contractSizeMax(c));
+      if (size == null) return false;
+      const pp = { type: t, size, attrs: T2.attrs, customs: T2.attrs.includes('customs') ? 1 : 0 };
+      return g.canHandle(c, pp) && !g.breakProb(c, pp);      // 깨질 위험이 있으면 '받는다'고 할 수 없다
+    }).map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('');
+    return dots ? `<span class="takes">${dots}</span>` : '';
+  }
+  // 칸과 배차는 숫자보다 눈금이 빠르다. 차 한 대가 칸 여섯이면 네모 여섯,
+  // 실을 게 넘치면 한 칸 띄우고 남는 만큼 더 — '6+4' 가 그대로 보인다.
+  const PIP_MAX = 10;
+  function pips(on, cap, over) {
+    if (cap > PIP_MAX) return '';
+    let h = '';
+    for (let i = 0; i < cap; i++) h += `<i class="${i < on ? 'on' : ''}"></i>`;
+    // 넘치는 칸은 많아야 여섯까지만 그린다 — 그 이상은 눈금이 아니라 벽이 된다
+    if (over > 0) { h += '<i class="gap"></i>'; for (let i = 0; i < Math.min(over, 6); i++) h += `<i class="over${over > 6 && i === 5 ? ' more' : ''}"></i>`; }
+    return `<span class="pips">${h}</span>`;
   }
   // 계약 카드용 한 대 적재 미리보기 (호출 팝업의 '급한 순 자동 선택'과 같은 규칙)
   // 지금 한 대 부르면 얼마를 받고 얼마를 내는가. '개당 Nc' 는 버는 돈으로 읽혀서(유저 지적)
