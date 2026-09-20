@@ -151,6 +151,8 @@
   const wetSoon = g => g.outdoorVolume() > 0 && (g.weatherNow() === 'rain' || g.upcoming().some(u => u.weather === 'rain'));
   const BEATS_L3 = [
     // 일괄 출고는 창고가 차야 의미가 있다 — 마당이 처음 열리는 이 장에서 가르친다
+    // 투자 버튼이 여기서 처음 열린다 — 캠페인은 '창고가 비면 내가 물량을 끌어온다'는 얘기다
+    { id: 'l3invest', kind: 'turn', when: g => g.story.seen.includes('l3intro'), pages: [{ expr: 'smile', hl: '#invest-btn' }, { expr: 'neutral', hl: '#invest-btn' }] },
     { id: 'l3rushReady', kind: 'turn', when: g => g.rushState && g.rushState().ready, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'think', hl: '#contract-strip' }] },
     { id: 'l3rushHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.rush, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'laugh', hl: '#contract-strip' }] },
     { id: 'l3intro', kind: 'start', when: () => true, pages: [

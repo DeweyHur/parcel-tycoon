@@ -33,6 +33,7 @@
     'codex',        // 도감·기록
     'mission',      // 이번 보름 목표(등급 D~A). 서장에는 없다 — 첫 장이 가르칠 것은 '꽉 채워 보낸다' 하나뿐
     'chain',        // 연속 만차(고적재 연쇄 배율)
+    'invest',       // 투자(사업 확장) 버튼과 홍보 캠페인
     'rush',         // 일괄 출고(창고가 차면 트럭 +2, 한꺼번에 비우면 보상 ×1.35)
     'capBonus',     // 칸 보너스(스킵·대기 누적·이달 첫 호출). 캠페인은 안 연다 — 칸 수가 호출마다 바뀌면
                     // "왜 지금은 6칸이지"를 먼저 설명해야 하고, 서장이 가르칠 것은 그게 아니다
@@ -101,7 +102,7 @@
     },
     // ----- 2장 (4월 전반): 봄비. 창고가 넘치면 마당이고, 마당에는 지붕이 없다 -----
     {
-      n: 3, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 2, grants: ['weather', 'theft', 'self', 'trust', 'rush'],
+      n: 3, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 2, grants: ['weather', 'theft', 'self', 'trust', 'rush', 'invest'],
       minCash: 300, minCap: 16, minCalls: 5,
       company: { cash: 900, warehouse: { cap: 24, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }], customers: [['anon', 0]] },
       mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 140, monthlyStress: 0, noBankrupt: true, callsDelta: 4 },

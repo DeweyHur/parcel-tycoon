@@ -13,17 +13,38 @@ const slot = (g, fam) => g.contracts.findIndex(c => c && D.familyOf(c.carrier) =
 t('시작 상태: 자금 450, 계약 3개(대량·냉장·프래자일), 준비 없이 play', () => { const g = NG(1); assert.equal(g.cash, 450); assert.equal(g.contracts.filter(Boolean).length, 3); assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk0', 'cold0', 'fragile0']); assert.equal(g.phase, 'play'); assert.equal(g.month, 1); });
 t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.sizeDelta, -1); });
 t('초기 입고는 작게 시작하고 소형 위주다', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.ok(sp.length >= 7 && sp.length <= 11, `initial arrivals ${sp.length}`); assert.ok(sp.length < g.turns(), '매일 택배가 오지 않는다'); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
-t('실시간 성장 투자: 홍보는 미래 입고, 트럭은 배차, 창고는 공간을 즉시 늘린다', () => {
+t('실시간 성장 투자: 홍보는 캠페인 크기, 트럭은 배차, 창고는 공간을 즉시 늘린다', () => {
   const g = NG(71); g.cash = 3000;
   const future0 = g.schedule.slice(g.turn).flat().length;
   const calls0 = g.contracts.filter(Boolean).map(c => c.maxCalls);
   const cap0 = g.warehouse.cap;
-  const ad = g.investGrowth('marketing'); assert.ok(ad.ok); assert.equal(g.schedule.slice(g.turn).flat().length, future0 + D.GROWTH.marketing.parcels);
+  // 홍보를 사도 물량은 그대로다 — 캠페인을 열어야 들어온다 (부록 AQ)
+  const ad = g.investGrowth('marketing'); assert.ok(ad.ok); assert.equal(g.schedule.slice(g.turn).flat().length, future0);
   const fl = g.investGrowth('fleet'); assert.ok(fl.ok); g.contracts.filter(Boolean).forEach((c, i) => assert.equal(c.maxCalls, calls0[i] + 1));
   const wh = g.investGrowth('warehouse'); assert.ok(wh.ok); assert.equal(g.warehouse.cap, cap0 + D.GROWTH.warehouse.cap);
   const fresh = g._makeContract('bulk1'); assert.ok(fresh.maxCalls >= D.CARRIERS.bulk1.trucks + 1, '새 계약에도 차량 투자가 적용된다');
   const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.deepEqual(h.growth, { marketing: 1, fleet: 1, warehouse: 1, automation: 0, branding: 0, coldchain: 0 });
 });
+t('홍보 캠페인: 보름에 한 번, 며칠 안에 물량을 끌어온다', () => {
+  const g = NG(73); g.cash = 3000;
+  const C = D.GROWTH.marketing.campaign;
+  assert.equal(g.campaignPlan().level, 0, '홍보가 0이면 열 수 없다');
+  assert.equal(g.runCampaign().ok, false);
+  g.investGrowth('marketing'); g.investGrowth('marketing');       // Lv.2
+  const plan = g.campaignPlan();
+  assert.equal(plan.parcels, 2 * C.per);
+  assert.equal(plan.cost, 2 * C.cost);
+  const before = g.schedule.slice(g.turn).flat().length, cash0 = g.cash;
+  const r = g.runCampaign(); assert.ok(r.ok, '캠페인이 열린다');
+  assert.equal(g.schedule.slice(g.turn).flat().length, before + plan.parcels, '그만큼 물량이 붙는다');
+  assert.equal(g.cash, cash0 - plan.cost);
+  const win = g.schedule.slice(g.turn, g.turn + C.days).flat().length;
+  assert.ok(win >= plan.parcels, '며칠 안에 몰려 들어온다 — ' + win);
+  assert.equal(g.runCampaign().ok, false, '같은 보름에 두 번은 안 된다');
+  const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
+  assert.equal(h.campaignPlan().used, true, '세이브를 건너도 이번 보름에 쓴 것이 남는다');
+});
+
 t('성장 트리: 차량→자동화→브랜드와 창고→저온 물류가 단계적으로 해금된다', () => {
   const g = EMPTY(72); g.cash = 9999;
   assert.ok(g.growthPlan('automation').locked); assert.ok(g.growthPlan('branding').locked); assert.ok(g.growthPlan('coldchain').locked);

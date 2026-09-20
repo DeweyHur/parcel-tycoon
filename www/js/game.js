@@ -124,6 +124,7 @@
       this.market = null;
       this.storage = []; this.offer = null; this.outdoorPref = []; this.weather = []; this.pendingRevenue = []; this.bigCustomer = null; this.feesDue = 0; this.debt = 0;
       this.insurer = 'none'; this.premMult = 1; this.noClaimMonths = 0; this.coverHalf = false; this.items = { transitCert: 0, yardIns: 0, customsBond: 0 };
+      this.campaignCycle = 0;                 // 캠페인을 연 사이클 (보름에 한 번)
       this.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0, automation: 0, branding: 0, coldchain: 0 }, (cfg.carry && cfg.carry.growth) || {});
       this.monthStats = null;
       this.run = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, discarded: 0 };
@@ -342,8 +343,7 @@
       const sf = this._scriptForecast(m); if (sf) return sf;
       const R = this.rules;
       const organic = Math.min(this.turns(m), D.GROWTH.organicArrivals);
-      const promoted = ((this.growth && this.growth.marketing) || 0) * D.GROWTH.marketing.parcels;
-      const extra = Math.round((this._extraArrivals(Math.min(m, 6)) * 0.25 + promoted) * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
+      const extra = Math.round(this._extraArrivals(Math.min(m, 6)) * 0.25 * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
       const total = organic + extra + (R.burstTurns || 0);
       const w = this._customerWeightsFor(m); const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
       const ratio = this._typeRatio(m);
@@ -407,9 +407,8 @@
       if (this.cash < plan.cost) return { ok: false, reason: 'cash', cost: plan.cost };
       this.cash -= plan.cost; this.run.spent += plan.cost;
       this.growth[kind]++;
-      let added = 0;
-      if (kind === 'marketing') added = this._injectGrowthDemand(this.schedule, plan.def.parcels, this.turn, this.month);
-      else if (kind === 'fleet') { for (const c of this.contracts) if (c) { c.maxCalls += plan.def.calls; c.calls += plan.def.calls; } }
+      const added = 0;                                  // 홍보는 여기서 물량을 넣지 않는다 — 캠페인이 넣는다
+      if (kind === 'fleet') { for (const c of this.contracts) if (c) { c.maxCalls += plan.def.calls; c.calls += plan.def.calls; } }
       else if (kind === 'warehouse') { this.warehouse.cap += plan.def.cap; this.stats.expansions++; this._assignCold(); }
       else if (kind === 'coldchain') { this.warehouse.cold += plan.def.cold; this.warehouse.frozen = (this.warehouse.frozen || 0) + plan.def.frozen; this._assignCold(); }
       this.emit('growth', { kind, level: this.growth[kind], cost: plan.cost, added });
@@ -735,6 +734,26 @@
     }
     baseCapacity(c) { return this.vehicleCap(c); }
     callCapacity(c) { return this.vehicleCap(c) * this.simulMax(c); }
+    // 홍보 캠페인 — 투자로 키운 홍보를 '발동'해서 며칠 안에 물량을 끌어온다.
+    // 상시 +N건이던 것을 발동형으로 바꾼 이유: 창고가 남아도는 보름을 플레이어가 직접 메울 수 있어야 하고,
+    // 그렇게 채운 창고가 곧 일괄 출고의 밑천이 된다. 보름에 한 번.
+    campaignPlan() {
+      const lv = (this.growth && this.growth.marketing) || 0, C = D.GROWTH.marketing.campaign;
+      const used = this.campaignCycle === this.month;
+      return { level: lv, parcels: lv * C.per, days: C.days, cost: lv * C.cost, used, ready: lv > 0 && !used && this.shows('invest') };
+    }
+    runCampaign() {
+      const p = this.campaignPlan();
+      if (!p.level || !this.shows('invest')) return { ok: false, reason: 'locked' };
+      if (p.used) return { ok: false, reason: 'used' };
+      if (this.cash < p.cost) return { ok: false, reason: 'cash', cost: p.cost };
+      this.cash -= p.cost;
+      this.campaignCycle = this.month;
+      const n = this._injectGrowthDemand(this.schedule, p.parcels, this.turn, this.month, this.turn + p.days);
+      this.say('log.campaign', { n, days: p.days, cost: p.cost });
+      this.emit('campaign', { n, days: p.days, cost: p.cost });
+      return { ok: true, n, days: p.days, cost: p.cost };
+    }
     rushState() {
       const R = D.RUSH, ratio = this.warehouse.cap ? this.usedVolume() / this.warehouse.cap : 0;
       const unlocked = this.shows('rush');
@@ -1048,11 +1067,12 @@
       this.say('log.monthStart', { m: this.monthIndex(m), y: this.yearOf(m), cal: this.calMonth(m), half: this.half(m) });
       this._startTurn();
     }
-    _injectGrowthDemand(sched, count, start, m) {
+    _injectGrowthDemand(sched, count, start, m, end) {
       if (!count || !sched.length) return 0;
       const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
       const slots = [];
-      for (let i = Math.max(0, start || 0); i < sched.length; i++) if (this.weather[i] !== 'storm') slots.push(i);
+      const last = Math.min(sched.length, end == null ? sched.length : end);
+      for (let i = Math.max(0, start || 0); i < last; i++) if (this.weather[i] !== 'storm') slots.push(i);
       if (!slots.length) return 0;
       const order = this.rng.shuffle(slots);
       for (let i = 0; i < count; i++) sched[order[i % order.length]].push(this._genParcelSpec(ratio, m, cw));
@@ -1066,7 +1086,6 @@
         const rows = sc.turns.map(t => t.map(x => ({ ...x })));
         while (rows.length < turns) rows.push([]);
         const out = rows.slice(0, turns);
-        this._injectGrowthDemand(out, ((this.growth && this.growth.marketing) || 0) * D.GROWTH.marketing.parcels, 0, m);
         return out;
       }
       const sched = Array.from({ length: turns }, () => []);
@@ -1074,8 +1093,8 @@
       const gen = () => this._genParcelSpec(ratio, m, cw);
       const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
       for (const t of organicTurns) sched[t].push(gen());
-      const promoted = ((this.growth && this.growth.marketing) || 0) * D.GROWTH.marketing.parcels;
-      let extra = Math.round((this._extraArrivals(m) * 0.25 + promoted) * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
+      // 홍보 물량은 여기 없다 — 캠페인(runCampaign)으로 플레이어가 직접 끌어온다
+      let extra = Math.round(this._extraArrivals(m) * 0.25 * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
       const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
       for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
       this.burstTurns = [];

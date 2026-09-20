@@ -48,7 +48,8 @@
     // 상시 성장 투자. 초반에는 유기적으로 들어오는 물량만 받고, 홍보에 투자한 만큼 다음 영업일부터 입고가 늘어난다.
     GROWTH: {
       organicArrivals: 6,
-      marketing: { costs: [60, 110, 180, 280, 420, 620], parcels: 3 },
+      // 홍보는 상시 물량이 아니라 '캠페인'으로 나간다 — 레벨은 한 번 열 때의 크기다
+      marketing: { costs: [60, 110, 180, 280, 420, 620], parcels: 3, campaign: { days: 3, per: 4, cost: 50 } },
       fleet: { costs: [90, 150, 240, 360, 520, 720], calls: 1 },
       warehouse: { costs: [80, 140, 220, 340, 500, 700], cap: 6 },
       automation: { costs: [140, 240, 380, 560], feeCut: 0.04, laborCut: 0.08, unlock: { fleet: 2 } },

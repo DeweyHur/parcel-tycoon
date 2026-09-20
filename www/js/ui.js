@@ -743,7 +743,8 @@
     const growth = Object.keys(growthNames).filter(k => g.growth[k]).map(k => `${growthNames[k]} Lv.${g.growth[k]}`).join(' · ');
     const title = hit.kind === 'yard' ? (ko ? '🌧 야외 적재장' : '🌧 Outdoor yard') : hit.kind === 'cold' ? (ko ? '❄ 저온 구역' : '❄ Cold zone') : (ko ? '🏭 창고 현황' : '🏭 Warehouse status');
     const body = `<div class="big-num">${used}/${cap}</div><div class="kv"><span>${ko ? '빈 공간' : 'Free space'}</span><span class="v">${Math.max(0, cap - used)}</span><span>${ko ? '냉장' : 'Cold'}</span><span class="v">${g.coldUsed()}/${g.warehouse.cold}</span><span>${ko ? '냉동' : 'Frozen'}</span><span class="v">${g.frozenUsed()}/${g.warehouse.frozen || 0}</span><span>${ko ? '야외 적재' : 'Outside'}</span><span class="v">${outside}</span></div>${growth ? `<div class="d" style="margin-top:8px;color:var(--gold)">${growth}</div>` : ''}<div class="d" style="margin-top:8px">${ko ? '바닥 타일 하나가 보관 1칸입니다. 상자를 누르면 개별 배송 정보가 열립니다.' : 'Each floor tile is one storage cell. Tap a box for delivery details.'}</div>`;
-    modal(title, body, [{ label: ko ? '사업 확장' : 'Invest', onClick: showGrowth }, { label: T('btn.close'), cls: 'primary', onClick: closeModal }]);
+    const acts = g.shows('invest') ? [{ label: ko ? '사업 확장' : 'Invest', onClick: showGrowth }] : [];
+    modal(title, body, acts.concat([{ label: T('btn.close'), cls: 'primary', onClick: closeModal }]));
   }
   function renderOffer() {
     const g = game, o = g.offer, el = $('#offer');
@@ -1605,7 +1606,7 @@
     if (!game || game.phase !== 'play') return;
     const g = game, ko = I18n.lang === 'ko';
     const info = {
-      marketing: ['📣', ko ? '홍보' : 'Marketing', ko ? '입고 +3' : '+3 arrivals'],
+      marketing: ['📣', ko ? '홍보' : 'Marketing', ko ? `캠페인 +${D.GROWTH.marketing.campaign.per}건` : `Campaign +${D.GROWTH.marketing.campaign.per}`],
       fleet: ['🚚', ko ? '차량' : 'Fleet', ko ? '계약마다 배차 +1' : '+1 call / contract'],
       warehouse: ['🏭', ko ? '창고' : 'Warehouse', ko ? '보관 공간 +6' : '+6 storage'],
       automation: ['⚙', ko ? '자동화' : 'Automation', ko ? '배차비 -4% · 인건비 -8%' : 'Fees -4% · labor -8%'],
@@ -1616,7 +1617,7 @@
     const nameOf = k => info[k][1];
     const current = k => {
       const lv = g.growth[k] || 0, d = D.GROWTH[k];
-      if (k === 'marketing') return ko ? `추가 입고 ${lv * d.parcels}건` : `${lv * d.parcels} extra arrivals`;
+      if (k === 'marketing') return lv ? (ko ? `캠페인 한 번에 ${lv * d.campaign.per}건` : `${lv * d.campaign.per} parcels per campaign`) : (ko ? '아직 캠페인을 못 연다' : 'No campaign yet');
       if (k === 'fleet') return ko ? `추가 배차 ${lv}대` : `${lv} extra calls`;
       if (k === 'warehouse') return ko ? `현재 ${g.warehouse.cap}칸` : `${g.warehouse.cap} cells now`;
       if (k === 'automation') return ko ? `비용 절감 ${lv * d.feeCut * 100}%` : `${lv * d.feeCut * 100}% fee cut`;
@@ -1639,7 +1640,14 @@
         <span class="growth-buy"><b>${it.price}c</b><small>${it.upgrade ? T('hire.upgrade', { name: it.ownedName }) : T('hire.btn')}</small></span>
       </button>`; }).join('');
     const hireSection = rc.length ? `<div class="growth-head" style="margin-top:14px"><span>${T('hire.title')}</span></div><div class="growth-tip">${T('hire.desc')}</div><div class="growth-grid">${hireCards}</div>` : '';
-    const body = `<div class="growth-head"><span>${ko ? '성장 단계' : 'Growth'} <b>Lv.${total}</b></span><span class="growth-cash">${g.cash}c</span></div><div class="growth-tip">${ko ? '투자할수록 창고와 트럭이 실제로 바뀝니다.' : 'Every upgrade visibly changes your depot and trucks.'}</div><div class="growth-grid">${cards}</div>${hireSection}`;
+    // 홍보 캠페인 — 창고가 비었을 때 직접 물량을 끌어오는 자리. 투자 화면 맨 위에 둔다
+    const cp = g.campaignPlan();
+    const campSection = cp.level ? `<div class="growth-head" style="margin-top:4px"><span>${T('camp.title')}</span></div>
+      <div class="growth-tip">${T('camp.desc')}</div>
+      <div class="growth-grid"><button class="growth-card" id="camp-go" ${cp.ready && g.cash >= cp.cost ? '' : 'disabled'}>
+        <span class="growth-icon">📣</span><span class="growth-copy"><b>${T('camp.btn')}</b><span>${cp.used ? T('camp.used') : T('camp.effect', { n: cp.parcels, days: cp.days })}</span></span>
+        <span class="growth-buy"><b>${cp.cost}c</b></span></button></div>` : '';
+    const body = `<div class="growth-head"><span>${ko ? '성장 단계' : 'Growth'} <b>Lv.${total}</b></span><span class="growth-cash">${g.cash}c</span></div><div class="growth-tip">${ko ? '투자할수록 창고와 트럭이 실제로 바뀝니다.' : 'Every upgrade visibly changes your depot and trucks.'}</div>${campSection}<div class="growth-grid">${cards}</div>${hireSection}`;
     const m = modal(ko ? '사업 확장' : 'Business growth', body, [{ label: T('btn.close'), onClick: closeModal }]);
     m.querySelectorAll('[data-growth]').forEach(el => el.onclick = () => {
       const kind = el.dataset.growth, r = g.investGrowth(kind);
@@ -1648,6 +1656,13 @@
       g.takeEvents(); scene.sync(g, { animate: true }); saveGame(); renderAll(); showGrowth();
     });
     m.querySelectorAll('[data-hire]').forEach(el => el.onclick = () => { SFX.click(); hireContractFlow(el.dataset.hire, showGrowth); });
+    const cg = m.querySelector('#camp-go');
+    if (cg) cg.onclick = () => {
+      const r = g.runCampaign();
+      if (!r.ok) { toast(r.reason === 'cash' ? T('camp.needCash', { n: r.cost }) : T('camp.used')); return; }
+      SFX.buy(); toast(T('camp.toast', { n: r.n, days: r.days }), 2600);
+      g.takeEvents(); saveGame(); renderAll(); showGrowth();
+    };
   }
   // 실시간 계약: 슬롯을 골라 즉시 고용한다 (마켓의 chooseSlot과 같은 카드 목록, 단 game.hireContract 로 처리)
   function hireContractFlow(carrier, back) {
@@ -1688,6 +1703,7 @@
     document.title = T('title.name') + ': ' + T('title.sub');
     document.documentElement.lang = I18n.lang;
     $('#hud-cash-lbl').textContent = T('hud.cashLbl'); $('#usage-lbl').textContent = T('common.warehouse'); $('#cold-lbl').textContent = D.ATTRS.cold.name;
+    $('#invest-btn').hidden = !game || !game.shows('invest');   // 2장에서 열린다
     $('#invest-btn').textContent = I18n.lang === 'ko' ? '투자' : 'Invest'; $('#menu-btn').textContent = T('menu.title');
     if (scene && scene.relabel) scene.relabel();
   }
