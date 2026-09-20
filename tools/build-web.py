@@ -21,7 +21,8 @@ css = css.replace("url('../fonts/Galmuri11-Bold.woff2')", f"url(data:font/woff2;
 audio = {n: b64(WWW / 'audio' / f'{n}.mp3') for n in ['title', 'warehouse', 'overflow', 'market', 'gameover', 'fanfare']}
 audio_js = 'window.__AUDIO_B64__ = ' + '{' + ','.join(f'{k}:"{v}"' for k, v in audio.items()) + '};'
 
-scripts = re.findall(r'<script src="([^"]+)"></script>', html)  # js/*.js + locales/*.js (index.html 순서대로)
+# ?v=<해시> 가 붙어 있다(tools/stamp-assets.py). 파일을 읽을 때는 떼고 쓴다
+scripts = [s.split('?')[0] for s in re.findall(r'<script src="([^"]+)"></script>', html)]  # js/*.js + locales/*.js (index.html 순서대로)
 def script_src(rel):
     src = (WWW / rel).read_text(encoding='utf-8')
     if demo and rel.endswith('build.js'):
