@@ -353,6 +353,10 @@ body.cine { background: #000; }
 .letter p { margin: 0 0 10px; }
 .letter .sign { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin: 14px 0 0; font-weight: 700; }
 .letter .sign img { border: 2px solid #b8a67e; background: #fff6e0; image-rendering: pixelated; }
+/* 한 사장의 방문 — 편지가 아니라 사람이 앞에 있다 */
+.visit { display: flex; gap: 12px; align-items: flex-start; line-height: 1.8; font-size: 14px; }
+.visit img { border: 2px solid var(--line); background: #1b1a2e; image-rendering: pixelated; flex: 0 0 auto; }
+.visit p { margin: 0; color: var(--ink); }
 /* 계약서 */
 .paper { position: relative; background: #f2ece0; color: #24201a; border: 3px solid #a99a7c; box-shadow: 4px 4px 0 var(--shadow); padding: 14px; }
 .paper h3 { margin: 0 0 12px; text-align: center; letter-spacing: 3px; border-bottom: 3px double #a99a7c; padding-bottom: 8px; }

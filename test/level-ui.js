@@ -151,15 +151,19 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(mk.empty === 0, '빈 계약 슬롯이 없다 (지금: ' + mk.empty + '칸)');
 
   console.log('\n1장 끝 — 한 사장이 값을 부르고 간판을 바꿔 단다');
-  for (let k = 0; k < 10; k++) {                                    // 마켓 → 편지 → 상호
+  const visitSeen = [];
+  for (let k = 0; k < 12; k++) {                                    // 마켓 → 한 사장 방문(4쪽) → 상호
     if (await page.$('#lv-name')) break;
     await readBeat();
+    const txt = await page.$eval('#modal', el => el.textContent.replace(/\s+/g, ' ')).catch(() => '');
+    if (txt) visitSeen.push(txt.slice(0, 70));
     const b = await page.$('#modal .foot .btn.primary'); if (!b) break;
     await b.click(); await page.waitForTimeout(700);
   }
-  const letter2 = await page.$eval('#modal', el => el.textContent.replace(/\s+/g, ' ')).catch(() => '');
   const hasInput = await page.$('#lv-name');
-  check(!!hasInput, '1장 끝에서 상호를 묻는다 — ' + letter2.slice(0, 40));
+  check(!!hasInput, '1장 끝에서 상호를 묻는다 — ' + visitSeen.join(' / ').slice(0, 90));
+  check(visitSeen.some(t => /한 사장이 왔다/.test(t)) && visitSeen.some(t => /넘기겠네/.test(t)) && visitSeen.some(t => /1200c/.test(t)),
+    '계약서 앞에 한 사장이 직접 와서 값과 조건을 말한다');
   if (hasInput) { await hasInput.fill('한길택배'); await page.waitForTimeout(100); }
   await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(500);
   await page.screenshot({ path: 'shots/L04-contract.png' });

@@ -154,7 +154,34 @@
   // 숫자 리포트도, 장 카드도 두지 않는다 — 한 장이 보름이라 격식을 붙일 자리가 아니다.
   function showLevelDone(r) {
     if (!r.recorded) { r.recorded = true; Store.remove(SAVE_KEY); BGM.stop(0.5); SFX.win(); BGM.oneShot('fanfare'); }
+    // 값을 부르는 장(1장)에서는 편지가 아니라 한 사장이 직접 온다 — 종이보다 사람이 먼저다
+    if (r.level === 2) return showHanVisit(r, verdictOf(r));
     showLetter(r, verdictOf(r));
+  }
+
+  // 한 사장의 방문 — 창고를 넘기겠다는 말을 그가 직접 한다.
+  // 편지 한 장 뒤에 곧바로 계약서를 내밀면 "설명 없이 종이만 내민" 꼴이 된다.
+  // 여기서 값과 조건(보름마다 분납)을 말로 먼저 듣고, 그다음에 간판을 정하고, 계약서는 그 확인이 된다.
+  function showHanVisit(r, verdict) {
+    const price = LEVELS.DEAL.price;
+    const pages = [
+      { k: verdict === 'bad' ? 'visit.1bad' : 'visit.1good', expr: verdict === 'bad' ? 'neutral' : 'smile' },
+      { k: 'visit.2', expr: 'neutral' },
+      { k: 'visit.3', expr: 'neutral', p: { price } },
+      { k: 'visit.4', expr: 'smile' },
+    ];
+    let i = 0;
+    const draw = () => {
+      const pg = pages[i], last = i === pages.length - 1;
+      const body = `<div class="visit">${faceImg('han', pg.expr, 64)}<p>${T(pg.k, pg.p || {})}</p></div>`;
+      const m = modal(T('visit.title'), body, [{ label: T(last ? 'visit.go' : 'visit.next'), cls: 'primary', onClick: () => {
+        SFX.click();
+        if (last) return afterChapter(r);
+        i++; draw();
+      } }]);
+      return m;
+    };
+    draw();
   }
   const faceImg = (who, expr, size) => `<img src="${who === 'park' ? Story.sprite('park', expr) : Story.sprite(who, expr)}" width="${size || 56}" height="${size || 56}" alt="" style="image-rendering:pixelated;flex:0 0 auto">`;
   // 한 장을 어떻게 끝냈는가 — 편지 문장을 고르는 데만 쓴다
