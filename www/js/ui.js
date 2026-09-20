@@ -146,17 +146,16 @@
     const P = Profile.get();
     // 마켓은 장 **끝**에 온다 (정산 직후). 배차를 다 쓴 그 자리에서 충전을 배우고, 예보로 다음 장을 준비한다.
     game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false,
-      companyName: P.campaign.name || '', carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
+      companyName: P.campaign.name || T('lv.ownerShop'), carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
-    closeModal(); startPlay({ intro: n === 1, chapter: n });
+    closeModal(); startPlay({ intro: n === 1 });
   }
-  // 장이 끝나면 두 화면이 이어진다: 한 사장님 편지 → 장 끝 카드 (→ 마지막 장이면 상호 · 계약서)
-  // 숫자 리포트는 두지 않는다 — 정산 화면에서 이미 숫자를 봤고, 장이 끝나는 자리는 편지 한 장이면 된다.
+  // 장이 끝나면 한 사장님 편지 한 장이다 (→ 1장 끝이면 상호 · 가계약서, 그 뒤로는 잔금 회차).
+  // 숫자 리포트도, 장 카드도 두지 않는다 — 한 장이 보름이라 격식을 붙일 자리가 아니다.
   function showLevelDone(r) {
     if (!r.recorded) { r.recorded = true; Store.remove(SAVE_KEY); BGM.stop(0.5); SFX.win(); BGM.oneShot('fanfare'); }
     showLetter(r, verdictOf(r));
   }
-  const chName = n => T('lv.ch.' + Math.min(n, LEVELS.LAST));
   const faceImg = (who, expr, size) => `<img src="${who === 'park' ? Story.sprite('park', expr) : Story.sprite(who, expr)}" width="${size || 56}" height="${size || 56}" alt="" style="image-rendering:pixelated;flex:0 0 auto">`;
   // 한 장을 어떻게 끝냈는가 — 편지 문장을 고르는 데만 쓴다
   function verdictOf(r) {
@@ -191,11 +190,11 @@
       if (hasNext) return startLevel(next);            // 타이틀로 돌아가지 않는다 — 장은 이어진다
       closeModal(); showTitle();                       // 아직 다음 장이 없다 (임시 다리)
     };
-    showChapterEnd(r.level, Math.min(next, LEVELS.LAST), () => {
-      // 서장 끝에서만: 여기서 처음으로 간판을 달고 가계약서에 도장을 찍는다
-      if (r.level === 1) return askCompanyName(r, advance);
-      showInstalment(r, advance);                      // 그 뒤로는 장마다 잔금을 한 회차씩 갚는다
-    });
+    // 서장 끝은 편지 한 장으로 끝난다 — 보름 대타에 서류를 쓸 자리가 없다.
+    // 1장 끝(한 달)에서 한 사장이 값을 부르고, 그 자리에서 간판을 갈아 달고 가계약서에 도장을 찍는다.
+    if (r.level === 1) return advance();
+    if (r.level === 2) return askCompanyName(r, advance);
+    showInstalment(r, advance);                        // 2장부터는 장마다 잔금을 한 회차씩 갚는다
   }
 
   // ---------- 잔금 회차 ----------
@@ -436,43 +435,9 @@
       checkPhase();
       if (game && game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); }
     };
-    const after = o && o.chapter ? () => showChapterStart(o.chapter, go) : go;
-    if (o && o.intro && window.Intro) Intro.play(scene, after); else after();
+    if (o && o.intro && window.Intro) Intro.play(scene, go); else go();
   }
 
-  // ---------- 장 카드 ----------
-  // 영화 챕터 카드다. 컷씬이 끝나고 첫날이 시작되기 전에 한 번, 장이 끝나고 다음 장으로 넘어가기 전에 한 번.
-  // 규칙을 말하지 않는다 — 제목·부제·달력, 그것뿐이다.
-  // 그 장이 도는 달력 구간. 장마다 런이 새로 시작하므로 그 런의 1..cycles 로 읽는다
-  // (캠페인 전체의 사이클 번호로 읽으면 startMonth 위에 또 더해져 달이 밀린다)
-  function chWhen(n) {
-    const lv = LEVELS.get(n); if (!game || !lv) return '';
-    const c1 = lv.cycles || 1;
-    // 한 사이클짜리 장은 '3월 전반'처럼 반달로 적는다 — '3월 — 3월'은 아무 말도 아니다
-    if (game.calMonth(1) === game.calMonth(c1) && game.half(1) === game.half(c1))
-      return T('ch.whenHalf', { y: game.yearOf(1), cal: game.calMonth(1), half: T('fmt.half' + game.half(1)) });
-    return T('ch.when', { y: game.yearOf(1), a: game.calMonth(1), b: game.calMonth(c1) });
-  }
-  function chapterCard(cls, inner, onTap) {
-    const m = modal('', `<div class="chcard ${cls}">${inner}<div class="tap">${T(cls === 'end' ? 'ch.tapNext' : 'ch.tap')}</div></div>`, null);
-    m.classList.add('titlecard'); $('#modal-root').classList.add('title-mode');
-    const card = m.querySelector('.chcard');
-    let used = false;
-    card.onclick = () => { if (used) return; used = true; SFX.select(); closeModal(); onTap(); };
-    return m;
-  }
-  // 장 이름과 날짜뿐이다. 부제·맺음말을 붙이면 카드가 읽을거리가 된다 — 여기는 숨 쉬는 자리다
-  function showChapterStart(n, done) {
-    BGM.stop(0.6); SFX.thud();
-    chapterCard('start', `<h2>${esc(chName(n))}</h2>
-      <div class="when">${esc(chWhen(n))}</div>`, done);
-  }
-  function showChapterEnd(n, nextN, done) {
-    const soon = nextN > LEVELS.IMPLEMENTED;
-    const next = nextN <= LEVELS.LAST ? `<div class="nx"><span class="lbl">${T('ch.nextLabel')}</span>
-      <b>${esc(chName(nextN))}</b>${soon ? ` <span class="soon">${T('ch.soon')}</span>` : ''}</div>` : '';
-    chapterCard('end', `<h2>${esc(T('ch.endTitle', { ch: chName(n) }))}</h2>${next}`, done);
-  }
   function updateMusic() {
     if (!game) { BGM.play('title'); return; }
     const g = game;

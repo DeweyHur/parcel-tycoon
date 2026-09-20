@@ -86,13 +86,9 @@ const say = m => { console.log(m); log.push(m); };
     '탑차·화각이 컷신 전으로 돌아온다 — 탑차 x' + intro1.truck + ' · 화각 ' + intro1.fov);
   await page.waitForTimeout(400);
 
-  say('\n■ 장 시작 카드');
-  const startCard = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/서장/.test(startCard) && !/빈 창고/.test(startCard) && /2027/.test(startCard),
-    '컷씬 뒤에 제목·부제·달력이 뜬다 — ' + startCard.replace(/\s+/g, ' ').trim());
-  check(!(await page.$eval('#story', el => !el.hidden).catch(() => false)), '장 카드 동안 대화창이 안 뜬다');
-  await shot('00c-chapter');
-  await page.click('#modal .chcard'); await page.waitForTimeout(600);
+  say('\n■ 프롤로그 뒤에 장 카드가 없다');
+  check(!(await page.$('#modal .chcard')), '장 카드(블랙스크린)가 없다 — 컷씬이 끝나면 곧바로 첫날이다');
+  await shot('00c-day1');
 
   const state = () => page.evaluate(() => { const g = PT.game; return g ? { phase: g.phase, m: g.month, t: g.turn, turns: g.turns(), cash: g.cash, used: g.usedVolume(), cap: g.warehouse.cap, ret: g.stats.returned, disc: g.stats.discarded, sig: PT.scene.buildSig, seen: g.story.seen.length } : { phase: 'none' }; });
   const storyOpen = () => page.$eval('#story', el => !el.hidden).catch(() => false);
@@ -240,55 +236,30 @@ const say = m => { console.log(m); log.push(m); };
   const seenAll = await page.evaluate(() => (PT.game && PT.game.story ? PT.game.story.seen.slice() : []));
   check(!firstSeen.includes('l1due'), '서장은 통째로 무기한이라 기한 안내가 없다 — ' + firstSeen.join(',') );
 
-  say('\n■ 장 마무리: 편지 → 상호 → 계약서');
+  say('\n■ 장 마무리: 편지 한 장뿐 (서류는 1장 끝에)');
   await page.waitForTimeout(500);
   const rptTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
   check(!/리포트/.test(rptTxt) && !/정시/.test(rptTxt), '숫자 리포트는 없다 — ' + rptTxt.replace(/\s+/g, ' ').slice(0, 44));
   await shot('41-letter');
   const letTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
-  check(/한 사장 편지/.test(letTxt) && /한 사장/.test(letTxt), '한 사장 편지가 뜬다 — ' + letTxt.replace(/\s+/g, ' ').slice(0, 44));
-  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(400);
-  const endCard = await page.$eval('#modal .chcard.end', el => el.textContent).catch(() => '');
-  check(/서장/.test(endCard) && /1장/.test(endCard) && !/셔터/.test(endCard),
-    '장 끝 카드는 끝난 장과 다음 장 이름뿐이다 — ' + endCard.replace(/\s+/g, ' ').trim());
-  await shot('42b-chapter-end');
-  await page.click('#modal .chcard'); await page.waitForTimeout(400);
-  await shot('42-name');
-  const input = await page.$('#lv-name');
-  check(!!input, '상호 입력칸');
-  if (input) await input.fill('두번째창고');
-  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(400);
-  await shot('43-contract');
-  const ctTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
-  check(/매도인/.test(ctTxt) && /두번째창고/.test(ctTxt), '계약서에 매도인·내 상호가 적힌다');
-  // 무상 양도가 아니다 — 값·계약금·잔금이 적혀 있고, 셋이 맞아떨어진다
-  const deal = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('#modal .ct-row')].map(r => r.textContent);
-    const num = re => { const r = rows.find(x => re.test(x)); return r ? +(r.match(/(\d+)c/) || [0, 0])[1] : null; };
-    return { price: num(/매매 대금|Price/), down: num(/계약금|Deposit/), rest: num(/잔금|Balance/) };
-  });
-  check(deal.price > 0 && deal.down > 0 && deal.down + deal.rest === deal.price,
-    '값 = 계약금 + 잔금 — ' + JSON.stringify(deal));
-  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(600);
-  const stamped = await page.$eval('#ct-stamp', el => el.classList.contains('on')).catch(() => false);
-  check(stamped, '도장이 찍힌다');
-  const saved = await page.evaluate(() => (PT.Profile.get().campaign || {}));
-  check(saved.deal && saved.deal.paid === deal.down, '가계약금과 잔금 목표가 남는다 — ' + JSON.stringify(saved.deal));
-  await shot('44-stamped');
+  check(/한 사장 편지/.test(letTxt) && /봄만 더 맡아/.test(letTxt),
+    '한 사장이 "봄만 더 맡아 주게" 라고 한다 — ' + letTxt.replace(/\s+/g, ' ').slice(0, 60));
+  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(1400);   // 편지를 접으면 바로 1장
+  check(!(await page.$('#modal .chcard')), '장 끝 카드가 없다');
+  check(!(await page.$('#lv-name')), '보름 대타 뒤에는 상호를 묻지 않는다');
+  const noDeal = await page.evaluate(() => (PT.Profile.get().campaign || {}).deal || null);
+  check(!noDeal, '서장 끝에는 가계약이 없다 — ' + JSON.stringify(noDeal));
+  await shot('42-ch2');
 
   say('\n■ 서장 다음은 타이틀이 아니라 1장');
-  await safeClick('#modal .foot .btn.primary'); await page.waitForTimeout(1300);   // 창고를 넘겨받는다 → 바로 1장
-  const ch2 = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/1장/.test(ch2) && /후반/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
-  await shot('45-ch2');
-  await page.click('#modal .chcard'); await page.waitForTimeout(900); await readBeat();
+  await page.waitForTimeout(700); await readBeat();
   const l2 = await page.evaluate(() => { const g = PT.game, P = PT.Profile.get().campaign;
     return { level: g.cfg.level, cash: g.cash, carryCash: P.carry && P.carry.cash, cap: g.warehouse.cap,
       contracts: g.contracts.filter(Boolean).map(c => c.carrier), calls: !!document.querySelector('.contract .calls, #c0 .calls'),
       shows: ['market', 'calls', 'simul', 'attrs', 'cold', 'weather'].filter(k => g.shows(k)),
       types: [...new Set(g.schedule.flat().map(x => x.type))] }; });
   check(l2.level === 2 && l2.cash > 0 && l2.contracts.join() === 'bulk0' && l2.cap === 16,
-    '계약금 뺀 판이 그대로 넘어왔다 — ' + JSON.stringify(l2).slice(0, 120));
+    '서장 판이 그대로 넘어왔다 — ' + JSON.stringify(l2).slice(0, 120));
   check(l2.shows.join() === 'market,calls,simul', '1장에 열린 것은 마켓·배차·동시뿐 — ' + l2.shows.join(','));
   check(l2.types.join() === 'normal', '1장 입고는 아직 일반뿐 — ' + l2.types.join(','));
   await shot('46-ch2-play');

@@ -140,7 +140,8 @@ for (let n = 1; n <= LV.IMPLEMENTED; n++) {
 
   // 장이 끝나면 잔금을 한 회차 낸다 (ui.js 의 showInstalment 와 같은 계산)
   const next = g.carryState();
-  if (n === 1) { const down = Math.max(0, Math.min(LV.DEAL.price, Math.floor(next.cash * LV.DEAL.downRate)));
+  // 값을 부르는 자리는 1장 끝(level 2)이다 — 서장은 보름 대타라 서류가 없다
+  if (n === 2) { const down = Math.max(0, Math.min(LV.DEAL.price, Math.floor(next.cash * LV.DEAL.downRate)));
     deal = { price: LV.DEAL.price, paid: down, rest: LV.DEAL.price - down }; next.cash -= down;
     console.log(`  가계약: 값 ${deal.price}c · 계약금 ${down}c · 잔금 ${deal.rest}c → 다음 장 시작 ${next.cash}c`);
   } else if (deal && deal.rest > 0) {

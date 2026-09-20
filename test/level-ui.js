@@ -27,10 +27,8 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!titleBtns.includes('t-codex') && !titleBtns.includes('t-rec'), '도감·기록은 아직 없다');
 
   await page.click('#t-level'); await page.waitForTimeout(800);
-  // 컷씬 뒤(여기선 ?nointro) 장 시작 카드가 한 번 뜬다
-  const startCard = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/서장/.test(startCard) && /3월/.test(startCard) && !/빈 창고/.test(startCard), '장 시작 카드는 이름과 날짜뿐이다 — ' + startCard.replace(/\s+/g, ' ').trim());
-  await page.click('#modal .chcard'); await page.waitForTimeout(500);
+  // 장 카드는 없다 — 컷씬(여기선 ?nointro)이 끝나면 곧바로 첫날이다
+  check(!(await page.$('#modal .chcard')), '장 카드(블랙스크린)가 없다');
   const settle = async () => { await page.waitForFunction(() => !window.PT || !PT.busy, null, { timeout: 15000 }); await page.waitForTimeout(100); };
   const readBeat = async () => {
     await settle();
@@ -53,6 +51,8 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   };
   await readBeat(); await passGate();
   await page.screenshot({ path: 'shots/L01-day1.png' });
+  const sign = await page.evaluate(() => ({ name: PT.game.companyName(), hud: (document.getElementById('hud-perks') || {}).textContent || '' }));
+  check(sign.name === '한성창고' && /한성창고/.test(sign.hud), '서장 동안은 한 사장 간판이 걸려 있다 — ' + sign.hud.trim());
 
   console.log('\n첫 화면에 없는 것들');
   const vis = sel => page.$eval(sel, el => !el.hidden && el.offsetParent !== null).catch(() => false);
@@ -103,32 +103,20 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   const doneTxt = await page.$eval('#modal', el => el.textContent).catch(() => '');
   check(/한 사장 편지/.test(doneTxt), '장이 끝나면 숫자 리포트 없이 편지가 온다');
 
-  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);   // 장 끝 카드
-  const endCard = await page.$eval('#modal .chcard.end', el => el.textContent).catch(() => '');
-  check(/서장/.test(endCard) && /1장/.test(endCard), '장 끝 카드에 다음 장 예고가 있다 — ' + endCard.replace(/\s+/g, ' ').trim());
-  await page.click('#modal .chcard'); await page.waitForTimeout(400);
-  await page.screenshot({ path: 'shots/L03-name.png' });
-  const hasInput = await page.$('#lv-name');
-  check(!!hasInput, '상호 이름을 묻는다');
-  if (hasInput) { await hasInput.fill('한길택배'); await page.waitForTimeout(100); }
-  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(400);   // 계약서
-  await page.screenshot({ path: 'shots/L04-contract.png' });
-  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(500);   // 도장
-  const deal = await page.evaluate(() => Profile.get().campaign.deal);
-  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(1200);  // 창고를 넘겨받는다 → 바로 1장
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(1500);   // 편지를 접으면 바로 1장
   await page.screenshot({ path: 'shots/L05-ch2.png' });
 
-  console.log('\n서장 다음은 타이틀이 아니라 1장');
-  const ch2 = await page.$eval('#modal .chcard.start', el => el.textContent).catch(() => '');
-  check(/1장/.test(ch2) && /후반/.test(ch2), '타이틀을 거치지 않고 1장 카드가 뜬다 — ' + ch2.replace(/\s+/g, ' ').trim());
-  await page.click('#modal .chcard'); await page.waitForTimeout(1000);
+  console.log('\n서장 다음은 타이틀이 아니라 1장 (서류도 상호도 아직 없다)');
+  check(!(await page.$('#modal .chcard')) && !(await page.$('#lv-name')), '장 끝 카드도 상호 질문도 없다');
+  check(!(await page.evaluate(() => Profile.get().campaign.deal)), '보름 대타 뒤에는 가계약이 없다');
+  await page.waitForTimeout(500);
   const carried = await page.evaluate(() => { const g = PT.game, P = Profile.get().campaign;
     return { level: g.cfg.level, cash: g.cash, cap: g.warehouse.cap, carryCash: P.carry && P.carry.cash,
       contracts: g.contracts.filter(Boolean).map(c => c.carrier), name: g.companyName ? g.companyName() : '',
       seen: g.story.seen.length, market: g.shows('market'), calls: g.shows('calls'), attrs: g.shows('attrs') }; });
   check(carried.level === 2 && carried.market && carried.calls && !carried.attrs, '1장에서 마켓·배차가 열리고 특수 품목은 아직 — ' + JSON.stringify(carried));
-  check(!!deal && deal.paid > 0 && carried.cash > 0 && carried.cash <= Math.max(carried.carryCash, 300),
-    '계약금이 빠진 돈으로 1장을 시작한다 — 계약금 ' + (deal && deal.paid) + 'c · 시작 자금 ' + carried.cash + 'c');
+  check(carried.cash > 0 && carried.cash === carried.carryCash,
+    '서장이 남긴 돈이 그대로 1장으로 넘어온다 — ' + carried.cash + 'c');
   check(carried.contracts.join() === 'bulk0' && carried.cap === 16, '계약·창고가 그대로 넘어왔다 — ' + carried.contracts.join() + ' · ' + carried.cap + '칸');
   check(carried.seen > 0, '서장에서 들은 대사는 다시 안 한다 (본 비트 ' + carried.seen + '개)');
 
@@ -139,6 +127,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
     while (g.phase === 'play' && g.turn < g.turns() && n++ < 40) { g.wait(); if (g.phase === 'weekend') g.weekendChoose('rest'); g.takeEvents(); } 
     // 한 장을 다 굴린 플레이어를 대신한다 — 배차는 바닥나 있어야 마켓의 첫 수업(충전)이 뜬다
     g.contracts.forEach(c => { if (c) c.calls = 0; });
+    g.cash = Math.max(g.cash, 900);       // 빨리 감기는 호출을 안 해서 돈이 안 벌린다 — 계약금을 걸 만큼은 쥐여 준다
     PT.renderAll(); });
   await page.waitForTimeout(300);
   await page.click('#wait-btn', { force: true }); await page.waitForTimeout(1100);
@@ -161,6 +150,29 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!mk.refresh && !/가격 ×/.test(mk.txt), '새로고침·가격 배수가 없다');
   check(mk.empty === 0, '빈 계약 슬롯이 없다 (지금: ' + mk.empty + '칸)');
 
+  console.log('\n1장 끝 — 한 사장이 값을 부르고 간판을 바꿔 단다');
+  for (let k = 0; k < 10; k++) {                                    // 마켓 → 편지 → 상호
+    if (await page.$('#lv-name')) break;
+    await readBeat();
+    const b = await page.$('#modal .foot .btn.primary'); if (!b) break;
+    await b.click(); await page.waitForTimeout(700);
+  }
+  const letter2 = await page.$eval('#modal', el => el.textContent.replace(/\s+/g, ' ')).catch(() => '');
+  const hasInput = await page.$('#lv-name');
+  check(!!hasInput, '1장 끝에서 상호를 묻는다 — ' + letter2.slice(0, 40));
+  if (hasInput) { await hasInput.fill('한길택배'); await page.waitForTimeout(100); }
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(500);
+  await page.screenshot({ path: 'shots/L04-contract.png' });
+  const ctTxt = await page.$eval('#modal', el => el.textContent.replace(/\s+/g, ' ')).catch(() => '');
+  check(/매도인/.test(ctTxt) && /한길택배/.test(ctTxt) && /신흥동/.test(ctTxt),
+    '가계약서에 매도인·내 상호·목적물 자리가 적힌다 — ' + ctTxt.slice(0, 80));
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(700);   // 도장
+  const deal = await page.evaluate(() => Profile.get().campaign.deal);
+  check(!!deal && deal.paid > 0 && deal.paid + deal.rest === deal.price, '값 = 계약금 + 잔금 — ' + JSON.stringify(deal));
+  await page.click('#modal .foot .btn.primary'); await page.waitForTimeout(1500);  // → 바로 2장
+  const ch3 = await page.evaluate(() => ({ level: PT.game && PT.game.cfg.level, name: PT.game && PT.game.companyName() }));
+  check(ch3.level === 3 && ch3.name === '한길택배', '도장을 찍으면 내 간판을 걸고 2장이 시작된다 — ' + JSON.stringify(ch3));
+
   console.log('\n장이 끝나면 잔금을 한 회차 낸다');
   await page.evaluate(() => { const P = PT.Profile.get();
     P.campaign = { level: 3, cleared: 2, name: '한길택배', deal: { price: 1200, paid: 400, rest: 800 },
@@ -170,7 +182,6 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   await page.reload(); await page.waitForTimeout(900);
   await page.click('#modal .chpick .chip[data-ch="3"]'); await page.waitForTimeout(400);
   await page.click('#t-level'); await page.waitForTimeout(1400);
-  const c2 = await page.$('#modal .chcard'); if (c2) { await c2.click(); await page.waitForTimeout(800); }
   await readBeat(); await passGate(); await readBeat();
   // 장이 준비 마켓으로 열리므로 먼저 닫고, 마지막 날 직전까지 감는다
   await page.evaluate(() => { const g = PT.game; g.story.off = true; if (g.phase === 'market') g.closeMarket(); g.cash = 3000; let n = 0;
@@ -186,7 +197,6 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   for (let k = 0; k < 14; k++) {
     if (await page.$('#modal .paper .instbar')) break;
     await readBeat();
-    const ch = await page.$('#modal .chcard'); if (ch) { await ch.click(); await page.waitForTimeout(600); continue; }
     const btn = await page.$('#modal .foot .btn.primary'); if (btn) { await btn.click(); await page.waitForTimeout(700); continue; }
     break;
   }
