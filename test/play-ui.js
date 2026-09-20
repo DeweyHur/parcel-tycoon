@@ -126,6 +126,7 @@ const say = m => { console.log(m); log.push(m); };
   check(!(await vis('#chain-meter')), '연속 만차 미터 없음');
   check(!(await vis('#rush-meter')), '일괄 출고 미터 없음');
   check(!(await vis('#invest-btn')), '투자 버튼 없음 (2장에서 열린다)');
+  check(!(await vis('#ops-status')), '운영 상태 패널 없음 (보름 목표와 같이 열린다)');
   check(!(await vis('#bar-cold')), '냉장 바 없음');
   check(!(await page.$('#upcoming .chip.wx')), '날씨 칩 없음');
   check(!(await vis('#cust-btn')) && !(await vis('#log-btn')), '고객·기록 버튼 없음');

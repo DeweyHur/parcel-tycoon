@@ -103,7 +103,6 @@
     { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.elig > 0, pages: [{ speaker: 'yeo', expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
-    { id: 'l1sunday', kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
     { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
     { id: 'l1usage', kind: 'turn', when: g => usage(g) >= 0.75, pages: [{ expr: 'worry', hl: '#bar-usage' }] },
     { id: 'l1last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }, { expr: 'think' }] },
@@ -122,8 +121,8 @@
     { id: 'l1deadline', kind: 'turn', when: g => g.story.seen.includes('l1due') && g.parcels.some(p => !p.overdue && !p.noDeadline && p.deadline <= 1), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'l2intro', kind: 'start', when: () => true, pages: [
       { expr: 'smile' },
-      { expr: 'neutral', hl: '#c0' },
-      { expr: 'think', hl: '#c0' },
+      { expr: 'neutral', hl: '#c0 .calls' },      // 숫자가 아니라 파란 눈금을 가리킨다
+      { expr: 'think', hl: '#c0 .calls' },
     ] },
     // 배차가 줄어드는 것을 실제로 본 다음에 말한다
     { id: 'l2mission', kind: 'turn', when: g => g.story.seen.includes('l2calls'), pages: [{ expr: 'smile', hl: '#mission-meter' }, { expr: 'neutral', hl: '#chain-meter' }] },

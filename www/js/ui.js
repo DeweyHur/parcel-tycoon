@@ -492,6 +492,11 @@
         : (ko ? '안정적으로 성장 중' : 'Growing steadily');
     const root = $('#ops-status');
     const rush = g.rushState();
+    // '안정적으로 성장 중' 같은 판정은 보름 목표·연속 만차가 열린 뒤에야 뜻이 있다.
+    // 서장에는 판정도 지표도 없다 — 패널째 안 나온다(그 안의 미터도 아직 닫혀 있다).
+    const opsOn = g.shows('mission');
+    root.hidden = !opsOn && !g.shows('chain') && !g.shows('rush');
+    for (const sel of ['.ops-verdict', '.ops-metrics', '.ops-progress']) { const el = root.querySelector(sel); if (el) el.hidden = !opsOn; }
     root.className = state + (rush.ready ? ' rush-ready' : '') + (rush.critical ? ' rush-critical' : '');
     $('#ops-kicker').textContent = ko ? '현재 운영 판단' : 'OPERATION STATUS';
     $('#ops-title').textContent = title;
@@ -610,9 +615,18 @@
     $('#parcels').querySelectorAll('.parcel.group[data-gkey]').forEach(el => el.onclick = () => { if (busy) return; SFX.click(); const k = el.dataset.gkey; openGroups.has(k) ? openGroups.delete(k) : openGroups.add(k); renderAll(); });
     if (g.storage.length) $('#parcels').insertAdjacentHTML('afterbegin', g.storage.map(s => { const K = M.STORAGE_KINDS[s.kind], cu = M.CUSTOMERS[s.customer]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#a8845a"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${cu.icon}${esc(cu.name)}${s.perTurn ? ` · ${T('log.storagePerTurn', { perTurn: s.perTurn })}` : ''}</div><div class="st">${s.outdoor ? `${T('hud.outdoorTag')} · ` : ''}${T('storage.left', { n: s.left })}</div></div>`; }).join(''));
     $('#parcels').querySelectorAll('.parcel.storage').forEach(el => el.onclick = () => showStorage(+el.dataset.sid));
+    // 접어 둬도 기한만은 보여야 한다 — 종류마다 '가장 급한 것'의 남은 날
     const compactCounts = new Map();
-    for (const p of g.parcels) { const row = compactCounts.get(p.type) || { n: 0, cells: 0 }; row.n++; row.cells += p.size; compactCounts.set(p.type, row); }
-    warehouseCompact.innerHTML = `<button class="compact-stock total">📦 ${g.parcels.length} · ${used}/${cap}</button>` + [...compactCounts].map(([type, row]) => { const t = D.PARCEL_TYPES[type]; return `<button class="compact-stock" title="${esc(t.name)}"><i style="background:${t.css}"></i>×${row.n} · ${row.cells}</button>`; }).join('');
+    for (const p of g.parcels) {
+      const row = compactCounts.get(p.type) || { n: 0, cells: 0, due: null, over: false };
+      row.n++; row.cells += p.size;
+      if (p.overdue) row.over = true;
+      else if (!p.noDeadline && !(p.customs > 0)) row.due = row.due == null ? p.deadline : Math.min(row.due, p.deadline);
+      compactCounts.set(p.type, row);
+    }
+    warehouseCompact.innerHTML = `<button class="compact-stock total">📦 ${g.parcels.length} · ${used}/${cap}</button>` + [...compactCounts].map(([type, row]) => { const t = D.PARCEL_TYPES[type];
+      const due = row.over ? `<b class="wrisk"> ⏳!</b>` : row.due != null ? ` <span class="${row.due <= 1 ? 'wrisk' : 'd'}">⏳${T('fmt.turns', { n: row.due })}</span>` : '';
+      return `<button class="compact-stock" title="${esc(t.name)}"><i style="background:${t.css}"></i>×${row.n} · ${row.cells}${due}</button>`; }).join('');
     warehouseCompact.querySelectorAll('button').forEach(el => el.onclick = () => { SFX.click(); opts.warehouseOpen = true; saveOpts(); renderAll(); if (scene && scene.resize) scene.resize(); });
     const slotsOn = g.visibleSlots();
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) {
@@ -644,7 +658,8 @@
     if (f.overdue) warn.push(T('wait.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wait.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wait.frozenOver', { n: f.frozenOver }));
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
     // 오늘 영업을 마치면 받게 될 다음 입고 — 매 턴 가장 중요한 결정을 흐리거나 자르지 않는다.
-    wb.innerHTML = `${T(g.shows('self') ? 'wait.btn' : 'wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
+    const restsNext = g.isWeekendAfter(g.turn) && !g.shows('weekendChoice');   // 마감하면 그대로 쉬는 날로 넘어간다
+    wb.innerHTML = `${restsNext ? T('wait.btnRest') : T(g.shows('self') ? 'wait.btn' : 'wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
     renderCoach();
   }
   // ---------- 스토리 모드 코치 한 줄 ----------
@@ -994,8 +1009,8 @@
       const cargoCells = []; for (const p of selP) for (let n = 0; n < p.size; n++) cargoCells.push({ color: ptype(p).css, name: ptype(p).name });
       const shells = Array.from({ length: trucks }, (_, ti) => { const cells = Array.from({ length: vcap }, (_, ci) => { const cargo = cargoCells[ti * vcap + ci]; return `<i class="truck-cell ${cargo ? 'filled' : ''}"${cargo ? ` style="background:${cargo.color}" title="${esc(cargo.name)}"` : ''}></i>`; }).join(''); return `<div class="truck-shell"><div class="truck-cells" style="--cols:${Math.min(6, vcap)}">${cells}</div></div>`; }).join('');
       const ko = I18n.lang === 'ko', net = income - callFee;
-      const gauge = `<div class="load-visual"><div class="truck-stack">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div><div class="load-hint">${vol}/${cap} · ${Math.round(fill * 100)}% ${fill >= 0.8 ? '⚡' : ''} · ${ko ? '아래 상자를 눌러 적재' : 'Tap boxes below to load'}</div></div><div class="tbtn">${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : game.shows('simul') ? `<span class="d" style="color:var(--dim)">${T('call.simulMax', { n: Math.min(simul, Math.max(1, c.calls)) })}</span>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}</div>`;
-      const money = `${chain.count >= 2 ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<div class="load-hint" style="color:var(--green)">${T('call.fillOk')}</div>` : vol ? `<div class="load-hint" style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</div>` : ''}`;
+      const gauge = `<div class="load-visual"><div class="truck-stack">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div><div class="load-hint">${vol}/${cap} · ${Math.round(fill * 100)}% ${fill >= 0.8 && game.shows('chain') ? '⚡' : ''} · ${ko ? '아래 상자를 눌러 적재' : 'Tap boxes below to load'}</div></div><div class="tbtn">${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : game.shows('simul') ? `<span class="d" style="color:var(--dim)">${T('call.simulMax', { n: Math.min(simul, Math.max(1, c.calls)) })}</span>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}</div>`;
+      const money = `${chain.count >= 2 && game.shows('chain') ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<div class="load-hint" style="color:var(--green)">${T('call.fillOk')}</div>` : vol ? `<div class="load-hint" style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</div>` : ''}`;
       const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
       const riskLine = riskSel.length ? `<div class="d" style="font-size:12px;color:var(--orange);margin-bottom:6px">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
       const capsLine = !game.shows('attrs') ? '' : `<div class="d" style="font-size:11px;color:var(--dim);margin-bottom:4px">${car.badge || ''} ${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</div>`;
@@ -1037,17 +1052,18 @@
     const r = game.callCarrier(i, ids, trucks);
     if (!r.ok) { toast(r.msg); return; }
     pendingCall = r;
-    if (r.chain === 1) {
+    const showChain = game.shows('chain');       // 서장에는 연속 만차가 없다 — 축하도 하지 않는다
+    if (r.chain === 1 && showChain) {
       SFX.select(); toastLater(T('chain.start'), 1800); rewardBurst(T('chain.perfect'), 1);
     }
-    if (r.chain >= 2) {
+    if (r.chain >= 2 && showChain) {
       document.body.classList.remove('chain-hit'); void document.body.offsetWidth; document.body.classList.add('chain-hit');
       SFX.combo(r.chain);
       toastLater(T(r.chain >= D.LOAD_CHAIN.max ? 'chain.toastMax' : 'chain.toast', { n: r.chain, bonus: r.chainBonus }), 2200);
       rewardBurst(T(r.chain >= D.LOAD_CHAIN.max ? 'chain.max' : 'chain.count', { n: r.chain }), Math.min(3, r.chain));
       setTimeout(() => document.body.classList.remove('chain-hit'), 700);
     }
-    if (r.rush) {
+    if (r.rush && game.shows('rush')) {
       document.body.classList.add('rush-hit');
       scene.shake(.38); SFX.levelup();
       toast(T('rush.toast', { n: r.count, bonus: r.rushBonus }), 2800);
@@ -1145,7 +1161,17 @@
   }
   function checkPhase() {
     if (game.phase !== 'play') clearGate();
-    if (game.phase === 'weekend') showWeekend();
+    if (game.phase === 'weekend') {
+      // 고를 것이 '휴식' 하나뿐이면 카드를 띄울 이유가 없다 — 읽을 것만 늘고 누를 것은 하나다.
+      // 선택지가 열리는 장(5장)부터 카드가 돌아온다.
+      const only = game.weekendChoices().filter(o => o.ok);
+      if (only.length <= 1 && (!only[0] || only[0].id === 'rest')) {
+        game.weekendChoose('rest');
+        busy = true; renderAll();
+        const evs = game.takeEvents(); saveGame();
+        setTimeout(() => afterTurn(evs), 200);
+      } else showWeekend();
+    }
     else if (game.phase === 'summary') showSummary();
     else if (game.phase === 'market') showMarket();
     else if (game.phase === 'over' || game.phase === 'win') showResult();
