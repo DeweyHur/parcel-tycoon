@@ -608,6 +608,21 @@ t('자리가 다 찼으면 마켓이 계약 대신 특약을 반드시 내놓는
   assert.ok(opt, '냉동 특약이 매물에 있다 — ' + items.map(i => i.kind + ':' + (i.carrier || i.enh || i.fac || '')).join(' '));
 });
 
+t('서장에는 보름 목표·연속 만차·일괄 출고가 아예 없다', () => {
+  const lv = n => new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false });
+  const g1 = lv(1);
+  assert.ok(!g1.shows('mission') && !g1.shows('chain') && !g1.shows('rush'), '서장은 셋 다 닫혀 있다');
+  g1.warehouse.cap = 10; g1.parcels = [P(9101, 'normal', 9, { customer: 'anon' })];
+  assert.equal(g1.rushState().unlocked, false, '서장은 창고가 꽉 차도 일괄 출고가 안 열린다');
+  const g2 = lv(2);
+  assert.ok(g2.shows('mission') && g2.shows('chain'), '1장에서 보름 목표와 연속 만차가 열린다');
+  assert.equal(g2.shows('rush'), false, '일괄 출고는 1장에도 아직 없다');
+  const g3 = lv(3);
+  assert.ok(g3.shows('rush'), '2장에서 일괄 출고가 열린다');
+  g3.warehouse.cap = 10; g3.parcels = [P(9102, 'normal', 9, { customer: 'anon' })];
+  assert.ok(g3.rushState().unlocked && g3.rushState().ready, '2장에서 창고가 차면 준비된다');
+});
+
 t('4장에서 처음으로 평판이 움직이고, 0이면 판이 끝난다', () => {
   const LV = (n) => new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false });
   const g3 = LV(3);

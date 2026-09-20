@@ -485,20 +485,23 @@
     rm.hidden = !rush.unlocked;
     if (rush.unlocked) {
       $('#rush-fill').style.width = Math.round(rush.charge * 100) + '%';
-      $('#rush-title').textContent = ko ? '도크 러시' : 'DOCK RUSH';
+      $('#rush-title').textContent = T('rush.title');
       $('#rush-label').textContent = rush.ready
         ? (ko ? `준비 완료 · 보상 ×${rush.mult}` : `READY · REWARD ×${rush.mult}`)
         : (ko ? `${Math.round(rush.ratio * 100)}% · 더 쌓아라` : `${Math.round(rush.ratio * 100)}% · STOCKPILE`);
     }
     const chain = g.chainState();
     const cm = $('#chain-meter');
-    cm.hidden = chain.count < 1;
+    cm.hidden = !g.shows('chain') || chain.count < 1;
     if (chain.count > 0) {
       $('#chain-title').textContent = T('chain.title');
       $('#chain-fill').style.width = Math.min(100, chain.level / chain.max * 100) + '%';
       $('#chain-label').textContent = chain.count >= 2 ? T('chain.mult', { n: chain.count, mult: chain.mult.toFixed(2) }) : T('chain.armed');
       cm.className = 'chain-meter' + (chain.level >= chain.max ? ' max' : '');
     }
+    const mm = $('#mission-meter');
+    mm.hidden = !g.shows('mission');            // 서장에는 목표가 없다 — 미터도 없다
+    if (mm.hidden) return;
     const mission = g.missionState();
     $('#mission-grade').textContent = mission.grade;
     $('#mission-copy').textContent = T('mission.amount', { now: mission.earned, target: mission.maxAt });

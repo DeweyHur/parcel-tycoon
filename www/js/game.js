@@ -737,7 +737,7 @@
     callCapacity(c) { return this.vehicleCap(c) * this.simulMax(c); }
     rushState() {
       const R = D.RUSH, ratio = this.warehouse.cap ? this.usedVolume() / this.warehouse.cap : 0;
-      const unlocked = this.shows('simul');
+      const unlocked = this.shows('rush');
       return { unlocked, ratio, charge: unlocked ? Math.max(0, Math.min(1, ratio / R.readyAt)) : 0, ready: unlocked && ratio >= R.readyAt, critical: unlocked && ratio >= R.criticalAt, mult: R.bonus, extraTrucks: R.extraTrucks };
     }
     rushPreview(volume, trucks, fill) {

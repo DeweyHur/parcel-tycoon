@@ -102,8 +102,6 @@
     { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ speaker: 'yeo', expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
-    { id: 'l1chainHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.chain >= 2, pages: [{ expr: 'shock', hl: '#chain-meter' }, { expr: 'laugh', hl: '#mission-meter' }] },
-    { id: 'l1progress', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile', hl: '#mission-meter' }, { expr: 'neutral', hl: '#chain-meter' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
     { id: 'l1sunday', kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
     { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
@@ -128,8 +126,8 @@
       { expr: 'think', hl: '#c0' },
     ] },
     // 배차가 줄어드는 것을 실제로 본 다음에 말한다
-    { id: 'l2rushHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.rush, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'laugh', hl: '#contract-strip' }] },
-    { id: 'l2rushReady', kind: 'turn', when: g => g.rushState && g.rushState().ready, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'think', hl: '#contract-strip' }] },
+    { id: 'l2mission', kind: 'turn', when: g => g.story.seen.includes('l2calls'), pages: [{ expr: 'smile', hl: '#mission-meter' }, { expr: 'neutral', hl: '#chain-meter' }] },
+    { id: 'l2chain', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.chain >= 2, pages: [{ expr: 'shock', hl: '#chain-meter' }, { expr: 'laugh', hl: '#mission-meter' }] },
     { id: 'l2calls', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'neutral', hl: '#c0' }] },
     // 바닥났다. 여기서 처음으로 "월초에 안 채워진다"가 나온다
     { id: 'l2callsOut', kind: 'turn', when: g => !!outOfCalls(g), pages: [{ expr: 'worry', hl: '#c0' }, { expr: 'neutral' }] },
@@ -152,6 +150,9 @@
   // 신뢰도는 새 규칙이 아니라 '줄곧 돌고 있던 것'의 공개다 — 두 대가 붙은 것도, 배차비가 싼 것도 그거였다.
   const wetSoon = g => g.outdoorVolume() > 0 && (g.weatherNow() === 'rain' || g.upcoming().some(u => u.weather === 'rain'));
   const BEATS_L3 = [
+    // 일괄 출고는 창고가 차야 의미가 있다 — 마당이 처음 열리는 이 장에서 가르친다
+    { id: 'l3rushReady', kind: 'turn', when: g => g.rushState && g.rushState().ready, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'think', hl: '#contract-strip' }] },
+    { id: 'l3rushHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.rush, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'laugh', hl: '#contract-strip' }] },
     { id: 'l3intro', kind: 'start', when: () => true, pages: [
       { expr: 'neutral' },
       { expr: 'think', hl: '#upcoming' },
