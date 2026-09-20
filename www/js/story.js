@@ -94,12 +94,12 @@
     // 설정을 늘리지 않는다. 첫날이 가르치는 건 하나뿐이다 — 배차비는 정액이라 덜 실으면 손해다.
     { id: 'l1intro', kind: 'start', when: () => true, pages: [
       { expr: 'smile' },
-      // 칸 수를 말로 읽어 주지 않는다 — 카드에 적힌 그 숫자를 가리킨다
-      { speaker: 'yeo', expr: 'neutral', hl: '#c0 .sub b' },
       { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },
     { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 3, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
-    { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
+    // 여 실장은 여기서 처음 인사한다 — 계약 카드를 눌러 '한길 물류를 부른' 자리이고,
+    // 그가 가리키는 게이지도 이 팝업 안에 있다. 첫날 소개로 앞당기면 아무것도 안 가리키게 된다.
+    { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ speaker: 'yeo', expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1chainHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.chain >= 2, pages: [{ expr: 'shock', hl: '#chain-meter' }, { expr: 'laugh', hl: '#mission-meter' }] },

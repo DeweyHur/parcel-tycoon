@@ -162,6 +162,7 @@
     const done = r.deliveredCount || r.delivered || 0;
     const rate = done ? Math.round((r.onTimeCount || 0) / done * 100) : 100;
     const bad = (r.returned || 0) + (r.discarded || 0);
+    if (!done) return 'bad';                         // 한 대도 안 불렀으면 칭찬할 것이 없다
     return bad === 0 && rate >= 95 ? 'good' : rate >= 80 ? 'ok' : 'bad';
   }
 
