@@ -120,8 +120,8 @@ body { touch-action: manipulation; }
 /* 칸·배차 눈금. 채운 칸은 금색, 남는 칸은 어둡게, 넘치는 것은 한 칸 띄우고 주황 */
 .pips { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; }
 .pips i { width: 6px; height: 10px; background: #ffffff22; box-shadow: inset 0 0 0 1px #0004; }
-.pips i.on { background: var(--gold); }
-.pips i.over { background: var(--orange); opacity: .55; }
+.pips i.on { background: var(--gold); }   /* 색은 실은 택배 종류로 덮어쓴다 */
+.pips i.over { background: var(--orange); opacity: .4; }   /* 다음 차 몫 — 색은 그대로, 흐리게 */
 .pips i.over.more { opacity: .9; box-shadow: inset 0 0 0 1px #0004, 2px 0 0 var(--orange); }
 .pips i.gap { width: 5px; background: none; box-shadow: none; }
 /* 배차는 화물칸과 다른 것이니 색도 다르게 — 금색은 짐, 푸른색은 부를 수 있는 횟수 */

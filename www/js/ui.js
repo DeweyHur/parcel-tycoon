@@ -631,7 +631,7 @@
       const callPips = c.calls > 0 && c.calls <= 15
         ? `<span class="pips calls">${Array.from({ length: c.calls }, (_, k) => `${k && k % 5 === 0 ? '<i class="gap"></i>' : ''}<i class="on"></i>`).join('')}</span>`
         : T('fmt.trucks', { n: c.calls });
-      const cells = pips(pv.vol, vcap, Math.max(0, eligVol - pv.vol)) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
+      const cells = pips(pv.cells, vcap, pv.over) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
       btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${takesDots(g, c)}</span><span class="calls ${c.calls === 0 && g.shows('calls') ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips}</span></div>
         ${bar}
@@ -846,12 +846,12 @@
   // 칸과 배차는 숫자보다 눈금이 빠르다. 차 한 대가 칸 여섯이면 네모 여섯,
   // 실을 게 넘치면 한 칸 띄우고 남는 만큼 더 — '6+4' 가 그대로 보인다.
   const PIP_MAX = 10;
-  function pips(on, cap, over) {
+  function pips(cells, cap, over) {
     if (cap > PIP_MAX) return '';
     let h = '';
-    for (let i = 0; i < cap; i++) h += `<i class="${i < on ? 'on' : ''}"></i>`;
+    for (let i = 0; i < cap; i++) h += cells[i] ? `<i class="on" style="background:${cells[i]}"></i>` : '<i></i>';
     // 넘치는 칸은 많아야 여섯까지만 그린다 — 그 이상은 눈금이 아니라 벽이 된다
-    if (over > 0) { h += '<i class="gap"></i>'; for (let i = 0; i < Math.min(over, 6); i++) h += `<i class="over${over > 6 && i === 5 ? ' more' : ''}"></i>`; }
+    if (over.length) { h += '<i class="gap"></i>'; over.slice(0, 6).forEach((css, i) => { h += `<i class="over${over.length > 6 && i === 5 ? ' more' : ''}" style="background:${css}"></i>`; }); }
     return `<span class="pips">${h}</span>`;
   }
   // 계약 카드용 한 대 적재 미리보기 (호출 팝업의 '급한 순 자동 선택'과 같은 규칙)
@@ -860,18 +860,20 @@
   function loadPreview(g, c, elig) {
     const vcap = g.vehicleCap(c);
     const rewardOf = p => (p.reward != null ? p.reward : g.baseReward(p.type, p.baseSize));
+    const cellsOf = ps => { const out = []; for (const p of ps) for (let k = 0; k < p.size; k++) out.push(D.PARCEL_TYPES[p.type].css); return out; };
+    const pack = (take, fee) => {
+      const rest = elig.filter(p => !take.includes(p));
+      const vol = take.reduce((s2, p) => s2 + p.size, 0), rev = take.reduce((s2, p) => s2 + rewardOf(p), 0);
+      return { n: take.length, vol, fill: vol / vcap, fee, rev, net: rev - fee, cells: cellsOf(take), over: cellsOf(rest) };
+    };
     try {
       const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
       const r = g.autoPick(c, sorted, 1);
-      const fee = g.callFee(c, r.trucks || 1);
-      const rev = elig.filter(p => r.ids.includes(p.id)).reduce((s2, p) => s2 + rewardOf(p), 0);
-      return { n: r.ids.length, vol: r.vol, fill: r.vol / vcap, fee, rev, net: rev - fee };
+      return pack(elig.filter(p => r.ids.includes(p.id)), g.callFee(c, r.trucks || 1));
     } catch (e) {
-      const take = [];
-      let vol = 0;
+      const take = []; let vol = 0;
       for (const p of elig) { if (vol + p.size > vcap) continue; vol += p.size; take.push(p); }
-      const fee = g.truckFee(c), rev = take.reduce((s2, p) => s2 + rewardOf(p), 0);
-      return { n: take.length, vol, fill: vol / vcap, fee, rev, net: rev - fee };
+      return pack(take, g.truckFee(c));
     }
   }
   function trustBar(g, carrier) {
@@ -973,7 +975,12 @@
     const car = D.CARRIERS[c.carrier], vcap = game.vehicleCap(c), simul = game.simulMax(c), fee = game.truckFee(c);
     const elig = game.eligibleParcels(c);
     const trustInfo = (vol, trucks) => { if (!game.shows('trust')) return ''; const g = game.trustGainPreview(c, vol, trucks), nx = game.trustNext(c.carrier); return `<div class="d" style="font-size:11px;margin-bottom:6px">${trustBar(game, c.carrier)} ${T('call.xpGain', { xp: g.xp, parts: g.parts.join(', ') })}${nx ? ` · ${T('call.nextLevel')}: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 1 ? ` · ${esc(D.trustEffectText(c.carrier, game.trustLevel(c.carrier)))}` : ''}<details><summary style="cursor:pointer;color:var(--dim)">${T('call.trackToggle')}</summary>${trustTrack(c.carrier, game.trustXp(c.carrier))}</details></div>`; };
+    // 카드에 뜬 순수익이 곧 이 선택이다 — 열자마자 같은 것이 담겨 있어야 두 화면이 한 말을 한다
     const sel = new Set();
+    try {
+      const sorted0 = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
+      game.autoPick(c, sorted0, 1).ids.forEach(id => sel.add(id));
+    } catch (e) { /* 자동 선택이 안 되면 빈 채로 연다 */ }
     let extraTrucks = 0; // 사용자가 '한 대 더'로 늘린 대수
     const render = () => {
       const selP = [...sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
