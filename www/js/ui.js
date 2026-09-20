@@ -686,12 +686,22 @@
     const g = game, u = g.upcoming().find(x => x.turn === turn); if (!u || !u.specs) return;
     const wx = u.weather ? M.WEATHER[u.weather] : null;
     let coldFree = g.warehouse.cold - g.coldUsed(), fzFree = (g.warehouse.frozen || 0) - g.frozenUsed();
-    const rows = u.specs.map(s => { const t = D.PARCEL_TYPES[s.type], a = s.attrs || t.attrs, cu = M.CUSTOMERS[s.customer || 'anon']; let note = '';
+    // 똑같은 택배가 줄마다 따로 서면 읽을 것만 늘어난다 — 종류·크기·고객·상태가 같으면 묶어서 ×N.
+    // 냉장·냉동 자리 판정은 앞에서부터 차례로 하므로(같은 택배라도 하나는 들어가고 하나는 못 들어간다)
+    // 상태 문구까지 계산한 뒤에 묶는다 — 묶여도 잃는 정보가 없다 (부록 F 의 재고 묶기와 같은 규칙).
+    const lines = u.specs.map(s => { const t = D.PARCEL_TYPES[s.type], a = s.attrs || t.attrs, cu = M.CUSTOMERS[s.customer || 'anon']; let note = '';
       if (a.includes('frozen')) { if (s.size <= fzFree) { fzFree -= s.size; note = T('up.frozenOk'); } else note = `<b style="color:var(--red)">${T('up.frozenNo')}</b>`; }
       else if (a.includes('cold')) { if (s.size <= coldFree) { coldFree -= s.size; note = T('up.coldOk'); } else note = `<b style="color:var(--orange)">${T('up.coldNo')}</b>`; }
       if (a.includes('customs')) note += (note ? ' · ' : '') + T('up.customs', { n: g.rules.customsWait });
       if (s.burst) note += (note ? ' · ' : '') + `<b style="color:var(--orange)">${T('up.burst')}</b>`;
-      return `<div class="parcel"><div class="sw" style="background:${t.css}"></div><div><span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: s.size })} · ${game.baseReward(s.type, s.size)}c · ${esc(cu.name)}</div><div class="st">${note}</div></div>`; }).join('');
+      return { s, t, a, cu, note, key: [s.type, (a || []).join(''), s.size, s.customer || 'anon', note].join('|') };
+    });
+    const groups = [];
+    for (const ln of lines) { const g0 = groups.find(x => x.key === ln.key); if (g0) g0.n++; else groups.push({ ...ln, n: 1 }); }
+    const rows = groups.map(({ s, t, a, cu, note, n }) => {
+      const cells = T('fmt.cells', { n: s.size }) + (n > 1 ? ` <b>×${n}</b>` : '');
+      return `<div class="parcel"><div class="sw" style="background:${t.css}"></div><div><span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${cells} · ${game.baseReward(s.type, s.size) * n}c · ${esc(cu.name)}</div><div class="st">${note}</div></div>`;
+    }).join('');
     const vol = u.specs.reduce((v, s) => v + s.size, 0), used = g.usedVolume();
     modal(T('up.title', { date: g.dateDowLabel(turn) }), `<div class="pickinfo"><span>${T('up.volume', { vol })}</span><span>${T('common.warehouse')} ${used} → <b class="${used + vol > g.warehouse.cap ? 'bad' : ''}">${used + vol}</b>/${g.warehouse.cap}</span>${wx ? `<span>${wx.icon} ${wx.name}</span>` : ''}</div>${u.heat ? `<div class="d" style="color:var(--orange)">${T('up.heat')}</div>` : ''}<div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">${rows}</div><div class="d" style="margin-top:6px;color:var(--dim)">${T('up.note')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]);
   }
