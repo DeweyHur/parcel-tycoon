@@ -626,12 +626,12 @@
       const spare = c.calls === 0 && R.spareCall && !g.monthStats.spareUsed;
       const caps = g.contractCaps(c), fee = g.truckFee(c), simul = g.simulMax(c), eligVol = elig.reduce((s, p) => s + p.size, 0);
       const pd = g.trustPerk(c.carrier, 'delay'), delay = pd != null ? pd : (car.delay || 0);
-      // 한 대로 지금 부르면 몇 개가 실리고 개당 얼마인가 — 이 게임의 핵심 숫자를 카드에 직접 띄운다.
+      // 지금 한 대 부르면 얼마를 받고 얼마를 내는가 — 이 게임의 핵심 숫자를 카드에 직접 띄운다.
       const pv = loadPreview(g, c, elig);
       const extras = [simul > 1 ? T('hud.simulN', { n: simul }) : '', delay ? T('call.payLater', { n: delay }) : '', c.enh.regular && !c.freeUsedMonth ? T('hud.regular') : ''].filter(Boolean);
       btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${caps.length ? ` <small>${attrIcons(caps)}</small>` : ''}</span><span class="calls ${c.calls === 0 && g.shows('calls') ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : T('fmt.trucks', { n: c.calls })}</span></div>
         <div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>
-        <div class="sub"><b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b> · <span class="per ${pv.fill >= 0.8 ? 'good' : ''}">${pv.n ? T('hud.perParcel', { per: pv.per }) : T('hud.perNone')}</span>${extras.length ? ' · ' + extras.join(' · ') : ''}</div>`;
+        <div class="sub"><b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b> · <span class="per ${pv.n ? (pv.net >= 0 ? 'good' : 'bad') : ''}">${pv.n ? T('hud.netLine', { rev: pv.rev, fee: pv.fee, net: (pv.net >= 0 ? '+' : '−') + Math.abs(pv.net) }) : T('hud.perNone')}</span>${extras.length ? ' · ' + extras.join(' · ') : ''}</div>`;
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
     const f = g.forecast();
@@ -828,17 +828,24 @@
     };
     render();
   }
-  // 계약 카드용 한 대 적재 미리보기: 지금 부르면 몇 개 · 몇 칸 · 개당 얼마 (호출 팝업의 '급한 순 자동 선택'과 같은 규칙)
+  // 계약 카드용 한 대 적재 미리보기 (호출 팝업의 '급한 순 자동 선택'과 같은 규칙)
+  // 지금 한 대 부르면 얼마를 받고 얼마를 내는가. '개당 Nc' 는 버는 돈으로 읽혀서(유저 지적)
+  // 받는 값·배차비·남는 값 셋을 그대로 보여 준다 — 호출 팝업의 +수입/−비용/순익과 같은 언어다.
   function loadPreview(g, c, elig) {
     const vcap = g.vehicleCap(c);
+    const rewardOf = p => (p.reward != null ? p.reward : g.baseReward(p.type, p.baseSize));
     try {
       const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
       const r = g.autoPick(c, sorted, 1);
       const fee = g.callFee(c, r.trucks || 1);
-      return { n: r.ids.length, vol: r.vol, fill: r.vol / vcap, per: r.ids.length ? Math.round(fee / r.ids.length) : 0 };
+      const rev = elig.filter(p => r.ids.includes(p.id)).reduce((s2, p) => s2 + rewardOf(p), 0);
+      return { n: r.ids.length, vol: r.vol, fill: r.vol / vcap, fee, rev, net: rev - fee };
     } catch (e) {
-      const vol = Math.min(elig.reduce((s2, p) => s2 + p.size, 0), vcap);
-      return { n: elig.length, vol, fill: vol / vcap, per: elig.length ? Math.round(g.truckFee(c) / elig.length) : 0 };
+      const take = [];
+      let vol = 0;
+      for (const p of elig) { if (vol + p.size > vcap) continue; vol += p.size; take.push(p); }
+      const fee = g.truckFee(c), rev = take.reduce((s2, p) => s2 + rewardOf(p), 0);
+      return { n: take.length, vol, fill: vol / vcap, fee, rev, net: rev - fee };
     }
   }
   function trustBar(g, carrier) {

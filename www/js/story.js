@@ -425,9 +425,9 @@
     // 지금 이 순간 차를 부르면 실제로 얼마인가 — 말 대신 숫자로 보여 주기 위한 값들
     const nowC = c || bulk;
     const nowCap = nowC ? g.vehicleCap(nowC) : cap, nowFee = nowC ? g.truckFee(nowC) : fee;
-    let nowVol = 0, nowRev = 0;
-    if (nowC) for (const p of g.eligibleParcels(nowC).slice().sort((x, y) => x.deadline - y.deadline)) { if (nowVol + p.size > nowCap) continue; nowVol += p.size; nowRev += p.reward; }
-    return { nowCap, nowFee, nowVol, nowRev, nowNet: nowRev - nowFee, nowLoss: Math.max(0, nowFee - nowRev),
+    let nowVol = 0, nowRev = 0, nowCount = 0;
+    if (nowC) for (const p of g.eligibleParcels(nowC).slice().sort((x, y) => x.deadline - y.deadline)) { if (nowVol + p.size > nowCap) continue; nowVol += p.size; nowRev += p.reward; nowCount++; }
+    return { nowCap, nowFee, nowVol, nowRev, nowCount, nowNet: nowRev - nowFee, nowLoss: Math.max(0, nowFee - nowRev),
       name: bulk ? g.contractName(bulk) : '', cap, fee, per: Math.round(fee / Math.max(1, cap)), ready: c ? g.contractName(c) : '', readyCap: c ? g.vehicleCap(c) : cap,
       readyVol: c ? g.eligibleParcels(c).reduce((s2, p) => s2 + p.size, 0) : 0, readyFee: c ? g.truckFee(c) : fee,
       openName: oc ? g.contractName(oc) : '', openCap: oc ? g.vehicleCap(oc) : cap, openFee: oc ? g.truckFee(oc) : fee,
