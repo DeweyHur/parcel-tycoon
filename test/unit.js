@@ -81,7 +81,9 @@ t('차량: 용량을 넘기면 동시 대수 한도(기본 1)에서 거부, 신�
   g.trust.bulk0 = 3; assert.equal(g.simulMax(c), 2);
   r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 2); assert.equal(r.fee, D.FAMILIES.bulk.fee * 2);
 });
-t('도크 러시: 창고를 72% 이상 채우면 임시 트럭 +2, 2대 이상으로 55%를 비우면 보상 35% 폭발', () => {
+// 일괄 출고·연속 만차는 지금 꺼져 있다(D.DISABLED_FEATURES). 규칙 자체는 살아 있으니 켠 채로 검사한다
+const withAll = fn => () => { const keep = D.DISABLED_FEATURES; D.DISABLED_FEATURES = []; try { fn(); } finally { D.DISABLED_FEATURES = keep; } };
+t('도크 러시: 창고를 72% 이상 채우면 임시 트럭 +2, 2대 이상으로 55%를 비우면 보상 35% 폭발', withAll(() => {
   const g = EMPTY(202); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.warehouse.cap = 12;
   g.parcels = [1, 2, 3, 4, 5, 6].map(id => P(id, 'normal', 2));
@@ -90,8 +92,8 @@ t('도크 러시: 창고를 72% 이상 채우면 임시 트럭 +2, 2대 이상�
   const r = g.callCarrier(i, g.parcels.map(p => p.id), 2);
   assert.ok(r.ok, r.msg); assert.ok(r.rush); assert.equal(r.revenue, Math.round(base * D.RUSH.bonus));
   assert.equal(r.rushBonus, r.revenue - base); assert.equal(g.stats.rushes, 1); assert.equal(g.stats.rushBonus, r.rushBonus);
-});
-t('퍼펙트 로드: 80% 적재 출고를 연속하면 2회부터 보상이 커지고 대기하면 연쇄가 끊긴다', () => {
+}));
+t('퍼펙트 로드: 80% 적재 출고를 연속하면 2회부터 보상이 커지고 대기하면 연쇄가 끊긴다', withAll(() => {
   const g = EMPTY(203); const i = slot(g, 'bulk'), c = g.contracts[i];
   const load = base => [0, 1, 2].map(n => P(base + n, 'normal', 2));
   g.parcels = load(10); const first = g.callCarrier(i, g.parcels.map(p => p.id));
@@ -100,7 +102,7 @@ t('퍼펙트 로드: 80% 적재 출고를 연속하면 2회부터 보상이 커�
   assert.ok(second.ok); assert.equal(second.chain, 2); assert.equal(second.chainMult, 1.08); assert.equal(second.revenue, Math.round(base * 1.08)); assert.ok(second.chainBonus > 0);
   assert.equal(g.stats.maxLoadChain, 2); assert.equal(g.stats.chainBonus, second.chainBonus);
   adv(g); assert.equal(g.loadChain, 0);
-});
+}));
 t('차량: 배차비는 후불이라 자금 0이어도 호출 가능, 남은 배차보다 많이 못 부름', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i]; g.parcels = [P(1, 'normal', 1)];
   g.cash = 0; let r = g.callCarrier(i, [1]); assert.ok(r.ok); assert.equal(g.feesDue, D.FAMILIES.bulk.fee);
@@ -358,7 +360,7 @@ t('레벨: 플래그는 누적이고, 자유 런(레벨 없음)은 전부 켜져
   assert.deepEqual([...LV.showsAt(1)], []);
   const s2 = LV.showsAt(2); assert.ok(s2.has('market') && s2.has('calls') && !s2.has('weather'));
   const s3 = LV.showsAt(3); assert.ok(s3.has('market') && s3.has('weather'), '누적');
-  const free = NG(1); for (const f of LV.FLAGS) assert.ok(free.shows(f), f);
+  const free = NG(1); for (const f of LV.FLAGS) assert.equal(free.shows(f), !D.DISABLED_FEATURES.includes(f), f);
 });
 t('레벨 1: 계약 하나 · 개인 고객만 · 창고 16칸 · 시드 고정 · 한 사이클', () => {
   const g = L1(), g2 = L1({ difficulty: 'normal' });
@@ -647,19 +649,14 @@ t('자리가 다 찼으면 마켓이 계약 대신 특약을 반드시 내놓는
   assert.ok(opt, '냉동 특약이 매물에 있다 — ' + items.map(i => i.kind + ':' + (i.carrier || i.enh || i.fac || '')).join(' '));
 });
 
-t('서장에는 보름 목표·연속 만차·일괄 출고가 아예 없다', () => {
+t('보름 목표는 1장부터, 연속 만차·일괄 출고는 지금 어디에도 없다(꺼 둠)', () => {
   const lv = n => new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false });
-  const g1 = lv(1);
-  assert.ok(!g1.shows('mission') && !g1.shows('chain') && !g1.shows('rush'), '서장은 셋 다 닫혀 있다');
-  g1.warehouse.cap = 10; g1.parcels = [P(9101, 'normal', 9, { customer: 'anon' })];
-  assert.equal(g1.rushState().unlocked, false, '서장은 창고가 꽉 차도 일괄 출고가 안 열린다');
-  const g2 = lv(2);
-  assert.ok(g2.shows('mission') && g2.shows('chain'), '1장에서 보름 목표와 연속 만차가 열린다');
-  assert.equal(g2.shows('rush'), false, '일괄 출고는 1장에도 아직 없다');
-  const g3 = lv(3);
-  assert.ok(g3.shows('rush'), '2장에서 일괄 출고가 열린다');
-  g3.warehouse.cap = 10; g3.parcels = [P(9102, 'normal', 9, { customer: 'anon' })];
-  assert.ok(g3.rushState().unlocked && g3.rushState().ready, '2장에서 창고가 차면 준비된다');
+  assert.ok(!lv(1).shows('mission') && lv(2).shows('mission'));
+  for (const n of [1, 2, 3, 4, 5, 6]) { const g = lv(n); assert.ok(!g.shows('chain') && !g.shows('rush'), '레벨 ' + n);
+    g.warehouse.cap = 10; g.parcels = [P(9100 + n, 'normal', 9, { customer: 'anon' })]; assert.equal(g.rushState().ready, false); }
+  const free = NG(1); assert.ok(!free.shows('chain') && !free.shows('rush'), '자유 런에서도 꺼져 있다');
+  const g = EMPTY(203); const i = slot(g, 'bulk'); g.parcels = [0, 1, 2].map(n => P(50 + n, 'normal', 2));
+  const r = g.callCarrier(i, g.parcels.map(p => p.id)); assert.ok(r.ok); assert.equal(r.chain, 0); assert.equal(r.chainMult, 1);
 });
 
 t('4장에서 처음으로 평판이 움직이고, 0이면 판이 끝난다', () => {

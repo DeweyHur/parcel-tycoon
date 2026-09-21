@@ -128,8 +128,7 @@
       { expr: 'think', hl: '#c0 .calls' },
     ] },
     // 배차가 줄어드는 것을 실제로 본 다음에 말한다
-    { id: 'l2mission', kind: 'turn', when: g => g.story.seen.includes('l2calls'), pages: [{ expr: 'smile', hl: '#mission-meter' }, { expr: 'neutral', hl: '#chain-meter' }] },
-    { id: 'l2chain', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.chain >= 2, pages: [{ expr: 'shock', hl: '#chain-meter' }, { expr: 'laugh', hl: '#mission-meter' }] },
+    { id: 'l2mission', kind: 'turn', when: g => g.story.seen.includes('l2calls'), pages: [{ expr: 'smile', hl: '#mission-meter' }] },
     { id: 'l2calls', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'neutral', hl: '#c0' }] },
     // 바닥났다. 여기서 처음으로 "월초에 안 채워진다"가 나온다
     // 바닥났다 — 이번 한 번만 박 반장이 채워 준다. 원래는 마켓에서 사는 것이라는 걸 여기서 처음 말한다
@@ -162,8 +161,6 @@
     // 일괄 출고는 창고가 차야 의미가 있다 — 마당이 처음 열리는 이 장에서 가르친다
     // 투자 버튼이 여기서 처음 열린다 — 캠페인은 '창고가 비면 내가 물량을 끌어온다'는 얘기다
     { id: 'l3invest', kind: 'turn', when: g => g.story.seen.includes('l3intro'), pages: [{ expr: 'smile', hl: '#invest-btn' }, { expr: 'neutral', hl: '#invest-btn' }] },
-    { id: 'l3rushReady', kind: 'turn', when: g => g.rushState && g.rushState().ready, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'think', hl: '#contract-strip' }] },
-    { id: 'l3rushHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.rush, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'laugh', hl: '#contract-strip' }] },
     { id: 'l3intro', kind: 'start', when: () => true, pages: [
       { expr: 'neutral' },
       { expr: 'think', hl: '#upcoming' },
@@ -349,16 +346,13 @@
     // 차가 두 대 붙는 첫 순간. 자동으로 붙는 거라 설명이 없으면 배차가 왜 2대 줄었는지 모른다 (대본 1개월차 8턴에 정확히 12칸이 온다)
     { id: 'trucks2', needs: 'simul', months: [1, 2, 3], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'smile', hl: '#call-head .load-visual' }] },
     { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#parcels' }, { expr: 'neutral', hl: '#call-foot .btn.primary', gate: true }] },
-    { id: 'rushHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.rush, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'laugh', hl: '#contract-strip' }] },
     { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
-    { id: 'chainHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.chain >= 2, pages: [{ expr: 'shock', hl: '#chain-meter' }, { expr: 'laugh', hl: '#mission-meter' }] },
-    { id: 'progressHud', kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile', hl: '#mission-meter' }, { expr: 'neutral', hl: '#chain-meter' }] },
+    { id: 'progressHud', kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile', hl: '#mission-meter' }] },
     // 안내가 끝났다는 걸 말로 못 박아 준다. 이게 없으면 언제까지 시키는 대로 해야 하는지 알 수 없다.
     { id: 'handOff', months: [1], kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile' }] },
     // 배차 소진: 이 게임에서 제일 많이 막히는 지점 — 배차는 월초에 안 채워진다
     { id: 'callsOut', needs: 'calls', months: [1, 2, 3], kind: 'turn', when: g => !!outOfCalls(g), pages: [{ expr: 'worry', hl: '#actions' }, { expr: 'neutral' }] },
     { id: 'deadline1', months: [1, 2, 3], kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1 && !(p.customs > 0)), pages: [{ expr: 'worry', hl: '#parcels' }] },
-    { id: 'rushReady', kind: 'turn', when: g => g.rushState && g.rushState().ready, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'think', hl: '#contract-strip' }] },
     { id: 'usage76', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.76, pages: [{ expr: 'worry', hl: '#bar-usage' }, { expr: 'neutral', hl: '#upcoming' }] },
     { id: 'usage91', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.91, pages: [{ expr: 'shock', hl: '#bar-usage' }] },
     // 첫 일요일: 왜 차를 못 부르는지, 마당을 왜 비워야 하는지. 마지막 페이지에서 직접 고르게 한다

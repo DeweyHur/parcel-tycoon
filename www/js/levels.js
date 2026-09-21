@@ -72,7 +72,7 @@
     },
     // ----- 1장 (3월 후반): 배차는 소모품이다. 그래서 마켓이 있다 -----
     {
-      n: 2, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 1, grants: ['market', 'calls', 'simul', 'mission', 'chain'],
+      n: 2, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 1, grants: ['market', 'calls', 'simul', 'mission'],
       minCash: 200,
       company: { cash: 600, warehouse: { cap: 16, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }], customers: [['anon', 0]] },
       mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 120, monthlyStress: 0, theftMult: 0, noBankrupt: true },
@@ -106,7 +106,7 @@
     // 처음으로 ⚠ 깨지는 것이 온다. 밴은 일반도 받지만 4칸이라 일반만 실으면 남는 게 없다.
     // 그래서 ⚠ 는 밴으로, 일반은 한길로 — '차마다 맞는 짐'이 이 장이 가르치는 것이다. (직접 배송은 3장으로)
     {
-      n: 3, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 2, grants: ['weather', 'theft', 'trust', 'rush', 'invest', 'attrs'],
+      n: 3, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 2, grants: ['weather', 'theft', 'trust', 'invest', 'attrs'],
       minCash: 300, minCap: 16, minCalls: 5,
       company: { cash: 900, warehouse: { cap: 24, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }, { carrier: 'pack0' }], customers: [['anon', 0]] },
       addContracts: [{ carrier: 'pack0' }],

@@ -777,7 +777,7 @@
       return { count: this.loadChain || 0, level, max: C.max, mult: level >= 2 ? 1 + (level - 1) * C.step : 1, minFill: C.minFill };
     }
     chainPreview(fill) {
-      const C = D.LOAD_CHAIN, count = fill >= C.minFill ? (this.loadChain || 0) + 1 : 0;
+      const C = D.LOAD_CHAIN, count = this.shows('chain') && fill >= C.minFill ? (this.loadChain || 0) + 1 : 0;
       const level = Math.min(count, C.max);
       return { count, mult: level >= 2 ? 1 + (level - 1) * C.step : 1, qualifies: count > 0 };
     }
@@ -994,7 +994,7 @@
     tableMonth(c) { return this.monthIndex(c) + (this.rules.monthOffset || 0); }
     // 튜토리얼 대본(1~3개월차). 「인수인계」로 시작한 런에서만 (docs/STORY_TUTORIAL_DESIGN.md 부록 I)
     // 이 런에서 그 기능이 켜져 있는가. 캠페인 레벨 밖(자유 런)은 전부 켜져 있다 (levels.js FLAGS)
-    shows(k) { return !this._shows || this._shows.has(k); }
+    shows(k) { if ((D.DISABLED_FEATURES || []).includes(k)) return false; return !this._shows || this._shows.has(k); }
     // 상호: 레벨 1을 끝내면 플레이어가 붙인 이름이 회사 이름을 대신한다
     companyName() { return this.cfg.companyName || this.company.name; }
     // 준비 마켓은 아직 사이클 0 이다 — 그 장의 대본(사이클 1)을 보게 한다
@@ -1324,7 +1324,7 @@
       revenue = Math.round(revenue * R.revenueMult);
       const deliveredVolume = chosen.reduce((sum, p) => sum + p.size, 0);
       const actualFill = deliveredVolume / (vcap * trucks);
-      const chainQualified = actualFill >= D.LOAD_CHAIN.minFill && broken === 0;
+      const chainQualified = this.shows('chain') && actualFill >= D.LOAD_CHAIN.minFill && broken === 0;
       this.loadChain = chainQualified ? (this.loadChain || 0) + 1 : 0;
       const chainLevel = Math.min(this.loadChain, D.LOAD_CHAIN.max);
       const chainMult = chainLevel >= 2 ? 1 + (chainLevel - 1) * D.LOAD_CHAIN.step : 1;
