@@ -138,8 +138,7 @@ const say = m => { console.log(m); log.push(m); };
   check(!(await page.evaluate(() => PT.game.shows('trust'))) && (await page.$$('.trust')).length === 0, '신뢰도가 화면에 없다');
   // 택배 상세도 같은 기준으로 비어 있어야 한다
   // 창고 상세(재고)는 기본으로 접혀 있다 — 먼저 펼친다. 같은 택배는 묶음 줄이라 그것도 펼친다
-  await page.evaluate(() => { const t = document.getElementById('warehouse-toggle');
-    if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); });
+  check(!(await page.$('#warehouse-toggle')) && await vis('#parcels'), '재고 접기가 없다 — 상자 격자는 늘 보인다');
   await page.waitForTimeout(300);
   await safeClick('#parcels .ptile[data-id]'); await page.waitForTimeout(400);
   const pd = await page.evaluate(() => ({ txt: (document.getElementById('modal') || {}).textContent || '',

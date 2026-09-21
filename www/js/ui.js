@@ -12,7 +12,7 @@
   const cycleName = c => { const cy = D.CYCLES_PER_MONTH, mi = Math.ceil(c / cy), half = (c - 1) % cy + 1;
     const cal = ((D.START_MONTH - 1 + mi - 1) % 12) + 1; return T('fmt.cycle', { cal, half: T('fmt.half' + half) }); };
   const demoLocked = () => !!BUILD.demo && !Profile.hasFull();   // 데모 빌드 + 본편 미구매
-  const opts = Object.assign({ sound: true, music: true, musicVol: 0.6, sms: true, warehouseOpen: false }, Store.get(OPT_KEY) || {});
+  const opts = Object.assign({ sound: true, music: true, musicVol: 0.6, sms: true }, Store.get(OPT_KEY) || {});
   SFX.setEnabled(opts.sound); BGM.setEnabled(opts.music); BGM.setVolume(opts.musicVol);
   Profile.load();
 
@@ -547,16 +547,9 @@
   function renderAll() {
     if (!game) return;
     const g = game, R = g.rules;
-    const warehouseDetails = $('#warehouse-details'), warehouseToggle = $('#warehouse-toggle'), warehouseCompact = $('#warehouse-compact');
-    // 차를 부른 동안에는 창고가 곧 고르는 판이다 — 접어 뒀어도 편다
+    // 재고는 늘 펼쳐져 있다 — 상자 격자가 곧 창고이고, 차를 부르면 그대로 고르는 판이 된다
     if (callMode && (g.phase !== 'play' || !g.contracts[callMode.i] || !g.canCall(g.contracts[callMode.i]))) callMode = null;
-    const whOpen = opts.warehouseOpen || !!callMode;
     $('#app').classList.toggle('calling', !!callMode);
-    warehouseDetails.hidden = !whOpen;
-    warehouseCompact.hidden = whOpen;
-    warehouseToggle.textContent = T(opts.warehouseOpen ? 'warehouse.hide' : 'warehouse.show');
-    warehouseToggle.setAttribute('aria-expanded', String(opts.warehouseOpen));
-    $('#app').classList.toggle('warehouse-collapsed', !whOpen);
     updateMusic();
     $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { y: g.yearOf(), cal: g.calMonth(), n: g.month })}`;
     $('#hud-turn').textContent = T('hud.turn', { d: g.dateOf(g.turn), dow: g.dowName(g.turn) });
@@ -627,19 +620,6 @@
     renderCallBar();
     if (g.storage.length && !callMode) $('#parcels').insertAdjacentHTML('afterbegin', g.storage.map(s => { const K = M.STORAGE_KINDS[s.kind], cu = M.CUSTOMERS[s.customer]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#a8845a"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${cu.icon}${esc(cu.name)}${s.perTurn ? ` · ${T('log.storagePerTurn', { perTurn: s.perTurn })}` : ''}</div><div class="st">${s.outdoor ? `${T('hud.outdoorTag')} · ` : ''}${T('storage.left', { n: s.left })}</div></div>`; }).join(''));
     $('#parcels').querySelectorAll('.parcel.storage').forEach(el => el.onclick = () => showStorage(+el.dataset.sid));
-    // 접어 둬도 기한만은 보여야 한다 — 종류마다 '가장 급한 것'의 남은 날
-    const compactCounts = new Map();
-    for (const p of g.parcels) {
-      const row = compactCounts.get(p.type) || { n: 0, cells: 0, due: null, over: false };
-      row.n++; row.cells += p.size;
-      if (p.overdue) row.over = true;
-      else if (!p.noDeadline && !(p.customs > 0)) row.due = row.due == null ? p.deadline : Math.min(row.due, p.deadline);
-      compactCounts.set(p.type, row);
-    }
-    warehouseCompact.innerHTML = `<button class="compact-stock total">📦 ${g.parcels.length} · ${used}/${cap}</button>` + [...compactCounts].map(([type, row]) => { const t = D.PARCEL_TYPES[type];
-      const due = row.over ? `<b class="wrisk"> ⏳!</b>` : row.due != null ? ` <span class="${row.due <= 1 ? 'wrisk' : 'd'}">⏳${T('fmt.turns', { n: row.due })}</span>` : '';
-      return `<button class="compact-stock" title="${esc(t.name)}"><i style="background:${t.css}"></i>×${row.n} · ${row.cells}${due}</button>`; }).join('');
-    warehouseCompact.querySelectorAll('button').forEach(el => el.onclick = () => { SFX.click(); opts.warehouseOpen = true; saveOpts(); renderAll(); if (scene && scene.resize) scene.resize(); });
     const slotsOn = g.visibleSlots();
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) {
       const btn = $('#c' + i), c = g.contracts[i];
@@ -1884,14 +1864,12 @@
     if (scene && scene.relabel) scene.relabel();
   }
   function init() {
-    $('#app').classList.toggle('warehouse-collapsed', !opts.warehouseOpen);
     scene = new Scene3D($('#scene'));
     scene.setOnInspect(showSceneInspect);
     applyStaticText();
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) $('#c' + i).onclick = () => onContractTap(i);
     $('#hud-cash-box').onclick = () => { SFX.click(); hudDueOpen = !hudDueOpen; renderAll(); };
     $('#wait-btn').onclick = () => doWait(null);
-    $('#warehouse-toggle').onclick = () => { SFX.click(); opts.warehouseOpen = !opts.warehouseOpen; saveOpts(); renderAll(); if (scene && scene.resize) scene.resize(); };
     $('#invest-btn').onclick = () => { if (game) { SFX.click(); showGrowth(); } };
     $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
     $('#hud-month').onclick = () => { if (game) { SFX.click(); showCalendar(closeModal); } };
