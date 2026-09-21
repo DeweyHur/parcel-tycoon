@@ -746,10 +746,14 @@
     // 상시 +N건이던 것을 발동형으로 바꾼 이유: 창고가 남아도는 보름을 플레이어가 직접 메울 수 있어야 하고,
     // 그렇게 채운 창고가 곧 일괄 출고의 밑천이 된다. 보름에 한 번.
     campaignPlan() {
-      const lv = (this.growth && this.growth.marketing) || 0, C = D.GROWTH.marketing.campaign;
+      // 홍보 투자 없이도 1단계 캠페인은 열 수 있다. 캠페인(스토리)에서는 박 반장이 소개한 뒤부터
+      const lv = Math.max(1, (this.growth && this.growth.marketing) || 0), C = D.GROWTH.marketing.campaign;
       const used = this.campaignCycle === this.month;
-      return { level: lv, parcels: lv * C.per, days: C.days, cost: lv * C.cost, used, ready: lv > 0 && !used && this.shows('invest') };
+      const open = this.shows('invest') && this.campaignOpen();
+      return { level: open ? lv : 0, parcels: lv * C.per, days: C.days, cost: lv * C.cost, used, ready: open && !used };
     }
+    // 스토리 캠페인에서는 '창고가 빈 날 이틀'을 겪고 박 반장이 소개한 뒤에 열린다. 자유 런·안내 끔이면 처음부터
+    campaignOpen() { return !this.level || !this.story || this.story.off || (this.story.seen || []).includes('l3invest'); }
     runCampaign() {
       const p = this.campaignPlan();
       if (!p.level || !this.shows('invest')) return { ok: false, reason: 'locked' };
@@ -1240,6 +1244,8 @@
     // 대기: 턴을 넘긴다. selfIds를 주면 그 택배를 직접 배송(배송비 지불, 보상 그대로)하고 넘긴다
     wait(selfIds) {
       if (this.phase !== 'play') return false;
+      // 창고가 (거의) 빈 채로 하루를 넘긴 날 — 캠페인을 소개할 때를 잰다. 4분의 1도 안 찬 날은 비어 노는 날이다
+      if (this.usedVolume() <= this.warehouse.cap * 0.25) this.emptyDays = (this.emptyDays || 0) + 1;
       let self = null;
       if (selfIds && selfIds.length) { self = this.selfDeliver(selfIds); if (!self.ok) return self; }
       this.monthStats.waits++; this.run.waits++; this.stats.waits++;

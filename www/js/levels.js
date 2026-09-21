@@ -121,8 +121,9 @@
           ['normal 2 anon', 'normal 1 anon', 'fragile 2 anon'],
           ['normal 2 anon', 'normal 2 anon'],
           ['normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
-          ['normal 2 anon', 'normal 1 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
+          // 5·6일차는 한산하다 — 창고가 비어 노는 날을 겪어야 캠페인(l3invest)이 뜻이 있다
+          [],
+          [],
           ['normal 2 anon', 'normal 1 anon'],
           ['normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
           ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],

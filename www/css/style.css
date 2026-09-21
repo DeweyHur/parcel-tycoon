@@ -694,3 +694,6 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 .contract .takesrow { line-height: 1; margin: 2px 0 3px; }
 .contract .takesrow .takes { margin-left: 0; }
 .contract .nm { flex-wrap: wrap; gap: 2px 6px; }
+
+/* 캠페인 버튼: 글자가 잘리지 않게 조금 더 넓게 */
+#bottom-bar #invest-btn:not([hidden]) { flex: 1.3; }

@@ -164,7 +164,10 @@
   const BEATS_L3 = [
     // 일괄 출고는 창고가 차야 의미가 있다 — 마당이 처음 열리는 이 장에서 가르친다
     // 투자 버튼이 여기서 처음 열린다 — 캠페인은 '창고가 비면 내가 물량을 끌어온다'는 얘기다
-    { id: 'l3invest', kind: 'turn', when: g => g.story.seen.includes('l3intro'), pages: [{ expr: 'smile', hl: '#invest-btn' }, { expr: 'neutral', hl: '#invest-btn' }] },
+    // 캠페인은 '창고가 빈 날'을 두 번 겪은 다음에 — 비어 노는 게 아깝다는 걸 느낀 뒤라야 버튼이 뜻이 있다
+    { id: 'l3invest', kind: 'turn', when: g => (g.emptyDays || 0) >= 2, pages: [{ expr: 'think', hl: '#bar-usage' }, { expr: 'smile', hl: '#invest-btn', gate: true }] },
+    { id: 'l3campGo', kind: 'modal', modal: 'growth', when: (g, ctx) => ctx.ready, pages: [{ expr: 'neutral', hl: '#camp-go', gate: true }] },
+    { id: 'l3campDone', kind: 'turn', when: g => g.campaignCycle === g.month, pages: [{ expr: 'laugh', hl: '#upcoming' }] },
     { id: 'l3intro', kind: 'start', when: () => true, pages: [
       { expr: 'neutral' },
       { expr: 'think', hl: '#upcoming' },

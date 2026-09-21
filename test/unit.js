@@ -30,8 +30,15 @@ t('실시간 성장 투자: 홍보는 캠페인 크기, 트럭은 배차, 창고
 t('홍보 캠페인: 보름에 한 번, 며칠 안에 물량을 끌어온다', () => {
   const g = NG(73); g.cash = 3000;
   const C = D.GROWTH.marketing.campaign;
-  assert.equal(g.campaignPlan().level, 0, '홍보가 0이면 열 수 없다');
-  assert.equal(g.runCampaign().ok, false);
+  assert.equal(g.campaignPlan().level, 1, '홍보 투자가 없어도 1단계 캠페인은 연다');
+  assert.equal(g.campaignPlan().parcels, C.per);
+  // 스토리 2장: 창고가 빈 날 이틀을 겪고 박 반장이 소개(l3invest)하기 전엔 닫혀 있다
+  const s3 = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: 3, prep: false });
+  s3.cash = 3000; if (s3.phase === 'market') s3.closeMarket();
+  assert.equal(s3.campaignPlan().level, 0); assert.equal(s3.runCampaign().ok, false);
+  s3.parcels = []; s3.wait(); s3.takeEvents(); s3.parcels = []; s3.wait(); s3.takeEvents();
+  assert.ok((s3.emptyDays || 0) >= 2, '빈 날을 센다 — ' + s3.emptyDays);
+  s3.story.seen.push('l3invest'); assert.ok(s3.campaignPlan().ready, '소개 뒤에 열린다');
   g.investGrowth('marketing'); g.investGrowth('marketing');       // Lv.2
   const plan = g.campaignPlan();
   assert.equal(plan.parcels, 2 * C.per);

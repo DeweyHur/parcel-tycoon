@@ -555,6 +555,7 @@
     const g = game, R = g.rules;
     // 재고는 늘 펼쳐져 있다 — 상자 격자가 곧 창고이고, 차를 부르면 그대로 고르는 판이 된다
     const pk = ensurePick();
+    $('#invest-btn').hidden = !(g.shows('invest') && g.campaignOpen());   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다
     $('#app').classList.toggle('calling', !!pk);
     updateMusic();
     $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { y: g.yearOf(), cal: g.calMonth(), n: g.month })}`;
@@ -1175,7 +1176,7 @@
     const tbtn = `${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}`;
     const gauge = `<div class="load-visual mini"><div class="truck-stack">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
     const hint = `<div class="load-hint">${vol}/${cap} · ${Math.round(fill * 100)}%${fill >= 0.8 && game.shows('chain') ? ' ⚡' : ''} · ${T('call.tapBoxes')}${tbtn ? ` <span class="tbtn">${tbtn}</span>` : ''}</div>`;
-    const money = `${chain.count >= 2 && game.shows('chain') ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<div class="load-hint" style="color:var(--green)">${T('call.fillOk')}</div>` : vol ? `<div class="load-hint" style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</div>` : ''}`;
+    const money = `${chain.count >= 2 && game.shows('chain') ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
     const riskLine = riskSel.length ? `<div class="riskline">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
@@ -1892,13 +1893,14 @@
     const hireSection = rc.length ? `<div class="growth-head" style="margin-top:14px"><span>${T('hire.title')}</span></div><div class="growth-tip">${T('hire.desc')}</div><div class="growth-grid">${hireCards}</div>` : '';
     // 홍보 캠페인 — 창고가 비었을 때 직접 물량을 끌어오는 자리. 투자 화면 맨 위에 둔다
     const cp = g.campaignPlan();
-    const campSection = cp.level ? `<div class="growth-head" style="margin-top:4px"><span>${T('camp.title')}</span></div>
+    const campSection = cp.level ? `${g.level ? '' : `<div class="growth-head" style="margin-top:4px"><span>${T('camp.title')}</span></div>`}
       <div class="growth-tip">${T('camp.desc')}</div>
       <div class="growth-grid"><button class="growth-card" id="camp-go" ${cp.ready && g.cash >= cp.cost ? '' : 'disabled'}>
         <span class="growth-icon">📣</span><span class="growth-copy"><b>${T('camp.btn')}</b><span>${cp.used ? T('camp.used') : T('camp.effect', { n: cp.parcels, days: cp.days })}</span></span>
         <span class="growth-buy"><b>${cp.cost}c</b></span></button></div>` : '';
     const body = `<div class="growth-head"><span>${ko ? '성장 단계' : 'Growth'} <b>Lv.${total}</b></span><span class="growth-cash">${g.cash}c</span></div><div class="growth-tip">${ko ? '투자할수록 창고와 트럭이 실제로 바뀝니다.' : 'Every upgrade visibly changes your depot and trucks.'}</div>${campSection}<div class="growth-grid">${cards}</div>${hireSection}`;
-    const m = modal(ko ? '사업 확장' : 'Business growth', body, [{ label: T('btn.close'), onClick: closeModal }]);
+    const m = modal(g.level ? T('camp.button') : (ko ? '캠페인 · 사업 확장' : 'Campaign · Growth'), g.level ? campSection : body, [{ label: T('btn.close'), onClick: closeModal }]);
+    storyCheck({ kind: 'modal', modal: 'growth', ready: cp.ready && g.cash >= cp.cost });
     m.querySelectorAll('[data-growth]').forEach(el => el.onclick = () => {
       const kind = el.dataset.growth, r = g.investGrowth(kind);
       if (!r.ok) { toast(r.reason === 'cash' ? (ko ? `${r.cost}c가 필요합니다` : `Need ${r.cost}c`) : (ko ? '아직 잠겨 있습니다' : 'Still locked')); return; }
@@ -1911,7 +1913,8 @@
       const r = g.runCampaign();
       if (!r.ok) { toast(r.reason === 'cash' ? T('camp.needCash', { n: r.cost }) : T('camp.used')); return; }
       SFX.buy(); toast(T('camp.toast', { n: r.n, days: r.days }), 2600);
-      g.takeEvents(); saveGame(); renderAll(); showGrowth();
+      g.takeEvents(); saveGame(); closeModal(); renderAll();
+      storyCheck({ kind: 'turn' });
     };
   }
   // 실시간 계약: 슬롯을 골라 즉시 고용한다 (마켓의 chooseSlot과 같은 카드 목록, 단 game.hireContract 로 처리)
@@ -1953,8 +1956,7 @@
     document.title = T('title.name') + ': ' + T('title.sub');
     document.documentElement.lang = I18n.lang;
     $('#hud-cash-lbl').textContent = T('hud.cashLbl'); $('#usage-lbl').textContent = T('common.warehouse'); $('#cold-lbl').textContent = D.ATTRS.cold.name;
-    $('#invest-btn').hidden = !game || !game.shows('invest');   // 2장에서 열린다
-    $('#invest-btn').textContent = I18n.lang === 'ko' ? '투자' : 'Invest'; $('#menu-btn').textContent = T('menu.title');
+    $('#invest-btn').textContent = T('camp.button'); $('#menu-btn').textContent = T('menu.title');
     if (scene && scene.relabel) scene.relabel();
   }
   function init() {
