@@ -84,6 +84,10 @@ body { touch-action: manipulation; }
 .vbadge { display: inline-block; min-width: 14px; margin-right: 3px; text-align: center; font-size: 11px; }
 .vbadge.v1 { color: #6fdcff; } .vbadge.v2 { color: #ffd166; } .vbadge.v3 { color: #ff91dd; text-shadow: 0 0 5px #ff70d2; }
 @keyframes valueGlow { 50% { filter: brightness(1.65); transform: scale(1.12); } }
+.parcel .cboxes { display: inline-flex; gap: 3px; vertical-align: -1px; }
+.parcel .cbox { display: inline-flex; gap: 1px; }
+.parcel .cbox i { width: 6px; height: 9px; border: 1px solid #0006; }
+.parcel .cboxes .more { color: var(--dim); font-size: 10px; align-self: center; }
 .parcel .nm { font-weight: 700; }
 .parcel .st { color: var(--dim); font-size: 11px; text-align: right; }
 .parcel.overdue { border-color: var(--red); } .parcel.overdue .st { color: var(--red); }

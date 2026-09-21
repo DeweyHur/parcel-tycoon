@@ -941,11 +941,22 @@
     return parts.join(' · ');
   }
   function urgDot(p) { const u = urgencyOf(p); return `<span class="urg ${u <= 0 ? 'r' : u <= 1 ? 'r' : u <= 2 ? 'o' : u <= 3 ? 'y' : 'g'}"></span>`; }
+  // 칸 수는 숫자보다 상자 모양이 빠르다 — 2칸이면 붙은 상자 둘, 1칸이면 하나. 색은 택배 종류.
+  const CBOX_MAX = 12;
+  function cellBoxes(ps) {
+    let drawn = 0; const out = [];
+    for (const p of ps) {
+      if (drawn >= CBOX_MAX) { out.push('<b class="more">⋯</b>'); break; }
+      const t = ptype(p), n = Math.min(p.size, CBOX_MAX - drawn); drawn += n;
+      out.push(`<span class="cbox" title="${esc(t.name)}" aria-label="${esc(T('fmt.cells', { n: p.size }))}">${`<i style="background:${t.css}"></i>`.repeat(n)}</span>`);
+    }
+    return `<span class="cboxes">${out.join('')}</span>`;
+  }
   function parcelRow(p, s) {
     const t = ptype(p), a = attrsOf(p);
     const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (s && s.sel.has(p.id) ? ' sel' : '') + (s && !s.elig.has(p.id) ? ' dis' : '') + (s && s.risk && s.risk.has(p.id) ? ' risk' : '') + ` value-${valueTier(p)}`;
     const cu = M.CUSTOMERS[p.customer || 'anon'];
-    return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}" title="${esc(t.name)}" aria-label="${esc(t.name)}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust" title="${esc(cu.name)}">${cu.icon}</span>`}${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`;
+    return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}" title="${esc(t.name)}" aria-label="${esc(t.name)}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust" title="${esc(cu.name)}">${cu.icon}</span>`}${attrIcons(a)} ${cellBoxes([p])} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`;
   }
   // 똑같이 생긴 택배가 여러 줄로 늘어서는 것이 "글이 너무 많다"의 가장 큰 원인이다.
   // 지금 당장 결정에 영향을 주지 않는 것들(급하지 않고, 기한 안 지났고, 밖에 없고, 상할 위험 없는 것)만 한 줄로 묶는다.
@@ -954,19 +965,40 @@
   const openGroups = new Set();
   // 종류·속성·크기·상태가 완전히 같은 택배는 몇 줄이 있어도 읽는 사람에게는 한 가지 정보다.
   // 상태 문구까지 키에 넣으므로 묶여도 잃는 정보가 없고, 누르면 개별 줄로 펼쳐진다.
+  // 기한 숫자까지 키에 넣으면 똑같이 생긴 택배가 하루 차이로 갈라진다.
+  // 갈라야 할 것은 '위험'뿐 — 초과·상함·통관·폭염·실을 차 없음·무기한.
+  // 기한은 묶은 뒤에 가장 급한 것(다르면 범위)으로 보여 준다.
+  function hazardKey(p) {
+    const a = attrsOf(p), h = [];
+    if (p.overdue) h.push('od');
+    if (a.includes('cold') && !p.inCold) h.push('warm');
+    if (a.includes('frozen') && !p.inFrozen) h.push('fout');
+    if (a.includes('produce') && game && game.isHeatTurn() && !game.warehouse.vent && !p.inCold) h.push('heat');
+    if (p.customs > 0) h.push('cu');
+    if (p.noDeadline) h.push('nd');
+    try { if (game && game.phase === 'play' && !(p.customs > 0) && !game.contracts.some(c => c && game.canHandle(c, p) && game.breakProb(c, p) === 0) && !game.selfCan(p)) h.push('nc'); } catch (e) { /* 계산 못 하면 위험 없음으로 둔다 */ }
+    return h.join('+');
+  }
   function groupKeyOf(p) {
-    let st = ''; try { st = parcelStatus(p); } catch (e) { return null; }
-    st = valueTier(p) + '|' + st;
-    return `${p.type}|${attrsOf(p).join(',')}|${p.outdoor ? 'o' : ''}|${st}`;   // 크기는 합계로 보여 준다 — 펼치면 개별 크기가 나온다
+    // 크기는 합계를 상자로 보여 준다 — 펼치면 개별 크기가 나온다
+    return `${p.type}|${attrsOf(p).join(',')}|${p.outdoor ? 'o' : ''}|${valueTier(p)}|${hazardKey(p)}`;
+  }
+  // 묶인 줄의 기한: 가장 급한 것 기준. 안에서 기한이 다르면 범위로 바꿔 준다.
+  function groupStatus(ps) {
+    let base = ''; try { base = parcelStatus(ps[0]); } catch (e) { return ''; }
+    const ds = ps.filter(x => !x.noDeadline && !x.overdue && !(x.customs > 0)).map(x => x.deadline);
+    if (ds.length < 2) return base;
+    const lo = Math.min(...ds), hi = Math.max(...ds);
+    if (lo === hi) return base;
+    return base.replace(T('ps.deadline', { n: ps[0].deadline }), T('ps.deadlineRange', { lo, hi }));
   }
   function groupRow(key, ps) {
     const p = ps[0], t = ptype(p), a = attrsOf(p);
-    const vol = ps.reduce((n, x) => n + x.size, 0);
     const money = ps.reduce((n, x) => n + (x.reward != null ? x.reward : game.baseReward(x.type, x.baseSize)), 0);
     const cus = [...new Set(ps.map(x => M.CUSTOMERS[x.customer || 'anon'].icon))];
     const open = openGroups.has(key);
     const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '');
-    return `<div class="parcel group${cls} value-${valueTier(p)}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}" title="${esc(t.name)}" aria-label="${esc(t.name)}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">×${ps.length}</span>${attrIcons(a)} · ${T('fmt.cells', { n: vol })} · ${money}c</div><div class="st">${(st => st ? st + ' ' : '')(parcelStatus(p))}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
+    return `<div class="parcel group${cls} value-${valueTier(p)}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}" title="${esc(t.name)}" aria-label="${esc(t.name)}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">×${ps.length}</span>${attrIcons(a)} ${cellBoxes(ps)} · ${money}c</div><div class="st">${(st => st ? st + ' ' : '')(groupStatus(ps))}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
   }
   function renderParcels(container, parcels, selectable) {
     if (!parcels.length) { container.innerHTML = `<div id="empty">${T('hud.emptyWarehouse')}</div>`; return; }
