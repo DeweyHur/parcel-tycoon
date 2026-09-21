@@ -1036,7 +1036,18 @@
   // 선택은 그날·그 차 동안 유지되고, 날이 바뀌거나 차를 바꾸거나 한 번 보내면 다시 자동으로 담는다.
   let pick = null;       // { i, sel: Set<id>, extra, turn, auto }
   let lastSlot = 0;
-  let lastCallCtx = null;
+  let lastCallCtx = null, lastCallSig = '';
+  // 차는 늘 서 있어서 '팝업을 연 순간'이 없다. 대신 서 있는 차의 상태(몇 대·몇 칸·위험)가 바뀌면
+  // 그때 비트를 확인한다 — 처음 두 대가 붙는 순간(l2two) 같은 대사가 탭 없이도 나온다.
+  function callCtxChanged() {
+    const sig = lastCallCtx ? JSON.stringify(lastCallCtx) : '';
+    if (sig === lastCallSig) return; lastCallSig = sig;
+    if (!lastCallCtx) return;
+    // 다른 대사·배차 연출이 진행 중이면 끝날 때까지 기다렸다가 본다
+    let tries = 0;
+    const go = () => { if (sig !== lastCallSig || !game || game.phase !== 'play') return; if (busy || storyBusy) { if (++tries < 40) setTimeout(go, 400); return; } storyCheck(lastCallCtx); };
+    setTimeout(go, 0);
+  }
   // 직접 배송은 '우리 차' 한 대다 — 계약 차와 같은 자리에 서고, 같은 상자 격자에서 고른다.
   // 다만 돈이 나가는 일이라, 카드를 눌러 부른 게 아니면(배차가 떨어져 저절로 선 경우) 빈 채로 선다.
   const SELF = 'self';
@@ -1127,6 +1138,7 @@
     foot.querySelector('#pick-urgent').onclick = () => { pick.sel.clear(); sortByUrgency(elig).slice(0, n).forEach(p => pick.sel.add(p.id)); SFX.select(); renderAll(); };
     foot.querySelector('#pick-clear').onclick = () => { pick.sel.clear(); SFX.cancel(); renderAll(); };
     lastCallCtx = { kind: 'modal', modal: 'wait', self: true, picked: pl.picked.length, elig: elig.length, outdoor: g.outdoorVolume() };
+    callCtxChanged();
   }
   function renderCallBar() {
     const head = $('#call-head'), foot = $('#call-foot');
@@ -1169,6 +1181,7 @@
     foot.querySelector('#pick-clear').onclick = () => { cm.sel.clear(); SFX.cancel(); renderAll(); };
     foot.querySelector('#call-go').onclick = () => { if (!cm.sel.size || busy) return; SFX.click(); const ids = [...cm.sel]; cm.auto = true; doCall(i, ids, trucks); };
     lastCallCtx = { kind: 'modal', modal: 'call', sel: cm.sel.size, elig: elig.length, slot: i, trucks, vol, risk: riskSel.length };
+    callCtxChanged();
   }
 
   let pendingCall = null; // 방금 호출 결과 — afterTurn 에서 스토리 비트(첫 호출 등)에 넘긴다
