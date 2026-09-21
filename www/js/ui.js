@@ -548,8 +548,8 @@
     if (!game) return;
     const g = game, R = g.rules;
     // 재고는 늘 펼쳐져 있다 — 상자 격자가 곧 창고이고, 차를 부르면 그대로 고르는 판이 된다
-    if (callMode && (g.phase !== 'play' || !g.contracts[callMode.i] || !g.canCall(g.contracts[callMode.i]))) callMode = null;
-    $('#app').classList.toggle('calling', !!callMode);
+    const pk = ensurePick();
+    $('#app').classList.toggle('calling', !!pk);
     updateMusic();
     $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { y: g.yearOf(), cal: g.calMonth(), n: g.month })}`;
     $('#hud-turn').textContent = T('hud.turn', { d: g.dateOf(g.turn), dow: g.dowName(g.turn) });
@@ -615,10 +615,10 @@
     if (g.items.transitCert || g.items.yardIns === g.month || g.items.customsBond === g.month) $('#upcoming').innerHTML += `<span class="chip">${[g.items.transitCert ? `${M.INS_ITEMS.transitCert.icon} ${esc(M.INS_ITEMS.transitCert.name)} ${g.items.transitCert}` : '', g.items.yardIns === g.month ? `${M.INS_ITEMS.yardIns.icon} ${esc(M.INS_ITEMS.yardIns.name)}` : '', g.items.customsBond === g.month ? `${M.INS_ITEMS.customsBond.icon} ${esc(M.INS_ITEMS.customsBond.name)}` : ''].filter(Boolean).join(' · ')}</span>`;
     if (g.outdoorVolume() > 0) $('#upcoming').innerHTML += `<span class="chip heat">${T('hud.outdoor', { vol: g.outdoorVolume(), n: g.outdoorParcels().length, storage: g.storage.some(s => s.outdoor) ? T('hud.outdoorStorage') : '', pct: Math.round(g.theftProb() * 100) })}</span>`;
     renderOffer();
-    renderStock($('#parcels'), g.parcels, callMode ? callState() : null);
-    $('#parcels').querySelectorAll('.ptile[data-id]').forEach(el => el.onclick = () => { if (busy) return; if (callMode) return toggleCallPick(+el.dataset.id); SFX.click(); showParcelDetail(+el.dataset.id); });
+    renderStock($('#parcels'), g.parcels, pk ? callState() : null);
+    $('#parcels').querySelectorAll('.ptile[data-id]').forEach(bindTile);
     renderCallBar();
-    if (g.storage.length && !callMode) $('#parcels').insertAdjacentHTML('afterbegin', g.storage.map(s => { const K = M.STORAGE_KINDS[s.kind], cu = M.CUSTOMERS[s.customer]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#a8845a"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${cu.icon}${esc(cu.name)}${s.perTurn ? ` · ${T('log.storagePerTurn', { perTurn: s.perTurn })}` : ''}</div><div class="st">${s.outdoor ? `${T('hud.outdoorTag')} · ` : ''}${T('storage.left', { n: s.left })}</div></div>`; }).join(''));
+    if (g.storage.length) $('#parcels').insertAdjacentHTML('afterbegin', g.storage.map(s => { const K = M.STORAGE_KINDS[s.kind], cu = M.CUSTOMERS[s.customer]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#a8845a"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${cu.icon}${esc(cu.name)}${s.perTurn ? ` · ${T('log.storagePerTurn', { perTurn: s.perTurn })}` : ''}</div><div class="st">${s.outdoor ? `${T('hud.outdoorTag')} · ` : ''}${T('storage.left', { n: s.left })}</div></div>`; }).join(''));
     $('#parcels').querySelectorAll('.parcel.storage').forEach(el => el.onclick = () => showStorage(+el.dataset.sid));
     const slotsOn = g.visibleSlots();
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) {
@@ -627,7 +627,7 @@
       btn.hidden = false;
       const car = D.CARRIERS[c.carrier], vcap = g.vehicleCap(c), elig = g.eligibleParcels(c), lv = g.trustLevel(c);
       const can = g.canCall(c) && !busy, struck = g.isStruck(c);
-      btn.disabled = !can; btn.className = 'btn contract' + (can ? ' ready' : '');
+      btn.disabled = !can; btn.className = 'btn contract' + (can ? ' ready' : '') + (pk && pk.i === i ? ' picked' : '');
       const spare = c.calls === 0 && R.spareCall && !g.monthStats.spareUsed;
       const caps = g.contractCaps(c), fee = g.truckFee(c), simul = g.simulMax(c), eligVol = elig.reduce((s, p) => s + p.size, 0);
       const pd = g.trustPerk(c.carrier, 'delay'), delay = pd != null ? pd : (car.delay || 0);
@@ -1007,46 +1007,76 @@
     }).join('');
   }
 
-  // ── 호출: 팝업 대신 아래 창고 격자가 그대로 고르는 판이 된다 ──
-  // 위에는 차 그림과 돈, 가운데는 창고 상자(누르면 싣기/빼기), 아래는 보내기.
-  let callMode = null;   // { i, sel: Set<id>, extra: 사용자가 '한 대 더'로 늘린 대수 }
+  // ── 차는 늘 서 있다 ──
+  // 마지막으로 고른 계약의 차가 패널 위에 늘 서 있고, 창고 상자는 그 차에 실을 것을 고르는 판이다.
+  // 계약 카드를 누르면 그 차로 바뀌고, 호출을 누르면 바로 실어 간다.
+  // 선택은 그날·그 차 동안 유지되고, 날이 바뀌거나 차를 바꾸거나 한 번 보내면 다시 자동으로 담는다.
+  let pick = null;       // { i, sel: Set<id>, extra, turn, auto }
+  let lastSlot = 0;
+  let lastCallCtx = null;
+  function autoSel(i) {
+    const c = game.contracts[i], sel = new Set();
+    try {
+      const sorted0 = game.eligibleParcels(c).slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
+      game.autoPick(c, sorted0, 1).ids.forEach(id => sel.add(id));
+    } catch (e) { /* 자동 선택이 안 되면 빈 채로 */ }
+    return sel;
+  }
+  function ensurePick() {
+    const g = game;
+    if (!g || g.phase !== 'play') { pick = null; return null; }
+    const ok = k => !!(g.contracts[k] && g.canCall(g.contracts[k]));
+    let i = pick ? pick.i : lastSlot;
+    if (!ok(i)) i = g.contracts.findIndex((c, k) => ok(k));
+    if (i < 0) { pick = null; return null; }
+    if (!pick || pick.i !== i || pick.turn !== g.turn || pick.auto) pick = { i, sel: autoSel(i), extra: 0, turn: g.turn, auto: false };
+    const elig = new Set(g.eligibleParcels(g.contracts[i]).map(p => p.id));
+    for (const id of [...pick.sel]) if (!elig.has(id)) pick.sel.delete(id);   // 그새 나간 것은 뺀다
+    return pick;
+  }
   function onContractTap(i) {
     if (busy || game.phase !== 'play') return;
     const c = game.contracts[i]; if (!game.canCall(c)) return;
     SFX.resume(); SFX.click();
-    // 카드에 뜬 순수익이 곧 이 선택이다 — 열자마자 같은 것이 담겨 있어야 두 화면이 한 말을 한다
-    const sel = new Set();
-    try {
-      const sorted0 = game.eligibleParcels(c).slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
-      game.autoPick(c, sorted0, 1).ids.forEach(id => sel.add(id));
-    } catch (e) { /* 자동 선택이 안 되면 빈 채로 연다 */ }
-    callMode = { i, sel, extra: 0 };
-    renderAll(); if (scene && scene.resize) scene.resize();
+    lastSlot = i;
+    // 다른 차를 고르면 그 차에 맞게 새로 담는다. 같은 차를 다시 누르면 자동 선택으로 되돌린다.
+    pick = { i, auto: true };
+    renderAll();
     const pc = $('#parcels'); if (pc) pc.scrollTop = 0;
+    if (lastCallCtx) storyCheck(lastCallCtx);
   }
-  function exitCall() { if (!callMode) return; callMode = null; renderAll(); if (scene && scene.resize) scene.resize(); }
   function callState() {
-    const cm = callMode, c = game.contracts[cm.i], elig = game.eligibleParcels(c);
-    return { sel: cm.sel, elig: new Set(elig.map(p => p.id)), risk: new Set(elig.filter(p => game.breakProb(c, p) > 0).map(p => p.id)) };
+    const c = game.contracts[pick.i], elig = game.eligibleParcels(c);
+    return { sel: pick.sel, elig: new Set(elig.map(p => p.id)), risk: new Set(elig.filter(p => game.breakProb(c, p) > 0).map(p => p.id)) };
   }
   function toggleCallPick(id) {
-    const cm = callMode, c = game.contracts[cm.i];
-    const elig = game.eligibleParcels(c), p = elig.find(x => x.id === id);
-    if (!p) { SFX.nudge(); return; }
-    if (cm.sel.has(id)) { cm.sel.delete(id); SFX.cancel(); }
+    const c = game.contracts[pick.i];
+    const p = game.eligibleParcels(c).find(x => x.id === id);
+    if (!p) { SFX.click(); showParcelDetail(id); return; }   // 이 차엔 못 싣는 것 — 왜 안 되는지 보여 준다
+    if (pick.sel.has(id)) { pick.sel.delete(id); SFX.cancel(); }
     else {
       const vcap = game.vehicleCap(c), simul = game.simulMax(c);
-      const v = [...cm.sel].reduce((s, q) => s + (game.parcels.find(x => x.id === q) || { size: 0 }).size, 0) + p.size;
+      const v = [...pick.sel].reduce((s, q) => s + (game.parcels.find(x => x.id === q) || { size: 0 }).size, 0) + p.size;
       const maxCap = vcap * Math.min(simul, Math.max(1, c.calls));
       if (v > maxCap) { toast(T('call.maxSelect', { cap: maxCap })); return; }
-      cm.sel.add(id); SFX.select();
+      pick.sel.add(id); SFX.select();
     }
     renderAll();
+    if (lastCallCtx) storyCheck(lastCallCtx);
+  }
+  // 상자: 누르면 싣기/빼기, 꾹 누르면 상세. 차가 없으면(배차가 다 떨어지면) 누르면 상세.
+  function bindTile(el) {
+    const id = +el.dataset.id; let timer = null, long = false;
+    const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+    el.onpointerdown = () => { long = false; clear(); timer = setTimeout(() => { long = true; timer = null; if (!busy) { SFX.click(); showParcelDetail(id); } }, 450); };
+    el.onpointerup = el.onpointerleave = el.onpointercancel = clear;
+    el.oncontextmenu = e => e.preventDefault();
+    el.onclick = () => { clear(); if (long) { long = false; return; } if (busy) return; if (pick) return toggleCallPick(id); SFX.click(); showParcelDetail(id); };
   }
   function renderCallBar() {
     const head = $('#call-head'), foot = $('#call-foot');
-    if (!callMode) { head.hidden = foot.hidden = true; head.innerHTML = foot.innerHTML = ''; return; }
-    const cm = callMode, i = cm.i, c = game.contracts[i];
+    if (!pick) { head.hidden = foot.hidden = true; head.innerHTML = foot.innerHTML = ''; lastCallCtx = null; return; }
+    const cm = pick, i = cm.i, c = game.contracts[i];
     const car = D.CARRIERS[c.carrier], vcap = game.vehicleCap(c), simul = game.simulMax(c), fee = game.truckFee(c);
     const elig = game.eligibleParcels(c);
     const selP = [...cm.sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
@@ -1070,7 +1100,7 @@
     let trust = '';
     if (game.shows('trust')) { const tg = game.trustGainPreview(c, vol, trucks), nx = game.trustNext(c.carrier); trust = `<div class="trustline">${trustBar(game, c.carrier)} ${T('call.xpGain', { xp: tg.xp, parts: tg.parts.join(', ') })}${nx ? ` · ${T('call.nextLevel')}: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 1 ? ` · ${esc(D.trustEffectText(c.carrier, game.trustLevel(c.carrier)))}` : ''}</div>`; }
     head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}</div>${gauge}${hint}${money}${riskLine}${trust}`;
-    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn" id="call-cancel">${T('btn.cancel')}</button><button class="btn primary" id="call-go"${cm.sel.size ? '' : ' disabled'}>${T('call.btn')}</button>`;
+    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn primary" id="call-go"${cm.sel.size ? '' : ' disabled'}>${T('call.btn')}</button>`;
     head.hidden = foot.hidden = false;
     const ta = head.querySelector('#truck-add'); if (ta) ta.onclick = () => { cm.extra = trucks; SFX.select(); renderAll(); };
     const td = head.querySelector('#truck-del'); if (td) td.onclick = () => { cm.extra = Math.max(0, trucks - 2); SFX.cancel(); renderAll(); };
@@ -1081,9 +1111,8 @@
       SFX.select(); renderAll();
     };
     foot.querySelector('#pick-clear').onclick = () => { cm.sel.clear(); SFX.cancel(); renderAll(); };
-    foot.querySelector('#call-cancel').onclick = () => { SFX.cancel(); exitCall(); };
-    foot.querySelector('#call-go').onclick = () => { if (!cm.sel.size || busy) return; const ids = [...cm.sel]; callMode = null; renderAll(); if (scene && scene.resize) scene.resize(); doCall(i, ids, trucks); };
-    storyCheck({ kind: 'modal', modal: 'call', sel: cm.sel.size, elig: elig.length, slot: i, trucks, vol, risk: riskSel.length });
+    foot.querySelector('#call-go').onclick = () => { if (!cm.sel.size || busy) return; SFX.click(); const ids = [...cm.sel]; cm.auto = true; doCall(i, ids, trucks); };
+    lastCallCtx = { kind: 'modal', modal: 'call', sel: cm.sel.size, elig: elig.length, slot: i, trucks, vol, risk: riskSel.length };
   }
 
   let pendingCall = null; // 방금 호출 결과 — afterTurn 에서 스토리 비트(첫 호출 등)에 넘긴다

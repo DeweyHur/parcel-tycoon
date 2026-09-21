@@ -96,11 +96,14 @@
       { expr: 'smile' },
       { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },
-    { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 3, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
-    // 여 실장은 여기서 처음 인사한다 — 계약 카드를 눌러 '한길 물류를 부른' 자리이고,
-    // 그가 가리키는 게이지도 이 팝업 안에 있다. 첫날 소개로 앞당기면 아무것도 안 가리키게 된다.
-    // 팝업은 자동 선택된 채로 열린다 — 누르라고 시킬 것이 없어졌으니, 담긴 것을 보고 바로 호출로 간다
-    { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.elig > 0, pages: [{ speaker: 'yeo', expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#call-foot .btn.primary', gate: true }] },
+    // 차는 늘 패널 위에 서 있다. 부를 만해지면 박 반장이 그 차를 가리키고,
+    // 여 실장이 그 자리에서 처음 인사한다 — 그가 가리키는 차 그림이 바로 눈앞에 있다.
+    // 상자는 이미 자동으로 담겨 있으니, 담긴 것을 보고 바로 호출로 간다.
+    { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 3, pages: [
+      { expr: 'neutral', hl: '#call-head .load-visual' },
+      { speaker: 'yeo', expr: 'smile', hl: '#call-head .load-visual' },
+      { expr: 'neutral', hl: '#call-foot .btn.primary', gate: g => bestReadySlot(g).slot >= 0 },
+    ] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
     { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },

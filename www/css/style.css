@@ -660,6 +660,9 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 #call-foot { display: flex; gap: 6px; align-items: center; padding: 6px 8px 8px; border-top: 3px solid var(--line); background: var(--panel); }
 #call-foot .sp { flex: 1; }
 #call-foot .btn.primary { min-width: 84px; }
-#app.calling #actions, #app.calling #upcoming, #app.calling #offer, #app.calling #wxline, #app.calling #coach { display: none !important; }
-#app.calling:not(.cine) #scene { flex: 0 0 24%; min-height: 110px; }
+#app.calling:not(.cine) #scene { flex: 0 0 28%; min-height: 120px; }
 #app.calling #panel { flex: 1 1 auto; }
+
+/* 지금 패널 위에 서 있는 차 */
+.contract.picked { outline: 3px solid var(--gold); outline-offset: -1px; }
+#call-foot { padding: 5px 8px; }

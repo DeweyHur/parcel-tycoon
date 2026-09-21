@@ -80,7 +80,7 @@ const say = m => { console.log(m); log.push(m); };
     cls: document.getElementById('app').className, bodyCls: document.body.className,
     truck: +PT.scene.truck.position.x.toFixed(1), fov: PT.scene.camera.fov,
   }));
-  check(intro1.gone && !intro1.cine && !/cine|recall/.test(intro1.cls) && intro1.cls === scene0.cls && !intro1.bodyCls && intro1.basis === '',
+  check(intro1.gone && !intro1.cine && !/cine|recall/.test(intro1.cls) && intro1.cls.replace(/\s*calling/, '').trim() === scene0.cls.replace(/\s*calling/, '').trim() && !intro1.bodyCls && intro1.basis === '',
     '건너뛰면 화면이 제자리로 돌아온다 — ' + JSON.stringify(intro1));
   check(intro1.truck === scene0.truck && intro1.fov === scene0.fov,
     '탑차·화각이 컷신 전으로 돌아온다 — 탑차 x' + intro1.truck + ' · 화각 ' + intro1.fov);
@@ -140,7 +140,10 @@ const say = m => { console.log(m); log.push(m); };
   // 창고 상세(재고)는 기본으로 접혀 있다 — 먼저 펼친다. 같은 택배는 묶음 줄이라 그것도 펼친다
   check(!(await page.$('#warehouse-toggle')) && await vis('#parcels'), '재고 접기가 없다 — 상자 격자는 늘 보인다');
   await page.waitForTimeout(300);
-  await safeClick('#parcels .ptile[data-id]'); await page.waitForTimeout(400);
+  // 상자를 누르면 싣기/빼기 — 상세는 꾹 누른다
+  { const t = await page.$('#parcels .ptile[data-id]'); const b = t && await t.boundingBox();
+    if (b) { await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up(); } }
+  await page.waitForTimeout(400);
   const pd = await page.evaluate(() => ({ txt: (document.getElementById('modal') || {}).textContent || '',
     trust: document.querySelectorAll('#modal .trust').length, cust: document.querySelectorAll('#modal .cust').length }));
   check(/보낼 수 있는 곳/.test(pd.txt), '택배 상세가 열렸다');
