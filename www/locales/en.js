@@ -618,7 +618,7 @@
     'story.l2refill.2': 'You\u2019re at zero, so nothing is wasted. Go on, press it.',
     'story.l2limit.1': 'This raises the limit. A refill fills the bowl; this one <b>makes the bowl bigger</b>.<br>Buy it once and it stays.',
     'story.l2two.1': 'Two trucks. One wouldn\u2019t hold it, so a second came along.',
-    'story.l2two.2': 'Two dispatches and two fees, mind. Unless it\u2019s urgent, one full truck is cheaper.',
+    'story.l2two.2': 'Two dispatches, two fees — same price per truck. So if <b>both are full</b>, sending them together costs you nothing extra.<br>If the second one is half-empty, drop it and fill it tomorrow. Auto-select loads it that way.',
     'story.l2cap.1': 'Warehouse expansion. You saw what overflow looks like \u2014 the yard has no roof.<br>It only gets pricier, so buy early if you\u2019re buying.',
     'story.l2usage.1': 'Warehouse is nearly full. Anything over goes out to the yard.',
     'story.l2last.1': 'Last half-month. Summer brings its own trouble \u2014 but that keeps.',
