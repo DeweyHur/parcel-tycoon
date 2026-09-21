@@ -646,7 +646,8 @@
       const spent = c.calls === 0 && g.shows('calls') && !spare && !struck;
       const cells = pips(pv.cells, vcap, pv.over, pv.trucks) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
-      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${takesDots(g, c)}</span><span class="calls ${spent ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips}</span></div>
+      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}</span><span class="calls ${spent ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips}</span></div>
+        ${(td => td ? `<div class="takesrow">${td}</div>` : '')(takesDots(g, c))}
         ${bar}
         <div class="sub">${spent ? `<span class="spent">${T('hud.callsSpent')}</span>` : `${cells}${pv.n ? ` · <span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>` : ` · <span class="per">${T('hud.perNone')}</span>`}${extras.length ? ' · ' + extras.join(' · ') : ''}`}</div>`;
     }
