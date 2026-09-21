@@ -257,10 +257,11 @@ t('i18n: ko/en UI 키와 자리표시자가 일치', () => {
   for (const k in KO.ui) { assert.ok(k in EN.ui, 'en 누락: ' + k); for (const x of ph(KO.ui[k])) assert.ok(ph(EN.ui[k]).has(x), `en ${k} 자리표시자 {${x}} 누락`); }
   for (const k in EN.ui) assert.ok(k in KO.ui, 'ko 누락: ' + k);
 });
-t('턴 종료 UX: 대기 대신 오늘 마감과 다음 입고를 능동적인 행동으로 안내한다', () => {
-  assert.equal(KO.ui['wait.btnPlain'], '📦 오늘 마감');
+t('턴 종료 UX: 차를 안 부르고 넘기는 버튼은 「호출 없음」 — 다음 입고를 받는다는 걸 같이 말한다', () => {
+  assert.equal(KO.ui['wait.btnPlain'], '📦 호출 없음');
   assert.ok(KO.ui['wait.next'].includes('다음 입고')); assert.ok(KO.ui['wm.justWait'].includes('다음 입고 받기'));
-  assert.ok(KO.ui['help.body'].includes('<b>오늘 마감</b>')); assert.ok(EN.ui['wait.btnPlain'].includes('End Day'));
+  assert.ok(KO.ui['help.body'].includes('<b>호출 없음</b>')); assert.ok(EN.ui['wait.btnPlain'].includes('No call'));
+  assert.ok(!Object.values(KO.ui).some(v => typeof v === 'string' && v.includes('오늘 마감')), '「오늘 마감」이 남아 있다');
 });
 t('i18n: ko/en data·meta 텍스트 필드 모양이 일치', () => {
   const walk = (a, b, p) => { for (const k in a) { assert.ok(k in b, 'en 누락: ' + p + '.' + k); if (a[k] && typeof a[k] === 'object' && !Array.isArray(a[k])) walk(a[k], b[k], p + '.' + k); } for (const k in b) assert.ok(k in a, 'ko 누락: ' + p + '.' + k); };

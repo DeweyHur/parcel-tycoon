@@ -1108,7 +1108,7 @@
     el.oncontextmenu = e => e.preventDefault();
     el.onclick = () => { clear(); if (long) { long = false; return; } if (busy) return; if (pick) return toggleCallPick(id); SFX.click(); showParcelDetail(id); };
   }
-  // 우리 차(직접 배송) — 칸이 아니라 개수로 싣는다. 싣고 나면 오늘 영업은 끝이라, 보내기는 '오늘 마감' 버튼이 맡는다.
+  // 우리 차(직접 배송) — 칸이 아니라 개수로 싣는다. 싣고 나면 오늘 영업은 끝이라, 보내기는 아래 버튼(직접 배송 N개)이 맡는다.
   function selfPlan() {
     const g = game, picked = [...pick.sel].map(id => g.parcels.find(x => x.id === id)).filter(Boolean);
     const cost = picked.reduce((s, p) => s + g.selfCost(p), 0), income = picked.reduce((s, p) => s + p.reward, 0);

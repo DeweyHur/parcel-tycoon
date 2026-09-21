@@ -184,7 +184,7 @@
     // 마당에 나가 있는데 비가 온다
     { id: 'l3rain', kind: 'turn', when: wetSoon, pages: [
       { speaker: 'noh', expr: 'neutral', hl: '#upcoming .chip.wx' },
-      { expr: 'neutral', hl: '#wait-btn', gate: true },
+      { expr: 'neutral', hl: '#wm-reorder', gate: true },
     ] },
     // 대기 팝업에서 안팎을 바꾼다
     { id: 'l3reorder', kind: 'turn', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'neutral', hl: '#wm-reorder' }] },
