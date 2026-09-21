@@ -879,12 +879,32 @@
     // 7칸 차에 10칸을 7+3 으로 나눠 보내면 두 번째 차는 배차비만 더 나간다.
     // 그래도 보내야 하면 플레이어가 직접 고르거나, 대기 턴에 직접 배송하면 된다.
     autoPick(c, sorted, maxTrucks) {
-      const vcap = this.vehicleCap(c), maxCap = vcap * Math.max(1, maxTrucks);
-      const take = []; let v = 0;
-      for (const p of sorted) if (v + p.size <= maxCap) { take.push(p); v += p.size; }
-      let trimmed = false;
-      while (take.length) { const tr = Math.ceil(v / vcap); if (tr <= 1 || v - (tr - 1) * vcap >= vcap * 0.8) break; v -= take.pop().size; trimmed = true; }
-      return { ids: take.map(p => p.id), vol: v, trucks: Math.max(1, Math.ceil(v / vcap)), trimmed };
+      const vcap = this.vehicleCap(c);
+      // 1) 급한 것(기한 초과·오늘내일)은 순서대로 먼저 싣는다.
+      // 2) 남은 칸은 '가장 꽉 차게' — 순서대로 담기만 하면 2·2·1 을 담고 남은 2칸짜리를 못 싣는다(5/6).
+      //    합이 최대인 조합 중에서, 앞(더 급한) 것을 최대한 포함하는 조합을 고른다.
+      const urgent = p => p.overdue || (!p.noDeadline && p.deadline <= 1);
+      const fill = maxCap => {
+        const chosen = new Set(); let v = 0;
+        for (const p of sorted) if (urgent(p) && v + p.size <= maxCap) { chosen.add(p.id); v += p.size; }
+        const rest = sorted.filter(p => !chosen.has(p.id)), rem = maxCap - v, n = rest.length;
+        if (rem > 0 && n) {
+          // reach[i][s]: rest[i..] 로 정확히 s 칸을 만들 수 있나
+          const reach = Array.from({ length: n + 1 }, () => new Uint8Array(rem + 1)); reach[n][0] = 1;
+          for (let i = n - 1; i >= 0; i--) { const sz = rest[i].size; for (let s = 0; s <= rem; s++) reach[i][s] = reach[i + 1][s] || (s >= sz && reach[i + 1][s - sz]) ? 1 : 0; }
+          let t = rem; while (t > 0 && !reach[0][t]) t--;
+          for (let i = 0; i < n && t > 0; i++) { const sz = rest[i].size; if (t >= sz && reach[i + 1][t - sz]) { chosen.add(rest[i].id); t -= sz; v += sz; } }
+        }
+        return { take: sorted.filter(p => chosen.has(p.id)), v };
+      };
+      let trucks = Math.max(1, maxTrucks), r = fill(vcap * trucks), trimmed = false;
+      // 마지막 차가 본전선(80%)도 못 채우면 그 차는 빼고 한 대 적게 다시 꽉 채운다
+      for (;;) {
+        const tr = Math.ceil(r.v / vcap);
+        if (tr <= 1 || r.v - (tr - 1) * vcap >= vcap * 0.8) break;
+        r = fill(vcap * (tr - 1)); trimmed = true;
+      }
+      return { ids: r.take.map(p => p.id), vol: r.v, trucks: Math.max(1, Math.ceil(r.v / vcap)), trimmed };
     }
     canCall(c) {
       if (!c || this.isStruck(c) || this.isOffTurn()) return false;

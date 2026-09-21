@@ -486,6 +486,15 @@ t('스토리: 팝업 비트는 kind modal + modal 이름이 맞을 때만, 선�
   // 마감 팝업이 없어졌다 — 적재 정리는 야외 칩(#wm-reorder)이고, 비 다음 턴 비트로 가리킨다
   const rr = Story.check(g, { kind: 'turn' }); assert.ok(rr && rr.id === 'rainReorder' && rr.pages[0].hl === '#wm-reorder');
 });
+t('자동 선택: 순서대로 담다가 칸이 남지 않게 — 2·2·1·2 는 6칸 차에 2·2·2', () => {
+  const g = NG(9, { story: true }); const c = g.contracts.find(Boolean); g.vehicleCap = () => 6;
+  const mk = (id, size) => ({ id, size, noDeadline: true });
+  const r = g.autoPick(c, [mk(1, 2), mk(2, 2), mk(3, 1), mk(4, 2)], 1);
+  assert.equal(r.vol, 6); assert.deepEqual(r.ids, [1, 2, 4]);
+  // 급한 것(오늘내일)은 크기와 상관없이 먼저 실린다
+  const u = g.autoPick(c, [{ id: 9, size: 1, deadline: 1 }, mk(1, 2), mk(2, 2), mk(4, 2)], 1);
+  assert.ok(u.ids.includes(9) && u.vol === 5);
+});
 t('자동 선택: 마지막 차가 본전선(80%)도 못 채우면 그 차는 통째로 뺀다', () => {
   const g = NG(9, { story: true });
   const c = g.contracts.find(Boolean);
