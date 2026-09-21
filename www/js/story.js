@@ -128,7 +128,6 @@
       { expr: 'think', hl: '#c0 .calls' },
     ] },
     // 배차가 줄어드는 것을 실제로 본 다음에 말한다
-    { id: 'l2mission', kind: 'turn', when: g => g.story.seen.includes('l2calls'), pages: [{ expr: 'smile', hl: '#mission-meter' }] },
     { id: 'l2calls', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'neutral', hl: '#c0' }] },
     // 바닥났다. 여기서 처음으로 "월초에 안 채워진다"가 나온다
     // 바닥났다 — 이번 한 번만 박 반장이 채워 준다. 원래는 마켓에서 사는 것이라는 걸 여기서 처음 말한다
@@ -347,7 +346,6 @@
     { id: 'trucks2', needs: 'simul', months: [1, 2, 3], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'smile', hl: '#call-head .load-visual' }] },
     { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#parcels' }, { expr: 'neutral', hl: '#call-foot .btn.primary', gate: true }] },
     { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
-    { id: 'progressHud', kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile', hl: '#mission-meter' }] },
     // 안내가 끝났다는 걸 말로 못 박아 준다. 이게 없으면 언제까지 시키는 대로 해야 하는지 알 수 없다.
     { id: 'handOff', months: [1], kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile' }] },
     // 배차 소진: 이 게임에서 제일 많이 막히는 지점 — 배차는 월초에 안 채워진다

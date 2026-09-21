@@ -72,7 +72,7 @@
     },
     // ----- 1장 (3월 후반): 배차는 소모품이다. 그래서 마켓이 있다 -----
     {
-      n: 2, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 1, grants: ['market', 'calls', 'simul', 'mission'],
+      n: 2, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 1, grants: ['market', 'calls', 'simul'],
       minCash: 200,
       company: { cash: 600, warehouse: { cap: 16, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }], customers: [['anon', 0]] },
       mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 120, monthlyStress: 0, theftMult: 0, noBankrupt: true },

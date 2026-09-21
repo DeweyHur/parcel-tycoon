@@ -398,7 +398,7 @@
       return Math.max(200, Math.round(total * 0.72 / 10) * 10);
     }
     _missionEarn(amount) {
-      const ms = this.monthStats; if (!ms || !amount) return null;
+      const ms = this.monthStats; if (!ms || !amount || !this.shows('mission')) return null;
       const before = ms.missionRank || 0; ms.missionEarned = (ms.missionEarned || 0) + amount;
       const now = this.missionState().rank; if (now <= before) return null;
       let bonus = 0; for (let i = before + 1; i <= now; i++) bonus += D.MISSION.bonuses[i] || 0;

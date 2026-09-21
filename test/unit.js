@@ -10,6 +10,8 @@ const P = (id, type, size, extra) => Object.assign({ id, type, size, baseSize: s
 const adv = (g, selfIds) => { const r = g.wait(selfIds); if (g.phase === 'weekend') g.weekendChoose('rest'); return r; };
 const slot = (g, fam) => g.contracts.findIndex(c => c && D.familyOf(c.carrier) === fam);
 
+// 꺼 둔 시스템(D.DISABLED_FEATURES — 일괄 출고·연속 만차·보름 목표)의 규칙 자체는 살아 있으니 켠 채로 검사한다
+const withAll = fn => () => { const keep = D.DISABLED_FEATURES; D.DISABLED_FEATURES = []; try { fn(); } finally { D.DISABLED_FEATURES = keep; } };
 t('시작 상태: 자금 450, 계약 3개(대량·냉장·프래자일), 준비 없이 play', () => { const g = NG(1); assert.equal(g.cash, 450); assert.equal(g.contracts.filter(Boolean).length, 3); assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk0', 'cold0', 'fragile0']); assert.equal(g.phase, 'play'); assert.equal(g.month, 1); });
 t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.sizeDelta, -1); });
 t('초기 입고는 작게 시작하고 소형 위주다', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.ok(sp.length >= 7 && sp.length <= 11, `initial arrivals ${sp.length}`); assert.ok(sp.length < g.turns(), '매일 택배가 오지 않는다'); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
@@ -56,13 +58,13 @@ t('성장 트리: 차량→자동화→브랜드와 창고→저온 물류가 �
   g.investGrowth('warehouse'); g.investGrowth('warehouse'); const cold0 = g.warehouse.cold, frozen0 = g.warehouse.frozen;
   assert.ok(g.investGrowth('coldchain').ok); assert.equal(g.warehouse.cold, cold0 + 2); assert.equal(g.warehouse.frozen, frozen0 + 1);
 });
-t('월간 미션: 수익이 D→C→B→A 등급을 넘을 때 성장 보너스를 지급한다', () => {
+t('월간 미션: 수익이 D→C→B→A 등급을 넘을 때 성장 보너스를 지급한다', withAll(() => {
   const g = EMPTY(73); const i = slot(g, 'bulk'); g.monthStats.missionTarget = 200;
   g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2)];
   const cash = g.cash, r = g.callCarrier(i, [1, 2, 3]);
   assert.equal(r.missionUp.grade, 'C'); assert.equal(r.missionUp.bonus, 15); assert.equal(g.missionState().grade, 'C');
   assert.equal(g.cash, cash + r.revenue + r.missionUp.bonus);
-});
+}));
 t('조커 업체 없음: 용달·긴급 삭제', () => { assert.ok(!D.CARRIERS.target && !D.CARRIERS.urgent); for (const id in M.COMPANIES) for (const c of M.COMPANIES[id].contracts || []) assert.ok(D.FAMILIES[c.carrier] || D.CARRIERS[c.carrier], id + ' ' + c.carrier); });
 t('대기는 배차를 차감하지 않음', () => { const g = NG(3); const calls = g.contracts.map(c => c && c.calls); adv(g); assert.deepEqual(g.contracts.map(c => c && c.calls), calls); assert.equal(g.turn, 2); });
 
@@ -81,8 +83,6 @@ t('차량: 용량을 넘기면 동시 대수 한도(기본 1)에서 거부, 신�
   g.trust.bulk0 = 3; assert.equal(g.simulMax(c), 2);
   r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 2); assert.equal(r.fee, D.FAMILIES.bulk.fee * 2);
 });
-// 일괄 출고·연속 만차는 지금 꺼져 있다(D.DISABLED_FEATURES). 규칙 자체는 살아 있으니 켠 채로 검사한다
-const withAll = fn => () => { const keep = D.DISABLED_FEATURES; D.DISABLED_FEATURES = []; try { fn(); } finally { D.DISABLED_FEATURES = keep; } };
 t('도크 러시: 창고를 72% 이상 채우면 임시 트럭 +2, 2대 이상으로 55%를 비우면 보상 35% 폭발', withAll(() => {
   const g = EMPTY(202); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.warehouse.cap = 12;
@@ -649,9 +649,9 @@ t('자리가 다 찼으면 마켓이 계약 대신 특약을 반드시 내놓는
   assert.ok(opt, '냉동 특약이 매물에 있다 — ' + items.map(i => i.kind + ':' + (i.carrier || i.enh || i.fac || '')).join(' '));
 });
 
-t('보름 목표는 1장부터, 연속 만차·일괄 출고는 지금 어디에도 없다(꺼 둠)', () => {
+t('보름 목표·연속 만차·일괄 출고는 지금 어디에도 없다(꺼 둠)', () => {
   const lv = n => new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false });
-  assert.ok(!lv(1).shows('mission') && lv(2).shows('mission'));
+  assert.ok(!lv(1).shows('mission') && !lv(2).shows('mission') && !NG(1).shows('mission'));
   for (const n of [1, 2, 3, 4, 5, 6]) { const g = lv(n); assert.ok(!g.shows('chain') && !g.shows('rush'), '레벨 ' + n);
     g.warehouse.cap = 10; g.parcels = [P(9100 + n, 'normal', 9, { customer: 'anon' })]; assert.equal(g.rushState().ready, false); }
   const free = NG(1); assert.ok(!free.shows('chain') && !free.shows('rush'), '자유 런에서도 꺼져 있다');
