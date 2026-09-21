@@ -228,6 +228,12 @@
   // ---------- 잔금 회차 ----------
   // 장이 끝날 때마다 한 회차를 낸다. 한 번에 다 갚는 구조면 중간 장에서는 돈을 쌓기만 하면 돼서
   // 계산할 것이 없다 — 회차가 있어야 "이번 장에 얼마를 남겨야 하나"가 매 장의 질문이 된다.
+  // 이번 장이 끝날 때 낼 잔금 회차 (가계약 전·자유 런이면 0)
+  function instalmentDue(g) {
+    if (!g || !g.level || !window.LEVELS) return 0;
+    const deal = (Profile.get().campaign || {}).deal; if (!deal || !(deal.rest > 0)) return 0;
+    return LEVELS.dueAt(g.cfg.level, deal.rest) || 0;
+  }
   function showInstalment(r, done) {
     const P = Profile.get(), deal = P.campaign.deal;
     if (!deal) return done();                          // 가계약을 안 거친 판(장 건너뛰기 등)은 그냥 넘어간다
@@ -555,10 +561,12 @@
     $('#hud-turn').textContent = T('hud.turn', { d: g.dateOf(g.turn), dow: g.dowName(g.turn) });
     // 자금은 월말 정산 후 예상 잔액으로 보여준다 (사이클 중엔 모든 지출이 어음 — 자금 때문에 막히는 일이 없다)
     const pj = g.projectedCash(); const hc = $('#hud-cash'); const inPlay = g.phase === 'play';
+    // 가계약 뒤로는 장(보름)이 끝날 때마다 잔금 회차가 나간다 — 월말 예상에도 미리 뺀다
+    const inst = instalmentDue(g); if (inst) pj.total -= inst;
     hc.textContent = inPlay ? pj.total : g.cash; hc.style.color = inPlay && pj.total < 0 ? 'var(--red)' : '';
     $('#hud-cash-lbl').textContent = inPlay ? T('hud.cashLbl') : T('hud.cash');
     const due = $('#hud-due'); if (due && !inPlay) { due.textContent = g.debt ? T('hud.debt', { n: pj.loan }) : ''; due.hidden = false; }
-    else if (due) { const parts = [T('hud.cashNow', { n: g.cash })]; if (pj.pending) parts.push(T('hud.pending', { n: pj.pending })); if (pj.stock) parts.push(T('hud.stock', { n: pj.stock })); if (g.feesDue) parts.push(T('hud.feesDue', { n: g.feesDue })); parts.push(T('hud.opCostDue', { n: pj.opCost + pj.premium })); if (g.debt) parts.push(T('hud.debt', { n: pj.loan })); due.innerHTML = parts.join(' · ') + (pj.total < 0 && g.turn >= 5 ? ` · <span style="color:var(--orange)">${T('hud.loanWarn')}</span>` : ''); due.hidden = !hudDueOpen; }
+    else if (due) { const parts = [T('hud.cashNow', { n: g.cash })]; if (pj.pending) parts.push(T('hud.pending', { n: pj.pending })); if (pj.stock) parts.push(T('hud.stock', { n: pj.stock })); if (g.feesDue) parts.push(T('hud.feesDue', { n: g.feesDue })); parts.push(T('hud.opCostDue', { n: pj.opCost + pj.premium })); if (inst) parts.push(T('hud.instalment', { n: inst })); if (g.debt) parts.push(T('hud.debt', { n: pj.loan })); due.innerHTML = parts.join(' · ') + (pj.total < 0 && g.turn >= 5 ? ` · <span style="color:var(--orange)">${T('hud.loanWarn')}</span>` : ''); due.hidden = !hudDueOpen; }
     // 자금 분해(현금·재고·운영비·보험)는 매 턴 볼 필요가 없다 — 기본은 접고, 자금 칸을 누르면 펼친다.
     $('#hud-more').textContent = hudDueOpen ? '▴' : '▾';
     // 평판: 높을수록 좋다. 게이지가 비면 아무도 안 맡긴다 = 런 종료
@@ -1331,6 +1339,7 @@
     // 정산 화면이 답해야 하는 질문은 하나다: 이번 달 흑자야 적자야, 얼마야.
     // 그동안은 +2395 / -477 / -522 / -42 를 늘어놓고 덧셈은 플레이어에게 맡겼다.
     const net = s.net != null ? s.net : 0;
+    const inst = game.month >= R.months ? instalmentDue(game) : 0;   // 장이 끝나는 정산이면 한 사장에게 낼 잔금 회차도 같이
     const head = `<div class="sumnet ${net >= 0 ? 'good' : 'bad'}"><span class="lbl">${T('sum.net')}</span><span class="amt">${net >= 0 ? '+' : ''}${net}c</span>
       <span class="flow">${T('sum.netFlow', { from: s.cashStart != null ? s.cashStart : s.cash, to: s.cash })}${R.winCash ? ` · ${T('sum.goal', { n: R.winCash })}` : ''}</span></div>`;
     const sec = k => `<div class="sumsec">${T('sum.sec' + k)}</div>`;
@@ -1345,7 +1354,7 @@
       <span>${T('sum.fees')}</span><span class="v ${s.fees ? 'bad' : ''}">-${s.fees || 0}</span>
       ${s.selfCost ? `<span>${T('sum.selfCost')}</span><span class="v bad">-${s.selfCost}</span>` : ''}
       ${game.insurer !== 'none' ? `<span>${T('sum.premium', { name: esc(M.INSURERS[game.insurer].name) })}</span><span class="v ${s.premium ? 'bad' : ''}">-${s.premium || 0}</span><span class="sub" style="grid-column:1/-1;white-space:normal">${T('sum.claimsNext', { n: s.insClaims || 0, next: s.nextPremium })}${s.noClaimBonus ? ` · ${T('sum.noClaimBonus')}` : ''}</span>` : ''}
-      ${s.loan && s.loan.repaid ? `<span>${T('sum.loanRepaid')}</span><span class="v bad">-${s.loan.repaid + s.loan.interest} <small>${T('sum.loanInterest', { n: s.loan.interest })}</small></span>` : ''}</div>`;
+      ${s.loan && s.loan.repaid ? `<span>${T('sum.loanRepaid')}</span><span class="v bad">-${s.loan.repaid + s.loan.interest} <small>${T('sum.loanInterest', { n: s.loan.interest })}</small></span>` : ''}${inst ? `<span>${T('sum.instalment')}</span><span class="v bad">-${inst} <small>${T('sum.instalmentNote', { left: s.cash - inst })}</small></span>` : ''}</div>`;
     // 사고가 하나도 없으면 0 네 줄을 늘어놓지 않는다 — 좋은 소식은 한 줄이면 된다
     const bad = (s.penalty || 0) + (s.returned || 0) + (s.stolen || 0) + (s.broken || 0) + (s.claims || 0) + (s.discarded || 0);
     const incident = bad === 0 ? `${sec('Incident')}<div class="d" style="color:var(--green)">${T('sum.noIncident')}</div>` : `${sec('Incident')}<div class="kv">
