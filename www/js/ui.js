@@ -629,12 +629,16 @@
       btn.hidden = false;
       const car = D.CARRIERS[c.carrier], vcap = g.vehicleCap(c), elig = g.eligibleParcels(c), lv = g.trustLevel(c);
       const can = g.canCall(c) && !busy, struck = g.isStruck(c);
-      btn.disabled = !can; btn.className = 'btn contract' + (can ? ' ready' : '') + (pk && pk.i === i ? ' picked' : '');
+      btn.disabled = !can;
       const spare = c.calls === 0 && R.spareCall && !g.monthStats.spareUsed;
       const caps = g.contractCaps(c), fee = g.truckFee(c), simul = g.simulMax(c), eligVol = elig.reduce((s, p) => s + p.size, 0);
       const pd = g.trustPerk(c.carrier, 'delay'), delay = pd != null ? pd : (car.delay || 0);
       // 지금 한 대 부르면 얼마를 받고 얼마를 내는가 — 이 게임의 핵심 숫자를 카드에 직접 띄운다.
       const pv = loadPreview(g, c, elig);
+      // 지금 부르면 차가 꽉 찬다 — 눌러 보라고 반짝인다(강제는 아니다). 이미 서 있는 차면 호출 버튼이 대신 반짝인다
+      const fullNow = can && pv.n > 0 && pv.fill >= 1;
+      btn.className = 'btn contract' + (can ? ' ready' : '') + (pk && pk.i === i ? ' picked' : '') + (fullNow && !(pk && pk.i === i) ? ' full' : '');
+      btn.dataset.full = T('hud.fullTag');
       const extras = [delay ? T('call.payLater', { n: delay }) : '', c.enh.regular && !c.freeUsedMonth ? T('hud.regular') : ''].filter(Boolean);
       // 파란 눈금은 계약된 배차 횟수 — 쓴 만큼 비어 간다. 다 쓰면 전부 빈 칸(0대라는 글자 대신)
       const callMax = Math.max(c.calls, c.maxCalls || c.calls);
@@ -1152,7 +1156,7 @@
     let trust = '';
     if (game.shows('trust')) { const tg = game.trustGainPreview(c, vol, trucks), nx = game.trustNext(c.carrier); trust = `<div class="trustline">${trustBar(game, c.carrier)} ${T('call.xpGain', { xp: tg.xp, parts: tg.parts.join(', ') })}${nx ? ` · ${T('call.nextLevel')}: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 1 ? ` · ${esc(D.trustEffectText(c.carrier, game.trustLevel(c.carrier)))}` : ''}</div>`; }
     head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}</div>${gauge}${hint}${money}${riskLine}${trust}`;
-    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn primary" id="call-go"${cm.sel.size ? '' : ' disabled'}>${T('call.btn')}</button>`;
+    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn primary${vol && vol >= cap ? ' full' : ''}" id="call-go"${cm.sel.size ? '' : ' disabled'}>${T('call.btn')}</button>`;
     head.hidden = foot.hidden = false;
     const ta = head.querySelector('#truck-add'); if (ta) ta.onclick = () => { cm.extra = trucks; SFX.select(); renderAll(); };
     const td = head.querySelector('#truck-del'); if (td) td.onclick = () => { cm.extra = Math.max(0, trucks - 2); SFX.cancel(); renderAll(); };

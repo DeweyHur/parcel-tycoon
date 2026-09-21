@@ -388,6 +388,7 @@
     'hud.loadCells': '{vol}/{cap}칸{more}',
     'hud.netLine': "+{rev}c −{fee}c = <b>{net}c</b>",
     'hud.perNone': '실을 것 없음',
+    'hud.fullTag': '만차',
     'hud.callsSpent': '계약된 횟수 모두 차감',
     'hud.contractSub': "실을 것 <b>{vol}</b>/{cap}칸{more} · {fee}c",
     'hud.noTurn': '영업일 소모 없음',

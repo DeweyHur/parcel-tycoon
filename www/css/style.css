@@ -671,3 +671,10 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 #call-foot { padding: 5px 8px; }
 #contract-strip .contract.self { background: #2c3a36; }
 #contract-strip .contract.self .calls { color: var(--dim); }
+
+/* 만차 가능 — 눌러 보라는 반짝임 (강제 아님) */
+@keyframes fullGlow { 50% { box-shadow: 0 0 0 2px #7ee08a, 0 0 14px #7ee08aaa; } }
+#contract-strip .contract.full { border-color: var(--green); animation: fullGlow 1s steps(2) infinite; }
+#contract-strip .contract { position: relative; }
+#contract-strip .contract.full::before { content: attr(data-full); position: absolute; right: 4px; bottom: 3px; font-size: 9px; color: var(--green); }
+#call-go.full { animation: fullGlow 1s steps(2) infinite; }
