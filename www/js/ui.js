@@ -634,14 +634,17 @@
       // 지금 한 대 부르면 얼마를 받고 얼마를 내는가 — 이 게임의 핵심 숫자를 카드에 직접 띄운다.
       const pv = loadPreview(g, c, elig);
       const extras = [delay ? T('call.payLater', { n: delay }) : '', c.enh.regular && !c.freeUsedMonth ? T('hud.regular') : ''].filter(Boolean);
-      const callPips = c.calls > 0 && c.calls <= 15
-        ? `<span class="pips calls">${Array.from({ length: c.calls }, (_, k) => `${k && k % 5 === 0 ? '<i class="gap"></i>' : ''}<i class="on"></i>`).join('')}</span>`
-        : T('fmt.trucks', { n: c.calls });
+      // 파란 눈금은 계약된 배차 횟수 — 쓴 만큼 비어 간다. 다 쓰면 전부 빈 칸(0대라는 글자 대신)
+      const callMax = Math.max(c.calls, c.maxCalls || c.calls);
+      const callPips = callMax <= 15
+        ? `<span class="pips calls">${Array.from({ length: callMax }, (_, k) => `${k && k % 5 === 0 ? '<i class="gap"></i>' : ''}<i class="${k < c.calls ? 'on' : ''}"></i>`).join('')}</span>`
+        : `${c.calls}/${callMax}`;
+      const spent = c.calls === 0 && g.shows('calls') && !spare && !struck;
       const cells = pips(pv.cells, vcap, pv.over) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
-      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${takesDots(g, c)}</span><span class="calls ${c.calls === 0 && g.shows('calls') ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips}</span></div>
+      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${takesDots(g, c)}</span><span class="calls ${spent ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips}</span></div>
         ${bar}
-        <div class="sub">${cells}${pv.n ? ` · <span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>` : ` · <span class="per">${T('hud.perNone')}</span>`}${extras.length ? ' · ' + extras.join(' · ') : ''}</div>`;
+        <div class="sub">${spent ? `<span class="spent">${T('hud.callsSpent')}</span>` : `${cells}${pv.n ? ` · <span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>` : ` · <span class="per">${T('hud.perNone')}</span>`}${extras.length ? ' · ' + extras.join(' · ') : ''}`}</div>`;
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
     const f = g.forecast();

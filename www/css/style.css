@@ -129,8 +129,11 @@ body { touch-action: manipulation; }
 .pips i.over.more { opacity: .9; box-shadow: inset 0 0 0 1px #0004, 2px 0 0 var(--orange); }
 .pips i.gap { width: 5px; background: none; box-shadow: none; }
 /* 배차는 화물칸과 다른 것이니 색도 다르게 — 금색은 짐, 푸른색은 부를 수 있는 횟수 */
-.pips.calls i { width: 4px; height: 8px; background: #8fb8ff; opacity: .9; box-shadow: none; }
-.calls.zero .pips i { background: var(--red); }
+.pips.calls i { width: 4px; height: 8px; background: transparent; box-shadow: inset 0 0 0 1px #8fb8ff55; }
+.pips.calls i.on { background: #8fb8ff; opacity: .9; box-shadow: none; }
+.pips.calls i.gap { box-shadow: none; }
+.calls.zero .pips i { box-shadow: inset 0 0 0 1px #ffffff33; }
+.contract .sub .spent { color: var(--dim); white-space: normal; }
 .contract.ready { border-color: var(--gold); }
 #wait-btn, #self-btn { font-size: 14px; text-align: center; font-weight: 700; }
 #wait-btn small, #self-btn small { display: block; font-size: 11px; font-weight: 400; color: var(--ink); line-height: 1.35; }

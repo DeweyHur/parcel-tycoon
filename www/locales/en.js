@@ -387,6 +387,7 @@
     'hud.loadCells': '{vol}/{cap}{more}',
     'hud.netLine': "+{rev}c −{fee}c = <b>{net}c</b>",
     'hud.perNone': 'nothing to load',
+    'hud.callsSpent': 'all runs used',
     'hud.contractSub': "<b>{vol}</b>/{cap}{more} to load · {fee}c",
     'hud.noTurn': 'no turn',
     'hud.simulN': '{n} at once',
