@@ -86,14 +86,7 @@ body { touch-action: manipulation; }
 @keyframes valueGlow { 50% { filter: brightness(1.65); transform: scale(1.12); } }
 .parcel.nolead { grid-template-columns: 1fr auto; }
 .parcel .lead { font-size: 13px; text-align: center; line-height: 1; }
-.pbucket { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); padding: 5px 4px 2px; border-bottom: 1px solid var(--line); }
-#parcels .pbucket:first-child { padding-top: 1px; }
-.pbucket .bl { display: flex; align-items: center; }
-.pbucket .bl b { color: inherit; }
-.pbucket.r .bl { color: var(--red); } .pbucket.o .bl { color: var(--orange); } .pbucket.y .bl { color: var(--gold); }
-.pbucket.od .bl { color: var(--red); } .pbucket.cu .bl { color: var(--blue); }
-.pbucket .bn { color: var(--dim); }
-.parcel .cboxes { display: inline-flex; gap: 3px; vertical-align: -1px; }
+#parcels .parcel .cboxes { display: inline-flex; gap: 3px; vertical-align: -1px; }
 .parcel .cbox { display: inline-flex; gap: 1px; }
 .parcel .cbox i { width: 6px; height: 9px; border: 1px solid #0006; }
 .parcel .cboxes .more { color: var(--dim); font-size: 10px; align-self: center; }
@@ -625,3 +618,60 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
   .parcel.value-3 .sw, .reward-burst b, .reward-burst i { animation: none; }
   .mission-meter.hot > b, .mission-meter.hot > .mtrack i#mission-fill { animation: none; }
 }
+
+/* ── 재고 격자: 택배 하나 = 상자 하나 (2칸이면 붙은 두 칸) ── */
+.prow { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid #0f0e1a88; }
+.prow.nohead { grid-template-columns: minmax(0, 1fr) auto; }
+.prow .pl { display: flex; align-items: center; font-size: 10px; line-height: 1.2; color: var(--dim); }
+.prow .pl b { color: inherit; }
+.prow.r .pl, .prow.od .pl { color: var(--red); } .prow.o .pl { color: var(--orange); } .prow.y .pl { color: var(--gold); } .prow.cu .pl { color: var(--blue); }
+.prow .pt { display: flex; flex-wrap: wrap; gap: 5px; }
+.prow .pm { font-size: 11px; color: var(--dim); }
+.ptile { position: relative; display: inline-flex; gap: 1px; padding: 1px; margin: 0; background: #0f0e1a; border: 2px solid #0f0e1a; box-shadow: 2px 2px 0 #00000066; cursor: pointer; font: inherit; color: inherit; transition: transform .08s; }
+.ptile i { display: grid; place-items: center; width: 20px; height: 24px; background: var(--c); box-shadow: inset 0 -3px 0 #0003, inset 0 2px 0 #fff3; font-style: normal; }
+.ptile i span { font-size: 11px; line-height: 1; filter: drop-shadow(0 1px 0 #0008); }
+.ptile .vb { position: absolute; right: 1px; top: -1px; font-size: 8px; line-height: 1; color: #6fdcff; }
+.ptile.v2 { border-color: #c9962c; } .ptile.v2 .vb { color: var(--gold); }
+.ptile.v3 { border-color: #ff70d2; box-shadow: 0 0 6px #ff70d2aa, 2px 2px 0 #00000066; } .ptile.v3 .vb { color: #ff70d2; }
+.ptile.out i { background-image: repeating-linear-gradient(45deg, #0004 0 3px, transparent 3px 6px); }
+.ptile.rot, .ptile.heat { border-color: var(--orange); }
+.ptile.od { border-color: var(--red); animation: blink .9s steps(2) infinite; }
+.ptile.nc::after { content: '✕'; position: absolute; left: -3px; top: -7px; font-size: 10px; color: var(--red); }
+.ptile:active { transform: translateY(1px); }
+/* 차를 부른 동안: 실리는 것은 금테를 두르고 떠오르고, 못 싣는 것은 흐려진다 */
+.ptile.sel { outline: 2px solid var(--gold); outline-offset: 1px; transform: translateY(-2px); }
+.ptile.risk:not(.dis) { border-style: dashed; border-color: var(--orange); }
+.ptile.dis { opacity: .25; cursor: default; box-shadow: none; }
+#app.calling .ptile:not(.sel):not(.dis) i { filter: brightness(.8); }
+
+/* ── 호출 모드: 팝업 대신 패널이 고르는 판이 된다 ── */
+#call-head[hidden], #call-foot[hidden] { display: none; }
+#ops-status[hidden], #ops-status [hidden], .mission-meter[hidden] { display: none !important; }
+#call-head { padding: 6px 8px 4px; border-bottom: 3px solid var(--line); background: var(--panel2); }
+#call-head .ch-top { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 13px; }
+#call-head .ch-top .caps { font-size: 10px; color: var(--dim); }
+#call-head .load-visual.mini { margin: 4px 0 2px; gap: 6px; }
+#call-head .load-visual.mini .truck-stack { gap: 6px; }
+#call-head .load-visual.mini .truck-shell { min-height: 0; padding: 4px 22px 4px 4px; }
+#call-head .load-visual.mini .truck-shell::before { top: 4px; bottom: 2px; height: auto; width: 18px; }
+#call-head .load-visual.mini .truck-stack { padding-bottom: 7px; }
+#app.calling #warehouse-toggle { visibility: hidden; }
+#call-head .load-visual.mini .truck-cells { min-height: 0; gap: 2px; }
+#call-head .load-visual.mini .truck-cell { min-height: 16px; min-width: 12px; }
+#call-head .load-visual.mini { grid-template-columns: 1fr; }
+#call-head .load-visual.mini .load-money { grid-template-rows: none; grid-template-columns: repeat(3, 1fr); gap: 4px; min-width: 0; }
+#call-head .load-visual.mini .money-chip { padding: 2px 4px; font-size: 10px; display: flex; gap: 4px; justify-content: center; align-items: baseline; }
+#call-head .load-visual.mini .money-chip b { display: inline; }
+#call-head .load-visual.mini .money-chip b { font-size: 14px; }
+#call-head .load-hint { text-align: left; }
+#call-head .tbtn { display: inline-flex; gap: 4px; margin-left: 4px; }
+#call-head .tbtn .btn { padding: 1px 6px; font-size: 11px; }
+#call-head .riskline { font-size: 11px; color: var(--orange); margin-top: 2px; }
+#call-head .trustline { font-size: 11px; margin-top: 2px; }
+#call-head .chain-preview, #call-head .rush-preview { margin: 3px 0; padding: 3px 6px; font-size: 11px; }
+#call-foot { display: flex; gap: 6px; align-items: center; padding: 6px 8px 8px; border-top: 3px solid var(--line); background: var(--panel); }
+#call-foot .sp { flex: 1; }
+#call-foot .btn.primary { min-width: 84px; }
+#app.calling #actions, #app.calling #upcoming, #app.calling #offer, #app.calling #wxline, #app.calling #coach, #app.calling #warehouse-compact { display: none !important; }
+#app.calling:not(.cine) #scene { flex: 0 0 24%; min-height: 110px; }
+#app.calling #panel { flex: 1 1 auto; }

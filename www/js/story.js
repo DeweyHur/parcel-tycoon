@@ -100,7 +100,7 @@
     // 여 실장은 여기서 처음 인사한다 — 계약 카드를 눌러 '한길 물류를 부른' 자리이고,
     // 그가 가리키는 게이지도 이 팝업 안에 있다. 첫날 소개로 앞당기면 아무것도 안 가리키게 된다.
     // 팝업은 자동 선택된 채로 열린다 — 누르라고 시킬 것이 없어졌으니, 담긴 것을 보고 바로 호출로 간다
-    { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.elig > 0, pages: [{ speaker: 'yeo', expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
+    { id: 'l1callPick', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.elig > 0, pages: [{ speaker: 'yeo', expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#call-foot .btn.primary', gate: true }] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
     { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
@@ -137,7 +137,7 @@
     ] },
     { id: 'l2limit', kind: 'market', when: g => !!limitItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'enh' && /^limit/.test(it.enh)) }] },
     // 두 대가 붙는 순간 — 배차도 배차비도 두 배로 나간다
-    { id: 'l2two', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'smile', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#modal .truckgauge' }] },
+    { id: 'l2two', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'smile', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#call-head .load-visual' }] },
     // 넘쳐 본 다음에 확장을 판다
     { id: 'l2cap', kind: 'market', when: g => !!capItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'fac' && /^expand/.test(it.fac || '')) }] },
     { id: 'l2usage', kind: 'turn', when: g => usage(g) >= 0.9, pages: [{ expr: 'worry', hl: '#bar-usage' }] },
@@ -182,9 +182,9 @@
     { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => (ctx.picked || 0) === 0 && !!outOfCalls(g), pages: [{ expr: 'neutral', hl: '#modal .zone .parcel', gate: true }] },
     // 신뢰도 — 새로 생긴 게 아니라 줄곧 쌓이고 있던 것
     { id: 'l3trust', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel >= 0, pages: [
-      { expr: 'smile', hl: '#modal .trust' },
-      { expr: 'neutral', hl: '#modal .trust' },
-      { expr: 'think', hl: '#modal .trust' },
+      { expr: 'smile', hl: '#call-head .trustline' },
+      { expr: 'neutral', hl: '#call-head .trustline' },
+      { expr: 'think', hl: '#call-head .trustline' },
     ] },
     { id: 'l3switch', kind: 'market', when: g => !!switchItem(g), pages: [
       { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'contract' && it.switchFrom) },
@@ -225,7 +225,7 @@
     { id: 'l4coldFull', kind: 'turn', when: g => g.warehouse.cold > 0 && g.coldUsed && g.coldUsed() >= g.warehouse.cold, pages: [{ expr: 'worry', hl: '#bar-cold' }] },
     // ⚠ 깨지는 것 — 아무 차나 되는데 확률이 붙는다
     { id: 'l4fragile', kind: 'turn', when: g => !!firstOf(g, 'fragile'), pages: [{ expr: 'neutral', hl: '#parcels' }, { expr: 'think' }] },
-    { id: 'l4risk', kind: 'modal', modal: 'call', when: (g, ctx) => (ctx.risk || 0) > 0, pages: [{ expr: 'worry', hl: '#modal .pickinfo' }] },
+    { id: 'l4risk', kind: 'modal', modal: 'call', when: (g, ctx) => (ctx.risk || 0) > 0, pages: [{ expr: 'worry', hl: '#call-head .riskline' }] },
     // 🌾 상하는 것
     { id: 'l4produce', kind: 'turn', when: g => !!firstOf(g, 'produce'), pages: [{ expr: 'neutral', hl: '#parcels' }] },
     { id: 'l4break', kind: 'any', when: (g, ctx) => hasEvent(ctx, ['broken']), pages: [{ expr: 'shock' }, { expr: 'neutral' }] },
@@ -331,10 +331,10 @@
     { id: 'usage', months: [1], kind: 'turn', when: g => g.turn >= 2, pages: [{ expr: 'neutral', hl: '#bar-usage' }] },
     { id: 'callReady', months: [1], kind: 'turn', when: g => g.turn >= 3 || bestReadySlot(g).fill >= 0.8, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     // 호출 팝업 안: 자동 선택 버튼 → 호출 버튼. 팝업이 다시 그려질 때마다 ctx.sel(선택 수)로 확인한다
-    { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
+    { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
     // 차가 두 대 붙는 첫 순간. 자동으로 붙는 거라 설명이 없으면 배차가 왜 2대 줄었는지 모른다 (대본 1개월차 8턴에 정확히 12칸이 온다)
-    { id: 'trucks2', needs: 'simul', months: [1, 2, 3], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'neutral', hl: '#modal .truckgauge' }, { expr: 'smile', hl: '#modal .truckgauge' }] },
-    { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#pick-list' }, { expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
+    { id: 'trucks2', needs: 'simul', months: [1, 2, 3], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'smile', hl: '#call-head .load-visual' }] },
+    { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#parcels' }, { expr: 'neutral', hl: '#call-foot .btn.primary', gate: true }] },
     { id: 'rushHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.rush, pages: [{ expr: 'shock', hl: '#rush-meter' }, { expr: 'laugh', hl: '#contract-strip' }] },
     { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
     { id: 'chainHit', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.chain >= 2, pages: [{ expr: 'shock', hl: '#chain-meter' }, { expr: 'laugh', hl: '#mission-meter' }] },

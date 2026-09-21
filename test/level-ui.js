@@ -63,8 +63,8 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   check(!(await vis('#c1')) && !(await vis('#c2')), '빈 계약 슬롯이 없다');
   const calls = await page.$eval('#c0 .calls', el => el.textContent.trim()).catch(() => '');
   check(calls === '', '계약 카드에 배차 잔량이 없다 (지금: "' + calls + '")');
-  const custIcon = await page.$('#parcels .parcel .cust');
-  check(!custIcon, '택배 줄에 고객 아이콘이 없다');
+  const custIcon = await page.$('#parcels .ptile i span');
+  check(!custIcon, '택배 상자에 고객 아이콘이 없다');
 
   console.log('\n4사이클 진행 (마지막 날 직전까지는 게임 API로 빨리 감기)');
   const ff = await page.evaluate(() => {

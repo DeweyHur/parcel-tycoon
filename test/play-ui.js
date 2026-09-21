@@ -141,8 +141,7 @@ const say = m => { console.log(m); log.push(m); };
   await page.evaluate(() => { const t = document.getElementById('warehouse-toggle');
     if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); });
   await page.waitForTimeout(300);
-  if (!(await page.$('#parcels .parcel[data-id]'))) { await safeClick('#parcels .parcel.group'); await page.waitForTimeout(300); }
-  await safeClick('#parcels .parcel[data-id]'); await page.waitForTimeout(400);
+  await safeClick('#parcels .ptile[data-id]'); await page.waitForTimeout(400);
   const pd = await page.evaluate(() => ({ txt: (document.getElementById('modal') || {}).textContent || '',
     trust: document.querySelectorAll('#modal .trust').length, cust: document.querySelectorAll('#modal .cust').length }));
   check(/보낼 수 있는 곳/.test(pd.txt), '택배 상세가 열렸다');
@@ -153,7 +152,7 @@ const say = m => { console.log(m); log.push(m); };
   check(firstSeen.includes('l1intro'), '첫날 대사가 끝났다 — ' + firstSeen.join(','));
   check(!firstSeen.includes('l1waitGo'), '대기 팝업 안내 비트가 없다 (팝업 자체가 없다)');
   check(!(await vis('#c1')), '빈 계약 슬롯 없음');
-  check(!(await page.$('#parcels .parcel .cust')), '택배 줄에 고객 아이콘 없음');
+  check(!(await page.$('#parcels .ptile i span')), '서장 상자에는 아이콘이 없다 (속성·고객이 아직 없다)');
   const s0 = await state();
   check(s0.cap === 16, '창고 16칸 — ' + s0.cap);
   check(s0.sig === '16/0/0/0', '3D 건물이 16칸·냉장0 으로 지어졌다 — ' + s0.sig);
@@ -217,10 +216,18 @@ const say = m => { console.log(m); log.push(m); };
       await safeClick('#c' + act); await page.waitForTimeout(200);
       await readBeat(); await passGate();
       if (calls === 0 && !fs.existsSync('shots/P-11-call.png')) await shot('11-call');
-      for (const b of await page.$$('#modal .body .btn')) { if (/급한/.test(await b.textContent())) { await safeClick(b); await page.waitForTimeout(100); break; } }
+      // 호출은 팝업이 아니다 — 패널이 고르는 판이 되고, 창고 상자가 이미 골라져 있다
+      if (calls === 0) {
+        const cm = await page.evaluate(() => ({ calling: document.getElementById('app').classList.contains('calling'), modal: !!document.querySelector('#modal-root.show'),
+          tiles: document.querySelectorAll('#parcels .ptile').length, sel: document.querySelectorAll('#parcels .ptile.sel').length, head: !!document.querySelector('#call-head .load-visual') }));
+        check(cm.calling && !cm.modal && cm.head, '차를 부르면 팝업 없이 패널이 호출 판이 된다');
+        check(cm.tiles > 0 && cm.sel > 0, `창고 상자가 이미 골라져 있다 — ${cm.sel}/${cm.tiles}`);
+        const t = await page.$('#parcels .ptile.sel');
+        if (t) { await safeClick(t); await page.waitForTimeout(120); const after = await page.$$eval('#parcels .ptile.sel', els => els.length); check(after === cm.sel - 1, `상자를 누르면 빠진다 — ${cm.sel} → ${after}`); await safeClick('#pick-urgent'); await page.waitForTimeout(120); }
+      }
       await readBeat(); await passGate();
-      if (await safeClick('#modal .foot .btn.primary:not([disabled])')) { calls++; await page.waitForTimeout(500); await readBeat(); continue; }
-      await safeClick('#modal .foot .btn');
+      if (await safeClick('#call-foot .btn.primary:not([disabled])')) { calls++; await page.waitForTimeout(500); await readBeat(); continue; }
+      await safeClick('#call-cancel');
       await page.waitForTimeout(100);
     }
     const w = await page.$('#wait-btn:not([disabled])');

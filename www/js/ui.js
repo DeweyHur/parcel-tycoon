@@ -548,11 +548,15 @@
     if (!game) return;
     const g = game, R = g.rules;
     const warehouseDetails = $('#warehouse-details'), warehouseToggle = $('#warehouse-toggle'), warehouseCompact = $('#warehouse-compact');
-    warehouseDetails.hidden = !opts.warehouseOpen;
-    warehouseCompact.hidden = opts.warehouseOpen;
+    // 차를 부른 동안에는 창고가 곧 고르는 판이다 — 접어 뒀어도 편다
+    if (callMode && (g.phase !== 'play' || !g.contracts[callMode.i] || !g.canCall(g.contracts[callMode.i]))) callMode = null;
+    const whOpen = opts.warehouseOpen || !!callMode;
+    $('#app').classList.toggle('calling', !!callMode);
+    warehouseDetails.hidden = !whOpen;
+    warehouseCompact.hidden = whOpen;
     warehouseToggle.textContent = T(opts.warehouseOpen ? 'warehouse.hide' : 'warehouse.show');
     warehouseToggle.setAttribute('aria-expanded', String(opts.warehouseOpen));
-    $('#app').classList.toggle('warehouse-collapsed', !opts.warehouseOpen);
+    $('#app').classList.toggle('warehouse-collapsed', !whOpen);
     updateMusic();
     $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { y: g.yearOf(), cal: g.calMonth(), n: g.month })}`;
     $('#hud-turn').textContent = T('hud.turn', { d: g.dateOf(g.turn), dow: g.dowName(g.turn) });
@@ -618,10 +622,10 @@
     if (g.items.transitCert || g.items.yardIns === g.month || g.items.customsBond === g.month) $('#upcoming').innerHTML += `<span class="chip">${[g.items.transitCert ? `${M.INS_ITEMS.transitCert.icon} ${esc(M.INS_ITEMS.transitCert.name)} ${g.items.transitCert}` : '', g.items.yardIns === g.month ? `${M.INS_ITEMS.yardIns.icon} ${esc(M.INS_ITEMS.yardIns.name)}` : '', g.items.customsBond === g.month ? `${M.INS_ITEMS.customsBond.icon} ${esc(M.INS_ITEMS.customsBond.name)}` : ''].filter(Boolean).join(' · ')}</span>`;
     if (g.outdoorVolume() > 0) $('#upcoming').innerHTML += `<span class="chip heat">${T('hud.outdoor', { vol: g.outdoorVolume(), n: g.outdoorParcels().length, storage: g.storage.some(s => s.outdoor) ? T('hud.outdoorStorage') : '', pct: Math.round(g.theftProb() * 100) })}</span>`;
     renderOffer();
-    renderParcels($('#parcels'), g.parcels, null);
-    $('#parcels').querySelectorAll('.parcel[data-id]').forEach(el => el.onclick = () => { if (busy) return; SFX.click(); showParcelDetail(+el.dataset.id); });
-    $('#parcels').querySelectorAll('.parcel.group[data-gkey]').forEach(el => el.onclick = () => { if (busy) return; SFX.click(); const k = el.dataset.gkey; openGroups.has(k) ? openGroups.delete(k) : openGroups.add(k); renderAll(); });
-    if (g.storage.length) $('#parcels').insertAdjacentHTML('afterbegin', g.storage.map(s => { const K = M.STORAGE_KINDS[s.kind], cu = M.CUSTOMERS[s.customer]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#a8845a"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${cu.icon}${esc(cu.name)}${s.perTurn ? ` · ${T('log.storagePerTurn', { perTurn: s.perTurn })}` : ''}</div><div class="st">${s.outdoor ? `${T('hud.outdoorTag')} · ` : ''}${T('storage.left', { n: s.left })}</div></div>`; }).join(''));
+    renderStock($('#parcels'), g.parcels, callMode ? callState() : null);
+    $('#parcels').querySelectorAll('.ptile[data-id]').forEach(el => el.onclick = () => { if (busy) return; if (callMode) return toggleCallPick(+el.dataset.id); SFX.click(); showParcelDetail(+el.dataset.id); });
+    renderCallBar();
+    if (g.storage.length && !callMode) $('#parcels').insertAdjacentHTML('afterbegin', g.storage.map(s => { const K = M.STORAGE_KINDS[s.kind], cu = M.CUSTOMERS[s.customer]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#a8845a"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${cu.icon}${esc(cu.name)}${s.perTurn ? ` · ${T('log.storagePerTurn', { perTurn: s.perTurn })}` : ''}</div><div class="st">${s.outdoor ? `${T('hud.outdoorTag')} · ` : ''}${T('storage.left', { n: s.left })}</div></div>`; }).join(''));
     $('#parcels').querySelectorAll('.parcel.storage').forEach(el => el.onclick = () => showStorage(+el.dataset.sid));
     // 접어 둬도 기한만은 보여야 한다 — 종류마다 '가장 급한 것'의 남은 날
     const compactCounts = new Map();
@@ -963,12 +967,8 @@
     const lead = leadOn() ? `<div class="lead" title="${esc(cu.name)}">${cu.icon}</div>` : '';
     return `<div class="parcel${cls}" data-id="${p.id}">${lead}<div>${noDue || p.noDeadline ? '' : urgDot(p)}${valueBadge(p)}${attrIcons(a)} ${cellBoxes([p])} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p, noDue)}</div></div>`;
   }
-  // 재고는 "뭘 먼저 보내야 하나"로 읽힌다. 그래서 기한이 머리줄이고, 그 아래에
-  // 종류·위험이 같은 것끼리 한 덩어리로 놓인다. 같은 종류가 기한을 넘어 흩어지는
-  // 대신, 오늘 결정에 쓰이는 순서가 위에서 아래로 그대로 보인다.
-  const GROUP_MIN = 2;   // 위험까지 같은 줄이면 둘만 있어도 묶는다 — 잃는 정보가 없다
-  const openGroups = new Set();
-  // 기한·초과·통관은 머리줄이 들고 가므로 묶음 키에서 뺀다. 남는 것은 '위험'뿐.
+  // 재고는 "뭘 먼저 보내야 하나"로 읽힌다 — 기한이 줄 머리, 그 줄에 상자가 늘어선다.
+  // 상자 테두리로 보여 줄 '위험' — 기한·초과·통관은 줄 머리가 들고 간다.
   function hazardKey(p) {
     const a = attrsOf(p), h = [];
     if (a.includes('cold') && !p.inCold) h.push('warm');
@@ -977,8 +977,6 @@
     try { if (game && game.phase === 'play' && !(p.customs > 0) && !game.contracts.some(c => c && game.canHandle(c, p) && game.breakProb(c, p) === 0) && !game.selfCan(p)) h.push('nc'); } catch (e) { /* 계산 못 하면 위험 없음으로 둔다 */ }
     return h.join('+');
   }
-  // 크기는 상자 수로 보여 주므로 키에 넣지 않는다 — 2칸과 1칸이 한 줄에 같이 선다
-  function kindKeyOf(p) { return `${p.type}|${attrsOf(p).join(',')}|${p.outdoor ? 'o' : ''}|${valueTier(p)}|${hazardKey(p)}`; }
   // 기한 머리줄 — 초과 · 통관 N일 · 기한 N일 · 무기한
   function bucketOf(p) {
     const dotOf = n => n <= 1 ? 'r' : n <= 2 ? 'o' : n <= 3 ? 'y' : 'g';
@@ -987,114 +985,125 @@
     if (p.noDeadline) return { key: 'nd', urg: 90, cls: 'nd', dot: 'g', label: T('ps.noDue') };
     return { key: `d${p.deadline}`, urg: p.deadline, cls: dotOf(p.deadline), dot: dotOf(p.deadline), label: T('ps.deadline', { n: p.deadline }) };
   }
-  function bucketHead(b, ps) {
-    const money = ps.reduce((n, x) => n + (x.reward != null ? x.reward : game.baseReward(x.type, x.baseSize)), 0);
-    return `<div class="pbucket ${b.cls}"><span class="bl"><i class="urg ${b.dot}"></i>${b.label}</span><span class="bn">${money}c</span></div>`;
+
+  // ── 재고 격자: 택배 하나 = 상자 하나 ──
+  // 2칸이면 두 칸이 붙은 상자, 색은 종류, 테두리는 상태. 기한 줄마다 늘어선다.
+  // 평소엔 누르면 상세, 차를 부른 동안엔 누르면 싣고/빼기.
+  function tileIcons(p) {
+    const a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'];
+    const list = a.map(k => D.ATTRS[k].icon);
+    if (leadOn() && p.customer && p.customer !== 'anon') list.push(cu.icon);
+    return list.slice(0, p.size);   // 칸마다 하나 — 넘치는 것은 상세에서
   }
-  // 머리줄이 없을 때(기한 구간이 하나뿐일 때)만 줄에 기한을 적는다. 안에서 다르면 범위로.
-  function groupStatus(ps) {
-    let base = ''; try { base = parcelStatus(ps[0]); } catch (e) { return ''; }
-    const ds = ps.filter(x => !x.noDeadline && !x.overdue && !(x.customs > 0)).map(x => x.deadline);
-    if (ds.length < 2) return base;
-    const lo = Math.min(...ds), hi = Math.max(...ds);
-    if (lo === hi) return base;
-    return base.replace(T('ps.deadline', { n: ps[0].deadline }), T('ps.deadlineRange', { lo, hi }));
+  function parcelTile(p, s) {
+    const t = ptype(p), a = attrsOf(p), hz = hazardKey(p);
+    const rot = (a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen);
+    const cls = ['ptile', `v${valueTier(p)}`, p.overdue ? 'od' : '', rot ? 'rot' : '', hz.includes('heat') ? 'heat' : '', hz.includes('nc') ? 'nc' : '', p.outdoor ? 'out' : '',
+      s && s.sel.has(p.id) ? 'sel' : '', s && !s.elig.has(p.id) ? 'dis' : '', s && s.risk && s.risk.has(p.id) ? 'risk' : ''].filter(Boolean).join(' ');
+    const reward = p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize);
+    const tip = [t.name, T('fmt.cells', { n: p.size }), `${reward}c`].concat(a.map(k => D.ATTRS[k].name)).join(' · ');
+    const ic = tileIcons(p);
+    const cells = Array.from({ length: p.size }, (_, k) => `<i>${ic[k] ? `<span>${ic[k]}</span>` : ''}</i>`).join('');
+    const vb = valueTier(p) ? `<b class="vb">${valueTier(p) === 3 ? '✦' : valueTier(p) === 2 ? '◆' : '▲'}</b>` : '';
+    return `<button type="button" class="${cls}" data-id="${p.id}" style="--c:${t.css}" title="${esc(tip)}" aria-label="${esc(tip)}">${cells}${vb}</button>`;
   }
-  function groupRow(key, ps, noDue) {
-    const p = ps[0], a = attrsOf(p);
-    const money = ps.reduce((n, x) => n + (x.reward != null ? x.reward : game.baseReward(x.type, x.baseSize)), 0);
-    const cus = [...new Set(ps.map(x => M.CUSTOMERS[x.customer || 'anon'].icon))];
-    const open = openGroups.has(key);
-    const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (leadOn() ? '' : ' nolead');
-    const lead = leadOn() ? `<div class="lead">${cus.slice(0, 2).join('')}${cus.length > 2 ? '…' : ''}</div>` : '';
-    const st = noDue ? parcelStatus(p, true) : groupStatus(ps);
-    return `<div class="parcel group${cls} value-${valueTier(p)}${open ? ' open' : ''}" data-gkey="${esc(key)}">${lead}<div>${noDue || p.noDeadline ? '' : urgDot(p)}${valueBadge(p)}<span class="nm">×${ps.length}</span>${attrIcons(a)} ${cellBoxes(ps)} · ${money}c</div><div class="st">${st ? st + ' ' : ''}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
-  }
-  function renderParcels(container, parcels, selectable) {
+  function renderStock(container, parcels, s) {
     if (!parcels.length) { container.innerHTML = `<div id="empty">${T('hud.emptyWarehouse')}</div>`; return; }
-    const sorted = sortByUrgency(parcels);
-    if (selectable) { container.innerHTML = sorted.map(p => parcelRow(p, selectable)).join(''); return; }
     const buckets = [], byKey = new Map();
-    for (const p of sorted) {
+    for (const p of sortByUrgency(parcels)) {
       const b = bucketOf(p);
       let e = byKey.get(b.key);
       if (!e) { e = { b, ps: [] }; byKey.set(b.key, e); buckets.push(e); }
       e.ps.push(p);
     }
     buckets.sort((x, y) => x.b.urg - y.b.urg);
-    const one = buckets.length <= 1;          // 구간이 하나뿐이면 머리줄은 같은 말을 두 번 하는 것이다
-    const out = [], live = new Set();
-    for (const { b, ps } of buckets) {
-      if (!one) out.push(bucketHead(b, ps));
-      const groups = new Map();
-      for (const p of ps) { const k = b.key + '|' + kindKeyOf(p); (groups.get(k) || groups.set(k, []).get(k)).push(p); }
-      for (const [k, gs] of groups) {
-        if (gs.length >= GROUP_MIN) {
-          live.add(k);
-          out.push(groupRow(k, gs, !one));
-          if (openGroups.has(k)) out.push(...gs.map(x => `<div class="gchild">${parcelRow(x, null, !one)}</div>`));
-        } else out.push(...gs.map(x => parcelRow(x, null, !one)));
-      }
-    }
-    for (const k of [...openGroups]) if (!live.has(k)) openGroups.delete(k);
-    container.innerHTML = out.join('');
+    // 전부 기한 없음(서장)이면 머리말은 아무 말도 하지 않는다
+    const head = !(buckets.length === 1 && buckets[0].b.key === 'nd');
+    container.innerHTML = buckets.map(({ b, ps }) => {
+      // 같은 종류끼리 붙여 놓아야 색 덩어리로 읽힌다
+      const tiles = ps.slice().sort((x, y) => (x.type < y.type ? -1 : x.type > y.type ? 1 : 0) || y.size - x.size).map(p => parcelTile(p, s)).join('');
+      const money = ps.reduce((n, x) => n + (x.reward != null ? x.reward : game.baseReward(x.type, x.baseSize)), 0);
+      return `<div class="prow ${b.cls}${head ? '' : ' nohead'}">${head ? `<div class="pl"><i class="urg ${b.dot}"></i><span>${b.label}</span></div>` : ''}<div class="pt">${tiles}</div><div class="pm">${money}c</div></div>`;
+    }).join('');
   }
 
+  // ── 호출: 팝업 대신 아래 창고 격자가 그대로 고르는 판이 된다 ──
+  // 위에는 차 그림과 돈, 가운데는 창고 상자(누르면 싣기/빼기), 아래는 보내기.
+  let callMode = null;   // { i, sel: Set<id>, extra: 사용자가 '한 대 더'로 늘린 대수 }
   function onContractTap(i) {
     if (busy || game.phase !== 'play') return;
     const c = game.contracts[i]; if (!game.canCall(c)) return;
     SFX.resume(); SFX.click();
-    const car = D.CARRIERS[c.carrier], vcap = game.vehicleCap(c), simul = game.simulMax(c), fee = game.truckFee(c);
-    const elig = game.eligibleParcels(c);
-    const trustInfo = (vol, trucks) => { if (!game.shows('trust')) return ''; const g = game.trustGainPreview(c, vol, trucks), nx = game.trustNext(c.carrier); return `<div class="d" style="font-size:11px;margin-bottom:6px">${trustBar(game, c.carrier)} ${T('call.xpGain', { xp: g.xp, parts: g.parts.join(', ') })}${nx ? ` · ${T('call.nextLevel')}: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 1 ? ` · ${esc(D.trustEffectText(c.carrier, game.trustLevel(c.carrier)))}` : ''}<details><summary style="cursor:pointer;color:var(--dim)">${T('call.trackToggle')}</summary>${trustTrack(c.carrier, game.trustXp(c.carrier))}</details></div>`; };
     // 카드에 뜬 순수익이 곧 이 선택이다 — 열자마자 같은 것이 담겨 있어야 두 화면이 한 말을 한다
     const sel = new Set();
     try {
-      const sorted0 = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
+      const sorted0 = game.eligibleParcels(c).slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
       game.autoPick(c, sorted0, 1).ids.forEach(id => sel.add(id));
     } catch (e) { /* 자동 선택이 안 되면 빈 채로 연다 */ }
-    let extraTrucks = 0; // 사용자가 '한 대 더'로 늘린 대수
-    const render = () => {
-      const selP = [...sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
-      const vol = selP.reduce((s, p) => s + p.size, 0);
-      const need = vol ? game.trucksNeeded(c, vol) : 1;
-      const trucks = Math.min(Math.max(need, 1 + extraTrucks), Math.min(simul, Math.max(1, c.calls + (c.calls === 0 ? 1 : 0))));
-      const cap = vcap * trucks, callFee = game.callFee(c, trucks), baseIncome = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
-      const fill = vol / cap;
-      const chain = game.chainPreview(fill), chainIncome = Math.round(baseIncome * chain.mult);
-      const rush = game.rushPreview(vol, trucks, fill), income = rush ? Math.round(chainIncome * D.RUSH.bonus) : chainIncome;
-      const cargoCells = []; for (const p of selP) for (let n = 0; n < p.size; n++) cargoCells.push({ color: ptype(p).css, name: ptype(p).name });
-      const shells = Array.from({ length: trucks }, (_, ti) => { const cells = Array.from({ length: vcap }, (_, ci) => { const cargo = cargoCells[ti * vcap + ci]; return `<i class="truck-cell ${cargo ? 'filled' : ''}"${cargo ? ` style="background:${cargo.color}" title="${esc(cargo.name)}"` : ''}></i>`; }).join(''); return `<div class="truck-shell"><div class="truck-cells" style="--cols:${Math.min(6, vcap)}">${cells}</div></div>`; }).join('');
-      const ko = I18n.lang === 'ko', net = income - callFee;
-      const gauge = `<div class="load-visual"><div class="truck-stack">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div><div class="load-hint">${vol}/${cap} · ${Math.round(fill * 100)}% ${fill >= 0.8 && game.shows('chain') ? '⚡' : ''} · ${ko ? '아래 상자를 눌러 적재' : 'Tap boxes below to load'}</div></div><div class="tbtn">${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : game.shows('simul') ? `<span class="d" style="color:var(--dim)">${T('call.simulMax', { n: Math.min(simul, Math.max(1, c.calls)) })}</span>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}</div>`;
-      const money = `${chain.count >= 2 && game.shows('chain') ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<div class="load-hint" style="color:var(--green)">${T('call.fillOk')}</div>` : vol ? `<div class="load-hint" style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</div>` : ''}`;
-      const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
-      const riskLine = riskSel.length ? `<div class="d" style="font-size:12px;color:var(--orange);margin-bottom:6px">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
-      const capsLine = !game.shows('attrs') ? '' : `<div class="d" style="font-size:11px;color:var(--dim);margin-bottom:4px">${car.badge || ''} ${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</div>`;
-      const body = `${capsLine}${gauge}${money}${riskLine}${trustInfo(vol, trucks)}<div id="pick-list" style="display:flex;flex-direction:column;gap:3px"></div>
-        <div style="margin-top:8px;display:flex;gap:6px"><button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button></div>`;
-      const m = modal(game.contractName(c), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: T('call.btn'), cls: 'primary', disabled: sel.size === 0, onClick: () => { closeModal(); doCall(i, [...sel], trucks); } }]);
-      const ta = m.querySelector('#truck-add'); if (ta) ta.onclick = () => { extraTrucks = trucks; SFX.select(); render(); };
-      const td = m.querySelector('#truck-del'); if (td) td.onclick = () => { extraTrucks = Math.max(0, trucks - 2); SFX.cancel(); render(); };
-      const list = m.querySelector('#pick-list');
-      renderParcels(list, game.parcels, { sel, elig: new Set(elig.map(p => p.id)), risk: new Set(elig.filter(p => game.breakProb(c, p) > 0).map(p => p.id)) });
-      list.querySelectorAll('.parcel').forEach(el => el.onclick = () => {
-        const id = +el.dataset.id; if (!elig.some(p => p.id === id)) return;
-        if (sel.has(id)) { sel.delete(id); SFX.cancel(); }
-        else { const p = elig.find(x => x.id === id); const v = [...sel].reduce((s, q) => s + (game.parcels.find(x => x.id === q) || { size: 0 }).size, 0) + p.size; const maxCap = vcap * Math.min(simul, Math.max(1, c.calls)); if (v > maxCap) { toast(T('call.maxSelect', { cap: maxCap })); return; } sel.add(id); SFX.select(); }
-        render();
-      });
-      m.querySelector('#pick-urgent').onclick = () => {
-        sel.clear();
-        const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
-        const r = game.autoPick(c, sorted, Math.min(simul, Math.max(1, c.calls)));
-        r.ids.forEach(id => sel.add(id));
-        SFX.select(); render();
-      };
-      m.querySelector('#pick-clear').onclick = () => { sel.clear(); SFX.cancel(); render(); };
-      storyCheck({ kind: 'modal', modal: 'call', sel: sel.size, elig: elig.length, slot: i, trucks, vol });
+    callMode = { i, sel, extra: 0 };
+    renderAll(); if (scene && scene.resize) scene.resize();
+    const pc = $('#parcels'); if (pc) pc.scrollTop = 0;
+  }
+  function exitCall() { if (!callMode) return; callMode = null; renderAll(); if (scene && scene.resize) scene.resize(); }
+  function callState() {
+    const cm = callMode, c = game.contracts[cm.i], elig = game.eligibleParcels(c);
+    return { sel: cm.sel, elig: new Set(elig.map(p => p.id)), risk: new Set(elig.filter(p => game.breakProb(c, p) > 0).map(p => p.id)) };
+  }
+  function toggleCallPick(id) {
+    const cm = callMode, c = game.contracts[cm.i];
+    const elig = game.eligibleParcels(c), p = elig.find(x => x.id === id);
+    if (!p) { SFX.nudge(); return; }
+    if (cm.sel.has(id)) { cm.sel.delete(id); SFX.cancel(); }
+    else {
+      const vcap = game.vehicleCap(c), simul = game.simulMax(c);
+      const v = [...cm.sel].reduce((s, q) => s + (game.parcels.find(x => x.id === q) || { size: 0 }).size, 0) + p.size;
+      const maxCap = vcap * Math.min(simul, Math.max(1, c.calls));
+      if (v > maxCap) { toast(T('call.maxSelect', { cap: maxCap })); return; }
+      cm.sel.add(id); SFX.select();
+    }
+    renderAll();
+  }
+  function renderCallBar() {
+    const head = $('#call-head'), foot = $('#call-foot');
+    if (!callMode) { head.hidden = foot.hidden = true; head.innerHTML = foot.innerHTML = ''; return; }
+    const cm = callMode, i = cm.i, c = game.contracts[i];
+    const car = D.CARRIERS[c.carrier], vcap = game.vehicleCap(c), simul = game.simulMax(c), fee = game.truckFee(c);
+    const elig = game.eligibleParcels(c);
+    const selP = [...cm.sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
+    const vol = selP.reduce((s, p) => s + p.size, 0);
+    const need = vol ? game.trucksNeeded(c, vol) : 1;
+    const trucks = Math.min(Math.max(need, 1 + cm.extra), Math.min(simul, Math.max(1, c.calls + (c.calls === 0 ? 1 : 0))));
+    const cap = vcap * trucks, callFee = game.callFee(c, trucks), baseIncome = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
+    const fill = vol / cap;
+    const chain = game.chainPreview(fill), chainIncome = Math.round(baseIncome * chain.mult);
+    const rush = game.rushPreview(vol, trucks, fill), income = rush ? Math.round(chainIncome * D.RUSH.bonus) : chainIncome;
+    const cargoCells = []; for (const p of selP) for (let n = 0; n < p.size; n++) cargoCells.push({ color: ptype(p).css, name: ptype(p).name });
+    const shells = Array.from({ length: trucks }, (_, ti) => { const cells = Array.from({ length: vcap }, (_, ci) => { const cargo = cargoCells[ti * vcap + ci]; return `<i class="truck-cell ${cargo ? 'filled' : ''}"${cargo ? ` style="background:${cargo.color}" title="${esc(cargo.name)}"` : ''}></i>`; }).join(''); return `<div class="truck-shell"><div class="truck-cells" style="--cols:${Math.min(6, vcap)}">${cells}</div></div>`; }).join('');
+    const ko = I18n.lang === 'ko', net = income - callFee;
+    const tbtn = `${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}`;
+    const gauge = `<div class="load-visual mini"><div class="truck-stack">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
+    const hint = `<div class="load-hint">${vol}/${cap} · ${Math.round(fill * 100)}%${fill >= 0.8 && game.shows('chain') ? ' ⚡' : ''} · ${T('call.tapBoxes')}${tbtn ? ` <span class="tbtn">${tbtn}</span>` : ''}</div>`;
+    const money = `${chain.count >= 2 && game.shows('chain') ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}${!game.shows('trust') ? '' : fill >= 0.8 && vol ? `<div class="load-hint" style="color:var(--green)">${T('call.fillOk')}</div>` : vol ? `<div class="load-hint" style="color:var(--orange)">${T('call.fillLow', { pct: Math.round(fill * 100), need: Math.max(1, Math.ceil(cap * 0.8 - vol)) })}</div>` : ''}`;
+    const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
+    const riskLine = riskSel.length ? `<div class="riskline">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
+    const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
+    let trust = '';
+    if (game.shows('trust')) { const tg = game.trustGainPreview(c, vol, trucks), nx = game.trustNext(c.carrier); trust = `<div class="trustline">${trustBar(game, c.carrier)} ${T('call.xpGain', { xp: tg.xp, parts: tg.parts.join(', ') })}${nx ? ` · ${T('call.nextLevel')}: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 1 ? ` · ${esc(D.trustEffectText(c.carrier, game.trustLevel(c.carrier)))}` : ''}</div>`; }
+    head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}</div>${gauge}${hint}${money}${riskLine}${trust}`;
+    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn" id="call-cancel">${T('btn.cancel')}</button><button class="btn primary" id="call-go"${cm.sel.size ? '' : ' disabled'}>${T('call.btn')}</button>`;
+    head.hidden = foot.hidden = false;
+    const ta = head.querySelector('#truck-add'); if (ta) ta.onclick = () => { cm.extra = trucks; SFX.select(); renderAll(); };
+    const td = head.querySelector('#truck-del'); if (td) td.onclick = () => { cm.extra = Math.max(0, trucks - 2); SFX.cancel(); renderAll(); };
+    foot.querySelector('#pick-urgent').onclick = () => {
+      cm.sel.clear();
+      const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
+      game.autoPick(c, sorted, Math.min(simul, Math.max(1, c.calls))).ids.forEach(id => cm.sel.add(id));
+      SFX.select(); renderAll();
     };
-    render();
+    foot.querySelector('#pick-clear').onclick = () => { cm.sel.clear(); SFX.cancel(); renderAll(); };
+    foot.querySelector('#call-cancel').onclick = () => { SFX.cancel(); exitCall(); };
+    foot.querySelector('#call-go').onclick = () => { if (!cm.sel.size || busy) return; const ids = [...cm.sel]; callMode = null; renderAll(); if (scene && scene.resize) scene.resize(); doCall(i, ids, trucks); };
+    storyCheck({ kind: 'modal', modal: 'call', sel: cm.sel.size, elig: elig.length, slot: i, trucks, vol, risk: riskSel.length });
   }
 
   let pendingCall = null; // 방금 호출 결과 — afterTurn 에서 스토리 비트(첫 호출 등)에 넘긴다
