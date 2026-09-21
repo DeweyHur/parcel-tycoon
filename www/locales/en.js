@@ -1050,7 +1050,7 @@
     'mk.afterBuy': 'After purchase',
     'mk.allFacilities': 'All facilities already bought',
     'mk.sold': 'Sold',
-    'mk.currentContracts': 'Current contracts — refill trucks here{keep}',
+    'mk.currentContracts': 'Current contracts{keep}',
     'mk.keepCalls': ', {n} call kept',
     'mk.contractLine': '{calls}/{max} trucks left, vehicle {cap} slots',
     'mk.mine': 'My contracts',

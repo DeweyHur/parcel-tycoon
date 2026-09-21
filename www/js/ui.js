@@ -584,7 +584,6 @@
     $('#bar-cold').hidden = !g.shows('cold');
     const cu = g.coldUsed(), cc = g.warehouse.cold; const bc = $('#bar-cold'); bc.querySelector('i').style.width = cc ? Math.min(100, cu / cc * 100) + '%' : '100%'; const fz = g.warehouse.frozen || 0, fu = g.frozenUsed(); $('#cold-txt').textContent = (cc ? `${cu}/${cc}` : T('common.none')) + (fz || fu ? ` · ❆ ${fu}/${fz}` : ''); bc.className = 'bar cold ' + (cu > cc || fu > fz ? 'over' : '');
     const up = g.upcoming();
-    let sawEnd = false;   // 월말 정산 칩이 두 번 세 번 반복되면 줄만 길어진다 — 한 번만
     // 기획서대로 앞 2턴만 — 3턴 뒤 입고는 지금 결정에 쓰이지 않는데 줄만 세 줄로 늘어난다
     // 한 줄에 칩 둘 — 내일(▸)·모레(▸▸). 각 칩이 그날의 날씨와 입고를 같이 들고 있다.
     // 날짜도, '입고 예정'이라는 말도, 따로 서 있던 예보 줄도 뺐다 — 전부 중복이었다.
@@ -600,10 +599,9 @@
         }
         return out.join('');
       })()}</span>`;
-      const end = u.turn > g.turns();
-      if (end && sawEnd) return '';
-      if (end) sawEnd = true;
-      return `<span class="chip none">${end ? T('hud.monthEnd') : '-'}</span>`;
+      // 월말 정산은 '호출 없음' 버튼 아래에 이미 적혀 있다 — 칩으로 또 띄우면 같은 말이 두 번
+      if (u.turn > g.turns()) return '';
+      return `<span class="chip none">-</span>`;
     }).join('');
     if (g.isWeekendAfter(g.turn)) $('#upcoming').innerHTML += `<span class="chip none">🛌 ${T('hud.weekend')}</span>`;
     const wxNow = g.weatherNow(), W = M.WEATHER[wxNow], showWx = g.shows('weather');
@@ -1390,16 +1388,16 @@
       const ORDER = ['contract', 'enh', 'fac', 'customer', 'item'];
       const items = ORDER.map(k => { const rows = mk.items.map((it, i) => it.kind === k ? cards[i] : '').filter(Boolean); return rows.length ? `<div class="mkhead">${T('kind.' + k)}</div>` + rows.join('') : ''; }).join('');
       // 현재 계약: 맨 위. 카드마다 상세 버튼 + 배차 충전 버튼(정액·남은 배차는 버려짐)
-      const contracts = `<div style="font-size:12px;color:var(--gold);margin:4px 0">${T('mk.currentContracts', { keep: R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : '' })}</div>` + game.contracts.slice(0, game.visibleSlots()).map((c, si) => {
+      const contracts = `<div id="mk-contracts"><div style="font-size:12px;color:var(--gold);margin:4px 0">${T('mk.currentContracts', { keep: R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : '' })}</div>` + game.contracts.slice(0, game.visibleSlots()).map((c, si) => {
         if (!c) return `<div class="card dis" style="cursor:default"><div class="t">${T('my.slot', { n: si + 1 })} · ${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>`;
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
         return `<div class="card" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${T('my.remain', { calls: c.calls, max: c.maxCalls })}</span></div>
           <div class="crow"><span class="d">${T('fmt.cells', { n: game.baseCapacity(c) })}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
-      }).join('') + '<hr>';
+      }).join('') + '</div><hr>';
       const rc = game.refreshCost();
       const wh = game.warehouse, used = game.usedVolume(), outd = game.outdoorVolume();
       // 안 열린 것은 줄에서 뺀다 — 냉장 0/0 · 초대형 0/0 · 보험 · 고객은 그 장에 존재하지 않는 것들이다
-      const whLine = `<div class="pickinfo whinfo"><span>${T('common.warehouse')} <b class="${used > wh.cap ? 'bad' : ''}">${used}/${wh.cap}</b></span>${game.shows('cold') ? `<span>${D.ATTRS.cold.name} <b>${game.coldUsed()}/${wh.cold}</b></span>` : ''}${game.shows('frozen') && (wh.frozen || game.frozenUsed()) ? `<span>${D.ATTRS.frozen.name} <b>${game.frozenUsed()}/${wh.frozen || 0}</b></span>` : ''}${game.shows('bigsize') ? `<span>${T('common.xl')} <b>${game.parcels.filter(p => p.baseSize >= 7).length}/${wh.xl}</b></span>` : ''}${outd ? `<span class="bad">${T('hud.outdoorTag')} ${T('fmt.cells', { n: outd })}</span>` : ''}${game.shows('insurance') ? `<button class="btn small" id="mk-ins">${T('kind.item')}</button>` : ''}${game.shows('customers') ? `<button class="btn small" id="mk-cust">${T('kind.customer')}</button>` : ''}${game.visibleSlots() > 1 ? `<button class="btn small" id="mk-mine">${T('mk.mine')}</button>` : ''}</div>`;
+      const whLine = `<div class="pickinfo whinfo"><span>${T('common.warehouse')} <b class="${used > wh.cap ? 'bad' : ''}">${used}/${wh.cap}</b></span>${game.shows('cold') ? `<span>${D.ATTRS.cold.name} <b>${game.coldUsed()}/${wh.cold}</b></span>` : ''}${game.shows('frozen') && (wh.frozen || game.frozenUsed()) ? `<span>${D.ATTRS.frozen.name} <b>${game.frozenUsed()}/${wh.frozen || 0}</b></span>` : ''}${game.shows('bigsize') ? `<span>${T('common.xl')} <b>${game.parcels.filter(p => p.baseSize >= 7).length}/${wh.xl}</b></span>` : ''}${outd ? `<span class="bad">${T('hud.outdoorTag')} ${T('fmt.cells', { n: outd })}</span>` : ''}${game.shows('insurance') ? `<button class="btn small" id="mk-ins">${T('kind.item')}</button>` : ''}${game.shows('customers') ? `<button class="btn small" id="mk-cust">${T('kind.customer')}</button>` : ''}</div>`;
       const up = mk.prep ? game.upcoming() : [];
       const prepLine = mk.prep ? `<div class="d" style="font-size:12px;color:var(--gold);margin-bottom:4px">${T('mk.prepNote')} ${T('hud.upcoming')}: ${up.filter(u => u.specs).map(u => `${T('fmt.turnN', { n: u.turn })} ${u.specs.map(s => `<i class="sw" style="display:inline-block;width:8px;height:8px;background:${D.PARCEL_TYPES[s.type].css}"></i>${D.PARCEL_TYPES[s.type].short}${s.size}`).join(' ')}`).join(' · ')} · ${T('weather.title')} ${up.filter(u => u.weather).map(u => M.WEATHER[u.weather].icon).join('')}</div>` : '';
       // 못 받는 종류는 그 줄에서 바로 붉게 — 요약 경고만 있으면 '무엇이' 문제인지 눈으로 못 찾는다.
@@ -1428,7 +1426,6 @@
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
       storyCheck({ kind: 'market', bought: mk.bought, fcOpen });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
       const bind = (sel, fn) => { const el = m.querySelector(sel); if (el) el.onclick = fn; };
-      bind('#mk-mine', () => { SFX.click(); showMyContracts(render); });
       bind('#mk-cust', () => { SFX.click(); showCustomers(render); });
       bind('#mk-ins', () => { SFX.click(); showInsurance(render); });
       m.querySelectorAll('[data-detail]').forEach(b => b.onclick = e => { e.stopPropagation(); SFX.click(); showContractDetail(game.contracts[+b.dataset.detail], render); });

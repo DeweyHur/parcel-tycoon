@@ -284,7 +284,7 @@
     { id: 'l5rush', kind: 'turn', when: g => g.isRushTurn && g.isRushTurn(), pages: [{ expr: 'worry', hl: '#upcoming' }] },
     // 이 장의 진짜 교훈 — 자리가 다 찼을 때는 계약이 아니라 특약이다
     { id: 'l5full', kind: 'market', when: g => g.contracts.filter(Boolean).length >= root.DATA.CONTRACT_SLOTS && !!optItem(g), pages: [
-      { expr: 'think', hl: '#mk-mine' },
+      { expr: 'think', hl: '#mk-contracts' },
       { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt') },
       { expr: 'smile', hl: g => cardSel(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt') },
     ] },
