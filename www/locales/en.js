@@ -921,6 +921,7 @@
     'ps.noCarrier': 'no carrier',
     'ps.deadline': '⏳ <b>{n#d}</b>d',
     'ps.deadlineRange': '⏳ <b>{lo#d}~{hi#d}</b>d',
+    'ps.noDue': 'no deadline',
     'hud.emptyWarehouse': 'The warehouse is empty',
     'call.riskTag': '⚠ break risk',
     'call.spare': 'Spare driver (1/month)',

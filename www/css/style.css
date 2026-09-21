@@ -84,6 +84,15 @@ body { touch-action: manipulation; }
 .vbadge { display: inline-block; min-width: 14px; margin-right: 3px; text-align: center; font-size: 11px; }
 .vbadge.v1 { color: #6fdcff; } .vbadge.v2 { color: #ffd166; } .vbadge.v3 { color: #ff91dd; text-shadow: 0 0 5px #ff70d2; }
 @keyframes valueGlow { 50% { filter: brightness(1.65); transform: scale(1.12); } }
+.parcel.nolead { grid-template-columns: 1fr auto; }
+.parcel .lead { font-size: 13px; text-align: center; line-height: 1; }
+.pbucket { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); padding: 5px 4px 2px; border-bottom: 1px solid var(--line); }
+#parcels .pbucket:first-child { padding-top: 1px; }
+.pbucket .bl { display: flex; align-items: center; }
+.pbucket .bl b { color: inherit; }
+.pbucket.r .bl { color: var(--red); } .pbucket.o .bl { color: var(--orange); } .pbucket.y .bl { color: var(--gold); }
+.pbucket.od .bl { color: var(--red); } .pbucket.cu .bl { color: var(--blue); }
+.pbucket .bn { color: var(--dim); }
 .parcel .cboxes { display: inline-flex; gap: 3px; vertical-align: -1px; }
 .parcel .cbox { display: inline-flex; gap: 1px; }
 .parcel .cbox i { width: 6px; height: 9px; border: 1px solid #0006; }

@@ -922,6 +922,7 @@
     'ps.noCarrier': '실을 차 없음',
     'ps.deadline': '⏳ <b>{n#d}</b>일',
     'ps.deadlineRange': '⏳ <b>{lo#d}~{hi#d}</b>일',
+    'ps.noDue': '기한 없음',
     'hud.emptyWarehouse': '창고가 비어 있습니다',
     'call.riskTag': '⚠ 파손 위험',
     'call.spare': '예비 기사 (월 1회)',

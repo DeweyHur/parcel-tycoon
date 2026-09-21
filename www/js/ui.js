@@ -927,13 +927,14 @@
     return p.deadline;
   }
   function sortByUrgency(list) { return list.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || b.size - a.size); }
-  function parcelStatus(p) {
+  // noDue: 기한·초과·통관은 위의 기한 머리줄이 들고 있다. 줄에는 '위험'만 남긴다.
+  function parcelStatus(p, noDue) {
     const parts = [], a = attrsOf(p);
     if (a.includes('cold')) { if (!p.inCold) parts.push(`<b style="color:var(--red)">${T('ps.warm')}</b>`); else parts.push(T('ps.cold')); }
     if (a.includes('frozen')) { if (!p.inFrozen) parts.push(`<b style="color:var(--red)">${T('ps.frozenOut')}</b>`); else parts.push(T('ps.frozen')); }
     if (a.includes('produce')) { if (p.inCold) parts.push(T('ps.produceCold')); else if (game && game.isHeatTurn() && !game.warehouse.vent) parts.push(`<b style="color:var(--orange)">${T('ps.heat')}</b>`); }
-    if (p.customs > 0) { parts.push(`<b style="color:var(--blue)">${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })}</b>`); parts.push(`⏳ ${T('fmt.turns', { n: p.deadline })}`); if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`); return parts.join(' · '); }
-    if (p.noDeadline) { /* 무기한 — 아무 표시도 하지 않는다. 빈 칸이 곧 '급할 일 없음' */ }
+    if (p.customs > 0) { if (!noDue) { parts.push(`<b style="color:var(--blue)">${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })}</b>`); parts.push(`⏳ ${T('fmt.turns', { n: p.deadline })}`); } if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`); return parts.join(' · '); }
+    if (noDue || p.noDeadline) { /* 무기한이거나, 기한은 머리줄이 들고 있다 */ }
     else if (p.overdue) { const ri = game ? game.returnIn(p) : null; parts.push(`<b style="color:var(--red)">${T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' })}</b>`); } else parts.push(T('ps.deadline', { n: p.deadline }));
     if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`);
     // 어떤 계약으로도 못 싣고 직접 배송도 안 되는 택배 — 반송 말고는 길이 없으니 눈에 띄어야 한다
@@ -952,38 +953,45 @@
     }
     return `<span class="cboxes">${out.join('')}</span>`;
   }
-  function parcelRow(p, s) {
-    const t = ptype(p), a = attrsOf(p);
-    const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (s && s.sel.has(p.id) ? ' sel' : '') + (s && !s.elig.has(p.id) ? ' dis' : '') + (s && s.risk && s.risk.has(p.id) ? ' risk' : '') + ` value-${valueTier(p)}`;
+  // 앞머리 칸은 고객 자리다. 고객이 열리기 전에는 아예 비운다 —
+  // 종류 색은 이미 상자가 들고 있어서 색 견본을 또 놓으면 갈색 옆에 갈색이다.
+  const leadOn = () => !!(game && game.shows('customers'));
+  function parcelRow(p, s, noDue) {
+    const a = attrsOf(p);
+    const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (s && s.sel.has(p.id) ? ' sel' : '') + (s && !s.elig.has(p.id) ? ' dis' : '') + (s && s.risk && s.risk.has(p.id) ? ' risk' : '') + (leadOn() ? '' : ' nolead') + ` value-${valueTier(p)}`;
     const cu = M.CUSTOMERS[p.customer || 'anon'];
-    return `<div class="parcel${cls}" data-id="${p.id}"><div class="sw" style="background:${t.css}" title="${esc(t.name)}" aria-label="${esc(t.name)}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust" title="${esc(cu.name)}">${cu.icon}</span>`}${attrIcons(a)} ${cellBoxes([p])} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`;
+    const lead = leadOn() ? `<div class="lead" title="${esc(cu.name)}">${cu.icon}</div>` : '';
+    return `<div class="parcel${cls}" data-id="${p.id}">${lead}<div>${noDue || p.noDeadline ? '' : urgDot(p)}${valueBadge(p)}${attrIcons(a)} ${cellBoxes([p])} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p, noDue)}</div></div>`;
   }
-  // 똑같이 생긴 택배가 여러 줄로 늘어서는 것이 "글이 너무 많다"의 가장 큰 원인이다.
-  // 지금 당장 결정에 영향을 주지 않는 것들(급하지 않고, 기한 안 지났고, 밖에 없고, 상할 위험 없는 것)만 한 줄로 묶는다.
-  // 묶인 줄을 누르면 펼쳐지므로 개별 정보는 사라지지 않는다.
-  const GROUP_MIN = 2;   // 상태까지 같은 줄이면 둘만 있어도 묶는다 — 잃는 정보가 없다
+  // 재고는 "뭘 먼저 보내야 하나"로 읽힌다. 그래서 기한이 머리줄이고, 그 아래에
+  // 종류·위험이 같은 것끼리 한 덩어리로 놓인다. 같은 종류가 기한을 넘어 흩어지는
+  // 대신, 오늘 결정에 쓰이는 순서가 위에서 아래로 그대로 보인다.
+  const GROUP_MIN = 2;   // 위험까지 같은 줄이면 둘만 있어도 묶는다 — 잃는 정보가 없다
   const openGroups = new Set();
-  // 종류·속성·크기·상태가 완전히 같은 택배는 몇 줄이 있어도 읽는 사람에게는 한 가지 정보다.
-  // 상태 문구까지 키에 넣으므로 묶여도 잃는 정보가 없고, 누르면 개별 줄로 펼쳐진다.
-  // 기한 숫자까지 키에 넣으면 똑같이 생긴 택배가 하루 차이로 갈라진다.
-  // 갈라야 할 것은 '위험'뿐 — 초과·상함·통관·폭염·실을 차 없음·무기한.
-  // 기한은 묶은 뒤에 가장 급한 것(다르면 범위)으로 보여 준다.
+  // 기한·초과·통관은 머리줄이 들고 가므로 묶음 키에서 뺀다. 남는 것은 '위험'뿐.
   function hazardKey(p) {
     const a = attrsOf(p), h = [];
-    if (p.overdue) h.push('od');
     if (a.includes('cold') && !p.inCold) h.push('warm');
     if (a.includes('frozen') && !p.inFrozen) h.push('fout');
     if (a.includes('produce') && game && game.isHeatTurn() && !game.warehouse.vent && !p.inCold) h.push('heat');
-    if (p.customs > 0) h.push('cu');
-    if (p.noDeadline) h.push('nd');
     try { if (game && game.phase === 'play' && !(p.customs > 0) && !game.contracts.some(c => c && game.canHandle(c, p) && game.breakProb(c, p) === 0) && !game.selfCan(p)) h.push('nc'); } catch (e) { /* 계산 못 하면 위험 없음으로 둔다 */ }
     return h.join('+');
   }
-  function groupKeyOf(p) {
-    // 크기는 합계를 상자로 보여 준다 — 펼치면 개별 크기가 나온다
-    return `${p.type}|${attrsOf(p).join(',')}|${p.outdoor ? 'o' : ''}|${valueTier(p)}|${hazardKey(p)}`;
+  // 크기는 상자 수로 보여 주므로 키에 넣지 않는다 — 2칸과 1칸이 한 줄에 같이 선다
+  function kindKeyOf(p) { return `${p.type}|${attrsOf(p).join(',')}|${p.outdoor ? 'o' : ''}|${valueTier(p)}|${hazardKey(p)}`; }
+  // 기한 머리줄 — 초과 · 통관 N일 · 기한 N일 · 무기한
+  function bucketOf(p) {
+    const dotOf = n => n <= 1 ? 'r' : n <= 2 ? 'o' : n <= 3 ? 'y' : 'g';
+    if (p.customs > 0) return { key: `cu${p.customs}|${p.deadline}`, urg: p.customs + p.deadline, cls: 'cu', dot: dotOf(p.customs + p.deadline), label: `${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })} · ⏳ ${T('fmt.turns', { n: p.deadline })}` };
+    if (p.overdue) { const ri = game ? game.returnIn(p) : null; return { key: 'od', urg: -1, cls: 'od', dot: 'r', label: T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' }) }; }
+    if (p.noDeadline) return { key: 'nd', urg: 90, cls: 'nd', dot: 'g', label: T('ps.noDue') };
+    return { key: `d${p.deadline}`, urg: p.deadline, cls: dotOf(p.deadline), dot: dotOf(p.deadline), label: T('ps.deadline', { n: p.deadline }) };
   }
-  // 묶인 줄의 기한: 가장 급한 것 기준. 안에서 기한이 다르면 범위로 바꿔 준다.
+  function bucketHead(b, ps) {
+    const money = ps.reduce((n, x) => n + (x.reward != null ? x.reward : game.baseReward(x.type, x.baseSize)), 0);
+    return `<div class="pbucket ${b.cls}"><span class="bl"><i class="urg ${b.dot}"></i>${b.label}</span><span class="bn">${money}c</span></div>`;
+  }
+  // 머리줄이 없을 때(기한 구간이 하나뿐일 때)만 줄에 기한을 적는다. 안에서 다르면 범위로.
   function groupStatus(ps) {
     let base = ''; try { base = parcelStatus(ps[0]); } catch (e) { return ''; }
     const ds = ps.filter(x => !x.noDeadline && !x.overdue && !(x.customs > 0)).map(x => x.deadline);
@@ -992,34 +1000,43 @@
     if (lo === hi) return base;
     return base.replace(T('ps.deadline', { n: ps[0].deadline }), T('ps.deadlineRange', { lo, hi }));
   }
-  function groupRow(key, ps) {
-    const p = ps[0], t = ptype(p), a = attrsOf(p);
+  function groupRow(key, ps, noDue) {
+    const p = ps[0], a = attrsOf(p);
     const money = ps.reduce((n, x) => n + (x.reward != null ? x.reward : game.baseReward(x.type, x.baseSize)), 0);
     const cus = [...new Set(ps.map(x => M.CUSTOMERS[x.customer || 'anon'].icon))];
     const open = openGroups.has(key);
-    const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '');
-    return `<div class="parcel group${cls} value-${valueTier(p)}${open ? ' open' : ''}" data-gkey="${esc(key)}"><div class="sw" style="background:${t.css}" title="${esc(t.name)}" aria-label="${esc(t.name)}"></div><div>${urgDot(p)}${valueBadge(p)}${game && !game.shows('customers') ? '' : `<span class="cust">${cus.slice(0, 3).join('')}${cus.length > 3 ? '…' : ''}</span>`}<span class="nm">×${ps.length}</span>${attrIcons(a)} ${cellBoxes(ps)} · ${money}c</div><div class="st">${(st => st ? st + ' ' : '')(groupStatus(ps))}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
+    const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (leadOn() ? '' : ' nolead');
+    const lead = leadOn() ? `<div class="lead">${cus.slice(0, 2).join('')}${cus.length > 2 ? '…' : ''}</div>` : '';
+    const st = noDue ? parcelStatus(p, true) : groupStatus(ps);
+    return `<div class="parcel group${cls} value-${valueTier(p)}${open ? ' open' : ''}" data-gkey="${esc(key)}">${lead}<div>${noDue || p.noDeadline ? '' : urgDot(p)}${valueBadge(p)}<span class="nm">×${ps.length}</span>${attrIcons(a)} ${cellBoxes(ps)} · ${money}c</div><div class="st">${st ? st + ' ' : ''}<span class="gchev">${open ? '▴' : '▾'}</span></div></div>`;
   }
   function renderParcels(container, parcels, selectable) {
     if (!parcels.length) { container.innerHTML = `<div id="empty">${T('hud.emptyWarehouse')}</div>`; return; }
     const sorted = sortByUrgency(parcels);
     if (selectable) { container.innerHTML = sorted.map(p => parcelRow(p, selectable)).join(''); return; }
-    // 묶을 수 있는 것만 모아 본다 (GROUP_MIN 개 미만이면 그냥 개별 줄로)
-    const counts = new Map();
-    for (const p of sorted) { const k = groupKeyOf(p); if (k) counts.set(k, (counts.get(k) || 0) + 1); }
-    const grouped = new Map();
-    for (const p of sorted) { const k = groupKeyOf(p); if (k && counts.get(k) >= GROUP_MIN) { (grouped.get(k) || grouped.set(k, []).get(k)).push(p); } }
-    const done = new Set(), out = [];
+    const buckets = [], byKey = new Map();
     for (const p of sorted) {
-      const k = groupKeyOf(p);
-      if (!k || !grouped.has(k)) { out.push(parcelRow(p, null)); continue; }
-      if (done.has(k)) continue;
-      done.add(k);
-      const ps = grouped.get(k);
-      out.push(groupRow(k, ps));
-      if (openGroups.has(k)) out.push(...ps.map(x => `<div class="gchild">${parcelRow(x, null)}</div>`));
+      const b = bucketOf(p);
+      let e = byKey.get(b.key);
+      if (!e) { e = { b, ps: [] }; byKey.set(b.key, e); buckets.push(e); }
+      e.ps.push(p);
     }
-    for (const k of [...openGroups]) if (!grouped.has(k)) openGroups.delete(k);
+    buckets.sort((x, y) => x.b.urg - y.b.urg);
+    const one = buckets.length <= 1;          // 구간이 하나뿐이면 머리줄은 같은 말을 두 번 하는 것이다
+    const out = [], live = new Set();
+    for (const { b, ps } of buckets) {
+      if (!one) out.push(bucketHead(b, ps));
+      const groups = new Map();
+      for (const p of ps) { const k = b.key + '|' + kindKeyOf(p); (groups.get(k) || groups.set(k, []).get(k)).push(p); }
+      for (const [k, gs] of groups) {
+        if (gs.length >= GROUP_MIN) {
+          live.add(k);
+          out.push(groupRow(k, gs, !one));
+          if (openGroups.has(k)) out.push(...gs.map(x => `<div class="gchild">${parcelRow(x, null, !one)}</div>`));
+        } else out.push(...gs.map(x => parcelRow(x, null, !one)));
+      }
+    }
+    for (const k of [...openGroups]) if (!live.has(k)) openGroups.delete(k);
     container.innerHTML = out.join('');
   }
 
