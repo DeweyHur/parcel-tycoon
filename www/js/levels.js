@@ -97,7 +97,8 @@
           ['normal 2 anon'],
           ['normal 1 anon'],
         ]),
-          market: { contracts: [], enh: ['limit1'], fac: ['expand1'] } },
+          // 다음 보름은 물량이 는다 — 배차를 두 배로 사는 대신 계약을 하나 더 들인다(박 반장이 게이트로 짚는다)
+          market: { contracts: ['pack0'], enh: ['limit1'], fac: ['expand1'] } },
       },
     },
     // ----- 2장 (4월 전반): 봄비. 창고가 넘치면 마당이고, 마당에는 지붕이 없다 -----

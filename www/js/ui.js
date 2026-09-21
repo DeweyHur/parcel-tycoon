@@ -1359,7 +1359,7 @@
       const cards = mk.items.map((it, i) => {
         if (it.kind === 'refill') return ''; // 충전은 위 '현재 계약' 칸에서
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}${T('mk.capLine', { vehicle: esc(o.vehicle), cap: o.cap, trucks: o.trucks, total: o.total, fee: o.fee, per: o.per })}<br>${o.badge}${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
+        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}${T('mk.capLine', { vehicle: esc(o.vehicle), cap: o.cap, trucks: o.trucks, total: o.total, fee: o.fee, per: o.per })}<br>${game.shows('attrs') ? `${o.badge}${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
@@ -1428,6 +1428,8 @@
           const si = game.contracts.findIndex(c => c && c.id === it.switchFrom), c = game.contracts[si];
           if (si >= 0) { modal(it.name, `<p>${T('slot.switchAsk', { from: esc(game.contractName(c)), to: esc(it.name), calls: c.calls })}</p>`, [{ label: T('btn.cancel'), onClick: render }, { label: T('slot.switchBtn'), cls: 'primary', onClick: () => buyContractInto(it, +el.dataset.i, si, render) }]); return; }
         }
+        const free = game.contracts.findIndex(c => !c);
+        if (it.kind === 'contract' && free >= 0) return buyContractInto(it, +el.dataset.i, free, render);
         chooseSlot(it, +el.dataset.i, render);
       });
     };
@@ -1447,13 +1449,16 @@
   function newlyHandles(it) {
     const g = game, car = D.CARRIERS[it.carrier], have = g.contracts.filter(Boolean);
     const gains = [];
+    // 아직 안 연 속성·크기는 말하지 않는다 — 1장 마켓에 '❄냉장·⚠파손'이 뜨면 그게 뭔지부터 설명해야 한다
+    const attrOn = a => g.shows('attrs') && (a !== 'cold' || g.shows('cold')) && (a !== 'frozen' || g.shows('frozen'));
     for (const a of D.GATING_ATTRS) {
+      if (!attrOn(a)) continue;
       const pp = { type: 'normal', size: Math.max(car.sizeMin, 1), attrs: [a], customs: a === 'customs' ? 1 : 0 };
       const mineOk = have.some(c => g.canHandle(c, pp) && g.breakProb(c, pp) === 0);
       const itsOk = g._carrierAccepts(car, pp) && (a !== 'fragile' || car.caps.includes('fragile'));
       if (!mineOk && itsOk) gains.push(`${D.ATTRS[a].icon}${D.ATTRS[a].name}`);
     }
-    for (let sz = 1; sz <= 7; sz++) {
+    for (let sz = 1; sz <= 7 && g.shows('bigsize'); sz++) {
       const pp = { type: 'normal', size: sz, attrs: [], customs: 0 };
       if (!have.some(c => g.canHandle(c, pp)) && g._carrierAccepts(car, pp)) { gains.push(T('mk.newSize', { n: sz })); break; }
     }
@@ -1688,6 +1693,7 @@
     if (!game || !window.Story || storyBusy) return;
     const beat = Story.check(game, ctx || { kind: 'turn' });
     if (!beat) return;
+    if (beat.acted) renderAll();
     if (beat.id === 'intro' || beat.id === 'farewell') { const P = Profile.get(); P.story = Object.assign({}, P.story, beat.id === 'farewell' ? { seen: true, done: true } : { seen: true }); Profile.save(); }
     saveGame();
     showStoryBeat(beat, () => { if ((depth || 0) < 1) storyCheck(ctx, (depth || 0) + 1); });

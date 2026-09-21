@@ -132,8 +132,15 @@
     { id: 'l2chain', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.chain >= 2, pages: [{ expr: 'shock', hl: '#chain-meter' }, { expr: 'laugh', hl: '#mission-meter' }] },
     { id: 'l2calls', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'neutral', hl: '#c0' }] },
     // 바닥났다. 여기서 처음으로 "월초에 안 채워진다"가 나온다
-    { id: 'l2callsOut', kind: 'turn', when: g => !!outOfCalls(g), pages: [{ expr: 'worry', hl: '#c0' }, { expr: 'neutral' }] },
+    // 바닥났다 — 이번 한 번만 박 반장이 채워 준다. 원래는 마켓에서 사는 것이라는 걸 여기서 처음 말한다
+    { id: 'l2callsOut', kind: 'turn', when: g => !!outOfCalls(g), act: g => { const c = outOfCalls(g); if (c) c.calls = c.maxCalls; },
+      pages: [{ expr: 'worry', hl: '#c0' }, { expr: 'smile', hl: '#c0 .calls' }] },
     { id: 'l2market', kind: 'market', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'think' }] },
+    // 새 계약 — 이번엔 강제로 들인다. 다음 보름 물량은 한길 혼자서는 못 나른다
+    { id: 'l2pack', kind: 'market', when: g => !!mkItem(g, it => it.kind === 'contract' && it.carrier === 'pack0'), pages: [
+      { expr: 'smile', hl: g => cardSel(g, it => it.kind === 'contract' && it.carrier === 'pack0') },
+      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'contract' && it.carrier === 'pack0'), gate: true },
+    ] },
     { id: 'l2refill', kind: 'market', when: g => !!refillSlot(g), pages: [
       { expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; } },
       { expr: 'neutral', hl: g => { const r = refillSlot(g); return r ? '#mk-refill-' + r.slot : null; }, gate: g => { const r = refillSlot(g); return !!r && r.c.calls === 0; } },
@@ -476,7 +483,9 @@
     });
     if (!g.story.notes) g.story.notes = [];
     g.story.notes.push({ id: b.id, month: g.month, turn: g.turn, text: pages.map(x => x.text) });
-    return { id: b.id, pages, calendar: !!b.calendar, name: root.I18n.t(CHARACTER.nameKey) };
+    // act: 비트가 판을 직접 바꾸는 자리(튜토리얼 한 번짜리 배차 충전 같은 것) — 화면은 ui 가 다시 그린다
+    let acted = false; if (b.act) { try { b.act(g); acted = true; } catch (e) { /* 판을 못 바꿔도 대사는 나간다 */ } }
+    return { id: b.id, pages, calendar: !!b.calendar, acted, name: root.I18n.t(CHARACTER.nameKey) };
   }
   // 6월 이후 월초 문자: 그 달력 달의 한 줄 예고. 스토리 모드가 아니어도 옵션이 켜져 있으면 나온다
   function sms(g) {
