@@ -1857,7 +1857,9 @@
     // 가득 충전 가격: 센터 정액 × 물가. 남은 배차와 무관(그래서 다 쓰고 충전하는 게 이득)
     // 재계약: 모자란 대수 × 배차비의 절반을 선금으로 낸다. 그 대수는 부를 때 나머지 절반만 낸다(c.prepaid).
     // 전에는 30c 정액 '충전'이라 배차비(51c) 한 대 값보다도 쌌다 — 이제 한 대의 총값은 계약 차든 재계약 차든 같다.
-    refillPrice(c) { return Math.round(Math.max(0, c.maxCalls - c.calls) * this.truckFee(c) * D.PREPAY_RATE); }
+    // 값은 '신뢰·강화 없는' 기본 배차비 기준 — 신뢰가 올라 배차비가 싸져도 재계약 값은 그대로다(신뢰·강화를 쌓을 이유를 남긴다)
+    baseTruckFee(c) { const R = this.rules, car = D.CARRIERS[c.carrier]; return Math.max(0, (R.feeFixed != null ? R.feeFixed : car.fee) * R.feeMult + R.feeDelta); }
+    refillPrice(c) { return Math.round(Math.max(0, c.maxCalls - c.calls) * this.baseTruckFee(c) * D.PREPAY_RATE); }
     // 실시간 계약 — 철도·해상처럼 원래 마켓에서만 팔던 계약을, 달이 끝나길 기다리지 않고 지금 웃돈을 얹어 들인다.
     // 아직 안 열린 계열(_familyOpen)은 마켓과 똑같이 안 나온다 — 진도를 건너뛰게 하지 않는다.
     realtimeContracts() {

@@ -158,7 +158,9 @@ t('재계약: 모자란 대수 × 배차비 절반 선금, 그 대수는 부를 
   const g = EMPTY(9); const b = slot(g, 'bulk'), c = g.contracts[b]; c.calls = 2; while (g.phase === 'play') adv(g); g.closeSummary(); g.cash = 9999;
   const it = g.market.items.find(x => x.kind === 'refill' && x.contractId === c.id); assert.ok(it);
   const missing = c.maxCalls - c.calls, fee = g.truckFee(c);
-  assert.equal(it.price, Math.round(missing * fee * 0.5));
+  assert.equal(it.price, Math.round(missing * g.baseTruckFee(c) * 0.5));
+  // 신뢰가 쌓여 배차비가 싸져도 재계약 값은 기본 배차비 기준 그대로
+  const keep = g.trust[c.carrier]; g.trust[c.carrier] = 999; assert.equal(g.refillPrice(c), it.price); g.trust[c.carrier] = keep;
   const cash0 = g.cash; const r = g.buy(g.market.items.indexOf(it), null); assert.ok(r.ok); assert.equal(r.wasted, 0);
   assert.equal(c.calls, c.maxCalls); assert.equal(c.prepaid, missing); assert.equal(g.cash, cash0 - it.price);
   // 선금 낸 대수는 절반, 넘어가면 온값 — 한 대의 총값은 계약 차든 재계약 차든 같다
