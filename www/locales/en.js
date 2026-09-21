@@ -622,6 +622,9 @@
     // ----- Chapter 2 (July-August): the rains, the yard, self-delivery, trust -----
     'story.l3intro.1': 'Rainy season\u2019s in. Summer is our busiest and our worst.',
     'story.l3intro.2': 'See that row up top? The <b>next few days\u2019 weather</b> shows ahead of time.<br>From here on you move by that.',
+    'story.l3intro.3': 'And from this month there is one more truck. <b>Gentle Parcel</b> — a small padded van.<br>It takes ⚠ fragile and plain alike, but at 4 cells a plain-only load barely breaks even.',
+    'story.l3fragile.1': 'See the ⚠? That one breaks. Hangil will not take it.',
+    'story.l3fragile.2': 'Send it with the van. The van earns its keep on fragile — plain goes cheaper with Hangil.',
     'story.l3forecast.1': 'There \u2014 rain marked. Best to have the warehouse clear by then.',
     'story.l3yard.1': 'Warehouse overflowed. What doesn\u2019t fit goes out to the <b>yard</b>.',
     'story.l3yard.2': 'The yard is ours too, but it has no roof.<br>Anything tagged <b>outdoor</b> in the list is sitting out there.',
@@ -653,8 +656,6 @@
     'story.l4cold.1': 'There it is, \u2744 chilled. With a chilled section it goes straight in.',
     'story.l4cold.2': 'See the <b>chilled</b> bar up top? You don\u2019t want that full.',
     'story.l4coldFull.1': 'Chilled is full. Anything more spills out, and what spills spoils.<br>Send the cold ones first.',
-    'story.l4fragile.1': 'The ones marked \u26a0 \u2014 those break.',
-    'story.l4fragile.2': 'Any truck will take them, but there\u2019s a <b>breakage chance</b>, and you pay for breakage.<br>A fragile-family contract or a padding clause removes it.',
     'story.l4risk.1': 'There\u2019s a \u26a0 in what you picked. See the odds and the payout there?<br>Take the risk if it\u2019s urgent; otherwise wait for the right truck.',
     'story.l4produce.1': '\ud83c\udf3e is produce. Leave it outside on a hot day and it turns.<br>It\u2019s cool now, but remember it come summer.',
     'story.l4break.1': 'Broken. That\u2019s what odds are.',
@@ -1311,6 +1312,12 @@
         "short": "EasyDoes",
         "vehicle": "padded van",
         "desc": "Fragile specialist. No breakage, fragile bonus · standard contract"
+      },
+      "pack0": {
+        "name": "Gentle Parcel",
+        "short": "Gentle",
+        "vehicle": "small padded van",
+        "desc": "Carries ⚠ fragile safely and takes plain too. Small van (4) — plain-only loads barely break even"
       },
       "fragile1": {
         "name": "Glass Hands",

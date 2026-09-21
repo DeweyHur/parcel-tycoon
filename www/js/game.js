@@ -171,7 +171,7 @@
       let wh, contracts;
       if (R.randomStart) {
         wh = { cap: 20 + this.rng.int(11), cold: this.rng.int(11), xl: this.rng.int(3) };
-        const pool = Object.keys(D.CARRIERS).filter(k => !this.isBanned(k) && D.CARRIERS[k].tier <= 1);
+        const pool = Object.keys(D.CARRIERS).filter(k => !this.isBanned(k) && D.CARRIERS[k].tier <= 1 && !D.CARRIERS[k].campaign);
         const fams = [...new Set(this.rng.shuffle(pool).map(FAM))].slice(0, 4);
         contracts = fams.map(f => ({ carrier: f, grade: this.rng.next() < 0.3 ? 'trusted' : 'normal' }));
       } else {
@@ -207,6 +207,13 @@
         if (this.level && this.level.minCalls != null) c.calls = Math.max(c.calls, Math.min(c.maxCalls, this.level.minCalls));
         return c;
       });
+      // 장이 새로 쥐여 주는 계약 — 물려받은 판(carry)에 없으면 붙인다 (addCustomers 와 같은 규칙)
+      for (const s of (this.level && this.level.addContracts) || []) {
+        if (this.contracts.length >= D.CONTRACT_SLOTS || this.contracts.some(c => c && c.carrier === this.resolveCenter(s.carrier, s.grade || 'normal'))) continue;
+        const c = this._makeContract(this.resolveCenter(s.carrier, s.grade || 'normal'), null, null, true);
+        if (this.level.minCalls != null) c.calls = Math.max(c.calls, Math.min(c.maxCalls, this.level.minCalls));
+        this.contracts.push(c);
+      }
       while (this.contracts.length < D.CONTRACT_SLOTS) this.contracts.push(null);
       this.startContractIds = this.contracts.filter(Boolean).map(c => c.id);
     }

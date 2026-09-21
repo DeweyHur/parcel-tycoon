@@ -101,42 +101,48 @@
       },
     },
     // ----- 2장 (4월 전반): 봄비. 창고가 넘치면 마당이고, 마당에는 지붕이 없다 -----
+    // 물량이 늘어나는 달이다. 답은 '배차를 두 배로'가 아니라 **계약 하나 더** — 작은 완충 밴(pack0)이 붙고,
+    // 처음으로 ⚠ 깨지는 것이 온다. 밴은 일반도 받지만 4칸이라 일반만 실으면 남는 게 없다.
+    // 그래서 ⚠ 는 밴으로, 일반은 한길로 — '차마다 맞는 짐'이 이 장이 가르치는 것이다. (직접 배송은 3장으로)
     {
-      n: 3, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 2, grants: ['weather', 'theft', 'self', 'trust', 'rush', 'invest'],
+      n: 3, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 2, grants: ['weather', 'theft', 'trust', 'rush', 'invest', 'attrs'],
       minCash: 300, minCap: 16, minCalls: 5,
-      company: { cash: 900, warehouse: { cap: 24, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }], customers: [['anon', 0]] },
+      company: { cash: 900, warehouse: { cap: 24, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }, { carrier: 'pack0' }], customers: [['anon', 0]] },
+      addContracts: [{ carrier: 'pack0' }],
       mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 140, monthlyStress: 0, noBankrupt: true, callsDelta: 4 },
       seed: 20270401,
       script: {
-        // 9일차에 26칸 — 차가 하루에 옮길 수 있는 것보다 크다. 어떻게 굴려도 마당으로 나가고, 그날부터 비다
+        // 총 69칸(⚠ 7개 14칸). 한길 7대(물려받은 바닥)×6 + 일괄 출고 2대 + 밴 8대×4 로 덮이는 양.
+        // 9일차에 16칸 — 전날까지 비워 두지 않았으면 마당으로 나가고, 그날부터 비다
         1: { weather: ['sunny', 'sunny', 'rain', 'sunny', 'sunny', 'sunny', 'rain', 'sunny', 'rain', 'rain', 'sunny', 'rain', 'sunny'],
           turns: turns([
-          ['normal 2 anon', 'normal 2 anon', 'normal 1 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 1 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 1 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 1 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 1 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 1 anon', 'fragile 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
+          ['normal 2 anon', 'normal 1 anon', 'fragile 2 anon'],
+          ['normal 2 anon', 'normal 2 anon'],
+          ['normal 2 anon', 'fragile 2 anon'],
+          ['normal 2 anon', 'normal 1 anon'],
         ]),
           market: { contracts: ['bulk1'], enh: ['limit1'], fac: ['yard'] } },
       },
     },
     // ----- 3장 (4월 후반): 이사철. 이름 있는 화주 · ⚠ 깨지는 것 · ❄ 찬 것 -----
     {
-      n: 4, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 3, grants: ['attrs', 'cold', 'customers'],
+      n: 4, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 3, grants: ['cold', 'customers', 'self'],
       minCash: 500, minCap: 24, minCalls: 5, minWarehouse: { cold: 8 },
       // 한 사이클 안에 마켓이 한 번뿐이라 '사고 나서 배운다'가 안 된다 — 냉장은 시작 판에 쥐여 주고,
       // 왜 그게 필요한지를 박 반장이 말로 짚는다.
       company: { cash: 1200, warehouse: { cap: 24, cold: 8, frozen: 0, xl: 0 },
         contracts: [{ carrier: 'bulk0' }, { carrier: 'cold0' }], customers: [['anon', 0]] },
       addCustomers: [['mart', 0], ['glass', 0], ['farm', 0]],
+      addContracts: [{ carrier: 'cold0' }],
       mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 160, monthlyStress: 0, noBankrupt: true, callsDelta: 7 },
       seed: 20270416,
       script: {

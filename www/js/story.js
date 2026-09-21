@@ -160,6 +160,12 @@
     { id: 'l3intro', kind: 'start', when: () => true, pages: [
       { expr: 'neutral' },
       { expr: 'think', hl: '#upcoming' },
+      { expr: 'smile', hl: '#c1' },
+    ] },
+    // ⚠ 가 처음 온 날 — 한길 차엔 못 싣는다. 밴으로
+    { id: 'l3fragile', kind: 'turn', when: g => g.parcels.some(p => p.type === 'fragile'), pages: [
+      { expr: 'neutral', hl: '#parcels' },
+      { expr: 'think', hl: '#c1' },
     ] },
     // 예보 줄 — 며칠 뒤 비가 온다는 걸 미리 읽는 법
     { id: 'l3forecast', kind: 'turn', when: g => g.upcoming().some(u => u.weather === 'rain'), pages: [{ expr: 'neutral', hl: '#upcoming' }] },
@@ -177,13 +183,6 @@
     { id: 'l3reorder', kind: 'turn', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'neutral', hl: '#wm-reorder' }] },
     // 도난 — 마당은 문이 없다
     { id: 'l3theft', kind: 'any', when: (g, ctx) => hasEvent(ctx, ['stolen']), pages: [{ expr: 'shock' }, { expr: 'neutral' }] },
-    // 직접 배송 — 차가 없을 때 내가 나른다
-    // 직접 배송은 팝업이 아니라 '우리 차' 카드다 — 누르면 급한 것부터 담긴 채 서고, 오늘 마감이 싣고 간다
-    { id: 'l3self', kind: 'turn', when: g => !!outOfCalls(g) && g.selfEligible().length > 0, pages: [
-      { expr: 'think', hl: '#cself' },
-      { expr: 'neutral', hl: '#cself', gate: true },
-    ] },
-    { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => !!ctx.self && !!outOfCalls(g), pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
     // 신뢰도 — 새로 생긴 게 아니라 줄곧 쌓이고 있던 것
     { id: 'l3trust', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel >= 0, pages: [
       { expr: 'smile', hl: '#call-head .trustline' },
@@ -227,8 +226,12 @@
       { expr: 'worry', hl: '#bar-cold' },
     ] },
     { id: 'l4coldFull', kind: 'turn', when: g => g.warehouse.cold > 0 && g.coldUsed && g.coldUsed() >= g.warehouse.cold, pages: [{ expr: 'worry', hl: '#bar-cold' }] },
-    // ⚠ 깨지는 것 — 아무 차나 되는데 확률이 붙는다
-    { id: 'l4fragile', kind: 'turn', when: g => !!firstOf(g, 'fragile'), pages: [{ expr: 'neutral', hl: '#parcels' }, { expr: 'think' }] },
+    // 직접 배송 — '우리 차' 카드. 계약 차가 모자랄 때 내가 하나씩 나른다 (2장에서는 계약 하나 더가 답이었다)
+    { id: 'l3self', kind: 'turn', when: g => g.selfEligible().length > 0 && (!!outOfCalls(g) || g.turn >= 3), pages: [
+      { expr: 'think', hl: '#cself' },
+      { expr: 'neutral', hl: '#cself', gate: true },
+    ] },
+    { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => !!ctx.self, pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
     { id: 'l4risk', kind: 'modal', modal: 'call', when: (g, ctx) => (ctx.risk || 0) > 0, pages: [{ expr: 'worry', hl: '#call-head .riskline' }] },
     // 🌾 상하는 것
     { id: 'l4produce', kind: 'turn', when: g => !!firstOf(g, 'produce'), pages: [{ expr: 'neutral', hl: '#parcels' }] },
