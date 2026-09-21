@@ -594,7 +594,15 @@
     $('#upcoming').innerHTML = up.slice(0, 2).map((u, i) => {
       const mark = `<b class="ahead">${T(i ? 'hud.dayAfter' : 'hud.tomorrow')}</b>`;
       const wx = u.weather && g.shows('weather') ? `${M.WEATHER[u.weather].icon} ` : '';
-      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${mark} ${wx}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}${u.specs.map(s => `<i style="background:${D.PARCEL_TYPES[s.type].css}" title="${esc(D.PARCEL_TYPES[s.type].name)}" aria-label="${esc(D.PARCEL_TYPES[s.type].name)}"></i>${s.size}`).join(' ')}</span>`;
+      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${mark} ${wx}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}${(() => {
+        let drawn = 0; const out = [];
+        for (const sp of u.specs) {
+          if (drawn >= 12) { out.push('<b class="more">⋯</b>'); break; }
+          const t = D.PARCEL_TYPES[sp.type], n = Math.min(sp.size, 12 - drawn); drawn += n;
+          out.push(`<span class="box" title="${esc(t.name)}" aria-label="${esc(t.name)} ${sp.size}">${`<i style="background:${t.css}"></i>`.repeat(n)}</span>`);
+        }
+        return out.join('');
+      })()}</span>`;
       const end = u.turn > g.turns();
       if (end && sawEnd) return '';
       if (end) sawEnd = true;
