@@ -642,7 +642,7 @@
         ? `<span class="pips calls">${Array.from({ length: callMax }, (_, k) => `${k && k % 5 === 0 ? '<i class="gap"></i>' : ''}<i class="${k < c.calls ? 'on' : ''}"></i>`).join('')}</span>`
         : `${c.calls}/${callMax}`;
       const spent = c.calls === 0 && g.shows('calls') && !spare && !struck;
-      const cells = pips(pv.cells, vcap, pv.over) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
+      const cells = pips(pv.cells, vcap, pv.over, pv.trucks) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
       btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${takesDots(g, c)}</span><span class="calls ${spent ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips}</span></div>
         ${bar}
@@ -869,10 +869,11 @@
   // 칸과 배차는 숫자보다 눈금이 빠르다. 차 한 대가 칸 여섯이면 네모 여섯,
   // 실을 게 넘치면 한 칸 띄우고 남는 만큼 더 — '6+4' 가 그대로 보인다.
   const PIP_MAX = 10;
-  function pips(cells, cap, over) {
+  // trucks > 1 이면 차마다 한 칸 띄워 그린다 — 두 대가 '6+6' 으로 보인다
+  function pips(cells, cap, over, trucks) {
     if (cap > PIP_MAX) return '';
     let h = '';
-    for (let i = 0; i < cap; i++) h += cells[i] ? `<i class="on" style="background:${cells[i]}"></i>` : '<i></i>';
+    for (let i = 0; i < cap * (trucks || 1); i++) { if (i && i % cap === 0) h += '<i class="gap"></i>'; h += cells[i] ? `<i class="on" style="background:${cells[i]}"></i>` : '<i></i>'; }
     // 넘치는 칸은 많아야 여섯까지만 그린다 — 그 이상은 눈금이 아니라 벽이 된다
     if (over.length) { h += '<i class="gap"></i>'; over.slice(0, 6).forEach((css, i) => { h += `<i class="over${over.length > 6 && i === 5 ? ' more' : ''}" style="background:${css}"></i>`; }); }
     return `<span class="pips">${h}</span>`;
@@ -880,6 +881,7 @@
   // 계약 카드용 한 대 적재 미리보기 (호출 팝업의 '급한 순 자동 선택'과 같은 규칙)
   // 지금 한 대 부르면 얼마를 받고 얼마를 내는가. '개당 Nc' 는 버는 돈으로 읽혀서(유저 지적)
   // 받는 값·배차비·남는 값 셋을 그대로 보여 준다 — 호출 팝업의 +수입/−비용/순익과 같은 언어다.
+  const pickTrucks = (g, c) => Math.max(1, Math.min(g.simulMax(c), c.calls || 1));
   function loadPreview(g, c, elig) {
     const vcap = g.vehicleCap(c);
     const rewardOf = p => (p.reward != null ? p.reward : g.baseReward(p.type, p.baseSize));
@@ -891,8 +893,9 @@
     };
     try {
       const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
-      const r = g.autoPick(c, sorted, 1);
-      return pack(elig.filter(p => r.ids.includes(p.id)), g.callFee(c, r.trucks || 1));
+      const r = g.autoPick(c, sorted, pickTrucks(g, c));
+      const pv = pack(elig.filter(p => r.ids.includes(p.id)), g.callFee(c, r.trucks || 1));
+      return Object.assign(pv, { trucks: r.trucks || 1, fill: pv.vol / (vcap * (r.trucks || 1)) });
     } catch (e) {
       const take = []; let vol = 0;
       for (const p of elig) { if (vol + p.size > vcap) continue; vol += p.size; take.push(p); }
@@ -1039,7 +1042,7 @@
     const c = game.contracts[i], sel = new Set();
     try {
       const sorted0 = game.eligibleParcels(c).slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
-      game.autoPick(c, sorted0, 1).ids.forEach(id => sel.add(id));
+      game.autoPick(c, sorted0, pickTrucks(game, c)).ids.forEach(id => sel.add(id));
     } catch (e) { /* 자동 선택이 안 되면 빈 채로 */ }
     return sel;
   }
@@ -1156,7 +1159,7 @@
     foot.querySelector('#pick-urgent').onclick = () => {
       cm.sel.clear();
       const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
-      game.autoPick(c, sorted, Math.min(simul, Math.max(1, c.calls))).ids.forEach(id => cm.sel.add(id));
+      game.autoPick(c, sorted, pickTrucks(game, c)).ids.forEach(id => cm.sel.add(id));
       SFX.select(); renderAll();
     };
     foot.querySelector('#pick-clear').onclick = () => { cm.sel.clear(); SFX.cancel(); renderAll(); };
