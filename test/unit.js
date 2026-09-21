@@ -145,11 +145,16 @@ t('마켓: 보유 계열은 더 높은 tier 센터만 등장(갈아타기), 같�
     for (const c of g.contracts) if (c) assert.equal(g.market.items.some(it => it.kind === 'refill' && it.contractId === c.id), c.calls < c.maxCalls, `seed ${s} refill ${c.carrier}`);
   }
 });
-t('배차 충전: 가득 채우기 정액, 남은 배차는 버려짐, 가득 차 있으면 불가. 월초 리셋 없음', () => {
+t('재계약: 모자란 대수 × 배차비 절반 선금, 그 대수는 부를 때 나머지 절반. 가득이면 불가, 월초 리셋 없음', () => {
   const g = EMPTY(9); const b = slot(g, 'bulk'), c = g.contracts[b]; c.calls = 2; while (g.phase === 'play') adv(g); g.closeSummary(); g.cash = 9999;
-  const it = g.market.items.find(x => x.kind === 'refill' && x.contractId === c.id); assert.ok(it); assert.equal(it.price, g.refillPrice(c));
-  const cash0 = g.cash; const r = g.buy(g.market.items.indexOf(it), null); assert.ok(r.ok); assert.equal(r.wasted, 2); assert.equal(c.calls, c.maxCalls); assert.equal(g.cash, cash0 - it.price);
-  assert.ok(!g.refill(c.id).ok); g.closeMarket(); assert.equal(g.month, 2); assert.equal(c.calls, c.maxCalls);
+  const it = g.market.items.find(x => x.kind === 'refill' && x.contractId === c.id); assert.ok(it);
+  const missing = c.maxCalls - c.calls, fee = g.truckFee(c);
+  assert.equal(it.price, Math.round(missing * fee * 0.5));
+  const cash0 = g.cash; const r = g.buy(g.market.items.indexOf(it), null); assert.ok(r.ok); assert.equal(r.wasted, 0);
+  assert.equal(c.calls, c.maxCalls); assert.equal(c.prepaid, missing); assert.equal(g.cash, cash0 - it.price);
+  // 선금 낸 대수는 절반, 넘어가면 온값 — 한 대의 총값은 계약 차든 재계약 차든 같다
+  assert.equal(g.callFee(c, 1), Math.round(fee * 0.5));
+  assert.ok(!g.refill(c.id).ok); g.closeMarket(); assert.equal(c.calls, c.maxCalls);
   const h = EMPTY(9); const hc = h.contracts[slot(h, 'bulk')]; hc.calls = 0; while (h.phase === 'play') adv(h); h.closeSummary(); h.closeMarket(); assert.equal(hc.calls, 0);
 });
 t('계약 교체(갈아타기): 같은 계열 상위 센터로 바꾸면 잔여 배차 소멸, 신뢰도는 센터별', () => {
@@ -193,7 +198,9 @@ t('월말 정산 → 마켓 → 다음 달, 배차비는 정산에', () => {
   assert.equal(g.phase, 'summary'); assert.equal(g.summary.fees, D.FAMILIES.bulk.fee); g.closeSummary(); assert.equal(g.phase, 'market'); g.closeMarket(); assert.equal(g.month, 2);
   for (const c of g.contracts) if (c) assert.ok(c.calls <= c.maxCalls);
 });
-t('마켓 구매 5개 제한', () => { const g = EMPTY(9); while (g.phase === 'play') adv(g); g.closeSummary(); g.cash = 9999; let bought = 0; for (let i = 0; i < g.market.items.length && bought < 6; i++) { const it = g.market.items[i]; if (it.sold || it.kind === 'refill') continue; const r = g.buy(i, it.kind === 'contract' ? (it.switchFrom ? g.contracts.findIndex(c => c && c.id === it.switchFrom) : 0) : it.kind === 'enh' ? 0 : null); if (r.ok) bought++; else if (bought >= 5) { assert.ok(/5/.test(r.msg)); break; } } assert.ok(bought <= 5); });
+t('마켓 구매 개수 제한 없음 — 돈이 있으면 다 살 수 있다', () => { const g = EMPTY(9); while (g.phase === 'play') adv(g); g.closeSummary(); g.cash = 99999; let bought = 0, fail = 0;
+  for (let i = 0; i < g.market.items.length; i++) { const it = g.market.items[i]; if (it.sold || it.kind === 'refill' || it.kind === 'contract') continue; const r = g.buy(i, it.kind === 'enh' ? g.contracts.findIndex(Boolean) : null); if (r.ok) bought++; else if (/까지만/.test(r.msg)) fail++; }
+  assert.equal(fail, 0); });
 t('저장/불러오기 후 결정적 진행', () => {
   const a = NG(21); for (let i = 0; i < 3 && a.phase === 'play'; i++) adv(a); const json = JSON.stringify(a.toJSON()); const b = Game.fromJSON(JSON.parse(json));
   for (let i = 0; i < 4; i++) { if (a.phase === 'play') adv(a); if (b.phase === 'play') adv(b); } a.takeEvents(); b.takeEvents(); assert.equal(JSON.stringify(a.toJSON()), JSON.stringify(b.toJSON()));

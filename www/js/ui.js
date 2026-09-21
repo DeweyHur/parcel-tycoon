@@ -858,9 +858,16 @@
     render();
   }
   // 이 계약이 받아 주는 품목 — 색 점 하나가 한 종류다. 속성이 안 열린 장에서는 전부 일반이라 안 그린다.
-  function takesDots(g, c) {
-    if (!g.shows('attrs')) return '';
-    const dots = Object.keys(D.PARCEL_TYPES).filter(t => {
+  // 칸 수를 숫자 대신 작은 트럭으로 — 빈 칸이 곧 용량이다
+  function miniTruck(g, c) {
+    const n = g.baseCapacity(c);
+    return `<span class="mktruck" title="${esc(T('fmt.cells', { n }))}" aria-label="${esc(T('fmt.cells', { n }))}">${'<i></i>'.repeat(Math.min(n, 16))}<b></b></span>`;
+  }
+  // always: 속성이 안 열린 장에서도 그린다(그땐 일반만 있으니 갈색 한 점)
+  function takesDots(g, c, always) {
+    if (!g.shows('attrs') && !always) return '';
+    const open = t => t === 'normal' || (g.shows('attrs') && (t !== 'fresh' || g.shows('cold')) && (t !== 'frozen' || g.shows('frozen')) && (t !== 'large' || g.shows('bigsize')) && (t !== 'intl' || g.shows('bigsize')));
+    const dots = Object.keys(D.PARCEL_TYPES).filter(open).filter(t => {
       const T2 = D.PARCEL_TYPES[t], size = T2.sizes.find(sz => sz >= D.CARRIERS[c.carrier].sizeMin && sz <= g.contractSizeMax(c));
       if (size == null) return false;
       const pp = { type: t, size, attrs: T2.attrs, customs: T2.attrs.includes('customs') ? 1 : 0 };
@@ -1392,7 +1399,7 @@
         if (!c) return `<div class="card dis" style="cursor:default"><div class="t">${T('my.slot', { n: si + 1 })} · ${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>`;
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
         return `<div class="card" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${T('my.remain', { calls: c.calls, max: c.maxCalls })}</span></div>
-          <div class="crow"><span class="d">${T('fmt.cells', { n: game.baseCapacity(c) })}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
+          <div class="crow"><span class="d">${miniTruck(game, c)}${takesDots(game, c, true)}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
       }).join('') + '</div><hr>';
       const rc = game.refreshCost();
       const wh = game.warehouse, used = game.usedVolume(), outd = game.outdoorVolume();
@@ -1417,7 +1424,7 @@
       const fcBlk = game.forecastBlocked(nm);
       const fcWarn = fcBlk.length ? `<div class="d fcwarn" id="mk-fcwarn">${T('mk.forecastBlocked', { list: fcBlk.map(t => D.PARCEL_TYPES[t].short).join(' · ') })}</div>` : '';
       const fcLine = `<div class="d"><a class="hl" id="mk-fctoggle">${T(mk.prep ? 'mk.forecastSumNow' : 'mk.forecastSum', { m: game.cycleLabel(nm), min: fcTot.min, max: fcTot.max })} ${fcOpen ? '▴' : '▾'}</a></div>${fcOpen ? `<div class="d fcline" id="mk-fc">${fcRows}</div>` : ''}${fcWarn}${seasonLine}`;
-      const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span><span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>${whLine}${contracts}${fcLine}${prepLine}${items}
+      const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span>${R.marketMaxBuy ? `<span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span>` : ''}</div>${whLine}${contracts}${fcLine}${prepLine}${items}
         ${R.noRefresh || !game.shows('attrs') ? '' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
       // 마지막 사이클의 마켓을 닫으면 다음 사이클이 아니라 **장**이 끝난다
       const lastCycle = !game.rules.endless && mk.month >= game.rules.months;
@@ -1431,12 +1438,12 @@
       m.querySelectorAll('[data-detail]').forEach(b => b.onclick = e => { e.stopPropagation(); SFX.click(); showContractDetail(game.contracts[+b.dataset.detail], render); });
       m.querySelectorAll('[data-refill]').forEach(b => b.onclick = e => { e.stopPropagation(); const it = mk.items[+b.dataset.refill]; const c = game.contracts.find(x => x && x.id === it.contractId);
         const go = () => { const r = game.buy(+b.dataset.refill, null); if (r.ok) { SFX.buy(); saveGame(); toast(T('toast.refill', { name: game.contractName(c), n: c.maxCalls })); render(); } else toast(r.msg); };
-        if (c && c.calls > 0) askConfirm(T('mk.refillWaste', { n: c.calls }) + ' — ' + T('mk.refillDesc', { max: c.maxCalls, calls: c.calls }), go, T('mk.refillBtn', { price: it.price }), render); else go(); });
+        go(); });
       m.querySelectorAll('[data-offer]').forEach(b => b.onclick = e => { e.stopPropagation(); SFX.click(); showOfferDetail(mk.items[+b.dataset.offer], render); });
       m.querySelectorAll('.card[data-i]').forEach(el => el.onclick = () => {
         const it = mk.items[+el.dataset.i]; if (it.sold) return;
         SFX.click();
-        if (mk.bought >= R.marketMaxBuy) return toast(T('err.marketMax', { n: R.marketMaxBuy }));
+        if (R.marketMaxBuy && mk.bought >= R.marketMaxBuy) return toast(T('err.marketMax', { n: R.marketMaxBuy }));
         const price = it.kind === 'contract' ? game.contractPrice(it) : it.price;
         if (game.cash < price) return toast(T('err.noCash'));
         if (it.kind === 'fac' || it.kind === 'item' || it.kind === 'customer') { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }

@@ -200,6 +200,7 @@
         const c = this._makeContract(this.resolveCenter(s.carrier, s.grade || 'normal'), null, null, true);
         if (s.enh) Object.assign(c.enh, s.enh);
         if (s.calls != null) c.calls = Math.min(c.maxCalls, s.calls + R.startCallsDelta);
+        if (s.prepaid) c.prepaid = Math.min(c.calls, s.prepaid);
         // 앞 장을 배차 0으로 끝냈다고 다음 장을 통째로 못 보내면 안 된다 — 한 장이 한 사이클이고
         // 마켓은 그 끝에만 열리니까, 바닥난 채로 시작하면 열흘 동안 손쓸 방법이 아예 없다.
         // 장이 바뀌는 사이에 새로 끊어 둔 것으로 치고 바닥을 보장한다.
@@ -232,7 +233,7 @@
       return {
         cash: this.cash,
         warehouse: { cap: this.warehouse.cap, cold: this.warehouse.cold, frozen: this.warehouse.frozen, xl: this.warehouse.xl || 0 },
-        contracts: this.contracts.filter(Boolean).map(c => ({ carrier: c.carrier, grade: c.grade, calls: c.calls, enh: { ...c.enh } })),
+        contracts: this.contracts.filter(Boolean).map(c => ({ carrier: c.carrier, grade: c.grade, calls: c.calls, prepaid: c.prepaid || 0, enh: { ...c.enh } })),
         customers: Object.keys(this.customers).map(id => [id, this.customerLevel(id)]),
         trust: { ...this.trust },
         growth: { ...this.growth },
@@ -795,7 +796,9 @@
       return Math.max(0, Math.round(fee));
     }
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
-    callFee(c, trucks) { const free = c.enh.regular && !c.freeUsedMonth ? 1 : 0; const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut; return Math.round(Math.max(0, trucks - free) * this.truckFee(c) * Math.max(0.7, 1 - cut)); }
+    callFee(c, trucks) { const free = c.enh.regular && !c.freeUsedMonth ? 1 : 0; const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut;
+      const paid = Math.max(0, trucks - free), pre = Math.min(paid, c.prepaid || 0);
+      return Math.round((paid - pre * D.PREPAY_RATE) * this.truckFee(c) * Math.max(0.7, 1 - cut)); }
     trucksNeeded(c, volume) { return Math.max(1, Math.ceil(volume / this.vehicleCap(c))); }
     capacityBonusNote(c) {
       const R = this.rules, notes = [];
@@ -1271,6 +1274,7 @@
       // 후불: 배차비는 월말 정산에서 빠진다 (자금 부족으로 호출이 막히지 않는다)
       this.feesDue += fee; this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
       if (c.enh.regular && !c.freeUsedMonth) c.freeUsedMonth = true;
+      if (c.prepaid) c.prepaid = Math.max(0, c.prepaid - trucks);
       const fill = volume / (vcap * trucks);
       if (fill >= 0.8) { this.stats.fullTrucks++; this.addRep(D.REP_GAIN.fullTruck, MSG('why.repFull')); }
 
@@ -1845,7 +1849,9 @@
     // 계약 아이템의 배차 대수(센터 기본 + 회사 보정)
     itemTrucks(it) { return Math.max(1, D.CARRIERS[it.carrier].trucks + this.rules.callsDelta); }
     // 가득 충전 가격: 센터 정액 × 물가. 남은 배차와 무관(그래서 다 쓰고 충전하는 게 이득)
-    refillPrice(c) { return Math.round(D.CARRIERS[c.carrier].refill * this.rules.priceMult * this.inflation()); }
+    // 재계약: 모자란 대수 × 배차비의 절반을 선금으로 낸다. 그 대수는 부를 때 나머지 절반만 낸다(c.prepaid).
+    // 전에는 30c 정액 '충전'이라 배차비(51c) 한 대 값보다도 쌌다 — 이제 한 대의 총값은 계약 차든 재계약 차든 같다.
+    refillPrice(c) { return Math.round(Math.max(0, c.maxCalls - c.calls) * this.truckFee(c) * D.PREPAY_RATE); }
     // 실시간 계약 — 철도·해상처럼 원래 마켓에서만 팔던 계약을, 달이 끝나길 기다리지 않고 지금 웃돈을 얹어 들인다.
     // 아직 안 열린 계열(_familyOpen)은 마켓과 똑같이 안 나온다 — 진도를 건너뛰게 하지 않는다.
     realtimeContracts() {
@@ -1876,7 +1882,7 @@
       const c = this.contracts.find(x => x && x.id === contractId); if (!c) return { ok: false, msg: T('err.emptySlot') };
       if (c.calls >= c.maxCalls) return { ok: false, msg: T('err.refillFull') };
       const price = this.refillPrice(c); if (this.cash < price) return { ok: false, msg: T('err.noCash') };
-      const wasted = c.calls; c.calls = c.maxCalls; this.cash -= price; this.run.spent += price; this.stats.refills = (this.stats.refills || 0) + 1;
+      const wasted = 0, added = c.maxCalls - c.calls; c.prepaid = (c.prepaid || 0) + added; c.calls = c.maxCalls; this.cash -= price; this.run.spent += price; this.stats.refills = (this.stats.refills || 0) + 1;
       this.say('log.refill', { name: this.contractName(c), n: c.maxCalls, price, wasted: wasted ? MSG('log.refillWasted', { n: wasted }) : '' });
       return { ok: true, price, wasted };
     }
@@ -1884,7 +1890,7 @@
       if (this.phase !== 'market') return { ok: false, msg: T('err.notMarket') };
       const R = this.rules, it = this.market.items[itemIdx];
       if (!it || it.sold) return { ok: false, msg: T('err.sold') };
-      if (it.kind !== 'refill' && this.market.bought >= R.marketMaxBuy) return { ok: false, msg: T('err.marketMax', { n: R.marketMaxBuy }) };
+      if (R.marketMaxBuy && it.kind !== 'refill' && this.market.bought >= R.marketMaxBuy) return { ok: false, msg: T('err.marketMax', { n: R.marketMaxBuy }) };
       let price = it.price;
       if (it.kind === 'contract') {
         price = this.contractPrice(it);
