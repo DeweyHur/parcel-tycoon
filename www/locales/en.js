@@ -581,6 +581,8 @@
     'story.l1last.2': "Good work these two weeks. Not bad at all for a first go.<br>Finish it like this and Mr. Han will be pleased.",
     'story.l1intro.1': "There you are. Mr. Han told me — this fortnight is yours.<br>You used to unload; now you raise the shutter. Stay close and watch.",
     'story.l1intro.2': "One call to Hangil is <b>{nowFee}c</b> — the same {nowFee}c whether you load one crate or fill the deck.<br>Right now the depot holds {nowCount}, and sending all of them pays <b>{nowRev}c</b>.<br>Paying {nowFee}c to collect {nowRev}c leaves you <b>{nowLoss}c down</b>. Let's just <b>close the day</b>.",
+    'story.l1wait2.1': 'Still this little. Call now and you mostly pay the fee.<br>Stack it until the truck is <b>nearly full</b>.',
+    'story.l1wait2.2': 'So <b>No call</b> again today. Call when it is full — I will tell you when.',
     'story.l1call.1': 'Now it is worth calling. See that truck? Hangil Logistics — already <b>{readyVol}/{readyCap}</b> full.',
     'story.l1call.2': "Yeo, from Hangil Logistics. One call runs <b>{nowFee}c</b>.<br>The painted cells are what we will take away.",
     'story.l1call.3': "The urgent ones are <b>already loaded</b>, as many as fit. Tap boxes below to add or remove.<br>Call now: <b>{nowRev}c</b> in, {nowFee}c fee — <b>{nowNet}c left</b>. Go on.",

@@ -140,6 +140,10 @@ const say = m => { console.log(m); log.push(m); };
   // 창고 상세(재고)는 기본으로 접혀 있다 — 먼저 펼친다. 같은 택배는 묶음 줄이라 그것도 펼친다
   check(!(await page.$('#warehouse-toggle')) && await vis('#parcels'), '재고 접기가 없다 — 상자 격자는 늘 보인다');
   await page.waitForTimeout(300);
+  // 둘째 날엔 '한 번 더 넘기라'는 게이트가 호출 없음 버튼에 걸려 있다 (l1wait2)
+  const w2 = await page.evaluate(() => ({ gate: !document.getElementById('story-gate').hidden, hl: (document.querySelector('.story-hl') || {}).id, seen: PT.game.story.seen.includes('l1wait2') }));
+  check(w2.seen && w2.gate && w2.hl === 'wait-btn', '둘째 날: 한 번 더 넘기라고 호출 없음에 게이트 — ' + JSON.stringify(w2));
+  await page.evaluate(() => { document.getElementById('story-gate').hidden = true; });
   // 상자를 누르면 싣기/빼기 — 상세는 꾹 누른다
   { const t = await page.$('#parcels .ptile[data-id]'); const b = t && await t.boundingBox();
     if (b) { await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up(); } }
@@ -148,6 +152,9 @@ const say = m => { console.log(m); log.push(m); };
     trust: document.querySelectorAll('#modal .trust').length, cust: document.querySelectorAll('#modal .cust').length }));
   check(/보낼 수 있는 곳/.test(pd.txt), '택배 상세가 열렸다');
   check(pd.trust === 0 && pd.cust === 0 && !/신뢰|고객|직접 배송/.test(pd.txt), '택배 상세에 신뢰·고객·직접 배송이 없다 — ' + pd.txt.replace(/\s+/g, ' ').slice(0, 60));
+  await page.evaluate(() => { const b = document.querySelector('#modal .foot .btn'); if (b) b.click(); });
+  await page.waitForTimeout(200);
+  if (w2.gate) await page.evaluate(() => { document.getElementById('story-gate').hidden = false; });
   await safeClick('#modal .foot .btn'); await page.waitForTimeout(250);
   // 첫날 대사: 여 실장이 실제 숫자로 계산해 준다 (시키는 대로 누르라는 말 대신)
   const firstSeen = await page.evaluate(() => PT.game.story.seen.slice());

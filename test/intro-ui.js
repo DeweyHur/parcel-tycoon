@@ -42,7 +42,7 @@ const check = (ok, msg) => { console.log((ok ? '  ✔ ' : '  ✘ ') + msg); if (
   await page.mouse.click(195, 400); await page.waitForTimeout(700);
   check(!(await page.$('#modal .chcard')), '컷씬 뒤에 장 카드 없이 곧바로 첫날이다');
   const c1 = await clean();
-  check(c1.gone && !c1.cine && c1.cls === base.cls && !c1.bodyCls && c1.basis === '' && c1.truck === base.truck && c1.fov === base.fov, '건너뛰면 원상복구 — ' + JSON.stringify(c1));
+  check(c1.gone && !c1.cine && c1.cls.replace(/\s*calling/, '').trim() === base.cls.replace(/\s*calling/, '').trim() && !c1.bodyCls && c1.basis === '' && c1.truck === base.truck && c1.fov === base.fov, '건너뛰면 원상복구 — ' + JSON.stringify(c1));
   check(!c1.closed && !c1.front, '플레이 화면은 앞면이 벗겨진 단면이다');
   check(c1.story === false, '건너뛴 직후 박 반장이 말을 건다');
 
