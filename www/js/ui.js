@@ -1746,6 +1746,11 @@
       SFX.nudge(); pt.classList.remove('shake'); void pt.offsetWidth; pt.classList.add('shake'); place();
     };
   }
+  // 대사 속 속성 아이콘(⚠❄❆🌾🛃)은 픽셀 글꼴이 흑백으로 그린다 — 그 종류 색 상자에 얹어 창고 상자와 같은 색으로 보이게
+  const ICON_TYPE = { '⚠': 'fragile', '❄': 'fresh', '❆': 'frozen', '🌾': 'produce', '🛃': 'intl' };
+  function tintIcons(html) {
+    return html.replace(/(<[^>]*>)|([⚠❄❆🌾🛃])\uFE0F?/gu, (m, tag, ic) => tag ? tag : `<span class="sicon" style="background:${D.PARCEL_TYPES[ICON_TYPE[ic]].css}">${ic}</span>`);
+  }
   function showStoryBeat(beat, after) {
     const el = $('#story'); let i = 0; storyBusy = true; clearGate();
     let typing = null; // { timer, done, chars, base, talk }
@@ -1762,7 +1767,7 @@
       const base = Story.sprite(pg.speaker, pg.expr, false), talk = Story.sprite(pg.speaker, pg.expr, true);
       $('#story-name').textContent = pg.name || beat.name;
       face.src = base;
-      const body = $('#story-body'); body.innerHTML = pg.text;
+      const body = $('#story-body'); body.innerHTML = tintIcons(pg.text);
       const chars = wrapChars(body);
       $('#story-pages').textContent = beat.pages.length > 1 ? `${i + 1}/${beat.pages.length}` : '';
       next.textContent = i < beat.pages.length - 1 ? T('story.next') : T('story.ok');

@@ -685,3 +685,7 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 .mktruck b { width: 7px; height: 11px; margin-left: 2px; background: #e0553d; box-shadow: inset 0 0 0 1px #11101d; }
 .crow .takes { display: inline-flex; gap: 2px; vertical-align: middle; margin-right: 6px; }
 .crow .takes i { width: 8px; height: 8px; border: 1px solid #0008; }
+
+/* 대사 속 속성 아이콘 — 그 택배 종류 색 상자 위에 */
+.sicon { display: inline-block; min-width: 1.15em; padding: 0 1px; margin: 0 1px; line-height: 1.15; text-align: center; color: #1b1a2e; border: 1px solid #0008; box-shadow: inset 0 -2px 0 #0003; vertical-align: 1px; }
+#story .sbody .sicon:has(.ch:not(.on)) { visibility: hidden; }
