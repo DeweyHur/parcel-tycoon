@@ -608,12 +608,14 @@
     if (g.isWeekendAfter(g.turn)) $('#upcoming').innerHTML += `<span class="chip none">🛌 ${T('hud.weekend')}</span>`;
     const wxNow = g.weatherNow(), W = M.WEATHER[wxNow], showWx = g.shows('weather');
     if (showWx) $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.name + (W.desc ? ' — ' + W.desc : ''))}">${W.icon}</span>` + $('#upcoming').innerHTML;
-    $('#upcoming').querySelectorAll('.chip.wx').forEach(el => el.onclick = () => { SFX.click(); showWeatherInfo(); });
-    $('#upcoming').querySelectorAll('.chip.up').forEach(el => el.onclick = () => { SFX.click(); showUpcomingInfo(+el.dataset.turn); });
     $('#wxline').onclick = () => { SFX.click(); showWeatherInfo(); };
     $('#wxline').className = 'wxline ' + wxNow; $('#wxline').innerHTML = wxNow !== 'sunny' ? `${W.icon} ${esc(W.desc)}` : ''; $('#wxline').hidden = wxNow === 'sunny' || !showWx;
     if (g.items.transitCert || g.items.yardIns === g.month || g.items.customsBond === g.month) $('#upcoming').innerHTML += `<span class="chip">${[g.items.transitCert ? `${M.INS_ITEMS.transitCert.icon} ${esc(M.INS_ITEMS.transitCert.name)} ${g.items.transitCert}` : '', g.items.yardIns === g.month ? `${M.INS_ITEMS.yardIns.icon} ${esc(M.INS_ITEMS.yardIns.name)}` : '', g.items.customsBond === g.month ? `${M.INS_ITEMS.customsBond.icon} ${esc(M.INS_ITEMS.customsBond.name)}` : ''].filter(Boolean).join(' · ')}</span>`;
-    if (g.outdoorVolume() > 0) $('#upcoming').innerHTML += `<span class="chip heat">${T('hud.outdoor', { vol: g.outdoorVolume(), n: g.outdoorParcels().length, storage: g.storage.some(s => s.outdoor) ? T('hud.outdoorStorage') : '', pct: Math.round(g.theftProb() * 100) })}</span>`;
+    if (g.outdoorVolume() > 0) $('#upcoming').innerHTML += `<span class="chip heat" id="wm-reorder" role="button">${T('hud.outdoor', { vol: g.outdoorVolume(), n: g.outdoorParcels().length, storage: g.storage.some(s => s.outdoor) ? T('hud.outdoorStorage') : '', pct: Math.round(g.theftProb() * 100) })} · <b>${T('re.title')} ▸</b></span>`;
+    // 칩을 다 그린 뒤에 단다 — innerHTML += 가 앞서 단 핸들러를 지워 버린다
+    $('#upcoming').querySelectorAll('.chip.wx').forEach(el => el.onclick = () => { SFX.click(); showWeatherInfo(); });
+    $('#upcoming').querySelectorAll('.chip.up').forEach(el => el.onclick = () => { SFX.click(); showUpcomingInfo(+el.dataset.turn); });
+    { const rb = $('#wm-reorder'); if (rb) rb.onclick = () => { if (busy) return; SFX.click(); showReorder(() => renderAll()); }; }
     renderOffer();
     renderStock($('#parcels'), g.parcels, pk ? callState() : null);
     $('#parcels').querySelectorAll('.ptile[data-id]').forEach(bindTile);
@@ -646,6 +648,16 @@
         ${bar}
         <div class="sub">${spent ? `<span class="spent">${T('hud.callsSpent')}</span>` : `${cells}${pv.n ? ` · <span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>` : ` · <span class="per">${T('hud.perNone')}</span>`}${extras.length ? ' · ' + extras.join(' · ') : ''}`}</div>`;
     }
+    const sc = $('#cself');
+    if (sc) {
+      sc.hidden = !g.shows('self');
+      if (!sc.hidden) {
+        const on = selfOk() && !busy && g.phase === 'play', n = g.selfCount(), el = g.selfEligible();
+        sc.disabled = !on; sc.className = 'btn contract self' + (on ? ' ready' : '') + (pk && pk.i === SELF ? ' picked' : '');
+        const pv = sortByUrgency(el).slice(0, n);
+        sc.innerHTML = `<div class="nm"><span>🚐 ${T('self.card')}</span><span class="calls">×${n}</span></div><div class="sub">${el.length ? `${pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), [])} · ${T('self.cardSub', { n: el.length })}` : T('err.nothingSelf')}</div>`;
+      }
+    }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
     const f = g.forecast();
     renderOps(g, f);
@@ -654,7 +666,8 @@
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
     // 오늘 영업을 마치면 받게 될 다음 입고 — 매 턴 가장 중요한 결정을 흐리거나 자르지 않는다.
     const restsNext = g.isWeekendAfter(g.turn) && !g.shows('weekendChoice');   // 마감하면 그대로 쉬는 날로 넘어간다
-    wb.innerHTML = `${restsNext ? T('wait.btnRest') : T(g.shows('self') ? 'wait.btn' : 'wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
+    const selfN = pk && pk.i === SELF ? pk.sel.size : 0;
+    wb.innerHTML = `${selfN ? T('wm.selfWait', { n: selfN, cost: selfPlan().cost }) : restsNext ? T('wait.btnRest') : T('wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
     renderCoach();
   }
   // ---------- 스토리 모드 코치 한 줄 ----------
@@ -1017,7 +1030,12 @@
   let pick = null;       // { i, sel: Set<id>, extra, turn, auto }
   let lastSlot = 0;
   let lastCallCtx = null;
-  function autoSel(i) {
+  // 직접 배송은 '우리 차' 한 대다 — 계약 차와 같은 자리에 서고, 같은 상자 격자에서 고른다.
+  // 다만 돈이 나가는 일이라, 카드를 눌러 부른 게 아니면(배차가 떨어져 저절로 선 경우) 빈 채로 선다.
+  const SELF = 'self';
+  const selfOk = () => !!(game && game.shows('self') && game.selfEligible().length);
+  function autoSel(i, tapped) {
+    if (i === SELF) { const sel = new Set(); if (tapped) sortByUrgency(game.selfEligible()).slice(0, game.selfCount()).forEach(p => sel.add(p.id)); return sel; }
     const c = game.contracts[i], sel = new Set();
     try {
       const sorted0 = game.eligibleParcels(c).slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
@@ -1028,31 +1046,38 @@
   function ensurePick() {
     const g = game;
     if (!g || g.phase !== 'play') { pick = null; return null; }
-    const ok = k => !!(g.contracts[k] && g.canCall(g.contracts[k]));
+    const ok = k => k === SELF ? selfOk() : !!(g.contracts[k] && g.canCall(g.contracts[k]));
     let i = pick ? pick.i : lastSlot;
-    if (!ok(i)) i = g.contracts.findIndex((c, k) => ok(k));
+    if (!ok(i)) { i = g.contracts.findIndex((c, k) => ok(k)); if (i < 0 && selfOk()) i = SELF; }
     if (i < 0) { pick = null; return null; }
-    if (!pick || pick.i !== i || pick.turn !== g.turn || pick.auto) pick = { i, sel: autoSel(i), extra: 0, turn: g.turn, auto: false };
-    const elig = new Set(g.eligibleParcels(g.contracts[i]).map(p => p.id));
+    if (!pick || pick.i !== i || pick.turn !== g.turn || pick.auto) pick = { i, sel: autoSel(i, pick && pick.tapped), extra: 0, turn: g.turn, auto: false };
+    const elig = new Set((i === SELF ? g.selfEligible() : g.eligibleParcels(g.contracts[i])).map(p => p.id));
     for (const id of [...pick.sel]) if (!elig.has(id)) pick.sel.delete(id);   // 그새 나간 것은 뺀다
     return pick;
   }
   function onContractTap(i) {
     if (busy || game.phase !== 'play') return;
-    const c = game.contracts[i]; if (!game.canCall(c)) return;
+    if (i === SELF ? !selfOk() : !game.canCall(game.contracts[i])) return;
     SFX.resume(); SFX.click();
     lastSlot = i;
     // 다른 차를 고르면 그 차에 맞게 새로 담는다. 같은 차를 다시 누르면 자동 선택으로 되돌린다.
-    pick = { i, auto: true };
+    pick = { i, auto: true, tapped: true };
     renderAll();
     const pc = $('#parcels'); if (pc) pc.scrollTop = 0;
     if (lastCallCtx) storyCheck(lastCallCtx);
   }
   function callState() {
+    if (pick.i === SELF) return { sel: pick.sel, elig: new Set(game.selfEligible().map(p => p.id)), risk: new Set() };
     const c = game.contracts[pick.i], elig = game.eligibleParcels(c);
     return { sel: pick.sel, elig: new Set(elig.map(p => p.id)), risk: new Set(elig.filter(p => game.breakProb(c, p) > 0).map(p => p.id)) };
   }
   function toggleCallPick(id) {
+    if (pick.i === SELF) {
+      if (!game.selfEligible().some(x => x.id === id)) { SFX.click(); showParcelDetail(id); return; }
+      if (pick.sel.has(id)) { pick.sel.delete(id); SFX.cancel(); }
+      else { const n = game.selfCount(); if (pick.sel.size >= n) { toast(T('wm.limit', { n })); return; } pick.sel.add(id); SFX.select(); }
+      renderAll(); if (lastCallCtx) storyCheck(lastCallCtx); return;
+    }
     const c = game.contracts[pick.i];
     const p = game.eligibleParcels(c).find(x => x.id === id);
     if (!p) { SFX.click(); showParcelDetail(id); return; }   // 이 차엔 못 싣는 것 — 왜 안 되는지 보여 준다
@@ -1076,9 +1101,30 @@
     el.oncontextmenu = e => e.preventDefault();
     el.onclick = () => { clear(); if (long) { long = false; return; } if (busy) return; if (pick) return toggleCallPick(id); SFX.click(); showParcelDetail(id); };
   }
+  // 우리 차(직접 배송) — 칸이 아니라 개수로 싣는다. 싣고 나면 오늘 영업은 끝이라, 보내기는 '오늘 마감' 버튼이 맡는다.
+  function selfPlan() {
+    const g = game, picked = [...pick.sel].map(id => g.parcels.find(x => x.id === id)).filter(Boolean);
+    const cost = picked.reduce((s, p) => s + g.selfCost(p), 0), income = picked.reduce((s, p) => s + p.reward, 0);
+    return { picked, cost, income, net: income - cost };
+  }
+  function renderSelfBar(head, foot) {
+    const g = game, n = g.selfCount(), elig = g.selfEligible(), pl = selfPlan();
+    const cells = Array.from({ length: n }, (_, k) => { const p = pl.picked[k]; return `<i class="truck-cell ${p ? 'filled' : ''}"${p ? ` style="background:${ptype(p).css}" title="${esc(ptype(p).name)}"` : ''}></i>`; }).join('');
+    const vans = ['coldvan', 'padvan', 'bigvan'].filter(v => g.warehouse[v]).map(v => D.FACILITIES[v].name).join(', ');
+    const blocked = g.parcels.filter(p => !g.selfCan(p)).length;
+    head.innerHTML = `<div class="ch-top"><b>🚐 ${T('self.card')}</b><span class="caps">${vans ? `${T('wm.vans')}: ${esc(vans)}` : T('wm.noVans')}${blocked ? ` · ${T('wm.blocked', { n: blocked })}` : ''}</span></div>
+      <div class="load-visual mini"><div class="truck-stack"><div class="truck-shell van"><div class="truck-cells" style="--cols:${Math.min(6, n)}">${cells}</div></div></div><div class="load-money"><span class="money-chip">${T('call.earn')}<b>+${pl.income}c</b></span><span class="money-chip cost">${T('call.cost')}<b>−${pl.cost}c</b></span><span class="money-chip net">${T('call.net')}<b>${pl.net >= 0 ? '+' : ''}${pl.net}c</b></span></div></div>
+      <div class="load-hint">${pl.picked.length}/${n} · ${T('wm.selfHead2', { size: g.selfSizeMax(), base: D.SELF_DELIVERY.costBase, per: D.SELF_DELIVERY.costPerSize })} · ${T('self.hintWait')}</div>`;
+    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span>`;
+    head.hidden = foot.hidden = false;
+    foot.querySelector('#pick-urgent').onclick = () => { pick.sel.clear(); sortByUrgency(elig).slice(0, n).forEach(p => pick.sel.add(p.id)); SFX.select(); renderAll(); };
+    foot.querySelector('#pick-clear').onclick = () => { pick.sel.clear(); SFX.cancel(); renderAll(); };
+    lastCallCtx = { kind: 'modal', modal: 'wait', self: true, picked: pl.picked.length, elig: elig.length, outdoor: g.outdoorVolume() };
+  }
   function renderCallBar() {
     const head = $('#call-head'), foot = $('#call-foot');
     if (!pick) { head.hidden = foot.hidden = true; head.innerHTML = foot.innerHTML = ''; lastCallCtx = null; return; }
+    if (pick.i === SELF) return renderSelfBar(head, foot);
     const cm = pick, i = cm.i, c = game.contracts[i];
     const car = D.CARRIERS[c.carrier], vcap = game.vehicleCap(c), simul = game.simulMax(c), fee = game.truckFee(c);
     const elig = game.eligibleParcels(c);
@@ -1168,16 +1214,17 @@
   function doWait(selfIds) {
     if (busy || game.phase !== 'play') return;
     SFX.resume();
-    // 자체 배송이 열리기 전(서장~2장)에는 대기 팝업에 고를 것이 없다 — 팝업 없이 그냥 하루를 넘긴다.
-    // 대신 팝업이 알려 주던 경고(반송·부패 임박)는 토스트로 남긴다.
-    if (!selfIds && !game.shows('self')) {
+    // 마감 팝업은 없다. 우리 차(직접 배송)에 실어 둔 게 있으면 그걸 나르고 마감한다.
+    // 팝업이 알려 주던 경고(반송·부패 임박)는 토스트로 남긴다.
+    if (!selfIds) {
+      const ids = pick && pick.i === SELF ? [...pick.sel] : [];
       const f = game.forecast(), w = [];
       if (f.overdue) w.push(T('wm.overdue', { n: f.overdue }));
       if (f.spoil) w.push(T('wm.spoil', { n: f.spoil }));
-      if (w.length) toast(T('wm.ifWait') + ': ' + w.join(' · '), 2600);
-      doWait([]); return;
+      if (w.length && !ids.length) toast(T('wm.ifWait') + ': ' + w.join(' · '), 2600);
+      if (pick) pick.auto = true;
+      doWait(ids); return;
     }
-    if (!selfIds) { SFX.click(); showWaitModal(); return; }
     const r = game.wait(selfIds);
     if (r && r.ok === false) { toast(r.msg); return; }
     busy = true; renderAll();
@@ -1185,36 +1232,6 @@
     saveGame();
     if (selfIds.length && r && r.ids) { SFX.select(); const rev = r.revenue, cost = r.cost; scene.selfDeliver(r.ids, () => { SFX.coin(r.ids.length); floatText(T('float.self', { rev, cost }), false, 70); afterTurn(events); }); }
     else { SFX.wait(); setTimeout(() => afterTurn(events), 250); }
-  }
-  // ---------- 대기 화면: 직접 배송 선택 + 적재 정리 + 다음 턴 예보 ----------
-  function showWaitModal() {
-    const g = game, f = g.forecast(), n = g.selfCount(), nextWx = f.monthEnd ? null : g.weatherAt(g.turn + 1);
-    let picked = [];
-    const render = () => {
-      const elig = sortByUrgency(g.selfEligible());
-      const pickedP = picked.map(id => g.parcels.find(x => x.id === id)).filter(Boolean);
-      const cost = pickedP.reduce((s, p) => s + g.selfCost(p), 0), income = pickedP.reduce((s, p) => s + p.reward, 0), net = income - cost;
-      const vans = ['coldvan', 'padvan', 'bigvan'].filter(v => g.warehouse[v]).map(v => D.FACILITIES[v].name).join(', ');
-      const cells = Array.from({ length: n }, (_, i) => { const p = pickedP[i]; return `<i class="truck-cell ${p ? 'filled' : ''}"${p ? ` style="background:${ptype(p).css}" title="${esc(ptype(p).name)}"` : ''}></i>`; }).join('');
-      const gauge = `<div class="load-visual"><div class="truck-stack"><div class="truck-shell van"><div class="truck-cells" style="--cols:${Math.min(6, n)}">${cells}</div></div></div><div class="load-money"><span class="money-chip">${T('call.earn')}<b>+${income}c</b></span><span class="money-chip cost">${T('call.cost')}<b>−${cost}c</b></span><span class="money-chip net">${T('call.net')}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div><div class="load-hint">${picked.length}/${n} · ${T('wm.selfHead2', { size: g.selfSizeMax(), base: D.SELF_DELIVERY.costBase, per: D.SELF_DELIVERY.costPerSize })}</div></div>
-        <div class="tbtn"><button class="btn small" id="wm-auto">${T('call.pickUrgent')}</button>${picked.length ? `<button class="btn small" id="wm-clear">${T('call.pickClear')}</button>` : ''}</div>`;
-      const rows = elig.map(p => { const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], on = picked.includes(p.id); return `<div class="parcel ${on ? 'sel' : ''} ${p.overdue ? 'overdue' : ''}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${T('wm.rewardCost', { reward: p.reward, cost: g.selfCost(p) })}</div><div class="st">${parcelStatus(p)}</div></div>`; }).join('');
-      const blocked = g.parcels.filter(p => !g.selfCan(p)).length;
-      const warn = []; if (f.overdue) warn.push(T('wm.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wm.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wm.frozenOver', { n: f.frozenOver }));
-      const body = `<div class="pickinfo"><span>${T('hud.cashLbl')} <b>${g.projectedCash().total}</b>c</span><span>${T('wm.nextWarehouse')} <b class="${f.used > f.cap ? 'bad' : ''}">${f.used}/${f.cap}</b></span>${nextWx ? `<span>${M.WEATHER[nextWx].icon} ${M.WEATHER[nextWx].name}</span>` : `<span>${T('hud.monthEnd')}</span>`}</div>
-        ${warn.length ? `<div class="d" style="color:var(--red);margin-bottom:4px">${T('wm.ifWait')}: ${warn.join(' · ')}</div>` : ''}
-        ${g.outdoorVolume() > 0 ? `<div class="d" style="margin-bottom:4px">${T('wm.outdoor', { vol: g.outdoorVolume(), pct: Math.round(g.theftProb() * 100) })} <button class="btn small" id="wm-reorder">${T('re.title')}</button></div>` : ''}
-        ${gauge}
-        <div class="d" style="color:var(--dim);margin:4px 0">${vans ? `${T('wm.vans')}: ${esc(vans)}` : T('wm.noVans')}${blocked ? ` · ${T('wm.blocked', { n: blocked })}` : ''}</div>
-        <div class="zone">${rows || `<div id="empty">${T('err.nothingSelf')}</div>`}</div>`;
-      const m = modal(T('wm.title'), body, [{ label: T('btn.cancel'), onClick: closeModal }, { label: picked.length ? T('wm.selfWait', { n: picked.length, cost }) : T('wm.justWait'), cls: 'primary', onClick: () => { closeModal(); doWait(picked.slice()); } }], T('wm.sub'));
-      m.querySelectorAll('.parcel[data-id]').forEach(el => el.onclick = () => { const id = +el.dataset.id; SFX.click(); if (picked.includes(id)) picked = picked.filter(x => x !== id); else { if (picked.length >= n) { toast(T('wm.limit', { n })); return; } picked.push(id); } render(); });
-      const rb = m.querySelector('#wm-reorder'); if (rb) rb.onclick = () => { SFX.click(); showReorder(() => { render(); }); };
-      m.querySelector('#wm-auto').onclick = () => { picked = elig.slice(0, n).map(p => p.id); SFX.select(); render(); };
-      const cb = m.querySelector('#wm-clear'); if (cb) cb.onclick = () => { picked = []; SFX.cancel(); render(); };
-      storyCheck({ kind: 'modal', modal: 'wait', picked: picked.length, elig: elig.length, outdoor: g.outdoorVolume() });
-    };
-    render();
   }
   function afterTurn(events) {
     for (const e of events) if (e.type === 'discard') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.discard', { why: I18n.text(e.why) }), true, 30); }
@@ -1900,6 +1917,7 @@
     scene.setOnInspect(showSceneInspect);
     applyStaticText();
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) $('#c' + i).onclick = () => onContractTap(i);
+    $('#cself').onclick = () => onContractTap(SELF);
     $('#hud-cash-box').onclick = () => { SFX.click(); hudDueOpen = !hudDueOpen; renderAll(); };
     $('#wait-btn').onclick = () => doWait(null);
     $('#invest-btn').onclick = () => { if (game) { SFX.click(); showGrowth(); } };

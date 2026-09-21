@@ -669,3 +669,5 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 /* 지금 패널 위에 서 있는 차 */
 .contract.picked { outline: 3px solid var(--gold); outline-offset: -1px; }
 #call-foot { padding: 5px 8px; }
+#contract-strip .contract.self { background: #2c3a36; }
+#contract-strip .contract.self .calls { color: var(--dim); }

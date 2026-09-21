@@ -174,15 +174,16 @@
       { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },
     // 대기 팝업에서 안팎을 바꾼다
-    { id: 'l3reorder', kind: 'modal', modal: 'wait', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'neutral', hl: '#wm-reorder' }] },
+    { id: 'l3reorder', kind: 'turn', when: g => g.outdoorVolume() > 0, pages: [{ expr: 'neutral', hl: '#wm-reorder' }] },
     // 도난 — 마당은 문이 없다
     { id: 'l3theft', kind: 'any', when: (g, ctx) => hasEvent(ctx, ['stolen']), pages: [{ expr: 'shock' }, { expr: 'neutral' }] },
     // 직접 배송 — 차가 없을 때 내가 나른다
-    { id: 'l3self', kind: 'turn', when: g => !!outOfCalls(g), pages: [
-      { expr: 'think', hl: '#wait-btn' },
-      { expr: 'neutral', hl: '#wait-btn', gate: true },
+    // 직접 배송은 팝업이 아니라 '우리 차' 카드다 — 누르면 급한 것부터 담긴 채 서고, 오늘 마감이 싣고 간다
+    { id: 'l3self', kind: 'turn', when: g => !!outOfCalls(g) && g.selfEligible().length > 0, pages: [
+      { expr: 'think', hl: '#cself' },
+      { expr: 'neutral', hl: '#cself', gate: true },
     ] },
-    { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => (ctx.picked || 0) === 0 && !!outOfCalls(g), pages: [{ expr: 'neutral', hl: '#modal .zone .parcel', gate: true }] },
+    { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => !!ctx.self && !!outOfCalls(g), pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
     // 신뢰도 — 새로 생긴 게 아니라 줄곧 쌓이고 있던 것
     { id: 'l3trust', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel >= 0, pages: [
       { expr: 'smile', hl: '#call-head .trustline' },
@@ -330,7 +331,7 @@
     // ----- 3월 (1개월차): 창고 -----
     { id: 'intro', months: [1], kind: 'start', when: () => true, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: '#parcels' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
     // 첫 대기 팝업(1개월차): intro 가 '대기'를 누르랬으니, 낯선 팝업에서 어디를 눌러야 하는지까지 짚어 준다. 이 한 번만.
-    { id: 'waitFirst', months: [1], kind: 'modal', modal: 'wait', when: g => g.story.seen.includes('intro'), pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
+    { id: 'waitFirst', months: [1], kind: 'modal', modal: 'wait', when: g => g.story.seen.includes('intro'), pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
     { id: 'usage', months: [1], kind: 'turn', when: g => g.turn >= 2, pages: [{ expr: 'neutral', hl: '#bar-usage' }] },
     { id: 'callReady', months: [1], kind: 'turn', when: g => g.turn >= 3 || bestReadySlot(g).fill >= 0.8, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     // 호출 팝업 안: 자동 선택 버튼 → 호출 버튼. 팝업이 다시 그려질 때마다 ctx.sel(선택 수)로 확인한다
@@ -378,8 +379,8 @@
     { id: 'bigParcel', kind: 'turn', when: g => g.parcels.some(p => p.size >= 4) && !g.contracts.some(c => c && g.contractSizeMax(c) >= 4), pages: [{ expr: 'worry', hl: '#parcels' }] },
     { id: 'noContract', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => !(p.customs > 0) && attrsOf(g, p).some(a => gating.includes(a)) && !handleable(g, p)), pages: [{ expr: 'worry' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
     // 대기 팝업 안 (noContract 다음): 직접 배송할 택배 하나 → 대기 버튼
-    { id: 'waitSelf', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('noContract') && ctx.picked === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#modal .zone .parcel', gate: true }] },
-    { id: 'waitGo', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('waitSelf') && ctx.picked > 0, pages: [{ expr: 'neutral', hl: '#modal .foot .btn.primary', gate: true }] },
+    { id: 'waitSelf', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('noContract') && ctx.picked === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#parcels .ptile:not(.dis)', gate: true }] },
+    { id: 'waitGo', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('waitSelf') && ctx.picked > 0, pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
     { id: 'offer', needs: 'storage', months: [2, 3], kind: 'turn', when: g => !!g.offer, pages: [{ expr: 'neutral', hl: '#offer' }, { expr: 'think' }] },
     { id: 'cash', months: [2, 3], kind: 'turn', when: g => g.projectedCash().total < 0 || g.debt > 0, pages: [{ expr: 'think', hl: '#hud-left' }, { expr: 'worry' }] },
     { id: 'summary2', months: [2], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }] },
@@ -398,7 +399,7 @@
     { id: 'rain', needs: 'weather', months: [1, 2, 3], kind: 'turn', when: g => g.outdoorVolume() > 0 && (g.weatherNow() === 'rain' || g.upcoming().some(u => u.weather === 'rain')), pages: [{ speaker: 'noh', expr: 'neutral', hl: '#upcoming .chip.wx' }, { expr: 'neutral', hl: '#upcoming .chip.wx', gate: g => !g.story.seen.includes('weatherDetail') }] },
     // 날씨도 지나가는 대사 대신 직접 눌러 확인하게 한다 (호기심에 먼저 눌러도 나온다)
     { id: 'weatherDetail', needs: 'weather', months: [1, 2, 3], kind: 'modal', modal: 'weather', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral' }] },
-    { id: 'rainReorder', months: [1, 2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('rain') && ctx.outdoor > 0, pages: [{ expr: 'neutral', hl: '#wm-reorder', gate: true }] },
+    { id: 'rainReorder', months: [1, 2, 3], kind: 'turn', when: g => g.story.seen.includes('rain') && g.outdoorVolume() > 0, pages: [{ expr: 'neutral', hl: '#wm-reorder', gate: true }] },
     { id: 'win', months: [3], kind: 'turn', when: g => g.turn >= 5, pages: [{ expr: 'neutral' }, { expr: 'smile' }, { expr: 'think' }] },
     { id: 'summary3', months: [3], kind: 'summary', when: () => true, pages: [{ expr: g => (g.summary && g.summary.cash > 0 ? 'laugh' : 'worry'), k: g => 'story.summary3.' + (g.summary && g.summary.cash > 0 ? 'good' : 'bad') }] },
     { id: 'farewell', months: [3, 4], kind: 'summary', when: g => g.monthIndex() >= 3 && g.half() === 2, calendar: true, pages: [{ expr: 'smile' }, { expr: 'neutral' }, { expr: 'laugh' }] },

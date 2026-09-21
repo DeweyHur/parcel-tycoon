@@ -469,7 +469,7 @@ t('스토리: 팝업 비트는 kind modal + modal 이름이 맞을 때만, 선�
   const g = NG(4, { story: true }); g.story.seen = ['intro', 'usage', 'callReady'];
   // 1개월차 첫 대기 팝업: '그냥 대기' 에 게이트. 딱 한 번만.
   const wf = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 3, outdoor: 0 });
-  assert.ok(wf && wf.id === 'waitFirst' && wf.pages[0].hl === '#modal .foot .btn.primary' && wf.pages[0].gate);
+  assert.ok(wf && wf.id === 'waitFirst' && wf.pages[0].hl === '#wait-btn' && wf.pages[0].gate);
   assert.equal(Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 3, outdoor: 0 }), null);
   const a = Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3, slot: 0 }); assert.ok(a && a.id === 'callModal' && a.pages.length === 3 && a.pages[2].hl === '#pick-urgent' && a.pages[2].gate && /칸/.test(a.pages[0].text));
   assert.equal(Story.check(g, { kind: 'modal', modal: 'call', sel: 0, elig: 3, slot: 0 }), null);
@@ -478,12 +478,13 @@ t('스토리: 팝업 비트는 kind modal + modal 이름이 맞을 때만, 선�
   g.weatherNow = () => 'rain'; assert.ok(!drain().includes('rain')); // 마당이 비어 있으면 비가 와도 rain 은 안 나온다
   // 대기 팝업: noContract 를 본 뒤에만 waitSelf → waitGo
   g.month = 3; g.story.seen.push('noContract');
-  const w = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 2, outdoor: 0 }); assert.ok(w && w.id === 'waitSelf' && w.pages[0].hl === '#modal .zone .parcel');
+  const w = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 2, outdoor: 0 }); assert.ok(w && w.id === 'waitSelf' && w.pages[0].hl === '#parcels .ptile:not(.dis)');
   const w2 = Story.check(g, { kind: 'modal', modal: 'wait', picked: 1, elig: 2, outdoor: 0 }); assert.ok(w2 && w2.id === 'waitGo');
   // 비: 마당에 택배 + 비일 때만. 그 뒤 대기 팝업에서 적재 정리 버튼
   g.outdoorVolume = () => 3;
   let r; while ((r = Story.check(g, { kind: 'turn' })) && r.id !== 'rain'); assert.ok(r && /3칸/.test(r.pages[0].text) && r.pages[1].gate, JSON.stringify(g.story.seen));
-  const rr = Story.check(g, { kind: 'modal', modal: 'wait', picked: 0, elig: 2, outdoor: 3 }); assert.ok(rr && rr.id === 'rainReorder' && rr.pages[0].hl === '#wm-reorder');
+  // 마감 팝업이 없어졌다 — 적재 정리는 야외 칩(#wm-reorder)이고, 비 다음 턴 비트로 가리킨다
+  const rr = Story.check(g, { kind: 'turn' }); assert.ok(rr && rr.id === 'rainReorder' && rr.pages[0].hl === '#wm-reorder');
 });
 t('자동 선택: 마지막 차가 본전선(80%)도 못 채우면 그 차는 통째로 뺀다', () => {
   const g = NG(9, { story: true });
