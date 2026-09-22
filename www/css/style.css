@@ -697,3 +697,8 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 
 /* 캠페인 버튼: 글자가 잘리지 않게 조금 더 넓게 */
 #bottom-bar #invest-btn:not([hidden]) { flex: 1.3; }
+
+/* 계약 상세: 싣는 종류 — 색 + 이름 */
+.cdtakes { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 5px 0 2px; font-size: 12px; }
+.cdtakes span { display: inline-flex; align-items: center; gap: 4px; }
+.cdtakes i { width: 10px; height: 10px; border: 1px solid #0008; }

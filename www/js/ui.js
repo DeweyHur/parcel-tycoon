@@ -874,20 +874,23 @@
     return `<span class="mktruck" title="${esc(T('fmt.cells', { n }))}" aria-label="${esc(T('fmt.cells', { n }))}">${'<i></i>'.repeat(Math.min(n, 16))}<b></b></span>`;
   }
   // always: 속성이 안 열린 장에서도 그린다(그땐 일반만 있으니 갈색 한 점)
-  function takesDots(g, c, always) {
-    if (!g.shows('attrs') && !always) return '';
+  function takesTypes(g, c, always) {
+    if (!g.shows('attrs') && !always) return [];
     // 지금 열린 종류 + 다음 사이클 예상에 있는 종류 — 마켓에서는 '곧 올 것'을 실을 수 있는지가 궁금하다
     const soon = new Set(); if (always) { try { for (const f of g.customerForecast(g.phase === 'market' ? g.month + 1 : g.month)) for (const t in f.range) if (f.range[t][1] > 0) soon.add(t); 
       // 장의 마지막 마켓이면 다음 장 대본에 오는 종류도 (1장 마켓에서 살살 택배가 ⚠ 를 싣는다는 걸 보여 준다)
       const nx = g.level && window.LEVELS && g.phase === 'market' && g.month >= g.rules.months ? LEVELS.get(g.level.n + 1) : null;
       if (nx && nx.script) for (const k in nx.script) for (const day of (nx.script[k].turns || [])) for (const sp of day) soon.add(sp.type); } catch (e) { /* 예상이 없으면 지금 것만 */ } }
     const open = t => t === 'normal' || soon.has(t) || (g.shows('attrs') && (t !== 'fresh' || g.shows('cold')) && (t !== 'frozen' || g.shows('frozen')) && (t !== 'large' || g.shows('bigsize')) && (t !== 'intl' || g.shows('bigsize')));
-    const dots = Object.keys(D.PARCEL_TYPES).filter(open).filter(t => {
+    return Object.keys(D.PARCEL_TYPES).filter(open).filter(t => {
       const T2 = D.PARCEL_TYPES[t], size = T2.sizes.find(sz => sz >= D.CARRIERS[c.carrier].sizeMin && sz <= g.contractSizeMax(c));
       if (size == null) return false;
       const pp = { type: t, size, attrs: T2.attrs, customs: T2.attrs.includes('customs') ? 1 : 0 };
       return g.canHandle(c, pp) && !g.breakProb(c, pp);      // 깨질 위험이 있으면 '받는다'고 할 수 없다
-    }).map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('');
+    });
+  }
+  function takesDots(g, c, always) {
+    const dots = takesTypes(g, c, always).map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('');
     return dots ? `<span class="takes">${dots}</span>` : '';
   }
   // 칸과 배차는 숫자보다 눈금이 빠르다. 차 한 대가 칸 여섯이면 네모 여섯,
@@ -1540,14 +1543,12 @@
     const g = game, car = D.CARRIERS[c.carrier], fam = D.FAMILIES[car.family];
     const enh = [c.enh.limit ? T('my.limit', { n: c.enh.limit }) : '', c.enh.cap ? T('my.cap', { n: c.enh.cap }) : '', c.enh.regular ? D.ENHANCEMENTS.regular.name : '', c.enh.express ? D.ENHANCEMENTS.express.name : '', c.enh.opt ? D.ENHANCEMENTS[c.enh.opt].name : ''].filter(Boolean);
     const rep = Story.repOf(c.carrier);
-    const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d"><b>${esc(car.name)}</b>${gradeBadge(c.grade)}<br>${rep === 'rep' ? '' : `${esc(Story.repName(rep, c.carrier))}<br>`}${T('cd.family', { name: esc(fam.name), tier: esc(D.GRADES[c.grade].name) })}</div></div>
-      <div class="kv" style="margin-top:8px"><span>${T('call.caps')}</span><span class="v">${g.contractCaps(c).length ? attrIcons(g.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: g.contractSizeMax(c) })}</span>
-      <span>${esc(car.vehicle || '')}</span><span class="v">${T('fmt.cells', { n: g.vehicleCap(c) })} · ×${g.simulMax(c)}</span>
+    const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d">${rep === 'rep' ? '' : `<b>${esc(Story.repName(rep, c.carrier))}</b>`}${gradeBadge(c.grade)}<div class="cdtakes">${takesTypes(g, c, true).map(t => `<span><i style="background:${D.PARCEL_TYPES[t].css}"></i>${esc(D.PARCEL_TYPES[t].name)}</span>`).join('')}</div><div style="color:var(--dim);font-size:11px">${T('call.size', { min: car.sizeMin, max: g.contractSizeMax(c) })}</div></div></div>
+      <div class="kv" style="margin-top:8px">      <span>${esc(car.vehicle || '')}</span><span class="v">${T('fmt.cells', { n: g.vehicleCap(c) })} · ×${g.simulMax(c)}</span>
       <span>${T('sum.fees')}</span><span class="v">${g.truckFee(c)}c${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}</span>
-      <span>${T('fmt.trucks', { n: c.maxCalls })}</span><span class="v ${c.calls === 0 ? 'bad' : ''}">${T('my.remain', { calls: c.calls, max: c.maxCalls })} · ${T('cd.refillLine', { price: g.refillPrice(c) })}</span>
+      <span>${T('cd.calls')}</span><span class="v ${c.calls === 0 ? 'bad' : ''}">${c.calls}/${c.maxCalls}</span>
       ${g.shows('trust') ? `<span>${T('common.trust')}</span><span class="v">${trustBar(g, c.carrier)}</span>` : ''}</div>
-      ${trustTrack(c.carrier, g.trustXp(c.carrier))}${enh.length ? `<div class="d">${T('kind.enh')}: ${enh.join(', ')}</div>` : ''}
-      <div class="d" style="color:var(--dim)">${T('my.record', { calls: c.totalCalls, n: c.delivered })}</div>`;
+      ${trustTrack(c.carrier, g.trustXp(c.carrier))}${enh.length ? `<div class="d">${T('kind.enh')}: ${enh.join(', ')}</div>` : ''}`;
     modal(g.contractName(c), body, [{ label: T('btn.close'), onClick: back || closeModal }]);
   }
   function chooseSlot(it, idx, back) {
