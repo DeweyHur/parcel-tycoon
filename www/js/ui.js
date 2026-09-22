@@ -83,9 +83,8 @@
     const nTotal = Object.keys(M.COMPANIES).length + Object.keys(M.PERKS).length + Object.keys(M.SCENARIOS).length;
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
       ${save ? `<button class="btn cta" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(save.story ? T('title.story') : M.SCENARIOS[save.cfg.scenario] ? M.SCENARIOS[save.cfg.scenario].name : save.cfg.scenario)} · ${T('fmt.monthTurn', { m: cycleName(save.month), t: save.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })})</small></button>` : ''}
-      <button class="btn ${storySeen(P) ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${demoLocked() ? T('demo.storySub', { n: demoMonthsLabel() }) : T('title.storySub')}</small></button>
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
-      <button class="btn ${storySeen(P) && !demoLocked() ? 'gold' : ''}" id="t-new">${demoLocked() ? '🔒 ' : ''}${T('title.new')}${demoLocked() ? ` <small style="color:var(--dim)">${T('demo.fullOnly')}</small>` : storySeen(P) ? '' : ` <small style="color:var(--dim)">${T('title.newHint')}</small>`}</button>
+      <button class="btn ${!demoLocked() ? 'gold' : ''}" id="t-new">${demoLocked() ? '🔒 ' : ''}${T('title.new')}${demoLocked() ? ` <small style="color:var(--dim)">${T('demo.fullOnly')}</small>` : ''}</button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).length, d: Object.keys(M.ACHIEVEMENTS).length })}</small></button>
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
       <button class="btn" id="t-help">${T('title.help')}</button>
@@ -94,8 +93,8 @@
     const m = modal('', body, null);
     m.classList.add('titlecard'); $('#modal-root').classList.add('title-mode');
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
-    m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort')); return; } if (!(storySeen(P))) { suggestStory(); return; } showScenarioSelect(); };
-    m.querySelector('#t-story').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-story').click(); }, T('title.newShort')); return; } showStoryStart(); };
+    m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort')); return; } showScenarioSelect(); };
+    // 인수인계는 캠페인으로 강제된다 — 끝낸 뒤 타이틀에는 다시 보이지 않는다
     const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex('companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };

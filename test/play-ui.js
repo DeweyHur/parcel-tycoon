@@ -290,9 +290,9 @@ const say = m => { console.log(m); log.push(m); };
   await page.evaluate(() => { const P = PT.Profile.get(); P.campaign.cleared = 99; PT.Profile.save(); });
   await page.reload(); await page.waitForTimeout(900);
   const after = await page.$$eval('#modal .btn', els => els.map(e => e.id).filter(Boolean));
-  check(after.includes('t-new') && after.includes('t-story') && after.includes('t-codex'), '자유 런·인수인계·도감이 열렸다 — ' + after.join(','));
+  check(after.includes('t-new') && !after.includes('t-story') && after.includes('t-codex'), '자유 런·도감이 열렸고 인수인계는 메뉴에서 빠졌다 — ' + after.join(','));
   // 1장 세이브가 남아 있으니 「새로 시작」 확인이 먼저 뜬다 — 넘기고 인수인계로 들어간다
-  await safeClick('#t-story'); await page.waitForTimeout(500);
+  await safeClick('#t-new'); await page.waitForTimeout(500);
   for (let k = 0; k < 8; k++) {
     if (await page.evaluate(() => !!(window.PT && PT.game && PT.game.phase === 'play' && !document.getElementById('modal-root').classList.contains('show')))) break;
     const warn = await page.$('#modal .foot .btn.warn');
