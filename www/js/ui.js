@@ -651,9 +651,7 @@
       const extras = [delay ? T('call.payLater', { n: delay }) : '', c.enh.regular && !c.freeUsedMonth ? T('hud.regular') : ''].filter(Boolean);
       // 파란 눈금은 계약된 배차 횟수 — 쓴 만큼 비어 간다. 다 쓰면 전부 빈 칸(0대라는 글자 대신)
       const callMax = Math.max(c.calls, c.maxCalls || c.calls);
-      const callPips = callMax <= 15
-        ? `<span class="pips calls">${Array.from({ length: callMax }, (_, k) => `${k && k % 5 === 0 ? '<i class="gap"></i>' : ''}<i class="${k < c.calls ? 'on' : ''}"></i>`).join('')}</span>`
-        : `${c.calls}/${callMax}`;
+      const callPips = callPipsHtml(c.calls, callMax);
       const spent = c.calls === 0 && g.shows('calls') && !spare && !struck;
       const cells = pips(pv.cells, vcap, pv.over, pv.trucks) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
@@ -669,7 +667,7 @@
         const on = selfOk() && !busy && g.phase === 'play', n = g.selfCount(), el = g.selfEligible();
         sc.disabled = !on; sc.className = 'btn contract self' + (on ? ' ready' : '') + (pk && pk.i === SELF ? ' picked' : '');
         const pv = sortByUrgency(el).slice(0, n);
-        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span><span class="takes"></span><span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls">×${n}</span>`;
+        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span><span class="takes"></span><span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls"></span>`;
       }
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
@@ -913,6 +911,17 @@
   // 실을 게 넘치면 한 칸 띄우고 남는 만큼 더 — '6+4' 가 그대로 보인다.
   const PIP_MAX = 10;
   // trucks > 1 이면 차마다 한 칸 띄워 그린다 — 두 대가 '6+6' 으로 보인다
+  // 배차 눈금: 열 대까지는 한 칸씩, 그보다 많으면 다섯 대를 큰 칸 하나(안에 5)로 묶는다 — 숫자 'n/m' 대신
+  function callPipsHtml(calls, max) {
+    let h = '';
+    for (let g0 = 0; g0 < max; g0 += 5) {
+      const size = Math.min(5, max - g0), have = Math.max(0, Math.min(size, calls - g0));
+      if (g0) h += '<i class="gap"></i>';
+      if (max > 10 && size === 5 && (have === 5 || have === 0)) h += `<b class="${have ? 'on' : ''}">5</b>`;
+      else for (let k = 0; k < size; k++) h += `<i class="${k < have ? 'on' : ''}"></i>`;
+    }
+    return `<span class="pips calls">${h}</span>`;
+  }
   function pips(cells, cap, over, trucks) {
     if (cap > PIP_MAX) return '';
     let h = '';
