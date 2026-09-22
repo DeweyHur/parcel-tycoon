@@ -1641,6 +1641,8 @@
       // **배차를 다 쓴 직후에 충전한다**는 연결이 통째로 사라진다 (그게 마켓의 첫 수업이다).
       // 마켓을 닫을 때 장이 끝난다. 자유 런은 그대로 — 마지막 정산이 곧 결과다.
       if (!this.rules.endless && this.month >= this.rules.months && !this.level) return this._finish();
+      // 마지막 장의 마지막 정산 뒤엔 살 게 없다 — 곧장 끝낸다 (다음 장이 없으니 마켓은 헛걸음)
+      if (this.level && this.month >= this.rules.months && LV && this.level.n >= LV.IMPLEMENTED) return this._finish();
       this._openMarket();
       return true;
     }

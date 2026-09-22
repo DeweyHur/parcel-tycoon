@@ -362,7 +362,7 @@ body.cine { background: #000; }
 #intro .ibar.top { top: 0; }
 /* 아래 띠는 '창고 뷰 아래 남는 자리'까지 덮는다 — 오프닝 동안 게임 패널이 비쳐 보이면 안 된다 */
 #intro .ibar.bot { bottom: 0; height: calc(var(--bot, 0%) + var(--bar, 0vh)); }
-#intro .iline { position: absolute; left: 0; right: 0; bottom: calc(var(--bot, 0%) + var(--bar, 0vh) + 18px); text-align: center; padding: 0 18px; opacity: 0; }
+#intro .iline { position: absolute; z-index: 2; left: 0; right: 0; bottom: calc(var(--bot, 0%) + var(--bar, 0vh) + 18px); text-align: center; padding: 0 18px; opacity: 0; }
 #intro .iline span { display: inline-block; background: #0b0a14cc; border: 3px solid var(--line); box-shadow: 3px 3px 0 var(--shadow); padding: 7px 12px; font-size: 13px; line-height: 1.5; color: var(--ink); max-width: 100%; }
 #intro #intro-skip { position: absolute; right: 10px; top: calc(var(--bar, 0vh) + 10px); opacity: .8; }
 #intro .ifade { position: absolute; inset: 0; background: #000; opacity: 1; pointer-events: none; }

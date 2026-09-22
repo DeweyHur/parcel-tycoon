@@ -47,6 +47,28 @@ window.Intro = (function () {
     { shot: 4, at: 0.25, f: () => SFX.shutter() },
   ];
 
+  // 엔딩 씬 — 마지막 장(잔금 완납·본계약) 뒤. 조작 없음, 누르면 끝. 착지하지 않고 암전으로 닫는다
+  const OUTRO = {
+    seq: [
+      // E1 저녁 · 길 건너에서 창고를 본다. 오프닝 첫 샷과 같은 자리 — 석 달 전과 같은 풍경, 다른 주인
+      { from: { p: [12.9, 4.5, 14.7], l: [3.0, 1.0, 1.2] }, to: { p: [14.6, 4.8, 15.6], l: [3.2, 1.0, 1.3] }, keys: ['outro.1'] },
+      // E2 회상 · 한 사장이 열쇠를 건네던 날 (오프닝의 로우앵글)
+      { cut: true, recall: true, from: { p: [4.0, 1.2, 8.5], l: [1.3, 2.3, 0.0] }, to: { p: [4.8, 1.0, 9.2], l: [1.4, 2.5, 0.1] }, keys: ['outro.2'] },
+      // E3 오늘 · 간판을 올려다본다
+      { cut: true, from: { p: [9.6, 2.2, 10.8], l: [1.6, 2.0, 0.2] }, to: { p: [8.4, 2.6, 10.0], l: [1.4, 2.1, 0.1] }, keys: ['outro.3', 'outro.4'] },
+      // E4 크레인처럼 멀어진다 — 동네 속 창고 하나
+      { cut: true, min: 5.2, from: { p: [13.4, 5.6, 16.0], l: [2.0, 1.0, 0.6] }, to: { p: [22.0, 13.0, 26.0], l: [2.0, 0.6, 0.4] }, keys: ['outro.5'] },
+      // 암전 위 마지막 한 줄
+      { dark: true, min: 3.4, from: { p: [22.0, 13.0, 26.0], l: [2.0, 0.6, 0.4] }, to: { p: [22.4, 13.2, 26.4], l: [2.0, 0.6, 0.4] }, keys: ['outro.end'] },
+    ],
+    cards: [],
+    cues: [
+      { shot: 1, at: 0.02, f: () => SFX.recallIn() },
+      { shot: 2, at: 0.02, f: () => SFX.recallOut() },
+      { shot: 4, at: 0.1, f: () => { try { BGM.oneShot('fanfare'); } catch (e) { } } },
+    ],
+  };
+
   const lerp3 = (a, b, e) => [a[0] + (b[0] - a[0]) * e, a[1] + (b[1] - a[1]) * e, a[2] + (b[2] - a[2]) * e];
   const clamp01 = v => Math.max(0, Math.min(1, v));
   const portrait = (who, expr) => (window.Story ? Story.sprite(who, expr, false) : '');
@@ -54,36 +76,39 @@ window.Intro = (function () {
   const tokens = html => html.split(/(<br\s*\/?>)/i).reduce((a, part) => (/^<br/i.test(part) ? (a.push('<br>'), a) : a.concat(part.split(''))), []);
 
   // 문구 길이에서 타임라인을 만든다. 문구를 고치면 샷 길이가 따라 늘어난다
-  function build() {
+  function build(seq, cardsIn, cuesIn, params) {
+    seq = seq || SEQ; cardsIn = cardsIn || CARDS; cuesIn = cuesIn || CUES;
     const C = cps();
     const shots = [], lines = [], cards = [], cues = [];
     let t = 0;
-    SEQ.forEach((s, si) => {
+    seq.forEach((s, si) => {
       const start = t;
       let dur = 0;
       for (const k of s.keys) {
-        const tk = tokens(T(k));
+        const tk = tokens(T(k, params || {}));
         const typ = tk.length * C;
         lines.push({ t: start + dur, lead: LEAD, type: typ, d: LEAD + typ + HOLD, k, tk, recall: !!s.recall });
         dur += LEAD + typ + HOLD + GAP;
       }
       dur = Math.max(dur, s.min || 0);
-      shots.push({ start, dur, cut: !!s.cut, home: !!s.home, truck: !!s.truck, from: s.from, to: s.to });
+      shots.push({ start, dur, cut: !!s.cut, home: !!s.home, truck: !!s.truck, dark: !!s.dark, from: s.from, to: s.to });
       t += dur;
     });
-    for (const c of CARDS) cards.push(Object.assign({}, c, { t: shots[c.shot].start + c.at }));
-    for (const c of CUES) cues.push({ t: shots[c.shot].start + c.at, f: c.f });
+    for (const c of cardsIn) cards.push(Object.assign({}, c, { t: shots[c.shot].start + c.at }));
+    for (const c of cuesIn) cues.push({ t: shots[c.shot].start + c.at, f: c.f });
     cues.sort((a, b) => a.t - b.t);
     return { shots, lines, cards, cues, total: t };
   }
 
-  function play(scene, done) {
+  function play(scene, done, opts) {
+    opts = opts || {};
+    const outro = !!opts.outro;
     const app = document.getElementById('app'), sceneEl = document.getElementById('scene');
     const end = () => { done && done(); };
     // ?nointro — 테스트·반복 확인용 (오프닝을 건너뛰고 바로 1턴)
     if (!scene || !scene.camera || !app || !sceneEl || /(\?|&)nointro\b/.test(location.search)) { end(); return null; }
 
-    const { shots: SHOTS, lines: LINES, cards: CARDS2, cues: CUES2, total: TOTAL } = build();
+    const { shots: SHOTS, lines: LINES, cards: CARDS2, cues: CUES2, total: TOTAL } = outro ? build(OUTRO.seq, OUTRO.cards, OUTRO.cues, opts.params) : build();
 
     const ov = document.createElement('div');
     ov.id = 'intro';
@@ -112,7 +137,7 @@ window.Intro = (function () {
     scene.camSet(SHOTS[0].from.p, SHOTS[0].from.l);
     scene.close(true);   // 밖에서 보는 동안은 벽이 다 있는 '완성된 창고' 다
     const truckX = scene.truck ? scene.truck.position.x : null;
-    if (scene.truck) scene.truck.position.x = TRUCK_OFF;   // 마당은 비어 있다 — 탑차는 S5 에 들어온다
+    if (scene.truck && !outro) scene.truck.position.x = TRUCK_OFF;   // 마당은 비어 있다 — 탑차는 S5 에 들어온다
 
     let over = false, look = SHOTS[0].from.l.slice(), homeFrom = null, homeTo = null;
     let shownKey = null, shownN = -1, recall = false, shownCard = null, fired = 0, truckIn = false, narrN = 0;
@@ -169,6 +194,7 @@ window.Intro = (function () {
 
       // 암전: 시작 페이드인 + 컷
       let dark = clamp01(1 - t / 0.5);
+      if (outro) for (const sh of SHOTS) if (sh.dark) dark = Math.max(dark, clamp01((t - sh.start + 0.9) / 0.9));
       for (const sh of SHOTS) if (sh.cut) dark = Math.max(dark, clamp01(1 - Math.abs(t - sh.start) / CUT));
       fadeEl.style.opacity = dark.toFixed(3);
 

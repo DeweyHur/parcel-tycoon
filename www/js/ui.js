@@ -218,7 +218,10 @@
       P.campaign = Object.assign({}, P.campaign, { cleared: Math.max(P.campaign.cleared || 0, r.level), level: next, carry, carryAt });
       Profile.save(); game = null;
       if (hasNext) return startLevel(next);            // 타이틀로 돌아가지 않는다 — 장은 이어진다
-      closeModal(); showTitle();                       // 아직 다음 장이 없다 (임시 다리)
+      // 마지막 장 — 인수인계가 끝났다. 엔딩 씬 한 번 보여 주고 타이틀로
+      closeModal();
+      if (window.Intro && scene) Intro.play(scene, () => showTitle(), { outro: true, params: { name: esc(P.campaign.name || T('lv.nameDefault')) } });
+      else showTitle();
     };
     // 서장 끝은 편지 한 장으로 끝난다 — 보름 대타에 서류를 쓸 자리가 없다.
     // 1장 끝(한 달)에서 한 사장이 값을 부르고, 그 자리에서 간판을 갈아 달고 가계약서에 도장을 찍는다.
@@ -274,7 +277,7 @@
       <div class="ct-row"><span>${esc(T('ct.seller'))}</span><b>${esc(T('ct.sellerName'))}</b></div>
       <div class="ct-row"><span>${esc(T('ct.buyer'))}</span><b>${esc(name)}</b></div>
       <div class="ct-row"><span>${esc(T('ct.item'))}</span><b>${esc(T('ct.itemName'))}</b></div>
-      <p class="ct-body">${T('ct.bodyFinal')}</p>
+      <p class="ct-body">${T('ct.bodyFinal', { price: (P.campaign.deal || {}).price || '' })}</p>
       <div class="stamp" id="ct-stamp">${esc(T('ct.stampMark'))}</div></div>`;
     const m = modal(T('ct.modal'), body, [{ label: T('ct.stamp'), cls: 'primary', onClick: () => {
       const st = m.querySelector('#ct-stamp');
