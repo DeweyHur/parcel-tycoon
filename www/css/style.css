@@ -711,3 +711,16 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 .rank.r1 i { border-color: #bcd6ff; }             /* 프리미엄 — 기존 배지의 파랑 */
 .rank.r2 i { border-color: #e0bcff; }             /* 엘리트 — 보라 */
 .rank.r3 i { border-color: var(--gold); }         /* 마스터 — 금 */
+
+/* 계약: 가로 스와이프 대신 세로 목록 — 한 줄에 이름 · 색 · 적재 · 순수익 · 배차 */
+#contract-strip { flex-direction: column; overflow: visible; gap: 4px; padding: 0 0 5px; scroll-snap-type: none; }
+#contract-strip .contract { flex: none; width: 100%; min-height: 0; padding: 5px 8px; display: grid; grid-template-columns: 78px auto minmax(0, 1fr) auto auto; align-items: center; gap: 6px; }
+#contract-strip .contract[hidden] { display: none; }
+#contract-strip .contract .cn { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
+#contract-strip .contract .takes { margin: 0; }
+#contract-strip .contract .cl { min-width: 0; overflow: hidden; }
+#contract-strip .contract .per { font-size: 12px; min-width: 36px; text-align: right; }
+#contract-strip .contract .calls { justify-self: end; }
+#contract-strip .contract.full::before { right: auto; left: 4px; bottom: -1px; }
+#call-head .ch-top .tbtn { margin-left: auto; }
+#call-head .trustline { cursor: pointer; }

@@ -657,10 +657,10 @@
       const spent = c.calls === 0 && g.shows('calls') && !spare && !struck;
       const cells = pips(pv.cells, vcap, pv.over, pv.trucks) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
-      btn.innerHTML = `<div class="nm"><span>${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}</span><span class="calls ${spent ? 'zero' : ''}">${struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips}</span></div>
-        ${(td => td ? `<div class="takesrow">${td}</div>` : '')(takesDots(g, c))}
-        ${bar}
-        <div class="sub">${spent ? `<span class="spent">${T('hud.callsSpent')}</span>` : `${cells}${pv.n ? ` · <span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>` : ` · <span class="per">${T('hud.perNone')}</span>`}${extras.length ? ' · ' + extras.join(' · ') : ''}`}</div>`;
+      // 세로 목록 한 줄: 이름 · 싣는 색 · 적재 눈금 · 순수익 · 배차 눈금. 글자는 최소로 — 자세한 건 꾹 누르면
+      const callsHtml = struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips;
+      const netHtml = spent || !pv.n ? '<span class="per">—</span>' : `<span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>`;
+      btn.innerHTML = `<span class="cn">${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}</span>${takesDots(g, c, true)}<span class="cl">${spent ? '' : cells}</span>${netHtml}<span class="calls ${spent ? 'zero' : ''}">${callsHtml}</span>`;
     }
     const sc = $('#cself');
     if (sc) {
@@ -669,7 +669,7 @@
         const on = selfOk() && !busy && g.phase === 'play', n = g.selfCount(), el = g.selfEligible();
         sc.disabled = !on; sc.className = 'btn contract self' + (on ? ' ready' : '') + (pk && pk.i === SELF ? ' picked' : '');
         const pv = sortByUrgency(el).slice(0, n);
-        sc.innerHTML = `<div class="nm"><span>🚐 ${T('self.card')}</span><span class="calls">×${n}</span></div><div class="sub">${el.length ? `${pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), [])} · ${T('self.cardSub', { n: el.length })}` : T('err.nothingSelf')}</div>`;
+        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span><span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls">×${n}</span>`;
       }
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
@@ -1135,6 +1135,11 @@
     renderAll();
     if (lastCallCtx) storyCheck(lastCallCtx);
   }
+  function bindHold(el, onHold) {
+    let t = null; const clear = () => { if (t) { clearTimeout(t); t = null; } };
+    el.onpointerdown = () => { clear(); t = setTimeout(() => { t = null; if (!busy) { SFX.click(); onHold(); } }, 450); };
+    el.onpointerup = el.onpointerleave = el.onpointercancel = clear; el.oncontextmenu = e => e.preventDefault();
+  }
   // 상자: 누르면 싣기/빼기, 꾹 누르면 상세. 차가 없으면(배차가 다 떨어지면) 누르면 상세.
   function bindTile(el) {
     const id = +el.dataset.id; let timer = null, long = false;
@@ -1185,14 +1190,16 @@
     const ko = I18n.lang === 'ko', net = income - callFee;
     const tbtn = `${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}`;
     const gauge = `<div class="load-visual mini"><div class="truck-stack">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
-    const hint = `<div class="load-hint">${vol}/${cap} · ${Math.round(fill * 100)}%${fill >= 0.8 && game.shows('chain') ? ' ⚡' : ''} · ${T('call.tapBoxes')}${tbtn ? ` <span class="tbtn">${tbtn}</span>` : ''}</div>`;
+    const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
     const money = `${chain.count >= 2 && game.shows('chain') ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
     const riskLine = riskSel.length ? `<div class="riskline">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
     let trust = '';
-    if (game.shows('trust')) { const tg = game.trustGainPreview(c, vol, trucks), nx = game.trustNext(c.carrier); trust = `<div class="trustline">${trustBar(game, c.carrier)} ${T('call.xpGain', { xp: tg.xp, parts: tg.parts.join(', ') })}${nx ? ` · ${T('call.nextLevel')}: ${esc(nx.effect)}` : ''}${game.trustLevel(c.carrier) >= 1 ? ` · ${esc(D.trustEffectText(c.carrier, game.trustLevel(c.carrier)))}` : ''}</div>`; }
-    head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}</div>${gauge}${hint}${money}${riskLine}${trust}`;
+    if (game.shows('trust')) { const tg = game.trustGainPreview(c, vol, trucks); trust = `<div class="trustline" title="${esc(T('call.trustHold'))}">${trustBar(game, c.carrier)} ${T('call.xpShort', { xp: tg.xp })}</div>`; }
+    head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}${tbtn ? `<span class="tbtn">${tbtn}</span>` : ''}</div>${gauge}${hint}${money}${riskLine}${trust}`;
+    // 신뢰 줄은 꾹 누르면 단계표(다음 단계·효과)가 나온다
+    { const tl = head.querySelector('.trustline'); if (tl) bindHold(tl, () => showContractDetail(c)); }
     foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn primary${vol && vol >= cap ? ' full' : ''}" id="call-go"${cm.sel.size ? '' : ' disabled'}>${T('call.btn')}</button>`;
     head.hidden = foot.hidden = false;
     const ta = head.querySelector('#truck-add'); if (ta) ta.onclick = () => { cm.extra = trucks; SFX.select(); renderAll(); };

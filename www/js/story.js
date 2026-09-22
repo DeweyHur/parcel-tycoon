@@ -200,9 +200,12 @@
       { expr: 'neutral', hl: '#call-head .trustline' },
       { expr: 'think', hl: '#call-head .trustline' },
     ] },
-    { id: 'l3switch', kind: 'market', when: g => !!switchItem(g), pages: [
-      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'contract' && it.switchFrom) },
-      { expr: 'worry' },
+    // 2장 마켓: 다음 보름 ❄ 신선을 받을 준비 — 보낼 차(냉장 계약)와 둘 곳(냉장 구역)을 직접 산다
+    { id: 'l4warn', kind: 'market', when: g => !!coldContract(g) || !!coldItem(g), pages: [{ expr: 'worry' }, { expr: 'neutral' }] },
+    { id: 'l4coldCar', kind: 'market', when: g => !!coldContract(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'cold'), gate: true }] },
+    { id: 'l4coldFac', kind: 'market', when: g => !!coldItem(g), pages: [
+      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'fac' && /^cold/.test(it.fac || '')) },
+      { expr: 'worry', hl: g => cardSel(g, it => it.kind === 'fac' && /^cold/.test(it.fac || '')), gate: true },
     ] },
     { id: 'l3yardBuy', kind: 'market', when: g => !!mkItem(g, it => it.kind === 'fac' && it.fac === 'yard'), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'fac' && it.fac === 'yard') }] },
     { id: 'l3last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }] },
@@ -215,6 +218,11 @@
   const coldContract = g => mkItem(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'cold');
   const firstOf = (g, t) => g.parcels.find(p => p.type === t);
   const BEATS_L4 = [
+    // 프리미엄 갈아타기(빠른손)는 3장 마켓에서 — 2장은 신선 준비만으로도 크다
+    { id: 'l3switch', kind: 'market', when: g => !!switchItem(g), pages: [
+      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'contract' && it.switchFrom) },
+      { expr: 'worry' },
+    ] },
     // 캠페인: 3장(4월 후반)에 — 2장은 폭주 직전이라 끌어올 때가 아니었다. id 는 그대로(game.campaignOpen 이 본다)
     // 캠페인은 '창고가 빈 날'을 두 번 겪은 다음에 — 비어 노는 게 아깝다는 걸 느낀 뒤라야 버튼이 뜻이 있다
     { id: 'l3invest', kind: 'turn', when: g => (g.emptyDays || 0) >= 2, act: () => {}, pages: [{ expr: 'think', hl: '#bar-usage' }, { expr: 'smile', hl: '#invest-btn', gate: true }] },
@@ -227,15 +235,9 @@
     // 이름 있는 화주 — 지금까지는 전부 개인 고객이었다
     { id: 'l4cust', kind: 'turn', when: g => g.parcels.some(p => p.customer && p.customer !== 'anon'), pages: [
       { expr: 'neutral', hl: '#parcels' },
-      { expr: 'think', hl: '#cust-btn' },
+      { expr: 'think', hl: '#parcels .ptile' },
     ] },
     // 마켓이 먼저 온다: 다음 사이클에 ❄ 가 오는데 받을 데가 없다
-    { id: 'l4warn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!coldContract(g), pages: [{ expr: 'worry', hl: '#mk-fcwarn' }, { expr: 'neutral' }] },
-    { id: 'l4coldCar', kind: 'market', when: g => !!coldContract(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'cold') }] },
-    { id: 'l4coldFac', kind: 'market', when: g => !!coldItem(g), pages: [
-      { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'fac' && /^cold/.test(it.fac || '')) },
-      { expr: 'worry' },
-    ] },
     // ❄ 가 실제로 들어온 날
     { id: 'l4cold', kind: 'turn', when: g => !!firstOf(g, 'fresh'), pages: [
       { expr: 'neutral', hl: '#parcels' },

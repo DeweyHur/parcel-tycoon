@@ -131,13 +131,14 @@
           ['normal 2 anon', 'fragile 2 anon'],
           ['normal 2 anon', 'normal 1 anon'],
         ]),
-          market: { contracts: ['bulk1'], enh: ['limit1'], fac: ['yard'] } },
+          // 다음 보름에 ❄ 신선이 온다 — 받을 차(냉장 계약)와 둘 곳(냉장 구역)을 여기서 직접 사게 한다(게이트)
+          market: { contracts: ['cold0'], enh: ['limit1'], fac: ['cold1', 'yard'] } },
       },
     },
     // ----- 3장 (4월 후반): 이사철. 이름 있는 화주 · ⚠ 깨지는 것 · ❄ 찬 것 -----
     {
       n: 4, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 3, grants: ['cold', 'customers', 'self', 'invest'],
-      minCash: 500, minCap: 24, minCalls: 5, minWarehouse: { cold: 8 },
+      minCash: 500, minCap: 24, minCalls: 5, minWarehouse: { cold: 4 },   // 2장 마켓에서 산 냉장 구역(4칸)을 못 샀을 때만 받치는 바닥
       // 한 사이클 안에 마켓이 한 번뿐이라 '사고 나서 배운다'가 안 된다 — 냉장은 시작 판에 쥐여 주고,
       // 왜 그게 필요한지를 박 반장이 말로 짚는다.
       company: { cash: 1200, warehouse: { cap: 24, cold: 8, frozen: 0, xl: 0 },
@@ -164,7 +165,8 @@
           ['normal 2 anon', 'normal 2 mart', 'fresh 2 farm'],
           ['normal 2 mart', 'normal 2 anon', 'normal 2 anon'],
         ]),
-          market: { contracts: ['fragile0'], enh: ['optFragile'], fac: ['cold1'] } },
+          // 빠른손(프리미엄 갈아타기)은 여기서 — 신선을 먼저 익히고 나서
+          market: { contracts: ['bulk1'], enh: ['optFragile'], fac: ['cold2'] } },
       },
     },
     // ----- 4장 (5월 전반): 소문. 평판이 열리고, 여기서 처음으로 끝날 수 있는 판이 된다 -----
