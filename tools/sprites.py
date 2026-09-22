@@ -333,6 +333,45 @@ def char_E(expr, talk=False):
     return img
 
 
+def hair_curly_black(img, col=(40, 34, 36), sh=(24, 20, 22)):
+    """짧은 곱슬 — 정수리가 봉긋하고 옆은 짧다 (20대)"""
+    o = P["o"]
+    rect(img, 8, 3, 23, 7, col); rect(img, 7, 5, 7, 9, col); rect(img, 24, 5, 24, 9, col)
+    hline(img, 9, 22, 2, o); px(img, 8, 3, o); px(img, 23, 3, o); rect(img, 6, 5, 6, 9, o); rect(img, 25, 5, 25, 9, o)
+    for x in (9, 12, 15, 18, 21): px(img, x, 3, sh); px(img, x + 1, 5, sh)
+    rect(img, 9, 8, 11, 8, col); rect(img, 14, 8, 17, 8, col); rect(img, 20, 8, 22, 8, col)
+
+def apron(img, col=(240, 160, 75), sh=(200, 120, 50), strap=(120, 70, 30)):
+    """파손주의 주황 앞치마 — 살살 택배 유니폼"""
+    o = P["o"]
+    rect(img, 9, 24, 22, 31, col); rect(img, 9, 24, 10, 31, sh); rect(img, 21, 24, 22, 31, sh)
+    rect(img, 8, 24, 8, 31, o); rect(img, 23, 24, 23, 31, o)
+    px(img, 11, 23, strap); px(img, 20, 23, strap); px(img, 11, 22, strap); px(img, 20, 22, strap)
+    # 가슴에 ⚠ 마크
+    px(img, 15, 26, o); px(img, 16, 26, o); hline(img, 14, 17, 27, o); hline(img, 13, 18, 28, o)
+    px(img, 15, 27, (250, 240, 200)); px(img, 16, 27, (250, 240, 200))
+
+def bubble_wrap(img):
+    """뽁뽁이 롤 — 왼팔에 끼고 있다"""
+    o = P["o"]; c = (210, 235, 245); d = (150, 200, 220)
+    rect(img, 1, 23, 7, 31, c); rect(img, 0, 23, 0, 31, o); rect(img, 8, 23, 8, 31, o); hline(img, 1, 7, 22, o)
+    for y in (24, 27, 30):
+        for x in (2, 5): px(img, x, y, d)
+    for y in (25, 28):
+        for x in (3, 6): px(img, x, y, (245, 252, 255))
+
+def char_F(expr, talk=False):
+    """안 대리 — 20대 청년, 짧은 곱슬, 주황 앞치마(⚠), 뽁뽁이 롤. 살살 택배의 조심성 많은 담당자"""
+    img = new()
+    skin, sh = (242, 206, 172), (202, 162, 128)
+    bust(img, skin, sh, (70, 80, 100), (50, 58, 75), collar=(235, 235, 230))
+    apron(img)
+    head(img, skin, sh)
+    hair_curly_black(img)
+    face(img, expr, skin_sh=sh, talk=talk)
+    bubble_wrap(img)
+    return img
+
 CHARS = [
     ("A", "박 반장", "60대 · 흰머리 · 안경 · 작업조끼 · 머그", "느긋한 멘토. 실수해도 '그럴 수 있지' 하고 커피부터 권한다", char_A),
     ("B", "강 소장", "50대 · 쪽머리(새치) · 클립보드", "깐깐한 베테랑. 숫자로 말한다. 칭찬은 짧고 지적은 정확", char_B),
@@ -440,7 +479,7 @@ def export_js():
     open(OUT + "/sprites_b64.txt", "w").write("\n".join(out) + "\n")
     # 조연: 여 실장(D)·노 기사(C)·강 소장(B)·이름 없는 담당자 — neutral/talk/smile
     reps = []
-    for rid, fn in (("yeo", char_D), ("noh", char_C), ("kang", char_B), ("rep", char_generic), ("han", char_E)):
+    for rid, fn in (("yeo", char_D), ("noh", char_C), ("kang", char_B), ("rep", char_generic), ("han", char_E), ("ahn", char_F)):
         exprs = (("neutral", False), ("neutral", True), ("smile", False))
         if rid == "han": exprs = exprs + (("smile", True), ("worry", False), ("laugh", False))   # 영감님은 편지·회상에서 표정을 더 쓴다
         for ek, talk in exprs:

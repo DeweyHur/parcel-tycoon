@@ -437,6 +437,7 @@
     'story.ok': '알겠어',
     'story.tapHere': '여기를 눌러',
     'story.name.yeo': '여 실장',
+    'story.name.ahn': '안 대리',
     'story.name.noh': '노 기사',
     'story.name.kang': '강 소장',
     'story.name.rep': '{center} 담당자',

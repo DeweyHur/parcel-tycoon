@@ -702,3 +702,12 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 .cdtakes { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 5px 0 2px; font-size: 12px; }
 .cdtakes span { display: inline-flex; align-items: center; gap: 4px; }
 .cdtakes i { width: 10px; height: 10px; border: 1px solid #0008; }
+
+/* 등급 계급장: 갈매기(V) 줄무늬 — 1·2·3줄 */
+.rank { display: inline-flex; flex-direction: column; align-items: center; gap: 0; margin-left: 5px; vertical-align: middle; line-height: 0; }
+.rank i { width: 7px; height: 7px; margin-top: -3px; border-left: 2px solid #8fb8ff; border-top: 2px solid #8fb8ff; transform: rotate(45deg); }
+.rank i:first-child { margin-top: 0; }
+.rank { filter: drop-shadow(0 1px 0 #0008); }
+.rank.r1 i { border-color: #bcd6ff; }             /* 프리미엄 — 기존 배지의 파랑 */
+.rank.r2 i { border-color: #e0bcff; }             /* 엘리트 — 보라 */
+.rank.r3 i { border-color: var(--gold); }         /* 마스터 — 금 */

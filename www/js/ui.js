@@ -22,7 +22,9 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   function ptype(p) { return D.PARCEL_TYPES[p.type]; }
   function today() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
-  function gradeBadge(g) { return g && g !== 'normal' ? `<span class="badge ${g}">${D.GRADES[g].name}</span>` : ''; }
+  // 등급은 글자 대신 계급장처럼 — 프리미엄 ▲ 하나, 엘리트 둘, 마스터 셋(금). 이름은 눌러 보면(툴팁) 나온다
+  const GRADE_RANK = { trusted: 1, expert: 2, master: 3 };
+  function gradeBadge(g) { const n = GRADE_RANK[g]; return n ? `<span class="rank r${n}" title="${esc(D.GRADES[g].name)}" aria-label="${esc(D.GRADES[g].name)}">${'<i></i>'.repeat(n)}</span>` : ''; }
 
   // ---------- toast / float ----------
   let toastTimer; const toastQueue = [];

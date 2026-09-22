@@ -436,6 +436,7 @@
     'story.ok': 'Got it',
     'story.tapHere': 'Tap here',
     'story.name.yeo': 'Yeo',
+    'story.name.ahn': 'Ahn',
     'story.name.noh': 'Noh',
     'story.name.kang': 'Kang',
     'story.name.rep': '{center} rep',

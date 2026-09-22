@@ -166,7 +166,7 @@
       fragile0: { family: 'fragile', tier: 0 },
       // 캠페인 2장에서 붙는 작은 완충 밴 — ⚠ 도 안전하게, 일반도 받는다(need 없음). 차가 4칸이라
       // 일반만 실으면 배차비와 똔똔이고, ⚠ 를 실어야 남는다. 마켓·랜덤 시작에는 안 나온다(campaign).
-      pack0: { family: 'fragile', tier: 0, need: null, campaign: true },
+      pack0: { family: 'fragile', tier: 0, need: null, campaign: true, rep: 'ahn' },
       fragile1: { family: 'fragile', tier: 1 },
       fragile2: { family: 'fragile', tier: 2, sizeMax: 7 },                    // 대형 파손까지
       fragile3: { family: 'fragile', tier: 3, sizeMax: 7, extraCaps: ['cold'] },
@@ -275,7 +275,7 @@
       fee: c.fee != null ? c.fee : Math.round(f.fee * t.fee), price: c.price != null ? c.price : Math.round(f.price * t.price),
       refill: c.refill != null ? c.refill : Math.round(f.price * 0.5 * (1 + c.tier * 0.5)),
       sizeMax: c.sizeMax != null ? c.sizeMax : f.sizeMax, delay: c.delay != null ? c.delay : (f.delay || 0), simul: c.simul || 1,
-      need: 'need' in c ? c.need : f.need, campaign: !!c.campaign });
+      need: 'need' in c ? c.need : f.need, campaign: !!c.campaign, rep: c.rep || f.rep });
   }
   // 계열 → 센터 id (tier 순). 회사 시작 계약·보장·가중치는 계열 이름으로 쓴다
   DATA.centersOf = fam => Object.keys(DATA.CARRIERS).filter(k => DATA.CARRIERS[k].family === fam && !DATA.CARRIERS[k].campaign).sort((a, b) => DATA.CARRIERS[a].tier - DATA.CARRIERS[b].tier);
