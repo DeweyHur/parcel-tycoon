@@ -229,6 +229,19 @@ t('직접 배송: 하루를 넘기지 않고 보름에 1회, 보상 그대로 + 
   g.warehouse.driver = true; assert.equal(g.selfTripsLeft(), 1); assert.ok(g.selfShip([901]).ok); assert.equal(g.selfTripsLeft(), 0);
   g.warehouse.bigvan = true; assert.equal(g.selfCount(), 2);
 });
+t('강화 칸: 등급만큼 아무 강화나, 특약도 여러 개, 칸이 차면 거절', () => {
+  const g = EMPTY(4); const c = g._makeContract('bulk', 'normal'); g.contracts = [c, null, null, null];
+  assert.equal(g.enhSlots(c), D.ENH_SLOTS.normal); assert.equal(g.enhUsed(c), 0);
+  g.phase = 'market'; g.cash = 99999;
+  const mk = ids => { g.market = { items: ids.map(e => ({ kind: 'enh', enh: e, price: 1, name: e, sold: false })) }; };
+  mk(['limit1', 'limit1', 'optFragile']);
+  assert.ok(g.buy(0, 0).ok); assert.ok(g.buy(1, 0).ok); assert.equal(g.enhUsed(c), 2); assert.equal(c.enh.limit, 2);
+  const r = g.buy(2, 0); assert.ok(!r.ok);                     // 2칸 다 참
+  const t = g._makeContract('cold', 'trusted'); g.contracts[1] = t; assert.equal(g.enhSlots(t), 3);
+  mk(['optFragile', 'optCustoms', 'express']);
+  assert.ok(g.buy(0, 1).ok); assert.ok(g.buy(1, 1).ok); assert.ok(g.buy(2, 1).ok);
+  assert.ok(g.contractCaps(t).includes('fragile') && g.contractCaps(t).includes('customs')); assert.equal(g.enhUsed(t), 3);
+});
 t('마켓 막힌 속성 보장: 처리 못 하는 특수 택배가 있으면 슬롯 A에 처리 가능한 업체', () => {
   let hit = 0; for (let s = 1; s <= 30; s++) { const g = EMPTY(s); g.contracts = [g._makeContract('bulk', 'normal'), null, null, null]; g.parcels = [P(1, 'frozen', 2, { inFrozen: true, deadline: 99 })]; g.warehouse.frozen = 4; g._assignCold();
     while (g.phase === 'play') adv(g); if (g.phase !== 'summary') continue; g.closeSummary(); const it = g.market.items[0]; if (it.kind === 'contract' && it.hint && D.CARRIERS[it.carrier].caps.includes('frozen')) hit++; }

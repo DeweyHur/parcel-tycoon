@@ -194,6 +194,7 @@
     'err.capMax': 'Capacity upgrade: max 3 per contract',
     'err.hasRegular': 'Regular dispatch already applied',
     'err.hasExpress': 'Express dispatch already applied',
+    'err.enhFull': 'No enhancement slots left ({n})',
     'err.optOne': 'One rider per contract',
     'err.optHasAttr': 'Carrier already handles that attribute',
     'err.optUrgent': 'Riders cannot be added to this contract',
@@ -630,7 +631,7 @@
     'story.l2pack.2': 'It takes plain parcels too, so you can split the load. Take it — tap it.',
     'story.l2refill.1': 'This is a refill. Flat price \u2014 so topping up while you still have dispatches left <b>throws the rest away</b>.',
     'story.l2refill.2': 'You\u2019re at zero, so nothing is wasted. Go on, press it.',
-    'story.l2limit.1': 'This raises the limit. A refill fills the bowl; this one <b>makes the bowl bigger</b>.<br>Buy it once and it stays.',
+    'story.l2limit.1': 'This raises the limit. A refill fills the bowl; this one <b>makes the bowl bigger</b>.<br>Buy it once and it stays. Each contract has <b>upgrade slots</b> — fit as many as it has.',
     'story.l2two.1': 'Two trucks. One wouldn\u2019t hold it, so a second came along.',
     'story.l2two.2': 'Two dispatches, two fees — same price per truck. So if <b>both are full</b>, sending them together costs you nothing extra.<br>If the second one is half-empty, drop it and fill it tomorrow. Auto-select loads it that way.',
     'story.l2cap.1': 'Warehouse expansion. You saw what overflow looks like \u2014 the yard has no roof.<br>It only gets pricier, so buy early if you\u2019re buying.',
@@ -719,7 +720,7 @@
     'story.l6off.1': 'No trucks today. Self-delivery still works \u2014 carry the urgent ones by hand.',
     'story.l5frozen.1': 'Next half brings ❆ <b>frozen</b>. Chilled trucks won\u2019t do — only the frozen line takes it.<br>You\u2019ve got a free slot. Fill it with this.',
     'story.l5full.1': 'Hold on. <b>All four contract slots are taken.</b> Nowhere to put another.',
-    'story.l5full.2': 'Then it isn\u2019t a contract you want, it\u2019s a <b>clause</b> \u2014 an extra term fitted to a contract you already have.<br>Takes no slot. One clause per contract, mind.',
+    'story.l5full.2': 'Then it isn\u2019t a contract you want, it\u2019s a <b>clause</b> \u2014 an extra term fitted to a contract you already have.<br>Takes no contract slot — but it uses one of that contract\u2019s <b>upgrade slots</b>.',
     'story.l5full.3': 'Buy that and fit it to the right contract; that truck will take \u2746 as well.<br>Last thing I\u2019ll teach you: when you\u2019re out of room, you don\u2019t add \u2014 you <b>fit</b>.',
     'story.l6stuck.1': 'Still nowhere to load that. Tap the parcel and it tells you what it needs.',
     'story.l6stuck.2': 'Slots full means find the clause; no clause and you\u2019re switching a contract out.',
@@ -1518,15 +1519,15 @@
     "ENHANCEMENTS": {
       "limit1": {
         "name": "Dispatch Limit +1",
-        "desc": "Monthly dispatch limit & remaining trucks +1 (2 per contract)"
+        "desc": "Monthly dispatch limit & remaining trucks +1"
       },
       "limit2": {
         "name": "Dispatch Limit +2",
-        "desc": "Monthly dispatch limit & remaining trucks +2 (2 per contract)"
+        "desc": "Monthly dispatch limit & remaining trucks +2"
       },
       "cap1": {
         "name": "Load Reinforcement",
-        "desc": "Vehicle capacity +1 (3 per contract)"
+        "desc": "Vehicle capacity +1"
       },
       "regular": {
         "name": "Free First Dispatch",
@@ -1546,7 +1547,7 @@
       },
       "optFragile": {
         "name": "Padded Packing Rider",
-        "desc": "This contract handles ⚠ fragile safely (1 rider per contract)"
+        "desc": "This contract handles ⚠ fragile safely"
       },
       "optCold": {
         "name": "Cooler Rider",

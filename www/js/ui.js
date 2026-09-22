@@ -648,7 +648,7 @@
       const fullNow = can && pv.n > 0 && pv.fill >= 1;
       btn.className = 'btn contract' + (can ? ' ready' : '') + (pk && pk.i === i ? ' picked' : '') + (fullNow && !(pk && pk.i === i) ? ' full' : '');
       btn.dataset.full = T('hud.fullTag');
-      const extras = [delay ? T('call.payLater', { n: delay }) : '', c.enh.regular && !c.freeUsedMonth ? T('hud.regular') : ''].filter(Boolean);
+      const extras = [delay ? T('call.payLater', { n: delay }) : '', g.regularFreeLeft(c) > 0 ? T('hud.regular') : ''].filter(Boolean);
       // 파란 눈금은 계약된 배차 횟수 — 쓴 만큼 비어 간다. 다 쓰면 전부 빈 칸(0대라는 글자 대신)
       const callMax = Math.max(c.calls, c.maxCalls || c.calls);
       const callPips = callPipsHtml(c.calls, callMax);
@@ -882,6 +882,13 @@
   }
   // 이 계약이 받아 주는 품목 — 색 점 하나가 한 종류다. 속성이 안 열린 장에서는 전부 일반이라 안 그린다.
   // 칸 수를 숫자 대신 작은 트럭으로 — 빈 칸이 곧 용량이다
+  // 강화 칸: 등급만큼 네모. 찬 칸은 금색, 빈 칸은 테두리만 — 이름은 길게 누르면(title)
+  function enhNames(g, c) { const cnt = {}; for (const id of g.enhList(c)) cnt[id] = (cnt[id] || 0) + 1; return Object.keys(cnt).map(id => D.ENHANCEMENTS[id].name + (cnt[id] > 1 ? ` ×${cnt[id]}` : '')); }
+  function enhPips(g, c) {
+    const used = g.enhList(c), n = g.enhSlots(c);
+    let h = ''; for (let k = 0; k < n; k++) h += used[k] ? `<i class="on" title="${esc(D.ENHANCEMENTS[used[k]].name)}"></i>` : '<i></i>';
+    return `<span class="eslots" title="${esc(T('kind.enh'))} ${used.length}/${n}">${h}</span>`;
+  }
   function miniTruck(g, c) {
     const n = g.baseCapacity(c);
     return `<span class="mktruck" title="${esc(T('fmt.cells', { n }))}" aria-label="${esc(T('fmt.cells', { n }))}">${'<i></i>'.repeat(Math.min(n, 16))}<b></b></span>`;
@@ -1460,7 +1467,7 @@
       const cards = mk.items.map((it, i) => {
         if (it.kind === 'refill') return ''; // 충전은 위 '현재 계약' 칸에서
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}${T('mk.capLine', { vehicle: esc(o.vehicle), cap: o.cap, trucks: o.trucks, total: o.total, fee: o.fee, per: o.per })}<br>${game.shows('attrs') ? `${o.badge}${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
+        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}${T('mk.capLine', { vehicle: esc(o.vehicle), cap: o.cap, trucks: o.trucks, total: o.total, fee: o.fee, per: o.per })}<span class="eslots" title="${esc(T('kind.enh'))}">${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span><br>${game.shows('attrs') ? `${o.badge}${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
@@ -1475,7 +1482,7 @@
         if (!c) return `<div class="card dis" style="cursor:default"><div class="t">${T('my.slot', { n: si + 1 })} · ${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>`;
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
         return `<div class="card" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${T('my.remain', { calls: c.calls, max: c.maxCalls })}</span></div>
-          <div class="crow"><span class="d">${miniTruck(game, c)}${takesDots(game, c, true)}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
+          <div class="crow"><span class="d">${miniTruck(game, c)}${takesDots(game, c, true)}${game.shows('market') ? enhPips(game, c) : ''}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
       }).join('') + '</div><hr>';
       const rc = game.refreshCost();
       const wh = game.warehouse, used = game.usedVolume(), outd = game.outdoorVolume();
@@ -1614,7 +1621,7 @@
   }
   function showContractDetail(c, back) {
     const g = game, car = D.CARRIERS[c.carrier], fam = D.FAMILIES[car.family];
-    const enh = [c.enh.limit ? T('my.limit', { n: c.enh.limit }) : '', c.enh.cap ? T('my.cap', { n: c.enh.cap }) : '', c.enh.regular ? D.ENHANCEMENTS.regular.name : '', c.enh.express ? D.ENHANCEMENTS.express.name : '', c.enh.opt ? D.ENHANCEMENTS[c.enh.opt].name : ''].filter(Boolean);
+    const enh = enhNames(g, c);
     const rep = Story.repOf(c.carrier);
     const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d">${rep === 'rep' ? '' : `<b>${esc(Story.repName(rep, c.carrier))}</b>`}${gradeBadge(c.grade)}<div class="cdtakes">${takesTypes(g, c, true).map(t => `<span><i style="background:${D.PARCEL_TYPES[t].css}"></i>${esc(D.PARCEL_TYPES[t].name)}</span>`).join('')}</div><div style="color:var(--dim);font-size:11px">${T('call.size', { min: car.sizeMin, max: g.contractSizeMax(c) })}</div></div></div>
       <div class="kv" style="margin-top:8px">      <span>${esc(car.vehicle || '')}</span><span class="v">${T('fmt.cells', { n: g.vehicleCap(c) })} · ×${g.simulMax(c)}</span>
@@ -1629,12 +1636,14 @@
     const body = `<p style="font-size:12px;color:var(--dim)">${isContract ? T('slot.pickReplace') : T('slot.pickApply')}</p>` + game.contracts.slice(0, game.visibleSlots()).map((c, s) => {
       if (!c) return isContract ? `<div class="card" data-s="${s}"><div class="t">${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>` : '';
       const tb = trustBar(game, c.carrier);
-      const info = `${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}` + (c.enh.limit ? ` · ${T('slot.limitEnh', { n: c.enh.limit })}` : '') + (c.enh.cap ? ` · ${T('slot.capEnh', { n: c.enh.cap })}` : '') + (c.enh.regular ? ` · ${D.ENHANCEMENTS.regular.name}` : '') + (c.enh.express ? ` · ${D.ENHANCEMENTS.express.name}` : '');
-      return `<div class="card" data-s="${s}"><div class="t">${esc(game.contractName(c))}</div><div class="d">${info}</div></div>`;
+      const full = !isContract && D.ENHANCEMENTS[it.enh] && D.ENHANCEMENTS[it.enh].kind !== 'trust' && game.enhUsed(c) >= game.enhSlots(c);
+      const names = enhNames(game, c);
+      const info = isContract ? `${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}` : `${enhPips(game, c)}${names.length ? ` ${names.join(' · ')}` : ''}`;
+      return `<div class="card ${full ? 'dis' : ''}" data-s="${s}"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span></div><div class="d">${info}</div></div>`;
     }).join('');
     const m = modal(it.name, body, [{ label: T('btn.cancel'), onClick: back }]);
     const doBuy = (s) => { if (isContract) return buyContractInto(it, idx, s, back); const r = game.buy(idx, s); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back(); } else toast(r.msg); };
-    m.querySelectorAll('.card').forEach(el => el.onclick = () => doBuy(+el.dataset.s));
+    m.querySelectorAll('.card:not(.dis)').forEach(el => el.onclick = () => doBuy(+el.dataset.s));
   }
 
   // ---------- result ----------
@@ -1718,7 +1727,7 @@
     const cards = g.contracts.map((c, i) => {
       if (!c) return `<div class="card dis" style="cursor:default"><div class="t">${T('my.slot', { n: i + 1 })} · ${T('err.emptySlot')}</div></div>`;
       const car = D.CARRIERS[c.carrier];
-      const enh = [c.enh.limit ? T('my.limit', { n: c.enh.limit }) : '', c.enh.cap ? T('my.cap', { n: c.enh.cap }) : '', c.enh.regular ? D.ENHANCEMENTS.regular.name : '', c.enh.express ? D.ENHANCEMENTS.express.name : '', c.enh.opt ? D.ENHANCEMENTS[c.enh.opt].name : ''].filter(Boolean);
+      const enh = enhNames(g, c);
       return `<div class="card" style="cursor:default"><div class="t"><span>${esc(g.contractName(c))}</span><span class="price">${T('my.remain', { calls: c.calls, max: c.maxCalls })}</span></div>
         <div class="d">${T('my.line', { vehicle: esc(car.vehicle || ''), cap: g.vehicleCap(c), fee: g.truckFee(c), simul: g.simulMax(c) })}${enh.length ? ` · ${enh.join(', ')}` : ''}<br>${T('my.record', { calls: c.totalCalls, n: c.delivered })}${g.shows('trust') ? `<br>${trustBar(g, c.carrier)}${trustTrack(c.carrier, g.trustXp(c.carrier))}` : ''}</div></div>`;
     }).join('');

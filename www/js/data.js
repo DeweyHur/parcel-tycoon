@@ -231,6 +231,8 @@
     // 단계별 효과 문구 (마켓 카드·호출 모달·도감이 같은 문자열을 읽는다)
     trustEffectText(carrier, lv) { const f = DATA.familyOf ? DATA.familyOf(carrier) : carrier; if (lv >= 1 && DATA.TRUST_PERK_TEXT[f]) return DATA.TRUST_PERK_TEXT[f][lv - 1]; return DATA.TRUST_EFFECTS[0]; },
 
+    // 강화 칸: 계약마다 등급만큼 칸이 있고, 어떤 강화든 한 칸씩 차지한다 (종류별 한도 없음). 다른 계약으로 못 옮긴다
+    ENH_SLOTS: { normal: 2, trusted: 3, expert: 4, master: 5 },
     ENHANCEMENTS: {
       // 차량 언어: limit = 배차 한도 +대, cap = 적재 보강 +칸(계약당 3회), regular = 월 첫 배차 무료, express = 동시 대수 +1
       limit1:  { price: 90, kind: 'limit', value: 1 },

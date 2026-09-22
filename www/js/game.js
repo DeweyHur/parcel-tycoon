@@ -806,7 +806,7 @@
     // 한 호출에 부를 수 있는 최대 대수
     simulMax(c) {
       if (!this.shows('simul')) return 1;
-      const base = Math.max(1, Math.max(D.CARRIERS[c.carrier].simul || 1, this.trustPerk(c.carrier, 'simul') || 1) + (c.enh.express ? 1 : 0));
+      const base = Math.max(1, Math.max(D.CARRIERS[c.carrier].simul || 1, this.trustPerk(c.carrier, 'simul') || 1) + (+c.enh.express || 0));
       return base + (this.rushState().ready ? D.RUSH.extraTrucks : 0);
     }
     // 대당 배차비
@@ -818,7 +818,7 @@
       return Math.max(0, Math.round(fee));
     }
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
-    callFee(c, trucks) { const free = c.enh.regular && !c.freeUsedMonth ? 1 : 0; const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut;
+    callFee(c, trucks) { const free = this.regularFreeLeft(c) > 0 ? 1 : 0; const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut;
       return Math.round(Math.max(0, trucks - free) * this.truckFee(c) * Math.max(0.7, 1 - cut)); }
     trucksNeeded(c, volume) { return Math.max(1, Math.ceil(volume / this.vehicleCap(c))); }
     capacityBonusNote(c) {
@@ -828,24 +828,33 @@
         if (R.waitStack && this.waitStack) notes.push(T('note.waitStack', { n: Math.min(R.waitStack, this.waitStack) }));
         if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) notes.push(T('note.firstCall'));
       }
-      if (c.enh.regular && !c.freeUsedMonth) notes.push(T('note.regular'));
+      if (this.regularFreeLeft(c) > 0) notes.push(T('note.regular'));
       return notes;
     }
     // ----- 능력 매칭 (CARRIER_CAPABILITY_DESIGN v0.2) -----
-    contractCaps(c) { const car = D.CARRIERS[c.carrier]; const caps = car.caps.slice(); if (c.enh.opt) { const a = D.ENHANCEMENTS[c.enh.opt].attr; if (!caps.includes(a)) caps.push(a); } return caps; }
+    contractCaps(c) { const car = D.CARRIERS[c.carrier]; const caps = car.caps.slice(); for (const o of this.contractOpts(c)) { const a = D.ENHANCEMENTS[o].attr; if (!caps.includes(a)) caps.push(a); } return caps; }
+    // 강화 칸 — 등급만큼. 어떤 강화든 한 칸 (신뢰 강화는 업체에 쌓이므로 칸을 안 먹는다)
+    contractOpts(c) { const o = (c.enh.opts || []).slice(); if (c.enh.opt && !o.includes(c.enh.opt)) o.unshift(c.enh.opt); return o; }
+    enhSlots(c) { return (D.ENH_SLOTS || {})[c.grade] || 2; }
+    enhUsed(c) { return (c.enh.limit || 0) + (c.enh.cap || 0) + (+c.enh.regular || 0) + (+c.enh.express || 0) + this.contractOpts(c).length; }
+    // 장착된 강화 id 목록 (칸 표시용) — 한도 강화는 +1/+2 를 구분해 기억한다
+    enhList(c) { const out = [], lim = (c.enh.limitIds || []).slice(0, c.enh.limit || 0); while (lim.length < (c.enh.limit || 0)) lim.push('limit1');
+      const rep = (id, n) => { for (let k = 0; k < n; k++) out.push(id); };
+      out.push(...lim); rep('cap1', c.enh.cap || 0); rep('regular', +c.enh.regular || 0); rep('express', +c.enh.express || 0); out.push(...this.contractOpts(c)); return out; }
+    regularFreeLeft(c) { return Math.max(0, (+c.enh.regular || 0) - (c.freeUsed || 0)); }
     // 특약을 붙인 계약은 그 속성도 '받는 것'에 들어간다. caps 만 넓히고 need 를 그대로 두면
     // 전문 계열(냉장·파손·냉동·통관)은 특약을 붙여도 그 물건을 거절한다 — 특약이 아무 쓸모가 없어진다.
     // 이 특약을 붙일 수 있는 계약이 하나라도 있는가
     _canFitOpt(key) {
       const e = D.ENHANCEMENTS[key]; if (!e || e.kind !== 'opt') return false;
-      return this.contracts.some(c => { if (!c || c.enh.opt) return false;
+      return this.contracts.some(c => { if (!c || this.enhUsed(c) >= this.enhSlots(c)) return false;
         const car = D.CARRIERS[c.carrier];
         if (car.onlyPlain || car.caps.includes(e.attr)) return false;
         if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return false;
         return true; });
     }
     contractNeed(c) { const car = D.CARRIERS[c.carrier]; if (!car.need) return null; const need = car.need.slice();
-      if (c.enh.opt) { const a = D.ENHANCEMENTS[c.enh.opt].attr; if (!need.includes(a)) need.push(a); } return need; }
+      for (const o of this.contractOpts(c)) { const a = D.ENHANCEMENTS[o].attr; if (!need.includes(a)) need.push(a); } return need; }
     contractSizeMax(c) { const car = D.CARRIERS[c.carrier]; const pk = this.trustPerk(c.carrier, 'sizeMax'); return pk ? Math.max(car.sizeMax, pk) : car.sizeMax; }
     // car: 업체 데이터, p: 택배(또는 {type,size,attrs,customs} 의사 택배), caps: 계약 단위 능력, sizeMax: 계약 단위 최대 크기
     _carrierAccepts(car, p, caps, sizeMax, need) {
@@ -1091,7 +1100,7 @@
       this.monthStats = { repStart: this.rep, revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false, cashStart: this.cash, missionEarned: 0, missionRank: 0, missionBonus: 0, missionTarget: 1 };
       // 월 배차 한도 리셋 (계약은 만료되지 않는다 — 마켓은 업그레이드·새 업체용)
       // v1.5: 배차는 소모품 — 월초 리셋 없음. 마켓의 '가득 충전'으로만 채운다
-      for (const c of this.contracts) if (c) { c.successCalls = 0; c.freeUsedMonth = false; }
+      for (const c of this.contracts) if (c) { c.successCalls = 0; c.freeUsed = 0; }
       this.monthStats.insClaims = 0; this.monthStats.covered = 0; this.monthStats.premium = 0; this.monthStats.storageIncome = 0; this.monthStats.fees = 0;
       const heatN = R.heatAlerts + (this.seasonMods(m).heatAlerts || 0);
       this.heatTurns = heatN ? this.rng.shuffle([...Array(this.turns(m)).keys()].map(i => i + 1)).slice(0, heatN).sort((a, b) => a - b) : [];
@@ -1297,7 +1306,7 @@
       const fee = this.callFee(c, trucks);
       // 후불: 배차비는 월말 정산에서 빠진다 (자금 부족으로 호출이 막히지 않는다)
       this.feesDue += fee; this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
-      if (c.enh.regular && !c.freeUsedMonth) c.freeUsedMonth = true;
+      if (this.regularFreeLeft(c) > 0) c.freeUsed = (c.freeUsed || 0) + 1;
       const fill = volume / (vcap * trucks);
       if (fill >= 0.8) { this.stats.fullTrucks++; this.addRep(D.REP_GAIN.fullTruck, MSG('why.repFull')); }
 
@@ -1944,18 +1953,18 @@
         const c = this.contracts[target];
         if (!c) return { ok: false, msg: T('err.pickContract') };
         const e = D.ENHANCEMENTS[it.enh];
-        if (e.kind === 'limit') { if (c.enh.limit >= 2) return { ok: false, msg: T('err.limitMax') }; c.enh.limit++; c.maxCalls += e.value; c.calls += e.value; }
-        else if (e.kind === 'cap') { if (c.enh.cap >= 3) return { ok: false, msg: T('err.capMax') }; c.enh.cap++; }
-        else if (e.kind === 'regular') { if (c.enh.regular) return { ok: false, msg: T('err.hasRegular') }; c.enh.regular = true; }
-        else if (e.kind === 'express') { if (c.enh.express) return { ok: false, msg: T('err.hasExpress') }; c.enh.express = true; }
+        if (e.kind !== 'trust' && this.enhUsed(c) >= this.enhSlots(c)) return { ok: false, msg: T('err.enhFull', { n: this.enhSlots(c) }) };
+        if (e.kind === 'limit') { c.enh.limit++; (c.enh.limitIds = c.enh.limitIds || []).push(it.enh); c.maxCalls += e.value; c.calls += e.value; }
+        else if (e.kind === 'cap') { c.enh.cap++; }
+        else if (e.kind === 'regular') { c.enh.regular = (+c.enh.regular || 0) + 1; }
+        else if (e.kind === 'express') { c.enh.express = (+c.enh.express || 0) + 1; }
         else if (e.kind === 'trust') this._addTrust(c.carrier, e.value);
         else if (e.kind === 'opt') {
           const car = D.CARRIERS[c.carrier];
-          if (c.enh.opt) return { ok: false, msg: T('err.optOne') };
-          if (car.caps.includes(e.attr)) return { ok: false, msg: T('err.optHasAttr') };
+          if (this.contractCaps(c).includes(e.attr)) return { ok: false, msg: T('err.optHasAttr') };
           if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return { ok: false, msg: T('err.optSize', { max: e.maxSizeMax }) };
           if (car.onlyPlain) return { ok: false, msg: T('err.optPlain') };
-          c.enh.opt = it.enh; if (e.capDelta) c.enh.capDelta += e.capDelta; if (e.callsDelta) { c.maxCalls = Math.max(1, c.maxCalls + e.callsDelta); c.calls = Math.max(0, Math.min(c.calls, c.maxCalls)); }
+          c.enh.opts = this.contractOpts(c).concat(it.enh); c.enh.opt = null; if (e.capDelta) c.enh.capDelta += e.capDelta; if (e.callsDelta) { c.maxCalls = Math.max(1, c.maxCalls + e.callsDelta); c.calls = Math.max(0, Math.min(c.calls, c.maxCalls)); }
         }
         this._updateTrustStats();
         this.say('log.enhance', { name: e.name, contract: this.contractName(c), price });
