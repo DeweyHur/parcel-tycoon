@@ -166,7 +166,7 @@
           ['normal 2 mart', 'normal 2 anon', 'normal 2 anon'],
         ]),
           // 빠른손(프리미엄 갈아타기)은 여기서 — 신선을 먼저 익히고 나서
-          market: { contracts: ['bulk1'], enh: ['optFragile'], fac: ['cold2'] } },
+          market: { contracts: ['bulk1'], enh: ['optFragile'], fac: ['cold2', 'driver'] } },
       },
     },
     // ----- 4장 (5월 전반): 소문. 평판이 열리고, 여기서 처음으로 끝날 수 있는 판이 된다 -----

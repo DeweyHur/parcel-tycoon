@@ -667,7 +667,7 @@
         const on = selfOk() && !busy && g.phase === 'play', n = g.selfCount(), el = g.selfEligible();
         sc.disabled = !on; sc.className = 'btn contract self' + (on ? ' ready' : '') + (pk && pk.i === SELF ? ' picked' : '');
         const pv = sortByUrgency(el).slice(0, n);
-        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span><span class="takes"></span><span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls"></span>`;
+        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span><span class="takes"></span><span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls ${g.selfTripsLeft() ? '' : 'zero'}">${callPipsHtml(g.selfTripsLeft(), Math.max(g.selfTrips(), g.selfTripsLeft()))}</span>`;
       }
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
@@ -678,8 +678,7 @@
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
     // 오늘 영업을 마치면 받게 될 다음 입고 — 매 턴 가장 중요한 결정을 흐리거나 자르지 않는다.
     const restsNext = g.isWeekendAfter(g.turn) && !g.shows('weekendChoice');   // 마감하면 그대로 쉬는 날로 넘어간다
-    const selfN = pk && pk.i === SELF ? pk.sel.size : 0;
-    wb.innerHTML = `${selfN ? T('wm.selfWait', { n: selfN, cost: selfPlan().cost }) : restsNext ? T('wait.btnRest') : T('wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
+    wb.innerHTML = `${restsNext ? T('wait.btnRest') : T('wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
     renderCoach();
   }
   // ---------- 스토리 모드 코치 한 줄 ----------
@@ -1100,7 +1099,7 @@
   // 직접 배송은 '우리 차' 한 대다 — 계약 차와 같은 자리에 서고, 같은 상자 격자에서 고른다.
   // 다만 돈이 나가는 일이라, 카드를 눌러 부른 게 아니면(배차가 떨어져 저절로 선 경우) 빈 채로 선다.
   const SELF = 'self';
-  const selfOk = () => !!(game && game.shows('self') && game.selfEligible().length);
+  const selfOk = () => !!(game && game.shows('self') && game.selfTripsLeft() > 0 && game.selfEligible().length);
   function autoSel(i, tapped) {
     if (i === SELF) { const sel = new Set(); if (tapped) sortByUrgency(game.selfEligible()).slice(0, game.selfCount()).forEach(p => sel.add(p.id)); return sel; }
     const c = game.contracts[i], sel = new Set();
@@ -1187,8 +1186,9 @@
     const blocked = g.parcels.filter(p => !g.selfCan(p)).length;
     head.innerHTML = `<div class="ch-top"><b>🚐 ${T('self.card')}</b><span class="caps">${vans ? `${T('wm.vans')}: ${esc(vans)}` : T('wm.noVans')}${blocked ? ` · ${T('wm.blocked', { n: blocked })}` : ''}</span></div>
       <div class="load-visual mini"><div class="truck-stack"><div class="truck-shell van"><div class="truck-cells" style="--cols:${Math.min(6, n)}">${cells}</div></div></div><div class="load-money"><span class="money-chip">${T('call.earn')}<b>+${pl.income}c</b></span><span class="money-chip cost">${T('call.cost')}<b>−${pl.cost}c</b></span><span class="money-chip net">${T('call.net')}<b>${pl.net >= 0 ? '+' : ''}${pl.net}c</b></span></div></div>
-      <div class="load-hint">${pl.picked.length}/${n} · ${T('wm.selfHead2', { size: g.selfSizeMax(), base: D.SELF_DELIVERY.costBase, per: D.SELF_DELIVERY.costPerSize })} · ${T('self.hintWait')}</div>`;
-    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span>`;
+      <div class="load-hint">${T('wm.selfHead2', { size: g.selfSizeMax() })}</div>`;
+    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn primary" id="self-go"${pl.picked.length ? '' : ' disabled'}>${T('self.go')}</button>`;
+    foot.querySelector('#self-go').onclick = () => { if (!pl.picked.length || busy) return; SFX.click(); doSelf(pl.picked.map(p => p.id)); };
     head.hidden = foot.hidden = false;
     foot.querySelector('#pick-urgent').onclick = () => { pick.sel.clear(); sortByUrgency(elig).slice(0, n).forEach(p => pick.sel.add(p.id)); SFX.select(); renderAll(); };
     foot.querySelector('#pick-clear').onclick = () => { pick.sel.clear(); SFX.cancel(); renderAll(); };
@@ -1294,7 +1294,7 @@
     // 마감 팝업은 없다. 우리 차(직접 배송)에 실어 둔 게 있으면 그걸 나르고 마감한다.
     // 팝업이 알려 주던 경고(반송·부패 임박)는 토스트로 남긴다.
     if (!selfIds) {
-      const ids = pick && pick.i === SELF ? [...pick.sel] : [];
+      const ids = [];
       const f = game.forecast(), w = [];
       if (f.overdue) w.push(T('wm.overdue', { n: f.overdue }));
       if (f.spoil) w.push(T('wm.spoil', { n: f.spoil }));
@@ -1309,6 +1309,24 @@
     saveGame();
     if (selfIds.length && r && r.ids) { SFX.select(); const rev = r.revenue, cost = r.cost; scene.selfDeliver(r.ids, () => { SFX.coin(r.ids.length); floatText(T('float.self', { rev, cost }), false, 70); afterTurn(events); }); }
     else { SFX.wait(); setTimeout(() => afterTurn(events), 250); }
+  }
+  // 직접 배송 — 영업일을 넘기지 않는다. 나르고 나면 판만 다시 그린다
+  function doSelf(ids) {
+    if (busy || game.phase !== 'play') return;
+    SFX.resume();
+    const r = game.selfShip(ids);
+    if (!r || r.ok === false) { toast((r && r.msg) || ''); return; }
+    busy = true; pick = null; renderAll();
+    const events = game.takeEvents(); saveGame();
+    SFX.select();
+    scene.selfDeliver(r.ids, () => {
+      SFX.coin(r.ids.length); floatText(T('float.self', { rev: r.revenue, cost: r.cost }), false, 70);
+      announceCustomers(events);
+      scene.sync(game, { animate: true });
+      busy = false; renderAll(); saveGame();
+      announceTrust(events);
+      if (game.phase === 'play') announce(Profile.evaluate(game, null));
+    });
   }
   function afterTurn(events) {
     for (const e of events) if (e.type === 'discard') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.discard', { why: I18n.text(e.why) }), true, 30); }

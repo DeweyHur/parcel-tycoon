@@ -221,11 +221,13 @@ t('평판 0 → 게임오버(아무도 안 맡긴다)', () => { const g = EMPTY(
 t('회사별 시작 상태', () => { for (const id in M.COMPANIES) { const g = new Game({ seed: 2, company: id }); assert.ok(g.cash > 0, id); assert.ok(g.contracts.filter(Boolean).length >= 2, id); } const q = new Game({ seed: 2, company: 'quick' }); assert.equal(q.selfCount(), 2); const th = new Game({ seed: 2, company: 'thrifty' }); assert.equal(th.rules.feeMult, 0.8); const po = new Game({ seed: 2, company: 'postal' }); assert.equal(po.truckFee(po.contracts[1]), 35); });
 t('시나리오 규칙', () => { const g = new Game({ seed: 1, scenario: 'cashcrunch' }); assert.equal(g.cash, 225); assert.ok(g.rules.noRefresh); const p = new Game({ seed: 1, scenario: 'peak' }); assert.equal(p.rules.months, 4); });   // months = 사이클 수 (2주 × 4 = 2개월)
 t('데일리 설정은 날짜에 결정적', () => { const a = dailyConfig('2026-09-05'), b = dailyConfig('2026-09-05'); assert.deepEqual(a, b); assert.equal(a.variants.length, 2); });
-t('직접 배송: 대기 턴에 1개, 보상 그대로 + 배송비 20c', () => {
-  const g = EMPTY(8); for (let i = 0; i < 3; i++) g.parcels.push(P(900 + i, 'normal', 1));
-  assert.equal(g.selfCount(), 1); assert.ok(!adv(g, [900, 901]).ok);
-  const turn = g.turn, cash = g.cash; const r = adv(g, [900]); assert.ok(r.ok); assert.equal(g.turn, turn + 1); assert.equal(g.cash, cash + 25); assert.equal(g.feesDue, 20); assert.equal(g.parcels.length, 2); assert.equal(g.stats.selfCalls, 1);
-  g.warehouse.driver = true; assert.equal(g.selfCount(), 2);
+t('직접 배송: 하루를 넘기지 않고 보름에 1회, 보상 그대로 + 배송비 크기×5c, 배송 기사 +1회', () => {
+  const g = EMPTY(8); for (let i = 0; i < 4; i++) g.parcels.push(P(900 + i, 'normal', 1));
+  assert.equal(g.selfCount(), 1); assert.equal(g.selfTripsLeft(), 1); assert.ok(!g.selfShip([900, 901]).ok);
+  const turn = g.turn, cash = g.cash; const r = g.selfShip([900]); assert.ok(r.ok); assert.equal(g.turn, turn); assert.equal(g.cash, cash + 25); assert.equal(g.feesDue, 5); assert.equal(g.parcels.length, 3); assert.equal(g.stats.selfCalls, 1);
+  assert.equal(g.selfTripsLeft(), 0); assert.ok(!g.selfShip([901]).ok);
+  g.warehouse.driver = true; assert.equal(g.selfTripsLeft(), 1); assert.ok(g.selfShip([901]).ok); assert.equal(g.selfTripsLeft(), 0);
+  g.warehouse.bigvan = true; assert.equal(g.selfCount(), 2);
 });
 t('마켓 막힌 속성 보장: 처리 못 하는 특수 택배가 있으면 슬롯 A에 처리 가능한 업체', () => {
   let hit = 0; for (let s = 1; s <= 30; s++) { const g = EMPTY(s); g.contracts = [g._makeContract('bulk', 'normal'), null, null, null]; g.parcels = [P(1, 'frozen', 2, { inFrozen: true, deadline: 99 })]; g.warehouse.frozen = 4; g._assignCold();

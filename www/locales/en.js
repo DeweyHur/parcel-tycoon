@@ -531,7 +531,7 @@
     'story.noContract.1': 'That parcel — none of your contracts can carry it. Tap End Day: before closing, I can haul one myself with self-delivery.',
     'story.noContract.2': 'It costs a bit, but less than a return. The real fix is buying the right contract at the next market.',
     'story.waitSelf.1': 'This list is what you can haul yourself. Pick one — the cost is right there.',
-    'story.waitGo.1': 'Picked? The button below. You carry that one yourself, then close for the day.',
+    'story.waitGo.1': 'Picked? Hit <b>Deliver yourself</b> below. The day doesn\u2019t end.',
     'story.offer.1': 'The moving company wants to rent space. Moving season — these offers come often.<br>No truck needed; you just hand over cells and collect a storage fee.',
     'story.offer.2': 'The catch: your warehouse shrinks by that much. Take it only when there\'s room. In a pinch you can end it early — with a penalty.',
     'story.cash.1': 'The cash number up top isn\'t what you hold — it\'s the <b>projected month-end balance</b>. Dispatch fees don\'t leave mid-month; they all go out at settlement.<br>You\'ll never be blocked from calling a truck for lack of cash.',
@@ -651,7 +651,7 @@
     'story.l3theft.1': 'Gone. The yard has no door.',
     'story.l3theft.2': 'Leave things out long enough and this happens. A yard fence helps.',
     'story.l3self.1': 'No truck. That\u2019s what <b>self-delivery</b> is for \u2014 I carry one before we close for the day.',
-    'story.l3self.2': 'Costs a bit, but it beats a return. Press End Day.',
+    'story.l3self.2': 'Cheap, and it <b>doesn\u2019t use the day</b>. But only once per half-month — save it. Tap <b>Deliver yourself</b>.',
     'story.l3selfPick.1': 'Pick what you\u2019ll carry today. Small only \u2014 two cells at most.',
     'story.l3trust.1': 'About time I showed you this. <b>Trust</b>.',
     'story.l3trust.2': 'You\u2019ve run with Hangil near half a year. That\u2019s what built up.<br>The second truck came from this. From here on, each tier also cuts your dispatch fee.',
@@ -984,7 +984,7 @@
     'wm.nextWarehouse': 'After next arrivals',
     'wm.ifWait': 'If you skip calling',
     'wm.outdoor': '🌧 Outside {vol} cells · theft this turn {pct}%',
-    'wm.selfHead2': 'Size ≤ {size} · full reward, cost {base}c + size×{per}c',
+    'wm.selfHead2': 'Up to {size} cells · doesn\u2019t use the day',
     'wm.vans': 'Vehicles',
     'wm.noVans': 'No vehicles — plain parcels and produce only',
     'wm.blocked': '{n} not eligible (see parcel details)',
@@ -993,6 +993,8 @@
     'wm.justWait': 'No call · Receive arrivals',
     'wm.sub': 'Finish today\'s work and receive the next business day\'s parcels',
     'wm.limit': 'Up to {n} per turn',
+    'self.go': 'Deliver',
+    'err.selfTrips': 'No self-deliveries left this half-month',
     'self.card': 'Own van',
     'self.cardSub': '{n} eligible',
     'self.hintWait': 'goes out with the self-deliver button',
@@ -1606,7 +1608,7 @@
       },
       "driver": {
         "name": "Courier",
-        "desc": "Direct delivery +1 parcel"
+        "desc": "Self-delivery +1 trip per half-month"
       }
     },
     "STRESS_NAMES": {

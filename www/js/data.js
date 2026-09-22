@@ -206,7 +206,7 @@
     CARRIER_L3: {},
 
     // 직접 배송: 대기 턴의 부가 행동. 택배 count개까지 골라 직접 배송 — 보상은 그대로, 대신 배송비(costBase + costPerSize×크기)를 낸다. 차량 시설로 확장
-    SELF_DELIVERY: { count: 1, sizeMax: 2, costBase: 15, costPerSize: 5 },
+    SELF_DELIVERY: { count: 1, trips: 1, sizeMax: 2, costBase: 0, costPerSize: 5 },   // 직접 배송: 하루를 쓰지 않는 대신 보름에 trips 번 — 싸지만 드물다
 
     GRADES: {
       // 등급 = 프리미엄 계약 (신뢰도와 무관). cap +칸, calls +대, fee 배율, trust 시작 xp, price 배율

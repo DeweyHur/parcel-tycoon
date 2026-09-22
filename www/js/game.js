@@ -699,7 +699,21 @@
       xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       return { xp, parts };
     }
-    selfCount() { return Math.max(1, D.SELF_DELIVERY.count + this.rules.selfCapDelta + (this.warehouse.bigvan ? 1 : 0) + (this.warehouse.driver ? 1 : 0) + ((this.weekendBonus && this.weekendBonus.self) || 0)); }
+    // 한 번 나갈 때 싣는 개수 (대형 트럭 +1)
+    selfCount() { return Math.max(1, D.SELF_DELIVERY.count + this.rules.selfCapDelta + (this.warehouse.bigvan ? 1 : 0)); }
+    // 보름에 나갈 수 있는 횟수 — 영업일을 쓰지 않으니 횟수로 묶는다. 배송 기사 +1, 야근 다음 날 보너스는 따로
+    selfTrips() { return Math.max(1, (D.SELF_DELIVERY.trips || 1) + (this.warehouse.driver ? 1 : 0)); }
+    selfTripsLeft() { return Math.max(0, this.selfTrips() - ((this.monthStats && this.monthStats.selfTrips) || 0)) + ((this.weekendBonus && this.weekendBonus.self) || 0); }
+    // 직접 배송: 영업일을 넘기지 않는다 (긴급처럼). 보름 횟수를 하나 쓴다
+    selfShip(ids) {
+      if (this.phase !== 'play') return { ok: false, msg: T('err.cannotShipNow') };
+      if (this.selfTripsLeft() <= 0) return { ok: false, msg: T('err.selfTrips') };
+      const r = this.selfDeliver(ids);
+      if (!r.ok) return r;
+      if (this.weekendBonus && this.weekendBonus.self > 0) this.weekendBonus.self--;
+      else this.monthStats.selfTrips = (this.monthStats.selfTrips || 0) + 1;
+      return r;
+    }
     selfCost(p) { return D.SELF_DELIVERY.costBase + D.SELF_DELIVERY.costPerSize * p.size; }
     selfCapacity() { return this.selfCount(); }
     selfSizeMax() { return this.warehouse.bigvan ? 4 : D.SELF_DELIVERY.sizeMax; }
@@ -1251,7 +1265,7 @@
       // 창고가 (거의) 빈 채로 하루를 넘긴 날 — 캠페인을 소개할 때를 잰다. 4분의 1도 안 찬 날은 비어 노는 날이다
       if (this.usedVolume() <= this.warehouse.cap * 0.25) this.emptyDays = (this.emptyDays || 0) + 1;
       let self = null;
-      if (selfIds && selfIds.length) { self = this.selfDeliver(selfIds); if (!self.ok) return self; }
+      if (selfIds && selfIds.length && this.selfTripsLeft() > 0) { self = this.selfShip(selfIds); if (!self.ok) return self; }
       this.monthStats.waits++; this.run.waits++; this.stats.waits++;
       this.loadChain = 0;
       if (self) { this.stats.callStreak++; this.stats.maxCallStreak = Math.max(this.stats.maxCallStreak, this.stats.callStreak); } else this.stats.callStreak = 0;

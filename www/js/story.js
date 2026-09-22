@@ -252,7 +252,7 @@
       { expr: 'think', hl: '#cself' },
       { expr: 'neutral', hl: '#cself', gate: true },
     ] },
-    { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => !!ctx.self, pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
+    { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => !!ctx.self, pages: [{ expr: 'neutral', hl: '#self-go', gate: true }] },
     { id: 'l4risk', kind: 'modal', modal: 'call', when: (g, ctx) => (ctx.risk || 0) > 0, pages: [{ expr: 'worry', hl: '#call-head .riskline' }] },
     // 🌾 상하는 것
     { id: 'l4produce', kind: 'turn', when: g => !!firstOf(g, 'produce'), pages: [{ expr: 'neutral', hl: '#parcels' }] },
@@ -402,10 +402,10 @@
     { id: 'cantHandle', kind: 'turn', when: g => g.unhandled().some(p => !(p.customs > 0)), pages: [{ expr: 'shock', hl: '#parcels' }, { expr: 'neutral' }] },
     // 크기가 커서 못 싣는 경우 — 대형은 직접 배송도 안 된다
     { id: 'bigParcel', kind: 'turn', when: g => g.parcels.some(p => p.size >= 4) && !g.contracts.some(c => c && g.contractSizeMax(c) >= 4), pages: [{ expr: 'worry', hl: '#parcels' }] },
-    { id: 'noContract', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => !(p.customs > 0) && attrsOf(g, p).some(a => gating.includes(a)) && !handleable(g, p)), pages: [{ expr: 'worry' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
+    { id: 'noContract', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => !(p.customs > 0) && attrsOf(g, p).some(a => gating.includes(a)) && !handleable(g, p)), pages: [{ expr: 'worry' }, { expr: 'neutral', hl: '#cself', gate: true }] },
     // 대기 팝업 안 (noContract 다음): 직접 배송할 택배 하나 → 대기 버튼
     { id: 'waitSelf', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('noContract') && ctx.picked === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#parcels .ptile:not(.dis)', gate: true }] },
-    { id: 'waitGo', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('waitSelf') && ctx.picked > 0, pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
+    { id: 'waitGo', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('waitSelf') && ctx.picked > 0, pages: [{ expr: 'neutral', hl: '#self-go', gate: true }] },
     { id: 'offer', needs: 'storage', months: [2, 3], kind: 'turn', when: g => !!g.offer, pages: [{ expr: 'neutral', hl: '#offer' }, { expr: 'think' }] },
     { id: 'cash', months: [2, 3], kind: 'turn', when: g => g.projectedCash().total < 0 || g.debt > 0, pages: [{ expr: 'think', hl: '#hud-left' }, { expr: 'worry' }] },
     { id: 'summary2', months: [2], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }] },
