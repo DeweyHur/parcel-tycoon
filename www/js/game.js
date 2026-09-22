@@ -724,7 +724,7 @@
         if (p.type === 'fresh' && !p.inCold && (heat || (p.warm || 0) + 1 >= R.warmLimit)) spoil++;
         if (this._attrs(p).includes('frozen') && !p.inFrozen) spoil++;
       }
-      return { used: this.usedVolume() + incoming, cap: this.warehouse.cap, incoming, count: nxt.length, overdue, spoil, frozenOver, monthEnd: this.turn >= D.TURNS_PER_MONTH };
+      return { used: this.usedVolume() + incoming, cap: this.warehouse.cap, incoming, count: nxt.length, overdue, spoil, frozenOver, monthEnd: this.turn >= this.turns() };   // 사이클 길이는 12~14 — 고정 13 을 쓰면 14일짜리 사이클에서 '월말 정산'이 하루 일찍 떴다
     }
     contractName(c) { return D.CARRIERS[c.carrier].name; }
     isStruck(c) { return this.rules.strike && this.strikeCarrier === c.carrier; }
