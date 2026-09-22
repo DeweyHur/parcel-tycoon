@@ -200,7 +200,6 @@
         const c = this._makeContract(this.resolveCenter(s.carrier, s.grade || 'normal'), null, null, true);
         if (s.enh) Object.assign(c.enh, s.enh);
         if (s.calls != null) c.calls = Math.min(c.maxCalls, s.calls + R.startCallsDelta);
-        if (s.prepaid) c.prepaid = Math.min(c.calls, s.prepaid);
         // 앞 장을 배차 0으로 끝냈다고 다음 장을 통째로 못 보내면 안 된다 — 한 장이 한 사이클이고
         // 마켓은 그 끝에만 열리니까, 바닥난 채로 시작하면 열흘 동안 손쓸 방법이 아예 없다.
         // 장이 바뀌는 사이에 새로 끊어 둔 것으로 치고 바닥을 보장한다.
@@ -233,7 +232,7 @@
       return {
         cash: this.cash,
         warehouse: { cap: this.warehouse.cap, cold: this.warehouse.cold, frozen: this.warehouse.frozen, xl: this.warehouse.xl || 0 },
-        contracts: this.contracts.filter(Boolean).map(c => ({ carrier: c.carrier, grade: c.grade, calls: c.calls, prepaid: c.prepaid || 0, enh: { ...c.enh } })),
+        contracts: this.contracts.filter(Boolean).map(c => ({ carrier: c.carrier, grade: c.grade, calls: c.calls, enh: { ...c.enh } })),
         customers: Object.keys(this.customers).map(id => [id, this.customerLevel(id)]),
         trust: { ...this.trust },
         growth: { ...this.growth },
@@ -653,6 +652,9 @@
     }
     // 신뢰도 특성: 현재 단계까지의 효과를 합친다 (뒤 단계가 같은 키를 덮는다)
     trustPerk(carrier, key) {
+      // 신뢰도가 화면에 없는 장(서장·1장)에서는 돈에 닿는 혜택(배차비 할인·보상 가산 등)을 주지 않는다 —
+      // 안 보이는 할인 때문에 '절반 못 채우면 손해'라는 규칙이 화면과 어긋났다. 두 대 동시(simul)만 예외(l2two 가 가르친다)
+      if (!this.shows('trust') && key !== 'simul') return null;
       const lv = this.trustLevel(carrier), perks = D.TRUST_PERKS[FAM(carrier)] || []; let v = null;
       for (let i = 0; i < Math.min(lv, perks.length); i++) if (perks[i][key] != null) v = perks[i][key];
       return v;
@@ -801,8 +803,7 @@
     }
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
     callFee(c, trucks) { const free = c.enh.regular && !c.freeUsedMonth ? 1 : 0; const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut;
-      const paid = Math.max(0, trucks - free), pre = Math.min(paid, c.prepaid || 0);
-      return Math.round((paid - pre * D.PREPAY_RATE) * this.truckFee(c) * Math.max(0.7, 1 - cut)); }
+      return Math.round(Math.max(0, trucks - free) * this.truckFee(c) * Math.max(0.7, 1 - cut)); }
     trucksNeeded(c, volume) { return Math.max(1, Math.ceil(volume / this.vehicleCap(c))); }
     capacityBonusNote(c) {
       const R = this.rules, notes = [];
@@ -1280,7 +1281,6 @@
       // 후불: 배차비는 월말 정산에서 빠진다 (자금 부족으로 호출이 막히지 않는다)
       this.feesDue += fee; this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
       if (c.enh.regular && !c.freeUsedMonth) c.freeUsedMonth = true;
-      if (c.prepaid) c.prepaid = Math.max(0, c.prepaid - trucks);
       const fill = volume / (vcap * trucks);
       if (fill >= 0.8) { this.stats.fullTrucks++; this.addRep(D.REP_GAIN.fullTruck, MSG('why.repFull')); }
 
@@ -1855,12 +1855,13 @@
     // 계약 아이템의 배차 대수(센터 기본 + 회사 보정)
     itemTrucks(it) { return Math.max(1, D.CARRIERS[it.carrier].trucks + this.rules.callsDelta); }
     // 가득 충전 가격: 센터 정액 × 물가. 남은 배차와 무관(그래서 다 쓰고 충전하는 게 이득)
-    // 재계약: 모자란 대수 × 배차비의 절반을 선금으로 낸다. 그 대수는 부를 때 나머지 절반만 낸다(c.prepaid).
     // 전에는 30c 정액 '충전'이라 배차비(51c) 한 대 값보다도 쌌다 — 이제 한 대의 총값은 계약 차든 재계약 차든 같다.
     // 값은 '신뢰·강화 없는' 기본 배차비 기준 — 신뢰가 올라 배차비가 싸져도 재계약 값은 그대로다(신뢰·강화를 쌓을 이유를 남긴다)
     baseTruckFee(c) { const R = this.rules, car = D.CARRIERS[c.carrier]; return Math.max(0, (R.feeFixed != null ? R.feeFixed : car.fee) * R.feeMult + R.feeDelta); }
-    // 재계약은 '가득 충전'이다 — 몇 대가 남았든 값은 같다: 계약 본래 대수 × 기본 배차비 × 절반.
-    // 한도 강화(+대)를 해도 값은 본래 대수 기준이라 그만큼 이득이다.
+    // 밸런스(부록 AS): 기본 배차비 = 만차 수입의 50%(절반 채우면 본전), 계약 = 대당 만차 수입의 25%.
+    // 그래서 강화 없이 만차로 굴려도 비용은 75% — 남는 25%를 신뢰·강화로 키우는 게 성장이다.
+    // 재계약은 '가득 충전'이다 — 몇 대가 남았든 값은 같다: 계약 본래 대수 × 기본 배차비 × 절반(= 만차 수입의 25%).
+    // 신뢰로 배차비가 싸져도, 한도 강화(+대)를 해도 값은 그대로다.
     refillPrice(c) { return Math.round(Math.max(1, D.CARRIERS[c.carrier].trucks) * this.baseTruckFee(c) * D.PREPAY_RATE); }
     // 실시간 계약 — 철도·해상처럼 원래 마켓에서만 팔던 계약을, 달이 끝나길 기다리지 않고 지금 웃돈을 얹어 들인다.
     // 아직 안 열린 계열(_familyOpen)은 마켓과 똑같이 안 나온다 — 진도를 건너뛰게 하지 않는다.
@@ -1892,7 +1893,7 @@
       const c = this.contracts.find(x => x && x.id === contractId); if (!c) return { ok: false, msg: T('err.emptySlot') };
       if (c.calls >= c.maxCalls) return { ok: false, msg: T('err.refillFull') };
       const price = this.refillPrice(c); if (this.cash < price) return { ok: false, msg: T('err.noCash') };
-      const wasted = c.calls; c.prepaid = c.maxCalls; c.calls = c.maxCalls; this.cash -= price;   // 남은 배차는 새 계약으로 바뀐다(선금 대수로) this.run.spent += price; this.stats.refills = (this.stats.refills || 0) + 1;
+      const wasted = c.calls; c.calls = c.maxCalls; this.cash -= price;   // 남은 배차는 새 계약으로 바뀐다(선금 대수로) this.run.spent += price; this.stats.refills = (this.stats.refills || 0) + 1;
       this.say('log.refill', { name: this.contractName(c), n: c.maxCalls, price, wasted: wasted ? MSG('log.refillWasted', { n: wasted }) : '' });
       return { ok: true, price, wasted };
     }

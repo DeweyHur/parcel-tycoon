@@ -41,7 +41,7 @@
     OPCOST_BASE_ARRIVALS: 22,
     CONTRACT_SLOTS: 4,
     MARKET_MAX_BUY: 0,     // 0 = 제한 없음 (한 번에 살 수 있는 개수를 세지 않는다)
-    PREPAY_RATE: 0.5,
+    PREPAY_RATE: 0.5,      // 재계약 = 대당 기본 배차비의 절반 (= 만차 수입의 25%)
     // 잠시 꺼 둔 시스템 — 화면이 이미 복잡하다. 캠페인·자유 런 모두에서 없는 것으로 친다(되살리려면 여기서 빼면 된다)
     DISABLED_FEATURES: ['chain', 'rush', 'mission'],      // 재계약 선금: 배차비의 절반
     REFRESH_COSTS: [40, 80, 140, 220],

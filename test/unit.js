@@ -154,7 +154,7 @@ t('마켓: 보유 계열은 더 높은 tier 센터만 등장(갈아타기), 같�
     for (const c of g.contracts) if (c) assert.equal(g.market.items.some(it => it.kind === 'refill' && it.contractId === c.id), c.calls < c.maxCalls, `seed ${s} refill ${c.carrier}`);
   }
 });
-t('재계약: 몇 대가 남았든 같은 값에 가득 — 본래 대수 × 기본 배차비 절반(선금), 부를 때 나머지 절반. 한도 강화·신뢰로 값이 안 바뀐다', () => {
+t('재계약: 몇 대가 남았든 같은 값에 가득 — 본래 대수 × 기본 배차비 절반. 부를 때 배차비는 그대로. 한도 강화·신뢰로 값이 안 바뀐다', () => {
   const g = EMPTY(9); const b = slot(g, 'bulk'), c = g.contracts[b]; c.calls = 2; while (g.phase === 'play') adv(g); g.closeSummary(); g.cash = 9999;
   const it = g.market.items.find(x => x.kind === 'refill' && x.contractId === c.id); assert.ok(it);
   const base = D.CARRIERS[c.carrier].trucks, fee = g.truckFee(c);
@@ -163,8 +163,9 @@ t('재계약: 몇 대가 남았든 같은 값에 가득 — 본래 대수 × 기
   const keepMax = c.maxCalls; c.maxCalls += 2; assert.equal(g.refillPrice(c), it.price, '한도 강화로 값이 안 오른다'); c.maxCalls = keepMax;
   const keep = g.trust[c.carrier]; g.trust[c.carrier] = 999; assert.equal(g.refillPrice(c), it.price, '신뢰로 값이 안 바뀐다'); g.trust[c.carrier] = keep;
   const cash0 = g.cash; const r = g.buy(g.market.items.indexOf(it), null); assert.ok(r.ok); assert.equal(r.wasted, 2);
-  assert.equal(c.calls, c.maxCalls); assert.equal(c.prepaid, c.maxCalls); assert.equal(g.cash, cash0 - it.price);
-  assert.equal(g.callFee(c, 1), Math.round(fee * 0.5));
+  assert.equal(c.calls, c.maxCalls); assert.equal(g.cash, cash0 - it.price);
+  // 재계약은 따로 드는 비용(만차 수입의 25%) — 부를 때 배차비(50%)는 그대로 낸다: 강화 없으면 비용 75%
+  assert.equal(g.callFee(c, 1), fee);
   assert.ok(!g.refill(c.id).ok); g.closeMarket(); assert.equal(c.calls, c.maxCalls);
   const h = EMPTY(9); const hc = h.contracts[slot(h, 'bulk')]; hc.calls = 0; while (h.phase === 'play') adv(h); h.closeSummary(); h.closeMarket(); assert.equal(hc.calls, 0);
 });
