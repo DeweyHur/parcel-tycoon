@@ -154,16 +154,16 @@ t('마켓: 보유 계열은 더 높은 tier 센터만 등장(갈아타기), 같�
     for (const c of g.contracts) if (c) assert.equal(g.market.items.some(it => it.kind === 'refill' && it.contractId === c.id), c.calls < c.maxCalls, `seed ${s} refill ${c.carrier}`);
   }
 });
-t('재계약: 모자란 대수 × 배차비 절반 선금, 그 대수는 부를 때 나머지 절반. 가득이면 불가, 월초 리셋 없음', () => {
+t('재계약: 몇 대가 남았든 같은 값에 가득 — 본래 대수 × 기본 배차비 절반(선금), 부를 때 나머지 절반. 한도 강화·신뢰로 값이 안 바뀐다', () => {
   const g = EMPTY(9); const b = slot(g, 'bulk'), c = g.contracts[b]; c.calls = 2; while (g.phase === 'play') adv(g); g.closeSummary(); g.cash = 9999;
   const it = g.market.items.find(x => x.kind === 'refill' && x.contractId === c.id); assert.ok(it);
-  const missing = c.maxCalls - c.calls, fee = g.truckFee(c);
-  assert.equal(it.price, Math.round(missing * g.baseTruckFee(c) * 0.5));
-  // 신뢰가 쌓여 배차비가 싸져도 재계약 값은 기본 배차비 기준 그대로
-  const keep = g.trust[c.carrier]; g.trust[c.carrier] = 999; assert.equal(g.refillPrice(c), it.price); g.trust[c.carrier] = keep;
-  const cash0 = g.cash; const r = g.buy(g.market.items.indexOf(it), null); assert.ok(r.ok); assert.equal(r.wasted, 0);
-  assert.equal(c.calls, c.maxCalls); assert.equal(c.prepaid, missing); assert.equal(g.cash, cash0 - it.price);
-  // 선금 낸 대수는 절반, 넘어가면 온값 — 한 대의 총값은 계약 차든 재계약 차든 같다
+  const base = D.CARRIERS[c.carrier].trucks, fee = g.truckFee(c);
+  assert.equal(it.price, Math.round(base * g.baseTruckFee(c) * 0.5));
+  const c1 = c.calls; c.calls = 0; assert.equal(g.refillPrice(c), it.price, '남은 대수와 상관없다'); c.calls = c1;
+  const keepMax = c.maxCalls; c.maxCalls += 2; assert.equal(g.refillPrice(c), it.price, '한도 강화로 값이 안 오른다'); c.maxCalls = keepMax;
+  const keep = g.trust[c.carrier]; g.trust[c.carrier] = 999; assert.equal(g.refillPrice(c), it.price, '신뢰로 값이 안 바뀐다'); g.trust[c.carrier] = keep;
+  const cash0 = g.cash; const r = g.buy(g.market.items.indexOf(it), null); assert.ok(r.ok); assert.equal(r.wasted, 2);
+  assert.equal(c.calls, c.maxCalls); assert.equal(c.prepaid, c.maxCalls); assert.equal(g.cash, cash0 - it.price);
   assert.equal(g.callFee(c, 1), Math.round(fee * 0.5));
   assert.ok(!g.refill(c.id).ok); g.closeMarket(); assert.equal(c.calls, c.maxCalls);
   const h = EMPTY(9); const hc = h.contracts[slot(h, 'bulk')]; hc.calls = 0; while (h.phase === 'play') adv(h); h.closeSummary(); h.closeMarket(); assert.equal(hc.calls, 0);

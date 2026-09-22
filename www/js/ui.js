@@ -1454,7 +1454,7 @@
       m.querySelectorAll('[data-detail]').forEach(b => b.onclick = e => { e.stopPropagation(); SFX.click(); showContractDetail(game.contracts[+b.dataset.detail], render); });
       m.querySelectorAll('[data-refill]').forEach(b => b.onclick = e => { e.stopPropagation(); const it = mk.items[+b.dataset.refill]; const c = game.contracts.find(x => x && x.id === it.contractId);
         const go = () => { const r = game.buy(+b.dataset.refill, null); if (r.ok) { SFX.buy(); saveGame(); toast(T('toast.refill', { name: game.contractName(c), n: c.maxCalls })); render(); } else toast(r.msg); };
-        go(); });
+        if (c && c.calls > 0) askConfirm(T('mk.refillWaste', { n: c.calls }), go, T('mk.refillBtn', { price: it.price }), render); else go(); });
       m.querySelectorAll('[data-offer]').forEach(b => b.onclick = e => { e.stopPropagation(); SFX.click(); showOfferDetail(mk.items[+b.dataset.offer], render); });
       m.querySelectorAll('.card[data-i]').forEach(el => el.onclick = () => {
         const it = mk.items[+el.dataset.i]; if (it.sold) return;

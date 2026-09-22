@@ -459,7 +459,7 @@
     'log.refill': 'Renewed: {name} {n} trucks (deposit -{price}c){wasted}',
     'log.refillWasted': ' · {n} leftover trucks wasted',
     'mk.refillDesc': 'Renew the used-up trucks. Pay half the fee up front as a deposit; each call then costs the other half.',
-    'mk.refillWaste': '⚠ {n} trucks still left — refilling now wastes {n}',
+    'mk.refillWaste': '{n} trucks still left. Renewal costs the same however many remain — best done when empty.',
     'mk.tierVs': 'vs. line standard: {cap0}→{cap1} cells · {t0}→{t1} trucks · {f0}→{f1}c/truck',
     'mk.detail': 'Details',
     'mk.refillBtn': 'Renew {price}c',

@@ -1859,7 +1859,9 @@
     // 전에는 30c 정액 '충전'이라 배차비(51c) 한 대 값보다도 쌌다 — 이제 한 대의 총값은 계약 차든 재계약 차든 같다.
     // 값은 '신뢰·강화 없는' 기본 배차비 기준 — 신뢰가 올라 배차비가 싸져도 재계약 값은 그대로다(신뢰·강화를 쌓을 이유를 남긴다)
     baseTruckFee(c) { const R = this.rules, car = D.CARRIERS[c.carrier]; return Math.max(0, (R.feeFixed != null ? R.feeFixed : car.fee) * R.feeMult + R.feeDelta); }
-    refillPrice(c) { return Math.round(Math.max(0, c.maxCalls - c.calls) * this.baseTruckFee(c) * D.PREPAY_RATE); }
+    // 재계약은 '가득 충전'이다 — 몇 대가 남았든 값은 같다: 계약 본래 대수 × 기본 배차비 × 절반.
+    // 한도 강화(+대)를 해도 값은 본래 대수 기준이라 그만큼 이득이다.
+    refillPrice(c) { return Math.round(Math.max(1, D.CARRIERS[c.carrier].trucks) * this.baseTruckFee(c) * D.PREPAY_RATE); }
     // 실시간 계약 — 철도·해상처럼 원래 마켓에서만 팔던 계약을, 달이 끝나길 기다리지 않고 지금 웃돈을 얹어 들인다.
     // 아직 안 열린 계열(_familyOpen)은 마켓과 똑같이 안 나온다 — 진도를 건너뛰게 하지 않는다.
     realtimeContracts() {
@@ -1890,7 +1892,7 @@
       const c = this.contracts.find(x => x && x.id === contractId); if (!c) return { ok: false, msg: T('err.emptySlot') };
       if (c.calls >= c.maxCalls) return { ok: false, msg: T('err.refillFull') };
       const price = this.refillPrice(c); if (this.cash < price) return { ok: false, msg: T('err.noCash') };
-      const wasted = 0, added = c.maxCalls - c.calls; c.prepaid = (c.prepaid || 0) + added; c.calls = c.maxCalls; this.cash -= price; this.run.spent += price; this.stats.refills = (this.stats.refills || 0) + 1;
+      const wasted = c.calls; c.prepaid = c.maxCalls; c.calls = c.maxCalls; this.cash -= price;   // 남은 배차는 새 계약으로 바뀐다(선금 대수로) this.run.spent += price; this.stats.refills = (this.stats.refills || 0) + 1;
       this.say('log.refill', { name: this.contractName(c), n: c.maxCalls, price, wasted: wasted ? MSG('log.refillWasted', { n: wasted }) : '' });
       return { ok: true, price, wasted };
     }
