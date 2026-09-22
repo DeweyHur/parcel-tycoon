@@ -662,6 +662,7 @@
     'story.l3last.1': 'Rains are easing. Autumn brings different freight \u2014 we\u2019ll get to that.',
     // ----- Chapter 3 (Sept-Oct): cold freight, fragile freight, named shippers -----
     'story.l4intro.1': 'Autumn. What comes in changes from here.<br>Until now it was all just boxes. Now some of it <b>spoils</b> and some of it <b>breaks</b>.',
+    'story.l4intro.2hold': 'And one more thing \u2014 you can see who sent it now.<br>That mark is the <b>customer</b>. <b>Press and hold</b> that box.',
     'story.l4intro.2': 'And one more thing \u2014 you can see who sent it now.',
     'story.l4cust.1': 'See that mark beside the parcel? That\u2019s the <b>shipper</b>.<br>It was all walk-ins before; now named firms use us too.',
     'story.l4cust.2': 'Keep delivering on time for the same sender and their trust builds — more work, better rates.<br><b>Press and hold</b> a box to see who sent it and where it can go.',

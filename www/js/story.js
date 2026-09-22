@@ -80,6 +80,7 @@
   const hasEvent = (ctx, types) => (ctx.events || []).some(e => types.includes(e.type));
   // 마켓 카드 id (ui.js 가 같은 키로 카드에 id 를 붙인다) — 대본 마켓이라 무엇이 나올지 알고 짚어 줄 수 있다
   const mkKey = it => it.kind + '-' + (it.carrier || it.enh || it.fac || it.item || it.customer || '');
+  const custTile = g => { const p = g.parcels.find(x => x.customer && x.customer !== 'anon'); return p ? `#parcels .ptile[data-id="${p.id}"]` : null; };
   const mkItem = (g, f) => ((g.market && g.market.items) || []).find(it => !it.sold && f(it));
   const cardSel = (g, f) => { const it = mkItem(g, f); return it ? '#mk-card-' + mkKey(it) : null; };
   // 충전 카드가 나와 있는 계약 중 배차가 가장 적게 남은 것
@@ -228,12 +229,13 @@
     { id: 'l3invest', kind: 'turn', when: g => (g.emptyDays || 0) >= 2, act: () => {}, pages: [{ expr: 'think', hl: '#bar-usage' }, { expr: 'smile', hl: '#invest-btn', gate: true }] },
     { id: 'l3campGo', kind: 'modal', modal: 'growth', when: (g, ctx) => ctx.ready, pages: [{ expr: 'neutral', hl: '#camp-go', gate: true }] },
     { id: 'l3campDone', kind: 'turn', when: g => g.campaignCycle === g.month, pages: [{ expr: 'laugh', hl: '#upcoming' }] },
-    { id: 'l4intro', kind: 'start', when: () => true, pages: [
+    // 첫날 고객사 택배가 이미 있으면 여기서 바로 꾹 누르기를 시킨다 (따로 l4cust 로 미루지 않는다)
+    { id: 'l4intro', kind: 'start', when: () => true, act: g => { if (custTile(g)) g.story.custHeld = true; }, pages: [
       { expr: 'neutral' },
-      { expr: 'smile', hl: '#parcels' },
+      { expr: 'smile', k: g => custTile(g) ? 'story.l4intro.2hold' : 'story.l4intro.2', hl: g => custTile(g) || '#parcels', gate: g => !!custTile(g), hold: true },
     ] },
     // 이름 있는 화주 — 지금까지는 전부 개인 고객이었다
-    { id: 'l4cust', kind: 'turn', when: g => g.parcels.some(p => p.customer && p.customer !== 'anon'), pages: [
+    { id: 'l4cust', kind: 'turn', when: g => !g.story.custHeld && g.parcels.some(p => p.customer && p.customer !== 'anon'), pages: [
       { expr: 'neutral', hl: '#parcels' },
       // 꾹 누르기를 여기서 처음 가르친다 — 게이트가 '꾹'을 기다린다(탭으로는 안 넘어간다)
       { expr: 'think', hl: g => { const p = g.parcels.find(x => x.customer && x.customer !== 'anon'); return p ? `#parcels .ptile[data-id="${p.id}"]` : '#parcels .ptile'; }, gate: true, hold: true },
