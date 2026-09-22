@@ -106,7 +106,7 @@
     // 처음으로 ⚠ 깨지는 것이 온다. 밴은 일반도 받지만 4칸이라 일반만 실으면 남는 게 없다.
     // 그래서 ⚠ 는 밴으로, 일반은 한길로 — '차마다 맞는 짐'이 이 장이 가르치는 것이다. (직접 배송은 3장으로)
     {
-      n: 3, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 2, grants: ['weather', 'theft', 'trust', 'invest', 'attrs'],
+      n: 3, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 2, grants: ['weather', 'theft', 'trust', 'attrs'],
       minCash: 300, minCap: 16, minCalls: 5,
       company: { cash: 900, warehouse: { cap: 24, cold: 0, frozen: 0, xl: 0 }, contracts: [{ carrier: 'bulk0' }, { carrier: 'pack0' }], customers: [['anon', 0]] },
       addContracts: [{ carrier: 'pack0' }],
@@ -121,9 +121,8 @@
           ['normal 2 anon', 'normal 1 anon', 'fragile 2 anon'],
           ['normal 2 anon', 'normal 2 anon'],
           ['normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
-          // 5·6일차는 한산하다 — 창고가 비어 노는 날을 겪어야 캠페인(l3invest)이 뜻이 있다
-          [],
-          [],
+          ['normal 2 anon', 'normal 1 anon'],
+          ['normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
           ['normal 2 anon', 'normal 1 anon'],
           ['normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
           ['normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'normal 2 anon', 'fragile 2 anon'],
@@ -137,7 +136,7 @@
     },
     // ----- 3장 (4월 후반): 이사철. 이름 있는 화주 · ⚠ 깨지는 것 · ❄ 찬 것 -----
     {
-      n: 4, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 3, grants: ['cold', 'customers', 'self'],
+      n: 4, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 3, grants: ['cold', 'customers', 'self', 'invest'],
       minCash: 500, minCap: 24, minCalls: 5, minWarehouse: { cold: 8 },
       // 한 사이클 안에 마켓이 한 번뿐이라 '사고 나서 배운다'가 안 된다 — 냉장은 시작 판에 쥐여 주고,
       // 왜 그게 필요한지를 박 반장이 말로 짚는다.
@@ -154,10 +153,12 @@
           ['normal 2 anon', 'normal 2 mart', 'produce 2 farm'],
           ['normal 2 mart', 'fragile 2 glass', 'normal 2 anon'],
           ['fresh 2 farm', 'normal 2 mart', 'normal 2 anon'],
-          ['normal 2 mart', 'normal 2 anon', 'fragile 2 glass'],
-          ['normal 2 anon', 'normal 2 mart', 'fresh 2 farm'],
-          ['normal 2 mart', 'produce 2 farm', 'normal 2 anon'],
-          ['normal 2 anon', 'normal 2 mart', 'fragile 2 glass'],
+          // 6·7일차는 한산하다 — 창고가 비어 노는 날을 겪고 나서 캠페인(l3invest)을 배운다.
+          // 캠페인은 사흘 안에 물량을 끌어오니, 그 뒤 8·9일차도 가볍게 둔다(캠페인 물량이 채운다)
+          [],
+          [],
+          ['normal 2 mart', 'fresh 2 farm'],
+          ['normal 2 anon', 'fragile 2 glass'],
           ['normal 2 mart', 'fresh 2 farm', 'normal 2 anon'],
           ['normal 2 mart', 'normal 2 anon', 'fragile 2 glass'],
           ['normal 2 anon', 'normal 2 mart', 'fresh 2 farm'],
