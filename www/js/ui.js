@@ -72,6 +72,8 @@
       + `<span id="t-music">${T('opt.music', { v: T(opts.music ? 'opt.on' : 'opt.off') })}</span>`
       + `<span id="t-lang">${T('opt.lang')}: ${esc(lang)}</span></div>`;
   }
+  // 인수인계(캠페인)를 끝까지 마쳤으면 옛 '스토리 안내'도 본 것으로 친다 — 새 런에서 또 권하지 않는다
+  const storySeen = P => !!((P.story && P.story.seen) || ((P.campaign && P.campaign.cleared) || 0) >= LEVELS.IMPLEMENTED);
   function showTitle() {
     $('#story').hidden = true; $('#sms').hidden = true; clearStoryHl(); clearGate(); storyBusy = false;
     const save = loadSave(), P = Profile.get();
@@ -81,9 +83,9 @@
     const nTotal = Object.keys(M.COMPANIES).length + Object.keys(M.PERKS).length + Object.keys(M.SCENARIOS).length;
     const body = `<div class="title"><h1>${T('title.name')}</h1><div class="sub">${T('title.sub')}</div>
       ${save ? `<button class="btn cta" id="t-continue">${T('title.continue')} <small style="color:var(--dim)">(${esc(save.story ? T('title.story') : M.SCENARIOS[save.cfg.scenario] ? M.SCENARIOS[save.cfg.scenario].name : save.cfg.scenario)} · ${T('fmt.monthTurn', { m: cycleName(save.month), t: save.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })})</small></button>` : ''}
-      <button class="btn ${P.story && P.story.seen ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${demoLocked() ? T('demo.storySub', { n: demoMonthsLabel() }) : T('title.storySub')}</small></button>
+      <button class="btn ${storySeen(P) ? '' : 'gold'}" id="t-story">${T('title.story')} <small style="color:var(--dim)">${demoLocked() ? T('demo.storySub', { n: demoMonthsLabel() }) : T('title.storySub')}</small></button>
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
-      <button class="btn ${P.story && P.story.seen && !demoLocked() ? 'gold' : ''}" id="t-new">${demoLocked() ? '🔒 ' : ''}${T('title.new')}${demoLocked() ? ` <small style="color:var(--dim)">${T('demo.fullOnly')}</small>` : P.story && P.story.seen ? '' : ` <small style="color:var(--dim)">${T('title.newHint')}</small>`}</button>
+      <button class="btn ${storySeen(P) && !demoLocked() ? 'gold' : ''}" id="t-new">${demoLocked() ? '🔒 ' : ''}${T('title.new')}${demoLocked() ? ` <small style="color:var(--dim)">${T('demo.fullOnly')}</small>` : storySeen(P) ? '' : ` <small style="color:var(--dim)">${T('title.newHint')}</small>`}</button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).length, d: Object.keys(M.ACHIEVEMENTS).length })}</small></button>
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
       <button class="btn" id="t-help">${T('title.help')}</button>
@@ -92,7 +94,7 @@
     const m = modal('', body, null);
     m.classList.add('titlecard'); $('#modal-root').classList.add('title-mode');
     if (save) m.querySelector('#t-continue').onclick = () => { SFX.resume(); SFX.select(); game = Game.fromJSON(save); closeModal(); startPlay(); };
-    m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort')); return; } if (!(P.story && P.story.seen)) { suggestStory(); return; } showScenarioSelect(); };
+    m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort')); return; } if (!(storySeen(P))) { suggestStory(); return; } showScenarioSelect(); };
     m.querySelector('#t-story').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-story').click(); }, T('title.newShort')); return; } showStoryStart(); };
     const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex('companies', showTitle); };
@@ -220,6 +222,7 @@
       if (hasNext) return startLevel(next);            // 타이틀로 돌아가지 않는다 — 장은 이어진다
       // 마지막 장 — 인수인계가 끝났다. 엔딩 씬 한 번 보여 주고 타이틀로
       closeModal();
+      { const P3 = Profile.get(); P3.story = Object.assign({}, P3.story, { seen: true, done: true }); Profile.save(); }
       if (window.Intro && scene) Intro.play(scene, () => showTitle(), { outro: true, params: { name: esc(P.campaign.name || T('lv.nameDefault')) } });
       else showTitle();
     };
@@ -442,7 +445,7 @@
       return `<div class="card ${!un || conflict ? 'dis' : ''} ${sel ? 'sel' : ''}" data-id="${id}"><div class="t">${esc(pk.name)}</div><div class="d">${un ? esc(pk.desc) + (conflict ? ` <span style="color:var(--orange)">(${esc(conflict)})</span>` : '') : esc(unlockText(pk.unlock))}</div></div>`;
     }).join('')).join('');
     const head = `<div class="perk-count">${T('prep.step3')} — ${esc(M.SCENARIOS[prep.scenario].name)} · ${co.icon} ${esc(co.name)}${daily ? ` · ${T('prep.variants')}: ${daily.variants.map(v => esc(M.DAILY_VARIANTS[v].name + '(' + M.DAILY_VARIANTS[v].desc + ')')).join(', ')}` : ''}<br>${T('prep.perkCount', { n: prep.perks.length, slots })}</div>`;
-    if (prep.story == null) prep.story = !(P.story && P.story.seen); // 첫 런은 안내가 기본으로 켜진다
+    if (prep.story == null) prep.story = !(storySeen(P)); // 첫 런은 안내가 기본으로 켜진다
     const storyCard = `<div style="font-size:12px;color:var(--gold);margin:10px 0 4px">${T('prep.story')}</div><div class="card toggle ${prep.story ? 'sel' : ''}" id="prep-story"><div class="t"><span>${prep.story ? '☑' : '☐'} ${T('prep.story')}</span></div><div class="d">${T('prep.storyDesc')}</div></div>`;
     const noIns = !!(co.mods && co.mods.noInsurance);
     const insCards = storyCard + `<div style="font-size:12px;color:var(--gold);margin:10px 0 4px">${T('prep.insuranceHead')}</div>` + (noIns ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('prep.startupNoIns')}</div>` : Object.keys(M.INSURERS).map(id => { const I = M.INSURERS[id]; const fee = Math.max(0, Math.round((I.fee + ((co.mods && co.mods.premiumDelta || {})[id] || 0)) * ((co.mods && co.mods.premiumMult) || 1) * ((M.SCENARIOS[prep.scenario].mods || {}).premiumMult || 1))); return `<div class="card ins ${prep.insurer === id ? 'sel' : ''}" data-ins="${id}"><div class="t"><span>${I.icon} ${esc(I.name)}</span><span class="price">${fee ? T('fmt.perMonth', { n: fee }) : '0c'}</span></div><div class="d">${esc(I.desc)}${I.fans.length ? `<br><span style="color:var(--green)">${T('prep.fans', { list: I.fans.map(f => M.CUSTOMERS[f].icon + M.CUSTOMERS[f].name).join(' ') })}</span>` : ''}</div></div>`; }).join(''));
