@@ -140,6 +140,8 @@
       if (cyTrust) for (const k in cyTrust) if (this.trust[k] != null) this.trust[k] = cyTrust[k];
       if (this.rules.year) this.year = this.rules.year;   // 시나리오가 해를 지정하면 그 해의 달력으로
       this.rep = this.rules.gameoverStress;   // 전임 창고장이 물려준 평판에서 시작한다
+      // 평판이 처음 열리는 장은 상한보다 낮게 시작한다 — 가득 찬 막대로 시작하면 채울 게 없다
+      if (this.level && this.level.startRep != null) this.rep = Math.min(this.rep, this.level.startRep);
       this._initCompany();
       this._initCustomers();
       this.insurer = this.rules.noInsurance ? 'none' : (cfg.insurer && M.INSURERS[cfg.insurer] ? cfg.insurer : 'none');
@@ -1569,7 +1571,7 @@
       if (R.closingBonus && this.usage() <= R.closingBonus.usage) { closing = R.closingBonus.amount; this.cash += closing; }
             if (R.erosion) { const cands = this.contracts.filter(c => c && this.startContractIds.includes(c.id) && c.maxCalls > 1); if (cands.length) { const c = this.rng.pick(cands); c.maxCalls--; c.calls = Math.min(c.calls, c.maxCalls); this.say('log.erosion', { name: this.contractName(c) }); } }
       // 평판: 사고 없이 넘긴 정산은 소문이 좋아지고, 상한까지 채운 채로 넘기면 등급이 오른다
-      let repClean = 0, repTierUp = null;
+      let repClean = 0, repTierUp = null, repPerks = null;
       if (ms.penalty === 0) repClean = this.addRep(D.REP_GAIN.cleanMonth, MSG('why.repClean'));
       if (this.rep >= this.repCap() && this.repTier < D.REP_TIERS.length - 1) {
         this.repTier++; repTierUp = this.repTierId();
@@ -1577,6 +1579,9 @@
         const opened = this.customersAtTier(this.repTier).filter(k => !this.customers[k]);
         if (opened.length) this.say('log.repCustomers', { list: opened.map(k => M.CUSTOMERS[k].icon + M.CUSTOMERS[k].name).join(', ') });
         this.emit('repTier', { tier: repTierUp, cap: this.repCap(), customers: opened });
+        // 정산표에 '무엇이 열렸는지' 그대로 — 물량·운영비 변화, 새 고객, 새 품목
+        const prev = D.REP_TIERS[this.repTier - 1], cur = D.REP_TIERS[this.repTier];
+        repPerks = { arr: Math.round((cur.arrivals / prev.arrivals - 1) * 100), op: Math.round((cur.opCost / prev.opCost - 1) * 100), customers: opened, goods: (cur.unlock || []).slice() };
       }
       // 통계
       this.stats.monthsDone = this.month;
@@ -1588,7 +1593,7 @@
       this.summary = { month: this.month, revenue: ms.revenue, opCost, opCostDetail: this._lastOpCost, calls: ms.calls, waits: ms.waits,
         delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, selfCost: ms.selfCost || 0, fees: ms.fees || 0, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, customers: this.customerSummary(),
         cash: this.cash, cashStart: ms.cashStart != null ? ms.cashStart : this.cash, net: this.cash - (ms.cashStart != null ? ms.cashStart : this.cash),
-        rep: this.rep, repCap: this.repCap(), repTier: this.repTierId(), repClean, repTierUp, repDelta: this.rep - (ms.repStart != null ? ms.repStart : this.rep), usage: Math.round(this.usage() * 100), left: this.parcels.length };
+        rep: this.rep, repCap: this.repCap(), repTier: this.repTierId(), repClean, repTierUp, repPerks, repDelta: this.rep - (ms.repStart != null ? ms.repStart : this.rep), usage: Math.round(this.usage() * 100), left: this.parcels.length };
       // 단기 금융: 지난달 차입 상환(원금+이자) → 그래도 음수면 새로 차입해 0으로 맞춤
       const loan = { interest: 0, repaid: 0, borrowed: 0, debt: 0 };
       if (this.debt > 0) { loan.interest = Math.ceil(this.debt * D.LOAN.interest); loan.repaid = this.debt; this.cash -= this.debt + loan.interest; this.run.spent += loan.interest; this.stats.interestPaid += loan.interest; this.debt = 0; }

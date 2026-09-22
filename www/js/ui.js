@@ -669,7 +669,7 @@
         const on = selfOk() && !busy && g.phase === 'play', n = g.selfCount(), el = g.selfEligible();
         sc.disabled = !on; sc.className = 'btn contract self' + (on ? ' ready' : '') + (pk && pk.i === SELF ? ' picked' : '');
         const pv = sortByUrgency(el).slice(0, n);
-        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span><span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls">×${n}</span>`;
+        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span><span class="takes"></span><span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls">×${n}</span>`;
       }
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
@@ -718,6 +718,21 @@
 
   // ---------- 평판 상세: 지금 등급의 바닥~상한 사이 어디인지, 다음 등급까지 얼마인지 ----------
   // HUD 게이지만으로는 "20/35" 의 20 이 시작값이라 뭘 채우는 중인지 보이지 않는다.
+  // 등급이 오르며 열린 것 — 물량/운영비 변화와 새 고객·새 품목을 아이콘으로
+  function repPerksHtml(pk) {
+    if (!pk) return '';
+    const parts = [`📦 ${pk.arr >= 0 ? '+' : ''}${pk.arr}%`, `💸 ${pk.op >= 0 ? '+' : ''}${pk.op}%`];
+    if (pk.customers && pk.customers.length) parts.push(pk.customers.map(k => M.CUSTOMERS[k].icon + esc(M.CUSTOMERS[k].name)).join(' '));
+    if (pk.goods && pk.goods.length) parts.push(pk.goods.map(t => `<i class="tdot" style="background:${D.PARCEL_TYPES[t].css}"></i>${esc(D.PARCEL_TYPES[t].short)}`).join(' '));
+    return ' · ' + parts.join(' · ');
+  }
+  // 고객 신뢰 단계: 숫자 대신 칸 — 채운 칸은 금색, 이번 달 새로 채운 칸은 초록, 잃은 칸은 빨강 테두리
+  function trustPips(from, to) {
+    const max = M.CUSTOMER_LEVELS.length - 1;
+    let h = '';
+    for (let i = 1; i <= max; i++) h += `<i class="${i <= to ? (i > from ? 'new' : 'on') : i <= from ? 'lost' : ''}"></i>`;
+    return `<span class="tpips" title="${esc(T('common.trust'))} ${to}/${max}">🤝${h}</span>`;
+  }
   function showRepInfo() {
     const g = game, floor = g.repFloor(), cap = g.repCap(), top = g.repTier >= D.REP_TIERS.length - 1;
     const band = Math.max(1, cap - floor), inBand = Math.max(0, Math.min(band, g.rep - floor));
@@ -731,8 +746,7 @@
       ${top ? '' : `<div style="font-size:12px;color:var(--gold);margin:10px 0 3px">${T('repi.nextHead', { name: esc(T('rep.tier.' + next.id)) })}</div>
         <div class="d">${T('repi.nextScale', { arr: Math.round((next.arrivals / g.repTierDef().arrivals - 1) * 100), op: Math.round((next.opCost / g.repTierDef().opCost - 1) * 100) })}</div>
         ${newCust.length ? `<div class="d">${T('repi.nextCust', { list: newCust.map(k => M.CUSTOMERS[k].icon + esc(M.CUSTOMERS[k].name)).join(' · ') })}</div>` : ''}
-        ${(next.unlock || []).filter(t => !g.repUnlocked(t)).length ? `<div class="d">${T('repi.nextGoods', { list: (next.unlock || []).filter(t => !g.repUnlocked(t)).map(t => D.PARCEL_TYPES[t].short).join(' · ') })}</div>` : ''}`}
-      <div class="d" style="color:var(--dim);margin-top:8px">${T('repi.zero')}</div>`;
+        ${(next.unlock || []).filter(t => !g.repUnlocked(t)).length ? `<div class="d">${T('repi.nextGoods', { list: (next.unlock || []).filter(t => !g.repUnlocked(t)).map(t => D.PARCEL_TYPES[t].short).join(' · ') })}</div>` : ''}`}`;
     modal(T('hud.rep'), body, [{ label: T('btn.close'), onClick: closeModal }]);
   }
   // ---------- HUD 팝업: 회사 · 날씨 · 입고 예정 ----------
@@ -903,6 +917,7 @@
     if (cap > PIP_MAX) return '';
     let h = '';
     for (let i = 0; i < cap * (trucks || 1); i++) { if (i && i % cap === 0) h += '<i class="gap"></i>'; h += cells[i] ? `<i class="on" style="background:${cells[i]}"></i>` : '<i></i>'; }
+    h += '<b class="cab"></b>';   // 트럭 앞머리 — 계약 목록에서만 보인다
     // 넘치는 칸은 많아야 여섯까지만 그린다 — 그 이상은 눈금이 아니라 벽이 된다
     if (over.length) { h += '<i class="gap"></i>'; over.slice(0, 6).forEach((css, i) => { h += `<i class="over${over.length > 6 && i === 5 ? ' more' : ''}" style="background:${css}"></i>`; }); }
     return `<span class="pips">${h}</span>`;
@@ -1384,14 +1399,14 @@
     const state = `${sec('State')}<div class="kv">
       <span>${T('sum.callsWaits')}</span><span class="v">${T('fmt.calls', { n: s.calls })} / ${T('fmt.calls', { n: s.waits })}</span>
       <span>${T('sum.delivered')}</span><span class="v">${T('fmt.count', { n: s.delivered })}</span>
-      ${!game.shows('rep') ? '' : `<span>${T('sum.rep')}</span><span class="v ${s.rep <= s.repCap * 0.45 ? 'bad' : ''}">${s.rep}/${s.repCap} <small>${esc(T('rep.tier.' + s.repTier))}${s.repDelta ? ` · ${s.repDelta > 0 ? '+' : ''}${s.repDelta}` : ''}${!s.repTierUp && game.repToNext() ? `<br>${T('sum.repToNext', { n: game.repToNext() })}` : ''}</small>${s.repTierUp ? `<br><small style="color:var(--gold)">${T('sum.repTierUp')}</small>` : ''}</span>`}
+      ${!game.shows('rep') ? '' : `<span>${T('sum.rep')}</span><span class="v ${s.rep <= s.repCap * 0.45 ? 'bad' : ''}">${s.rep}/${s.repCap} <small>${esc(T('rep.tier.' + s.repTier))}${s.repDelta ? ` · ${s.repDelta > 0 ? '+' : ''}${s.repDelta}` : ''}${!s.repTierUp && game.repToNext() ? `<br>${T('sum.repToNext', { n: game.repToNext() })}` : ''}</small>${s.repTierUp ? `<br><small style="color:var(--gold)">${T('sum.repTierUp')}${repPerksHtml(s.repPerks)}</small>` : ''}</span>`}
       <span>${T('sum.usage')}</span><span class="v">${T('sum.usageVal', { pct: s.usage, n: s.left })}</span>
       ${s.overdueVol ? `<span>${T('sum.overdueVol')}</span><span class="v bad">${T('fmt.cells', { n: s.overdueVol })}</span>` : ''}
       ${bad === 0 && R.winMaxDiscard != null ? `<span>${T('sum.discarded')}</span><span class="v">${T('sum.runDiscard', { n: game.run.discarded, max: R.winMaxDiscard })}</span>` : ''}
       ${R.winDelivered ? `<span>${T('sum.deliverGoal')}</span><span class="v">${game.run.delivered}/${T('fmt.count', { n: R.winDelivered })}</span>` : ''}
       ${R.winStorage ? `<span>${T('sum.storageGoal')}</span><span class="v">${game.stats.storageDone}/${T('fmt.cases', { n: R.winStorage })}</span>` : ''}
       ${R.winBigCustomer && game.bigCustomer ? `<span>${T('sum.bigCustomer')}</span><span class="v">${M.CUSTOMERS[game.bigCustomer].icon} ${esc(M.CUSTOMERS[game.bigCustomer].name)} ${T('common.trust')} ${game.customerLevel(game.bigCustomer)}/3</span>` : ''}</div>`;
-    const custs = s.customers && game.shows('customers') ? `${sec('Cust')}` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${T('common.trust')} ${c.month.lvStart}→${c.level}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : '';
+    const custs = s.customers && game.shows('customers') ? `${sec('Cust')}` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${trustPips(c.month.lvStart, c.level)}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : '';
     const body = head + income + cost + incident + state + custs;
     const last = !R.endless && game.month >= R.months;
     modal(T('sum.title', { n: game.cycleLabel(s.month) }), body, [{ label: last ? T('sum.final') : game.shows('market') ? T('sum.toMarket') : T('sum.toNext', { n: game.cycleLabel(s.month + 1) }), cls: 'primary', onClick: () => {
@@ -1467,7 +1482,7 @@
       m.querySelectorAll('[data-detail]').forEach(b => b.onclick = e => { e.stopPropagation(); SFX.click(); showContractDetail(game.contracts[+b.dataset.detail], render); });
       m.querySelectorAll('[data-refill]').forEach(b => b.onclick = e => { e.stopPropagation(); const it = mk.items[+b.dataset.refill]; const c = game.contracts.find(x => x && x.id === it.contractId);
         const go = () => { const r = game.buy(+b.dataset.refill, null); if (r.ok) { SFX.buy(); saveGame(); toast(T('toast.refill', { name: game.contractName(c), n: c.maxCalls })); render(); } else toast(r.msg); };
-        if (c && c.calls > 0) askConfirm(T('mk.refillWaste', { n: c.calls }), go, T('mk.refillBtn', { price: it.price }), render); else go(); });
+        go(); });   // 남은 대수가 있어도 묻지 않는다 — 크게 생각할 거리가 아니다
       m.querySelectorAll('[data-offer]').forEach(b => b.onclick = e => { e.stopPropagation(); SFX.click(); showOfferDetail(mk.items[+b.dataset.offer], render); });
       m.querySelectorAll('.card[data-i]').forEach(el => el.onclick = () => {
         const it = mk.items[+el.dataset.i]; if (it.sold) return;
@@ -1479,7 +1494,7 @@
         // 같은 계열 상위 센터로 갈아타기: 그 슬롯을 바로 대상으로, 확인만
         if (it.kind === 'contract' && it.switchFrom) {
           const si = game.contracts.findIndex(c => c && c.id === it.switchFrom), c = game.contracts[si];
-          if (si >= 0) { modal(it.name, `<p>${T('slot.switchAsk', { from: esc(game.contractName(c)), to: esc(it.name), calls: c.calls })}</p>`, [{ label: T('btn.cancel'), onClick: render }, { label: T('slot.switchBtn'), cls: 'primary', onClick: () => buyContractInto(it, +el.dataset.i, si, render) }]); return; }
+          if (si >= 0) { modal(it.name, switchCompare(c, it), [{ label: T('btn.cancel'), onClick: render }, { label: T('slot.switchBtn'), cls: 'primary', onClick: () => buyContractInto(it, +el.dataset.i, si, render) }]); return; }
         }
         const free = game.contracts.findIndex(c => !c);
         if (it.kind === 'contract' && free >= 0) return buyContractInto(it, +el.dataset.i, free, render);
@@ -1516,6 +1531,22 @@
       if (!have.some(c => g.canHandle(c, pp)) && g._carrierAccepts(car, pp)) { gains.push(T('mk.newSize', { n: sz })); break; }
     }
     return gains.length ? gains.join(' · ') : '';
+  }
+  // 갈아타기: 지금 계약과 새 계약을 항목별로 나란히 — 무엇이 얼마나 바뀌는지
+  function switchCompare(c, it) {
+    const o = offerSpec(it), car0 = D.CARRIERS[c.carrier], car1 = o.car;
+    const lv0 = game.shows('trust') ? game.trustLevel(c.carrier) : null, lv1 = game.shows('trust') ? game.trustLevel(it.carrier) : null;
+    const rows = [
+      [T('cmp.cap'), game.vehicleCap(c), o.cap, 1, v => T('fmt.cells', { n: v })],
+      [T('cmp.trucks'), c.maxCalls, o.trucks, 1, v => `${v}`],
+      [T('cmp.simul'), game.simulMax(c), Math.max(car1.simul || 1, 1), 1, v => `×${v}`],
+      [T('cmp.fee'), game.truckFee(c), o.fee, -1, v => `${v}c`],
+      [T('cmp.size'), game.contractSizeMax(c), car1.sizeMax, 1, v => `~${v}`],
+    ];
+    if (lv0 != null) rows.push([T('common.trust'), lv0, lv1, 1, v => `${v}`]);
+    const tr = rows.map(([k, a, b, dir, f]) => { const d = (b - a) * dir; return `<tr><td>${k}</td><td>${f(a)}</td><td class="${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${f(b)}${b > a ? ' ▲' : b < a ? ' ▼' : ''}</td></tr>`; }).join('');   // 화살표는 오르내림, 색은 좋고 나쁨(배차비는 내려야 초록)
+    return `<table class="cmp"><tr><th></th><th>${esc(car0.short || car0.name)}${gradeBadge(c.grade)}</th><th>${esc(car1.short || car1.name)}${gradeBadge(it.grade)}</th></tr>${tr}</table>
+      <p class="d" style="color:var(--dim);font-size:11px">${T('cmp.note', { calls: c.calls })}</p>`;
   }
   function offerSpec(it) {
     const R = game.rules, car = D.CARRIERS[it.carrier];

@@ -678,7 +678,7 @@ t('4장에서 처음으로 평판이 움직이고, 0이면 판이 끝난다', ()
 
   const g = LV(5);
   assert.ok(g.shows('rep'), '4장에는 평판이 있다');
-  assert.ok(g.rep > 0 && g.rep === g.repCap(), '1단계 상한에서 시작한다 — ' + g.rep + '/' + g.repCap());
+  assert.ok(g.rep > 0 && g.rep < g.repCap() && g.rep === 16, '상한보다 낮게 시작해 채울 게 있다 — ' + g.rep + '/' + g.repCap());
   g.addRep(-g.rep, 'test');
   assert.ok(g.rep <= 0, '0까지 내려간다');
   g.wait(); g.takeEvents();

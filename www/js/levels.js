@@ -174,6 +174,7 @@
     {
       n: 5, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 4, grants: ['rep', 'insurance', 'storage', 'bigsize'],
       minCash: 700, minCap: 24, minCalls: 6, minWarehouse: { cold: 8 },
+      startRep: 16,   // 평판이 처음 보이는 장: 24 중 16에서 — 꽉 채워 보내고 사고 없이 넘기면 이 장 안에 '동네 소문'에 닿는다
       company: { cash: 1800, warehouse: { cap: 32, cold: 6, frozen: 0, xl: 0 },
         contracts: [{ carrier: 'bulk0' }, { carrier: 'cold0' }, { carrier: 'fragile0' }, { carrier: 'large0' }], customers: [['anon', 0], ['mart', 1], ['glass', 0]] },
       addCustomers: [['mover', 0]],
@@ -195,8 +196,8 @@
           ['normal 2 mart', 'normal 2 anon', 'normal 2 mart'],
           ['normal 2 anon', 'normal 2 mart', 'fragile 2 glass'],
         ]),
-          // 다음 보름에 ❆ 가 온다. 계약 자리는 이미 넷이 다 찼으니 답은 계약이 아니라 **특약**이다
-          market: { contracts: [], enh: ['optFrozen', 'limit1'], item: ['transitCert'], fac: ['expand2', 'freezer1'] } },
+          // 다음 보름에 ❆ 가 온다. 자리가 비었으면 ❆ 계약을, 다 찼으면 **특약**을 붙인다
+          market: { contracts: ['frozen0'], enh: ['optFrozen', 'limit1'], item: ['transitCert'], fac: ['expand2', 'freezer1'] } },
       },
     },
     // ----- 5장 (5월 후반): 마지막 봄. ❆ 냉동 · 일요일 선택 · 그리고 자리가 없을 때 '붙이는' 법 -----

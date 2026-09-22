@@ -272,11 +272,13 @@
     const caps = f.caps.slice(); for (const x of c.extraCaps || []) if (!caps.includes(x)) caps.push(x);
     DATA.CARRIERS[id] = Object.assign({}, f, { id, family: c.family, tier: c.tier, grade: t.grade, caps,
       trucks: c.trucks != null ? c.trucks : f.trucks + t.trucks, cap: c.cap != null ? c.cap : f.cap + t.cap,
-      fee: c.fee != null ? c.fee : Math.round(f.fee * t.fee), price: c.price != null ? c.price : Math.round(f.price * t.price),
+      fee: c.fee != null ? c.fee : Math.round(f.fee * t.fee), price: 0,
       refill: c.refill != null ? c.refill : Math.round(f.price * 0.5 * (1 + c.tier * 0.5)),
       sizeMax: c.sizeMax != null ? c.sizeMax : f.sizeMax, delay: c.delay != null ? c.delay : (f.delay || 0), simul: c.simul || 1,
       need: 'need' in c ? c.need : f.need, campaign: !!c.campaign, rep: c.rep || f.rep, allowAttrs: c.allowAttrs || null });
   }
+  // 계약값 = 대당 만차 수입의 25% × 배차 대수 = 배차 대수 × 배차비 × 0.5 — 재계약과 같은 규칙(부록 AS)
+  for (const id in DATA.CARRIERS) { const car = DATA.CARRIERS[id]; car.price = Math.round(car.trucks * car.fee * DATA.PREPAY_RATE); }
   // 계열 → 센터 id (tier 순). 회사 시작 계약·보장·가중치는 계열 이름으로 쓴다
   DATA.centersOf = fam => Object.keys(DATA.CARRIERS).filter(k => DATA.CARRIERS[k].family === fam && !DATA.CARRIERS[k].campaign).sort((a, b) => DATA.CARRIERS[a].tier - DATA.CARRIERS[b].tier);
   DATA.centerFor = (fam, tier) => { const list = DATA.centersOf(fam); if (!list.length) return null; let best = list[0]; for (const k of list) if (DATA.CARRIERS[k].tier <= tier) best = k; return best; };

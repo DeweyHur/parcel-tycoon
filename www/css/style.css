@@ -127,6 +127,7 @@ body { touch-action: manipulation; }
 .pips i.on { background: var(--gold); }   /* 색은 실은 택배 종류로 덮어쓴다 */
 .pips i.over { background: var(--orange); opacity: .4; }   /* 다음 차 몫 — 색은 그대로, 흐리게 */
 .pips i.over.more { opacity: .9; box-shadow: inset 0 0 0 1px #0004, 2px 0 0 var(--orange); }
+.pips .cab { display: none; }
 .pips i.gap { width: 5px; background: none; box-shadow: none; }
 /* 배차는 화물칸과 다른 것이니 색도 다르게 — 금색은 짐, 푸른색은 부를 수 있는 횟수 */
 .pips.calls i { width: 4px; height: 8px; background: transparent; box-shadow: inset 0 0 0 1px #8fb8ff55; }
@@ -714,7 +715,7 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 
 /* 계약: 가로 스와이프 대신 세로 목록 — 한 줄에 이름 · 색 · 적재 · 순수익 · 배차 */
 #contract-strip { flex-direction: column; overflow: visible; gap: 4px; padding: 0 0 5px; scroll-snap-type: none; }
-#contract-strip .contract { flex: none; width: 100%; min-height: 0; padding: 5px 8px; display: grid; grid-template-columns: 78px auto minmax(0, 1fr) auto auto; align-items: center; gap: 6px; }
+#contract-strip .contract { flex: none; width: 100%; min-height: 0; padding: 5px 8px; display: grid; grid-template-columns: 78px 48px minmax(0, 1fr) auto auto; align-items: center; gap: 6px; }
 #contract-strip .contract[hidden] { display: none; }
 #contract-strip .contract .cn { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 #contract-strip .contract .takes { margin: 0; }
@@ -727,3 +728,22 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 
 /* 꾹 누르는 중 */
 .ptile.holding { transform: scale(.94); filter: brightness(1.2); transition: transform .45s, filter .45s; }
+
+/* 갈아타기 비교표 */
+table.cmp { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 6px; }
+table.cmp th { text-align: right; color: var(--gold); padding: 3px 6px; font-weight: 700; }
+table.cmp td { padding: 3px 6px; border-top: 1px solid #0f0e1a88; text-align: right; }
+table.cmp td:first-child { text-align: left; color: var(--dim); }
+table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); }
+
+/* 계약 목록: 색 점 칸 고정폭 → 트럭(적재 칸)이 모든 줄에서 같은 자리에서 시작. 끝에 빨간 캡(호출 바 트럭과 같은 방향) */
+#contract-strip .contract .takes { overflow: hidden; justify-self: start; }
+#contract-strip .contract .cl .pips { align-items: center; }
+#contract-strip .contract .cl .pips .cab { display: block; flex: none; width: 7px; height: 11px; margin-left: 3px; background: #e0553d; box-shadow: inset 0 0 0 1px #11101d; }
+
+.tpips { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; }
+.tpips i { width: 7px; height: 9px; background: #ffffff1a; box-shadow: inset 0 0 0 1px #0006; }
+.tpips i.on { background: var(--gold); }
+.tpips i.new { background: var(--green); }
+.tpips i.lost { background: none; box-shadow: inset 0 0 0 1px var(--red); }
+.tdot { display: inline-block; width: 7px; height: 7px; margin-right: 2px; border: 1px solid #0006; vertical-align: middle; }

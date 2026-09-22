@@ -295,6 +295,10 @@
     // 쇼핑 행사 폭주
     { id: 'l5rush', kind: 'turn', when: g => g.isRushTurn && g.isRushTurn(), pages: [{ expr: 'worry', hl: '#upcoming' }] },
     // 이 장의 진짜 교훈 — 자리가 다 찼을 때는 계약이 아니라 특약이다
+    // 캠페인에서 자리가 하나 비어 있으면 ❆ 는 계약으로 받는다 (다 찼으면 아래 l5full 이 특약을 가르친다)
+    { id: 'l5frozen', kind: 'market', when: g => g.contracts.filter(Boolean).length < root.DATA.CONTRACT_SLOTS && !!mkItem(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen'), pages: [
+      { expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen'), gate: true },
+    ] },
     { id: 'l5full', kind: 'market', when: g => g.contracts.filter(Boolean).length >= root.DATA.CONTRACT_SLOTS && !!optItem(g), pages: [
       { expr: 'think', hl: '#mk-contracts' },
       { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt') },
@@ -312,7 +316,8 @@
   const BEATS_L6 = [
     { id: 'l6intro', kind: 'start', when: () => true, pages: [
       { expr: 'neutral' },
-      { expr: 'smile' },
+      // 캠페인으로 넘어오면 자리가 비어 있을 수 있다 — 그땐 '다 찼다'고 말하지 않는다
+      { expr: 'smile', k: g => g.contracts.filter(Boolean).length >= root.DATA.CONTRACT_SLOTS ? 'story.l6intro.2' : 'story.l6intro.2open' },
     ] },
     // 일요일 선택 — 여태 그냥 쉬던 날에 고를 것이 생긴다
     { id: 'l6weekend', kind: 'weekend', when: () => true, pages: [
