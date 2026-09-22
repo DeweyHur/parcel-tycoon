@@ -235,7 +235,8 @@
     // 이름 있는 화주 — 지금까지는 전부 개인 고객이었다
     { id: 'l4cust', kind: 'turn', when: g => g.parcels.some(p => p.customer && p.customer !== 'anon'), pages: [
       { expr: 'neutral', hl: '#parcels' },
-      { expr: 'think', hl: '#parcels .ptile' },
+      // 꾹 누르기를 여기서 처음 가르친다 — 게이트가 '꾹'을 기다린다(탭으로는 안 넘어간다)
+      { expr: 'think', hl: g => { const p = g.parcels.find(x => x.customer && x.customer !== 'anon'); return p ? `#parcels .ptile[data-id="${p.id}"]` : '#parcels .ptile'; }, gate: true, hold: true },
     ] },
     // 마켓이 먼저 온다: 다음 사이클에 ❄ 가 오는데 받을 데가 없다
     // ❄ 가 실제로 들어온 날
@@ -486,7 +487,7 @@
     const pages = b.pages.map((pg, i) => {
       const key = pg.k ? pg.k(g) : `story.${b.id}.${i + 1}`;
       const speaker = typeof pg.speaker === 'function' ? pg.speaker(g) : pg.speaker || 'park';
-      return { speaker, name: pg.nameKey ? root.I18n.t(pg.nameKey) : speaker === 'park' ? root.I18n.t(CHARACTER.nameKey) : repName(speaker), expr: typeof pg.expr === 'function' ? pg.expr(g) : pg.expr, hl: typeof pg.hl === 'function' ? pg.hl(g) : pg.hl || null, gate: typeof pg.gate === 'function' ? !!pg.gate(g) : !!pg.gate, text: root.I18n.t(key, p) };
+      return { speaker, name: pg.nameKey ? root.I18n.t(pg.nameKey) : speaker === 'park' ? root.I18n.t(CHARACTER.nameKey) : repName(speaker), expr: typeof pg.expr === 'function' ? pg.expr(g) : pg.expr, hl: typeof pg.hl === 'function' ? pg.hl(g) : pg.hl || null, gate: typeof pg.gate === 'function' ? !!pg.gate(g) : !!pg.gate, hold: !!pg.hold, text: root.I18n.t(key, p) };
     });
     if (!g.story.notes) g.story.notes = [];
     g.story.notes.push({ id: b.id, month: g.month, turn: g.turn, text: pages.map(x => x.text) });

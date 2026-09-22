@@ -435,6 +435,7 @@
     'story.next': 'Next ▶',
     'story.ok': 'Got it',
     'story.tapHere': 'Tap here',
+    'story.holdHere': 'Press and hold',
     'story.name.yeo': 'Yeo',
     'story.name.ahn': 'Ahn',
     'story.name.noh': 'Noh',

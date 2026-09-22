@@ -724,3 +724,6 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 #contract-strip .contract.full::before { right: auto; left: 4px; bottom: -1px; }
 #call-head .ch-top .tbtn { margin-left: auto; }
 #call-head .trustline { cursor: pointer; }
+
+/* 꾹 누르는 중 */
+.ptile.holding { transform: scale(.94); filter: brightness(1.2); transition: transform .45s, filter .45s; }

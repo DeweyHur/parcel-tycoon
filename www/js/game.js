@@ -838,6 +838,7 @@
       const attrs = (p.attrs || D.PARCEL_TYPES[p.type].attrs).filter(a => D.GATING_ATTRS.includes(a) || (need || []).includes(a));
       if (p.size < car.sizeMin || p.size > sizeMax) return false;
       if (car.onlyPlain && attrs.filter(a => D.GATING_ATTRS.includes(a)).length) return false;
+      if (car.allowAttrs && attrs.some(a => D.GATING_ATTRS.includes(a) && !car.allowAttrs.includes(a))) return false;
       if (need && !need.some(a => attrs.includes(a))) return false;
       if (attrs.includes('frozen') && !caps.includes('frozen')) return false;
       if (attrs.includes('customs') && (p.customs || 0) > 0 && !caps.includes('customs')) return false;

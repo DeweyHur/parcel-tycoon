@@ -1148,6 +1148,7 @@
     el.onpointerup = el.onpointerleave = el.onpointercancel = clear;
     el.oncontextmenu = e => e.preventDefault();
     el.onclick = () => { clear(); if (long) { long = false; return; } if (busy) return; if (pick) return toggleCallPick(id); SFX.click(); showParcelDetail(id); };
+    el.addEventListener('hold', () => { SFX.click(); showParcelDetail(id); });
   }
   // 우리 차(직접 배송) — 칸이 아니라 개수로 싣는다. 싣고 나면 오늘 영업은 끝이라, 보내기는 아래 버튼(직접 배송 N개)이 맡는다.
   function selfPlan() {
@@ -1759,13 +1760,24 @@
   }
   // 강제 클릭 게이트: 대화가 끝난 뒤 hl 대상만 누를 수 있다. 다른 곳을 누르면 손가락이 흔들린다
   let gateTarget = null;
-  function clearGate() { const g = $('#story-gate'); if (g) { g.hidden = true; g.onclick = null; } if (gateTarget) { gateTarget.classList.remove('story-hl'); gateTarget = null; } }
-  function openGate(target) {
+  function clearGate() { const g = $('#story-gate'); if (g) { g.hidden = true; g.onclick = g.onpointerdown = g.onpointerup = g.onpointerleave = g.onpointercancel = null; } if (gateTarget) { gateTarget.classList.remove('story-hl'); gateTarget = null; } }
+  // hold: 꾹 눌러야 넘어가는 게이트 (상자 상세를 여는 법을 가르칠 때)
+  function openGate(target, hold) {
     clearGate(); if (!target) return;
     gateTarget = target; target.classList.add('story-hl');
-    const g = $('#story-gate'), pt = $('#story-point'); pt.textContent = T('story.tapHere');
+    const g = $('#story-gate'), pt = $('#story-point'); pt.textContent = T(hold ? 'story.holdHere' : 'story.tapHere');
     const place = () => { const r = target.getBoundingClientRect(); const below = r.top < 60; pt.className = 'spoint' + (below ? ' below' : ''); pt.style.left = (r.left + r.width / 2) + 'px'; pt.style.top = (below ? r.bottom + 10 : r.top - 8) + 'px'; };
     place(); g.hidden = false;
+    const inside = e => { const r = target.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
+    const nudge = () => { SFX.nudge(); pt.classList.remove('shake'); void pt.offsetWidth; pt.classList.add('shake'); place(); };
+    if (hold) {
+      let t = null;
+      g.onclick = null;
+      g.onpointerdown = e => { if (!inside(e)) return nudge(); target.classList.add('holding'); t = setTimeout(() => { t = null; target.classList.remove('holding'); clearGate(); target.dispatchEvent(new CustomEvent('hold')); }, 450); };
+      g.onpointerup = g.onpointerleave = g.onpointercancel = () => { if (t) { clearTimeout(t); t = null; target.classList.remove('holding'); nudge(); } };
+      return;
+    }
+    g.onpointerdown = g.onpointerup = g.onpointerleave = g.onpointercancel = null;
     g.onclick = e => {
       const r = target.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom && !target.disabled) { clearGate(); target.click(); return; }
@@ -1816,7 +1828,7 @@
       };
       typing.timer = setTimeout(tick, 80);
     };
-    const close = () => { stopTyping(); if (storyStopTyping === stopTyping) storyStopTyping = null; const pg = beat.pages[i]; const target = pg.gate && pg.hl ? document.querySelector(pg.hl) : null; el.hidden = true; clearStoryHl(); storyBusy = false; if (target && !target.disabled) openGate(target); else if (after) after(); };
+    const close = () => { stopTyping(); if (storyStopTyping === stopTyping) storyStopTyping = null; const pg = beat.pages[i]; const target = pg.gate && pg.hl ? document.querySelector(pg.hl) : null; el.hidden = true; clearStoryHl(); storyBusy = false; if (target && !target.disabled) openGate(target, pg.hold); else if (after) after(); };
     // 탭: 타자 중이면 전부 보여주고, 다 보였으면 다음 페이지 / 닫기
     const advance = () => { SFX.resume(); if (typing && !typing.done) { finishTyping(); return; } SFX.click(); if (i < beat.pages.length - 1) { i++; render(); } else close(); };
     next.onclick = e => { e.stopPropagation(); advance(); };

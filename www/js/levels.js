@@ -144,7 +144,7 @@
       company: { cash: 1200, warehouse: { cap: 24, cold: 8, frozen: 0, xl: 0 },
         contracts: [{ carrier: 'bulk0' }, { carrier: 'cold0' }], customers: [['anon', 0]] },
       addCustomers: [['mart', 0], ['glass', 0], ['farm', 0]],
-      addContracts: [{ carrier: 'cold0' }],
+      addContracts: [{ carrier: 'cold0' }, { carrier: 'pack0' }],
       mods: { noInsurance: true, storageOfferProb: 0, heatAlerts: 0, opCostFixed: 160, monthlyStress: 0, noBankrupt: true, callsDelta: 7 },
       seed: 20270416,
       script: {
