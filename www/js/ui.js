@@ -667,7 +667,7 @@
         const on = selfOk() && !busy && g.phase === 'play', n = g.selfCount(), el = g.selfEligible();
         sc.disabled = !on; sc.className = 'btn contract self' + (on ? ' ready' : '') + (pk && pk.i === SELF ? ' picked' : '');
         const pv = sortByUrgency(el).slice(0, n);
-        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span><span class="takes"></span><span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls ${g.selfTripsLeft() ? '' : 'zero'}">${callPipsHtml(g.selfTripsLeft(), Math.max(g.selfTrips(), g.selfTripsLeft()))}</span>`;
+        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span>${takesDots(g, SELF, true) || '<span class="takes"></span>'}<span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls ${g.selfTripsLeft() ? '' : 'zero'}">${callPipsHtml(g.selfTripsLeft(), Math.max(g.selfTrips(), g.selfTripsLeft()))}</span>`;
       }
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
@@ -895,6 +895,11 @@
       const nx = g.level && window.LEVELS && g.phase === 'market' && g.month >= g.rules.months ? LEVELS.get(g.level.n + 1) : null;
       if (nx && nx.script) for (const k in nx.script) for (const day of (nx.script[k].turns || [])) for (const sp of day) soon.add(sp.type); } catch (e) { /* 예상이 없으면 지금 것만 */ } }
     const open = t => t === 'normal' || soon.has(t) || (g.shows('attrs') && (t !== 'fresh' || g.shows('cold')) && (t !== 'frozen' || g.shows('frozen')) && (t !== 'large' || g.shows('bigsize')) && (t !== 'intl' || g.shows('bigsize')));
+    // c === SELF: 우리 차 — 크기 한도와 차량(냉동 탑차·완충 포장차)으로 거른다
+    if (c === SELF) return Object.keys(D.PARCEL_TYPES).filter(open).filter(t => {
+      const T2 = D.PARCEL_TYPES[t], size = T2.sizes.find(sz => sz <= g.selfSizeMax());
+      return size != null && g.selfCan({ type: t, size, attrs: T2.attrs, customs: 0 });
+    });
     return Object.keys(D.PARCEL_TYPES).filter(open).filter(t => {
       const T2 = D.PARCEL_TYPES[t], size = T2.sizes.find(sz => sz >= D.CARRIERS[c.carrier].sizeMin && sz <= g.contractSizeMax(c));
       if (size == null) return false;
