@@ -1,4 +1,4 @@
-// 캠페인 전체 점검: node test/campaign-run.js [rookie|normal]
+// 캠페인 전체 점검: node test/campaign-run.js
 // 구현된 장을 처음부터 끝까지 이어서 굴린다 — 장이 끝나면 carryState() 를 다음 장에 그대로 넘긴다.
 // 화면(ui.js) 없이 규칙만 확인한다: 판이 넘어가는가, 장마다 열리는 것이 맞는가, 반송·폐기가 안 나는가.
 const { Game, DATA: D } = require('../www/js/game.js');
@@ -6,7 +6,6 @@ const I18n = require('../www/js/i18n.js'); globalThis.I18n = I18n; globalThis.DA
 const Story = require('../www/js/story.js');
 const LV = require('../www/js/levels.js');
 
-const diff = process.argv[2] || 'rookie';
 const fail = [], check = (ok, msg) => { console.log((ok ? '  ok ' : '  FAIL ') + msg); if (!ok) fail.push(msg); };
 
 // 장마다 그 시점에 켜져 있어야 하는 것 = levels.js 의 grants 누적 (표를 두 벌 두지 않는다)
@@ -34,7 +33,7 @@ function bestCall(g) {
 }
 
 function playLevel(n, carry) {
-  const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: diff,
+  const g = new Game({ scenario: 'kr_spring', company: 'local', perks: [], insurer: 'none',
     story: true, level: n, prep: false, carry: carry || null });
   const seen = new Set();
   const beats = ctx => { let b, k = 0; while ((b = Story.check(g, ctx)) && k++ < 10) seen.add(b.id); };

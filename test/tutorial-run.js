@@ -1,4 +1,4 @@
-// 튜토리얼 대본 점검: node test/tutorial-run.js [rookie|normal]
+// 튜토리얼 대본 점검: node test/tutorial-run.js
 // 「인수인계」 런(분기 6사이클 = 3개월)을 사람처럼(꽉 차면 호출, 급하면 그냥 호출) 굴려 보고
 // 턴마다 창고·배차·자금과, 창고장이 짚어 줘야 하는 상황(2대 동시·배차 0·야외 적재)이 실제로 오는지 찍는다.
 const { Game, DATA: D } = require('../www/js/game.js');
@@ -6,8 +6,7 @@ const I18n = require('../www/js/i18n.js'); globalThis.I18n = I18n; globalThis.DA
 const Story = require('../www/js/story.js');
 const TUT = require('../www/js/tutorial.js');
 
-const diff = process.argv[2] || 'rookie';
-const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: diff, story: true, scripted: true, prep: false });
+const g = new Game({ scenario: 'kr_spring', company: 'local', perks: [], insurer: 'none', story: true, scripted: true, prep: false });
 const hit = {};   // 창고장이 말해야 하는 상황이 실제로 왔는지
 const note = k => { hit[k] = (hit[k] || 0) + 1; };
 
@@ -47,7 +46,7 @@ function market() {
   g.closeMarket();
 }
 
-console.log(`난이도 ${diff} · 시드 ${g.seed} · 시작 자금 ${g.cash}c`);
+console.log(`시드 ${g.seed} · 시작 자금 ${g.cash}c`);
 beats({ kind: 'start' });
 let guard = 0;
 while (g.month <= (TUT.CYCLES || 6) && guard++ < 300) {

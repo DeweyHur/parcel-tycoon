@@ -2494,3 +2494,63 @@ marketing: { costs: [...], parcels: 3, campaign: { days: 3, per: 4, cost: 50 } }
 
 - `▸`/`▸▸` 가 폰에서 내일·모레로 읽히는지는 사람 눈으로 봐야 한다. 애매하면 글자로.
 - 한 건도 안 보낸 보름의 편지 문구(지금은 '덜 채워 보낸 게 있었다고')는 아직 그 경우에 딱 맞지 않는다.
+
+## 부록 AS. 런 = 나라 달력 × 시작 달 × 길이 · 난이도 없음 · 실제 공휴일 (v1.31)
+
+유저 방향 셋. ① **"런은 국가와 날짜 기준으로 가자."** 처음 열리는 건 한국이고, 한국 명절을 다 겪는다. 처음엔 3개월 런만, 차츰 6개월·1년이 생긴다. ② **"현재 시나리오는 없애고 새로 편성하자."** ③ **"난이도는 없어도 될 것 같다 — 인수인계가 끝났으니까."** 퍽은 그대로 두고, 이번엔 다듬는 것부터.
+
+결정(질문 넷): 분기 컷은 **사계절 4개, 봄만 먼저 열고 순서대로**; 반기는 **분기 넷을 다 돌아야**, 한 해는 **반기 하나를 돌면**; 명절은 **실제 음력 날짜**(2025~2035 표); 데일리·무한 운영도 **전부 걷어낸다**.
+
+### 1. 런 7종 (`meta.js` SCENARIOS)
+
+테마 시나리오 열셋(성수기·폭염·파업·항만·자금난·블프·감사·이사·큰손·무한·데일리…)을 지웠다. 런은 이제 `RUN(country, span, startMonth, icon, unlock)` 한 줄이다 — 나라 달력(`calendar`)과 시작 달(`startMonth`)과 길이(`SPANS[span].months`, 사이클 수)뿐, 규칙 보정은 없다. **같은 석 달이라도 시작 달이 다르면 겪는 명절이 다르다**는 것이 시나리오의 전부다.
+
+| id | 이름 | 사이클 | 시작 | 점수 | 해금 |
+|---|---|---:|---:|---:|---|
+| kr_spring | 봄 (3~5월) | 6 | 3월 | ×1 | 처음부터 |
+| kr_summer | 여름 (6~8월) | 6 | 6월 | ×1 | `kr_spring_clear` 봄 완주 |
+| kr_autumn | 가을 (9~11월) | 6 | 9월 | ×1 | `kr_summer_clear` |
+| kr_winter | 겨울 (12~2월) | 6 | 12월 | ×1 | `kr_autumn_clear` |
+| kr_h1 | 상반기 (3~8월) | 12 | 3월 | ×1.25 | `kr_seasons` 분기 넷 완주 (도감에 n/4) |
+| kr_h2 | 하반기 (9~2월) | 12 | 9월 | ×1.25 | `kr_seasons` |
+| kr_year | 한 해 (3월~이듬해 2월) | 24 | 3월 | ×1.5 | `kr_half` 반기 하나 완주 |
+
+사다리는 저절로 가팔라진다 — 봄은 3·1절·어린이날뿐이지만 가을은 첫 달에 추석 폭주(×1.6)와 연휴 사흘이, 겨울은 12월 ×1.4에 성탄·신정·설이 온다. 난이도 선택 없이 시작 달이 난이도다. `DEFAULT_SCENARIO = 'kr_spring'`, `DEFAULT_UNLOCK.scenarios = ['kr_spring']`. 옛 세이브의 `quarter/halfyear/standard` 는 `kr_spring/kr_h1/kr_year` 로 읽는다(그 밖의 옛 id 는 봄).
+
+런 선택 화면은 **나라 → 기간(분기·반기·한 해) → 카드** 로 묶고, 카드마다 `📅 2026년 12월 ~ 2027년 2월` 처럼 실제 해와 달을 찍는다(해를 넘기면 두 해 다). 완주 조건·추천 회사 줄은 뺐다 — 완주 조건은 언제나 "끝까지"다.
+
+### 2. 난이도 제거
+
+`DIFFICULTIES`(수습·정규·베테랑)를 지웠다. 수습 보정은 캠페인이 쓰고 있었으므로 **`levels.js BASE_MODS`** 로 옮겨 장 전부에 깐다(입고 ×0.85 · 운영비 −20 · 배차비 ×0.8 · 가격 ×0.9 · 도난·파손·배상 ×0.5 · 예정 3일 · 평판 24 · 점수 ×0.7 · 속성 둘 없음 · **noHolidays**). 자유 런에는 아무 보정도 없다. `_buildRules` 순서: 런 → 회사 → (캠페인이면) BASE_MODS → 장 보정 → 퍽.
+
+"수습에선 해금 도전과제 인정 안 함"은 **"캠페인(장) 런은 인정 안 함"** 으로 바뀌었다(`profile.js`, `cfg.level`/`result.level` 로 판단). 결과·HUD·회사 팝업의 난이도 줄, 인수인계 시작 모달(죽은 코드 `suggestStory`/`showStoryStart`), `veteran_clear` 도전과제, 문구(`DIFFICULTIES`·`company.difficulty`·`story.diffAsk`)를 걷어냈다.
+
+### 3. 걷어낸 규칙
+
+시나리오 전용이던 가지를 `game.js` 에서 뺐다: 파업(`strike`/`isStruck`), 큰손 고객(`bigCustomer`), 폭주 턴 주입(`burstTurns`/`burstDeadlineDelta`), 행사 보관(`eventGoods`), 고객 강제(`forceCustomers`/`noAnon`), 승리 조건 여섯(`winDelivered`·`winMaxDiscard`·`winCash`·`winMaxOverdue`·`winStorage`·`winBigCustomer` — `_finish()` 는 이제 곧장 `_win()`), 보관 제안 주기(`storageOfferEvery`), 새로고침 금지(`noRefresh`), 무한(`endless` — 임대 인상·초과 페널티 가중·점수 300), 데일리(`dailyConfig`·`DAILY_VARIANTS`·연속 기록). 정산·마켓·결과·기록 화면의 그 줄들과 문구도 같이. `typeOverride`·`warmMult`·`customerWeights` 같은 **순수 수치 파라미터는 남겼다** — 나중에 나라 달력이나 퍽이 쓸 수 있다.
+
+도전과제는 런 해금 6개(`kr_*_clear`·`kr_seasons`·`kr_half`·`kr_year_clear`)와 `holiday_clear`(명절 폭주 기간 15개 배송, 새 통계 `holidayRushDelivered`)를 넣고, 시나리오를 주던 것들(`cust_l3`·`storage3`·`busy_month`·`four_carriers`·`rich_clear`·`perfect_month`)은 기록용으로 내렸다. `landlord`·`partner`·`peak_clear`·`fresh20`·`intl15`·`half_clear`·`three_unlocked`·`daily7`·`veteran_clear` 삭제. `all_scenarios` = 런 7종 전부 완주, `all_companies` 는 `clearsByCompany` 로.
+
+### 4. 실제 공휴일 (`CALENDARS.kr.holidays` → `Game._specialDays` / `holidayEvents`)
+
+달력 표에 턴 번호로 박혀 있던 `holiday_rush`/`holiday_off`(9월·2월 후반 3~5·6~7턴)를 지우고, **날짜에서 계산**한다.
+
+- `lunar`: 연도별 설날·추석 양력 날짜(2025~2035, `lunardate` 로 산출 — 2026 설 2/17 · 추석 9/25, 2027 설 2/6 · 추석 9/15, 2028 설 1/26 · 추석 10/3 …). 표 밖의 해는 가장 가까운 해의 표를 쓴다. `buddha`: 부처님오신날(음력 4/8).
+- `fixed`: 신정 1/1 · 3·1절 · 어린이날 5/5 · 현충일 6/6 · 광복절 8/15 · 개천절 10/3 · 한글날 10/9 · 성탄절 12/25. 마지막 칸이 대체공휴일 여부(신정·현충일은 없음).
+- 규칙: 명절은 당일 앞뒤 **사흘 연휴** → 겹친 **일요일 수만큼 연휴 뒤 첫 영업일이 대체공휴일**(2027 설 2/5~7 은 일요일이 끼어 2/8 월요일까지) → 연휴 앞 **영업일 닷새는 폭주**(`rushDays` 5, 입고 ×1.6, 그 입고분 기한 −1). 단일 공휴일은 일요일이면 다음 날로. 게임은 토요일이 영업일이라 **토요일 겹침은 그날 그대로 쉰다**(현실의 토요일 대체와 다르다 — 의도한 단순화).
+- `holidayEvents(c)` 가 그 사이클 영업일을 훑어 같은 명절의 이어진 턴을 하나로 묶고, 기존 이벤트와 **같은 모양**(`turns`·`noCalls`·`arrivalsMult`·`deadlineDelta`)으로 `monthEvents` 에 붙는다. 그래서 입고 생성·호출 금지·예보 표시·로그(`log.calEvent`)·달력 카드(`calendarMonths`, `holiday: true`, 실제 날짜)가 전부 그대로 먹는다.
+- 폭주가 달을 넘는 경우(2028 추석 10/3 → 9/26~10/2)도 날짜로 계산하니 그대로 걸린다.
+- **캠페인은 제외**(`noHolidays`) — 대본이 턴 번호로 짜여 있어 3·1절(2027 3/1 월요일 = 서장 첫날)이 끼면 어긋난다. 봄 자유 런은 첫날이 3·1절(또는 대체일)이라 **첫 턴이 휴무**인데, 창고가 비어 있으니 잃는 것 없이 "업체가 쉬는 날"을 보여 주는 셈이라 그대로 뒀다.
+- 문구: `cal.event.seol/chuseok/seol_rush/chuseok_rush/newyear/samil/buddha/children/memorial/liberation/foundation/hangul/christmas`, 도움말 「런과 달력」 절(난이도 절 자리), 9월·2월 note.
+
+### 5. 검증
+
+단위 **92**(런 7종·해금 사슬·옛 id 매핑·공휴일 날짜 셋·캠페인 제외·난이도 없음), `campaign-run` 여섯 장 전부 통과, `tutorial-run` phase win, `level-ui`·`intro-ui` 통과, 새 `test/runs-ui.js`(캠페인 마친 프로필로 런 선택 → 회사 → 퍽 → 봄 런 → 3·1절 → 빨리 감기 완주 → 여름 해금 → 사계절 → 반기 → 한 해, 도감 런·도전과제 탭) **21항목**, 콘솔 에러 0.
+
+`test/sim.js` 봇은 **이 작업과 무관하게 이미 죽어 있다**(원본에서도 분기 생존 3%, 월 대기 10.5 — 강화 칸·직접 배송 개편 뒤 봇이 따라오지 못한 상태). 부록 L 의 승률표는 더 이상 재현되지 않으니 봇 갱신이 필요하다. `test/smoke.js` 도 스플래시·캠페인 타이틀 이전 기준이라 첫 항목부터 깨진다 — `runs-ui.js`/`level-ui.js` 가 그 자리를 대신한다.
+
+### 6. 남은 것
+
+- 퍽 다듬기(유저가 말한 다음 단계) — 런이 규칙 보정을 잃었으니 "런을 계속 하게 하는 힘"은 퍽과 회사가 진다.
+- 미국·일본 달력: `CALENDARS.us/jp` 에 달별 표와 `holidays`(고정일 위주라 표가 짧다)만 끼우면 `RUN('us', …)` 로 런이 생긴다. 해금은 한국 한 해 완주(`kr_year_clear`)에 걸면 자연스럽다.
+- 봇(`sim.js`) 갱신, `smoke.js` 폐기 여부.

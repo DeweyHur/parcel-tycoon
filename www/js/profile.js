@@ -6,7 +6,7 @@ window.Profile = (function () {
 
   function emptyStats() {
     return { runs: 0, clears: 0, deliveredByType: { normal: 0, fresh: 0, fragile: 0, intl: 0, large: 0 }, waits: 0, calls: 0, contractsBought: 0, discarded: 0, tidyMonths: 0,
-      bigDelivered: 0, bestScore: 0, clearsByCompany: {}, clearsByCompanyStandard: {}, clearsByScenario: {}, dailyStreak: 0, lastDaily: null, dailyDone: {} };
+      bigDelivered: 0, bestScore: 0, clearsByCompany: {}, clearsByScenario: {} };
   }
   function fresh() {
     return { version: 1, license: { full: false, source: 'demo' }, splashSeen: 0, campaign: { level: 1, cleared: 0, name: '' }, unlocked: JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), achievements: {}, stats: emptyStats(), records: {}, recentRuns: [], createdAt: Date.now() };
@@ -19,11 +19,11 @@ window.Profile = (function () {
       let old = null; try { old = JSON.parse(localStorage.getItem('pt_records_v1') || 'null'); } catch (e) { }
       if (old && old.runs) {
         for (const r of old.runs) {
-          P.recentRuns.push({ date: r.date, score: r.score, win: r.win, month: r.month, turn: r.turn, cash: r.cash, scenario: 'standard', company: 'local', perks: r.perks || [] });
-          P.stats.runs++; if (r.win) { P.stats.clears++; P.stats.clearsByCompany.local = (P.stats.clearsByCompany.local || 0) + 1; P.stats.clearsByScenario.standard = (P.stats.clearsByScenario.standard || 0) + 1; P.stats.clearsByCompanyStandard.local = 1; }
+          P.recentRuns.push({ date: r.date, score: r.score, win: r.win, month: r.month, turn: r.turn, cash: r.cash, scenario: M.DEFAULT_SCENARIO, company: 'local', perks: r.perks || [] });
+          P.stats.runs++; if (r.win) { P.stats.clears++; P.stats.clearsByCompany.local = (P.stats.clearsByCompany.local || 0) + 1; P.stats.clearsByScenario[M.DEFAULT_SCENARIO] = (P.stats.clearsByScenario[M.DEFAULT_SCENARIO] || 0) + 1; }
         }
         P.stats.bestScore = old.best || 0;
-        if (P.stats.clears > 0) { setRecord('standard', 'local', Math.max(...old.runs.filter(r => r.win).map(r => r.score), 0), 3); }
+        if (P.stats.clears > 0) { setRecord(M.DEFAULT_SCENARIO, 'local', Math.max(...old.runs.filter(r => r.win).map(r => r.score), 0), 3); }
         P.migratedFrom = 'records_v1';
       }
       save();
@@ -97,11 +97,11 @@ window.Profile = (function () {
   function evaluate(game, result) {
     const got = [];
     const s = game ? game.stats : null, p = P.stats;
-    const rookie = game && game.cfg && game.cfg.difficulty === 'rookie';
+    const campaign = !!(game && game.cfg && game.cfg.level);   // 캠페인(장) 런은 해금 도전과제를 내지 않는다 — 판이 대본이라 누구나 같은 조건이다
     for (const id in M.ACHIEVEMENTS) {
       const a = M.ACHIEVEMENTS[id];
       if (P.achievements[id]) continue;
-      if (rookie && a.rewardType !== 'none') continue; // 수습 난이도에서는 해금 도전과제 인정 안 함
+      if (campaign && a.rewardType !== 'none') continue;
       let ok = false;
       try {
         if (a.kind === 'run' && s) ok = !!a.check(s, p, result, P);
@@ -121,38 +121,24 @@ window.Profile = (function () {
   // 런 종료: 누적 통계 반영 → 도전과제 판정 → 기록
   function recordRun(game, result) {
     const s = game.stats, p = P.stats;
-    const rookie = result.difficulty === 'rookie';
+    const campaign = !!result.level;
     p.runs++;
     p.storageDone = (p.storageDone || 0) + (s.storageDone || 0);
     for (const t in s.deliveredByType) p.deliveredByType[t] = (p.deliveredByType[t] || 0) + s.deliveredByType[t];
     p.waits += s.waits; p.calls += s.calls; p.contractsBought += s.contractsBought; p.discarded += s.discarded; p.tidyMonths += s.tidyMonths; p.bigDelivered = (p.bigDelivered || 0) + (s.bigDelivered || 0);
     p.bestScore = Math.max(p.bestScore, result.score);
-    if (result.win && !rookie) {
+    if (result.win && !campaign) {
       p.clears++;
       p.clearsByCompany[result.company] = (p.clearsByCompany[result.company] || 0) + 1;
       p.clearsByScenario[result.scenario] = (p.clearsByScenario[result.scenario] || 0) + 1;
-      if (result.scenario === 'standard') p.clearsByCompanyStandard[result.company] = 1;
     }
     setRecord(result.scenario, result.company, result.score, result.monthsDone);
-    if (result.scenario === 'daily' && result.date) {
-      if (!p.dailyDone[result.date]) {
-        p.dailyDone[result.date] = result.win ? result.score : -1;
-        if (result.win) {
-          const prev = p.lastDaily ? new Date(p.lastDaily) : null, cur = new Date(result.date);
-          p.dailyStreak = prev && (cur - prev) / 86400000 <= 1.5 ? p.dailyStreak + 1 : 1;
-          p.lastDaily = result.date;
-        }
-      }
-      // 오래된 데일리 기록 정리
-      const keys = Object.keys(p.dailyDone).sort(); while (keys.length > 60) delete p.dailyDone[keys.shift()];
-    }
-    P.recentRuns.unshift({ date: new Date().toISOString().slice(0, 10), score: result.score, win: result.win, demo: !!result.demo, month: result.month, turn: result.turn, cash: result.cash, scenario: result.scenario, company: result.company, difficulty: result.difficulty, perks: result.perks, reason: result.reason });
+    P.recentRuns.unshift({ date: new Date().toISOString().slice(0, 10), score: result.score, win: result.win, demo: !!result.demo, month: result.month, turn: result.turn, cash: result.cash, scenario: result.scenario, company: result.company, level: result.level || 0, perks: result.perks, reason: result.reason });
     P.recentRuns = P.recentRuns.slice(0, 20);
     const got = evaluate(game, result);
     save();
     return got;
   }
-  function dailyDoneToday(date) { return P.stats.dailyDone[date] != null; }
   function reset() { P = fresh(); save(); }
-  return { load, get, save, isUnlocked, perkSlots, evaluate, recordRun, dailyDoneToday, reset, hasFull, setFull, exportCode, importCode, KEY };
+  return { load, get, save, isUnlocked, perkSlots, evaluate, recordRun, reset, hasFull, setFull, exportCode, importCode, KEY };
 })();

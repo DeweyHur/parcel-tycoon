@@ -79,7 +79,6 @@
     'mk.forecast': "Expected volume, month {m} (approx.)",
     'log.monthStart': '── {cal}/{y} {half:1st half|2nd half} begins ──',
     'log.prepMarket': 'Prep market: buy before month 1 starts (1 free refresh)',
-    'log.bigCustomer': 'Big contract: {name} will send 60% of the volume',
     'log.custSuspend': '{name} suspended trade ({why}) — resumes next month',
     'log.custResume': '{name} resumed trade',
     'log.custLevel': '{name} trust level {level}!',
@@ -96,7 +95,6 @@
     'log.storageCollect': 'Storage picked up: {kind}{pay}',
     'log.storagePostpaid': ' (+{pay}c on pickup)',
     'log.offerExpired': 'Storage offer expired',
-    'log.strike': '⚠ {name} on strike this month: cannot call',
     'log.paid': '{name} paid +{amount}c ({count} parcels)',
     'log.heatAlert': ' 🌡Heat alert!',
     'log.arrive': '{date}: {list} arrived (usage {usage}%){note}',
@@ -156,12 +154,6 @@
     'over.stress': 'Operating stress hit the limit',
     'over.rep': 'Your reputation ran out — nobody ships with you anymore',
     'over.bankrupt': 'Bankrupt — debt {debt}c exceeded the {limit}c short-term credit limit',
-    'over.delivered': 'Not enough shipped: {n}/{need}',
-    'over.discard': 'Too many spoiled: {n} (max {max})',
-    'over.cash': 'Not enough cash: {cash}/{need}c',
-    'over.overdue': 'Too many overdue deliveries: {n} (max {max})',
-    'over.storage': 'Not enough storage contracts: {n}/{need}',
-    'over.bigCustomer': '{name} trust level {level} (needs 3)',
     'over.win': 'You ran it all the way through — {cycles} cycles ({months} months)',
     'over.winStory': 'Handover done — the place is yours now',
     'err.noCash': 'Not enough cash',
@@ -175,7 +167,6 @@
     'err.needRefundPenalty': 'Need {cost}c for refund + penalty',
     'err.cannotCallNow': 'Cannot call right now',
     'err.emptySlot': 'Empty slot',
-    'err.struck': 'This carrier is on strike',
     'err.noCalls': 'No dispatches left this month',
     'err.overCap': 'Can ship at most {cap}',
     'err.nothingToShip': 'Nothing to ship',
@@ -183,7 +174,6 @@
     'err.nothingSelf': 'No parcels eligible for self-delivery',
     'err.selfLimit': 'Self-delivery: up to {n} per turn',
     'err.selfCost': 'Not enough cash for {cost}c delivery cost',
-    'err.noRefresh': 'No refresh in this scenario',
     'err.notMarket': 'Not in the market',
     'err.notPlay': 'Can\'t hire right now',
     'err.sold': 'Already sold',
@@ -232,7 +222,7 @@
     'how.2.t': 'Send one full truck',
     'how.2.d': 'Fill trucks past 80%. Keep doing it and PERFECT LOAD rewards climb to ×1.08, ×1.16 and ×1.24.',
     'how.3.t': 'Run out the term you took on',
-    'how.3.d': 'Take over in March and run a quarter (3 months), a half-year (6) or a full year — your pick. Run out of cash or bottom out your reputation and it is over.',
+    'how.3.d': 'As long as the run you picked on the Korean calendar — it starts with three months of spring and widens to quarters, half-years and a full year. Holidays fall on their real dates. Run out of cash or bottom out your reputation and it is over.',
     'how.4.t': 'Grow from D to A grade',
     'how.4.d': 'Every month has a revenue mission. Reaching C, B and A pays instant bonuses, while investments visibly upgrade your depot and trucks.',
     'how.note': 'The retiring manager will explain the rest as you go.',
@@ -256,15 +246,14 @@
     'opt.on': 'On',
     'opt.off': 'Off',
     'cal.kr.name': 'Korea',
-    'prep.calendar': '📅 {year} · {place} calendar',
-    'prep.today': 'Today',
-    'prep.dailyDone': 'Recorded today',
-    'prep.win': 'Finish line',
-    'prep.recommend': 'Suggested',
-    'prep.dailyNormal': 'Daily is fixed to Regular',
-    'prep.scenarioTitle': 'Choose Scenario',
-    'prep.step1': 'Step 1/3 — pick the run length and rules',
+    'prep.scenarioTitle': "Choose a run",
+    'prep.step1': "Step 1/3 — pick the calendar, the start month and the length",
     'btn.title': 'Title',
+    'prep.runWhenSame': "{m1}/{y1} – {m2}/{y1}",
+    'prep.runWhenNext': "{m1}/{y1} – {m2}/{y2}",
+    'prep.span.quarter': "Quarter — three months",
+    'prep.span.half': "Half year — six months",
+    'prep.span.year': "Full year",
     'prep.nextCompany': 'Next: Company',
     'prep.warehouse': 'Capacity {cap} · Cold {cold} · XL {xl}',
     'prep.warehouseRandom': 'Random warehouse',
@@ -278,7 +267,6 @@
     'prep.noColdCompany': 'Company has no cold zone',
     'prep.sameFamily': 'A {family} perk is already equipped',
     'prep.step3': 'Step 3/3',
-    'prep.variants': 'Variants',
     'prep.perkCount': 'Perks {n}/{slots} (one per family)',
     'prep.insuranceHead': 'Insurance (monthly premium deducted at settlement; -20% next month with no claims)',
     'prep.startupNoIns': 'Startup begins uninsured. Available from the month 2 market',
@@ -304,7 +292,6 @@
     'prep.slotFull': 'You have {n} perk slots',
     'fmt.monthN': 'Month {n}',
     'hud.turn': '{d} {dow}',
-    'hud.strike': 'Strike',
     'hud.familyPerk': '{family} perk',
     'hud.upcoming': 'Incoming',
     'hud.tomorrow': "Tomorrow",
@@ -406,7 +393,6 @@
     'wait.over': ' over!',
     'cust.trustLv': 'Trust lv {n}',
     'cust.suspended': 'suspended',
-    'company.difficulty': 'Difficulty',
     'company.warehouse': 'Warehouse {cap} · Cold {cold} · Frozen {frozen} · XL {xl}',
     'company.facilities': 'Facilities',
     'company.customers': 'Customers',
@@ -557,7 +543,6 @@
     'story.farewell.3': '<b>This warehouse is yours now. Look after it.</b><br>I\'ll text if it\'s urgent. Coffee\'s on you.',
     'story.startTitle': 'Handover',
     'story.startBody': 'Take over Local Parcel for <b>three spring months (a quarter — 6 cycles)</b>. The retiring manager <b>Park</b> stays the whole way and explains the rules one at a time.<br>Finish it and the longer runs — half-year, full year — open up. Nothing is forced: skip any line, or turn him off in the menu.',
-    'story.diffAsk': 'Difficulty',
     'story.start': 'Start',
     'story.trucks2.1': 'You\'ve got <b>{vol} cells</b> to load and one truck holds {openCap}. So it booked <b>{trucks} trucks</b>.',
     'story.trucks2.2': '{trucks} trucks means {trucks} dispatches gone and a {callFee}c fee. But it all ships at once.<br>Over 80% on that gauge and even a few trucks pay off.',
@@ -817,7 +802,7 @@
     'title.story': 'Handover',
     'title.storySub': 'story tutorial · first three months',
     'prep.story': 'Manager guide',
-    'prep.storyDesc': 'Park explains the rules during the first 3 months (any company or scenario)',
+    'prep.storyDesc': 'Park explains the rules during the first 3 months (any company or run)',
     'menu.story': 'Manager guide: {v}',
     'menu.sms': 'Season texts: {v}',
     'help.notes': 'Manager\'s notes',
@@ -827,15 +812,26 @@
     'cal.thisMonth': 'now',
     'cal.eventTurns': 'days {a}–{b}',
     'cal.arrivals': 'volume {pct}',
-    'cal.event.holiday_rush': 'Holiday rush — arrivals ×1.6 those turns, deadline −1',
-    'cal.event.holiday_off': 'Holiday — no deliveries (carriers closed). The warehouse keeps receiving.',
+    'cal.event.seol': "Seollal holiday — carriers closed (no calls; arrivals continue)",
+    'cal.event.chuseok': "Chuseok holiday — carriers closed (no calls; arrivals continue)",
+    'cal.event.seol_rush': "Pre-Seollal rush — arrivals ×1.6, those parcels −1 day deadline",
+    'cal.event.chuseok_rush': "Pre-Chuseok rush — arrivals ×1.6, those parcels −1 day deadline",
+    'cal.event.newyear': "New Year's Day — carriers closed",
+    'cal.event.samil': "March 1st — carriers closed",
+    'cal.event.buddha': "Buddha's Birthday — carriers closed",
+    'cal.event.children': "Children's Day — carriers closed",
+    'cal.event.memorial': "Memorial Day — carriers closed",
+    'cal.event.liberation': "Liberation Day — carriers closed",
+    'cal.event.foundation': "Foundation Day — carriers closed",
+    'cal.event.hangul': "Hangul Day — carriers closed",
+    'cal.event.christmas': "Christmas — carriers closed",
     'cal.event.gift': 'Gift week — ⚠ fragile pay +10',
     'cal.event.sale': 'Shopping festival — plain parcels ×1.5, bulk fee −10%',
     'cal.kr.1.label': 'New Year lull',
     'cal.kr.1.note': 'Off-season — volume −15%, frequent snow, no cost inflation this month',
     'cal.kr.1.sms': 'First month of the year is quiet. Catch your breath and get ready for the February holiday.',
     'cal.kr.2.label': 'Lunar New Year',
-    'cal.kr.2.note': 'Seollal — volume +30%, gift sets (fresh·produce·fragile) ↑, rush turns 2–4, holiday closure turns 5–6',
+    'cal.kr.2.note': "Seollal — volume +30%, gift sets (fresh/produce/fragile) ↑. Five rush days before the holiday, three days carriers closed (dates follow the lunar calendar that year)",
     'cal.kr.2.sms': 'Seollal. Same as Chuseok but shorter and harder. Get through this and you\'re done. Well played.',
     'cal.kr.3.label': 'Spring moving',
     'cal.kr.3.note': 'Spring moving season · new term — volume +5%, large ↑, more storage offers',
@@ -856,7 +852,7 @@
     'cal.kr.8.note': 'Heat · vacation — plain −10%p, fresh ↑, volume −10%',
     'cal.kr.8.sms': 'Vacation season: fewer plain boxes, more fresh. Line up one more reefer truck.',
     'cal.kr.9.label': 'Chuseok',
-    'cal.kr.9.note': 'Chuseok — volume +25%, gift sets (fresh·produce·fragile) ↑, rush turns 2–4, holiday closure turns 5–6',
+    'cal.kr.9.note': "Chuseok — volume +25%, gift sets (fresh/produce/fragile) ↑. Five rush days before the holiday, three days carriers closed (dates follow the lunar calendar that year)",
     'cal.kr.9.sms': 'Week before Chuseok the gift sets pour in, and during the holiday no truck answers. Empty the warehouse before it.',
     'cal.kr.10.label': 'Autumn moving',
     'cal.kr.10.note': 'Autumn moving · harvest — produce ↑, more storage offers, storage fee +20%',
@@ -1056,18 +1052,13 @@
     'sum.storageIncome': 'Storage fees',
     'sum.overdueVol': 'Overdue in storage',
     'sum.discarded': 'Spoiled',
-    'sum.runDiscard': '(run total {n}/{max})',
     'sum.cash': 'Cash',
-    'sum.goal': '(goal {n})',
     'sum.stress': 'Stress',
     'sum.rep': 'Reputation',
     'sum.usage': 'Warehouse usage',
     'sum.repToNext': '{n} to next grade',
     'sum.usageVal': '{pct}% ({n} stored)',
-    'sum.deliverGoal': 'Shipping goal',
-    'sum.storageGoal': 'Storage contracts done',
     'fmt.cases': '{n}',
-    'sum.bigCustomer': 'Big-contract customer',
     'common.trust': 'trust',
     'sum.custClaim': 'damages -{n}c',
     'sum.title': '{n} Settlement',
@@ -1112,7 +1103,7 @@
     'kind.customer': 'Customer',
     'res.unlocked': '🔓 {name} unlocked',
     'res.best': '★ New best',
-    'res.scenarioCompany': 'Scenario / company',
+    'res.scenarioCompany': 'Run / company',
     'res.reached': 'Reached',
     'res.revenue': 'Total revenue',
     'res.spent': 'Total spent',
@@ -1126,7 +1117,6 @@
     'res.winStory': 'Handover complete',
     'res.over': 'Game Over',
     'rec.head': 'Best <b>{best} pts</b> · {runs} runs ({clears} wins)',
-    'rec.dailyStreak': 'daily streak {n}',
     'rec.win': 'win',
     'rec.lose': 'loss',
     'rec.empty': 'No records yet.',
@@ -1168,7 +1158,6 @@
     'stat.delivered': 'Parcels shipped',
     'stat.contracts': 'Contracts bought',
     'stat.tidy': 'Tidy month ends',
-    'stat.daily': 'Daily streak',
     'fmt.days': '{n:# day|# days}',
     'stat.profileNote': 'The profile is stored on this device (Google Play Games sync planned).',
     'stat.reset': 'Reset profile',
@@ -1180,7 +1169,7 @@
     'demo.gateTitle': 'This is the demo',
     'demo.gateBody': 'The demo covers the first {n} months of the handover. The full game lets you pick a quarter, a half-year or a full year — peak season, holiday rushes and rising costs included.',
     'demo.rowMonths': 'Full game year',
-    'demo.rowScenarios': 'Scenarios',
+    'demo.rowScenarios': 'Runs',
     'demo.rowCompanies': 'Companies',
     'demo.rowPerks': 'Perks',
     'demo.keepProfile': 'Achievements and records from the demo carry over — copy them with "Export profile" on the records screen.',
@@ -1215,16 +1204,16 @@
     'codex.tab.companies': 'Companies',
     'codex.tab.carriers': 'Carriers',
     'codex.tab.perks': 'Perks',
-    'codex.tab.scenarios': 'Scenarios',
+    'codex.tab.scenarios': 'Runs',
     'codex.tab.achievements': 'Achievements',
     'codex.tab.stats': 'Stats',
     'codex.ach.company': 'Company unlocks',
-    'codex.ach.scenario': 'Scenario unlocks',
+    'codex.ach.scenario': 'Run unlocks',
     'codex.ach.slot': 'Perk slots',
     'codex.ach.multi': 'First clear',
     'codex.ach.perk': 'Perk unlocks',
     'codex.ach.none': 'Records',
-    'help.body': '<div class="help">\n      <p>Parcels arrive at your warehouse every turn. Calls are per <b>vehicle</b>: each contract has a vehicle (N slots) and you pay a <b>dispatch fee</b> per vehicle every call. The fee is the same however much is on board, so <b>half full is break-even</b> — call below that and every call loses money; at 80%+ the carrier\'s trust and your reputation rise too. Dispatch fees are <b>paid at month end</b>, so you can always call, but they all come out at settlement. If cash goes negative after settlement, a <b>short-term loan</b> covers it and is repaid next month with 15% interest — debt over 400c means bankruptcy. Call a carrier to ship them, or <b>wait</b> and let them pile up. A call costs the same regardless of how many parcels it ships — you pay per <b>call</b>, so the more you ship at once, the better.</p>\n      <h3>Setting up a run</h3><p>Pick a <b>scenario</b> (length and rules) → a <b>company</b> (starting warehouse, contracts, traits) → <b>perks</b> (small rule tweaks). Companies, perks and scenarios are unlocked by <b>achievements</b>; the Codex shows conditions and progress. Companies open in tiers: <b>tier 1</b> (3 runs · first clear · 2 clears) → <b>tier 2</b> (30 of a parcel type in total) → <b>tier 3</b> (clear with 3 companies).</p>\n      <h3>Turn order</h3><p>Arrivals → call a carrier or wait → delivery → freshness and deadlines tick → overflow and delay penalties</p>\n      <h3>Parcel attributes — what happens in the warehouse</h3><table><tr><th>Attribute</th><th>Rule</th><th>Who can ship it</th></tr>\n      <tr><td>❄ Fresh</td><td>Outside the cold zone: <b>discarded next turn</b>. Deadline 3 turns</td><td>Any carrier (bonus from Cold Logistics only)</td></tr>\n      <tr><td>⚠ Fragile</td><td>A carrier without the ⚠ ability has a <b>25% break chance</b> (discard, +2 stress)</td><td>Any carrier. Safe: Fragile Pro · Heavy Haul · Rail · Air · Urgent · Padded Packing Rider</td></tr>\n      <tr><td>🛃 Customs</td><td><b>2 turns in customs</b> after arrival (20% chance of +1 delay). Takes space while waiting; the deadline starts afterwards</td><td>Any carrier once cleared. While in customs: Customs Broker · Air · Sea · Urgent only</td></tr>\n      <tr><td>❆ Frozen</td><td>Outside the freezer: <b>discarded immediately</b>. Deadline 8 turns. From month 4. Parcels larger than the freezer never arrive</td><td>Frozen Logistics · Reefer Container Rider only</td></tr>\n      <tr><td>🌾 Produce</td><td>Even inside, <b>heat waves cut the deadline by 2</b> (discarded if outside). Safe in spare cold space or with Ventilation. Deadline 5 turns</td><td>Any carrier (bonus from Cold Logistics). Self-delivery OK</td></tr>\n      <tr><td>Large (4–7)</td><td>Only carriers whose size range fits</td><td>Van Hire · Heavy Haul · Rail · Sea · Customs Broker</td></tr></table>\n      <h3>Wait · self-delivery · vehicles</h3><p>Pressing <b>Wait</b> opens the end-turn screen, where you can pick parcels to <b>self-deliver</b> — 1 per turn (Big Truck +1, City Quick and National Post +1), plain parcels and produce only, up to size 2. You keep the full reward but pay a <b>delivery cost</b> (15c + size×5c). Expand it with market <b>vehicles</b>: Reefer Van (❄❆), Padded Van (⚠ safe), Big Truck (size 4, +1). If anything is stored outside, the same screen leads to Arrange Storage. Tap a parcel row to see which contracts or self-delivery can handle it.</p>\n      <h3>Prep market</h3><p>Every run starts with a <b>prep market</b>. Before the first turn of month 1 you can spend your starting cash on contracts, upgrades, facilities and insurance, and you can see the first 1–2 turns of arrivals and weather. One free refresh. One-month scenarios are prepared here too.</p>\n      <h3>Difficulty</h3><p>Choose <b>Rookie · Regular · Veteran</b> at the top of the scenario screen. Rookie lowers arrivals, prices and damages and shows arrivals 3 turns ahead, but unlock achievements don\'t count. Veteran (after your first clear): arrivals +10%, damages ×1.5, theft and breakage ×1.3, stress limit 18, score ×1.4.</p>\n      <h3>Weather · storage · contracts · insurance</h3><p>Each turn has weather, forecast 2 turns ahead. <b>🌧 Rain</b> wets standard and ⚠ parcels outside (reward -20%), <b>🔥 heat waves</b> discard ❄❆ outside cold zones immediately, a <b>❄️ blizzard</b> turns the yard into a fridge (no ❄ spoilage, theft halved, ❄ shipping +10), and a <b>🌀 typhoon</b> doubles theft and pushes that turn\'s arrivals to the next turn.</p><p>When the warehouse overflows, pressing <b>Wait</b> opens <b>Arrange Storage</b>. Choose what goes outside yourself or use presets (urgent · high reward · high damages · by customer). It doesn\'t open on call turns — it\'s the reward for waiting.</p><p>Customers like the Moving Center offer <b>storage contracts</b>. Accepting pays an upfront fee and the volume occupies your warehouse for the term (not callable or arrangeable). Ending safely gives trust +2; returning early refunds the remaining term minus a 30c penalty. If it\'s put outside and stolen, damages ×2.</p><p><b>Insurance</b> is chosen at run start and can be switched in the market. It covers part of each damage claim, and the monthly premium is deducted at settlement. 0 claims → -20% next month (2 months in a row -30% + customer trust +1); many claims raise it. Uninsured, customers with damages ×2 (Glass Studio, Moving Center) send half the volume. The market also sells one-time insurance (Transit Certificate · Yard Insurance · Customs Bond).</p>\n      <h3>Customers</h3><p>Every parcel has a <b>customer</b> (icon on the left of the row). On-time delivery +1xp, meeting the customer\'s special rule +1xp, discard -3xp. Trust levels 1–3 raise volume and per-parcel reward, and levels 2–3 unlock customer perks. A discard (spoilage, return, theft, breakage) triggers a <b>damage claim</b> (base reward × damage multiplier) taken from your cash immediately, and if xp drops below 0 the customer stops trading until next month. Check the <b>Customers</b> button at the bottom.</p>\n      <p>The <b>ability</b> icons on a carrier card are the attributes it handles safely. A <b>rider</b> from the upgrade slot adds one attribute to a contract (1 per contract). ✈🚆🚢 only mark the transport mode and don\'t affect matching; Rail and Sea pay out 1–2 turns later.</p>\n      <h3>Three ways to ship</h3><p><b>Self-delivery</b>: on a wait turn, pick 1 parcel, pay the delivery cost, keep the full reward. <b>Carrier call</b>: spends 1 remaining call and the turn. Specialists get bonuses. <b>⚡Urgent Express</b>: ships 1 parcel instantly without using a turn — the safety net of a waiting strategy.</p>\n      <p>Van Hire takes any 1 parcel (no bonus, ⚠ break risk). Missing a deadline costs reward -25% and stress +1; 3 turns later the parcel is <b>returned</b> (stress +2). Whatever exceeds capacity is <b>stored outside</b>, newest arrivals first, and rolls for theft every turn (overflow 1–2: 15%, 3–5: 30%, 6+: 50%). Fresh food drops to 50% reward after 3 turns and is discarded the turn after (+3). Fresh food at room temperature (not ❄) spoils twice as fast.</p>\n      <h3>Warehouse</h3><p>Overflow of 1–2: +1 stress, 3 or more: +2 — the real danger is theft of what\'s outside. Stress {stress} is game over. <b>Operating cost</b> (rent 120c + 10c per contract slot + facility upkeep) and the insurance premium are settled at month end.</p>\n      <h3>Contracts and the market</h3><p>Each contract has a number of remaining calls, and you can\'t buy new contracts mid-month. Replace contracts and buy upgrades and facilities in the month-end market. Replacing a contract loses its remaining calls and upgrades. Grades: Standard &lt; Trusted &lt; Expert &lt; Master.</p>\n      <h3>Carrier trust</h3><p>Trust accrues per <b>carrier</b> and survives contract changes. Per call: delivery +1, capacity 80%+ +1, special parcels with a specialist +1. The call screen previews the xp for this call.</p>\n      <table><tr><th>Level</th><th>xp</th><th>Effect</th></tr><tr><td>1</td><td>3</td><td>Capacity +1 per call</td></tr><tr><td>2</td><td>8</td><td>+1 parcel every 4th call</td></tr><tr><td>3</td><td>15</td><td>Signature ability (Cold: deadlines freeze / Bulk · Broker · Heavy · Frozen · Urgent: +1 parcel / Van: special bonus / Fragile Pro: +15c / Air: size 4 / Rail · Sea: payment delay -1)</td></tr></table>\n      <p>Fastest route: call the same carrier <b>fully loaded</b> (80%+) for +2–3xp each time — level 3 in 5–6 calls.</p></div>',
+    'help.body': '<div class="help">\n      <p>Parcels arrive at your warehouse every turn. Calls are per <b>vehicle</b>: each contract has a vehicle (N slots) and you pay a <b>dispatch fee</b> per vehicle every call. The fee is the same however much is on board, so <b>half full is break-even</b> — call below that and every call loses money; at 80%+ the carrier\'s trust and your reputation rise too. Dispatch fees are <b>paid at month end</b>, so you can always call, but they all come out at settlement. If cash goes negative after settlement, a <b>short-term loan</b> covers it and is repaid next month with 15% interest — debt over 400c means bankruptcy. Call a carrier to ship them, or <b>wait</b> and let them pile up. A call costs the same regardless of how many parcels it ships — you pay per <b>call</b>, so the more you ship at once, the better.</p>\n      <h3>Setting up a run</h3><p>Pick a <b>run</b> (which country\'s calendar, when it starts, how long — quarter, half year or full year) → a <b>company</b> (starting warehouse, contracts, passive) → <b>perks</b> (small rule tweaks). Companies, perks and runs unlock through <b>achievements</b>; the Codex shows conditions and progress.</p>\n      <h3>Turn order</h3><p>Arrivals → call a carrier or wait → delivery → freshness and deadlines tick → overflow and delay penalties</p>\n      <h3>Parcel attributes — what happens in the warehouse</h3><table><tr><th>Attribute</th><th>Rule</th><th>Who can ship it</th></tr>\n      <tr><td>❄ Fresh</td><td>Outside the cold zone: <b>discarded next turn</b>. Deadline 3 turns</td><td>Any carrier (bonus from Cold Logistics only)</td></tr>\n      <tr><td>⚠ Fragile</td><td>A carrier without the ⚠ ability has a <b>25% break chance</b> (discard, +2 stress)</td><td>Any carrier. Safe: Fragile Pro · Heavy Haul · Rail · Air · Urgent · Padded Packing Rider</td></tr>\n      <tr><td>🛃 Customs</td><td><b>2 turns in customs</b> after arrival (20% chance of +1 delay). Takes space while waiting; the deadline starts afterwards</td><td>Any carrier once cleared. While in customs: Customs Broker · Air · Sea · Urgent only</td></tr>\n      <tr><td>❆ Frozen</td><td>Outside the freezer: <b>discarded immediately</b>. Deadline 8 turns. From month 4. Parcels larger than the freezer never arrive</td><td>Frozen Logistics · Reefer Container Rider only</td></tr>\n      <tr><td>🌾 Produce</td><td>Even inside, <b>heat waves cut the deadline by 2</b> (discarded if outside). Safe in spare cold space or with Ventilation. Deadline 5 turns</td><td>Any carrier (bonus from Cold Logistics). Self-delivery OK</td></tr>\n      <tr><td>Large (4–7)</td><td>Only carriers whose size range fits</td><td>Van Hire · Heavy Haul · Rail · Sea · Customs Broker</td></tr></table>\n      <h3>Wait · self-delivery · vehicles</h3><p>Pressing <b>Wait</b> opens the end-turn screen, where you can pick parcels to <b>self-deliver</b> — 1 per turn (Big Truck +1, City Quick and National Post +1), plain parcels and produce only, up to size 2. You keep the full reward but pay a <b>delivery cost</b> (15c + size×5c). Expand it with market <b>vehicles</b>: Reefer Van (❄❆), Padded Van (⚠ safe), Big Truck (size 4, +1). If anything is stored outside, the same screen leads to Arrange Storage. Tap a parcel row to see which contracts or self-delivery can handle it.</p>\n      <h3>Prep market</h3><p>Every run starts with a <b>prep market</b>. Before the first turn of month 1 you can spend your starting cash on contracts, upgrades, facilities and insurance, and you can see the first 1–2 turns of arrivals and weather. One free refresh.</p>\n      <h3>Runs and the calendar</h3><p>A run is <b>calendar × start month × length</b>. The Korean calendar opens with Spring (Mar–May); each finish opens the next season — Summer, Autumn, Winter. All four seasons unlock both half-year runs, and one half-year unlocks the Full Year. Holidays fall on their <b>real dates for that year</b>: Seollal and Chuseok follow the lunar calendar, the five days before them bring arrivals ×1.6 with deadlines one day shorter, and the three holiday days (plus a substitute day when one lands on Sunday) close the carriers — no calls. March 1st, Children\'s Day, Buddha\'s Birthday, Memorial Day, Liberation Day, Foundation Day, Hangul Day, Christmas and New Year\'s Day are single days off. Arrivals never stop.</p>\n      <h3>Weather · storage · contracts · insurance</h3><p>Each turn has weather, forecast 2 turns ahead. <b>🌧 Rain</b> wets standard and ⚠ parcels outside (reward -20%), <b>🔥 heat waves</b> discard ❄❆ outside cold zones immediately, a <b>❄️ blizzard</b> turns the yard into a fridge (no ❄ spoilage, theft halved, ❄ shipping +10), and a <b>🌀 typhoon</b> doubles theft and pushes that turn\'s arrivals to the next turn.</p><p>When the warehouse overflows, pressing <b>Wait</b> opens <b>Arrange Storage</b>. Choose what goes outside yourself or use presets (urgent · high reward · high damages · by customer). It doesn\'t open on call turns — it\'s the reward for waiting.</p><p>Customers like the Moving Center offer <b>storage contracts</b>. Accepting pays an upfront fee and the volume occupies your warehouse for the term (not callable or arrangeable). Ending safely gives trust +2; returning early refunds the remaining term minus a 30c penalty. If it\'s put outside and stolen, damages ×2.</p><p><b>Insurance</b> is chosen at run start and can be switched in the market. It covers part of each damage claim, and the monthly premium is deducted at settlement. 0 claims → -20% next month (2 months in a row -30% + customer trust +1); many claims raise it. Uninsured, customers with damages ×2 (Glass Studio, Moving Center) send half the volume. The market also sells one-time insurance (Transit Certificate · Yard Insurance · Customs Bond).</p>\n      <h3>Customers</h3><p>Every parcel has a <b>customer</b> (icon on the left of the row). On-time delivery +1xp, meeting the customer\'s special rule +1xp, discard -3xp. Trust levels 1–3 raise volume and per-parcel reward, and levels 2–3 unlock customer perks. A discard (spoilage, return, theft, breakage) triggers a <b>damage claim</b> (base reward × damage multiplier) taken from your cash immediately, and if xp drops below 0 the customer stops trading until next month. Check the <b>Customers</b> button at the bottom.</p>\n      <p>The <b>ability</b> icons on a carrier card are the attributes it handles safely. A <b>rider</b> from the upgrade slot adds one attribute to a contract (1 per contract). ✈🚆🚢 only mark the transport mode and don\'t affect matching; Rail and Sea pay out 1–2 turns later.</p>\n      <h3>Three ways to ship</h3><p><b>Self-delivery</b>: on a wait turn, pick 1 parcel, pay the delivery cost, keep the full reward. <b>Carrier call</b>: spends 1 remaining call and the turn. Specialists get bonuses. <b>⚡Urgent Express</b>: ships 1 parcel instantly without using a turn — the safety net of a waiting strategy.</p>\n      <p>Van Hire takes any 1 parcel (no bonus, ⚠ break risk). Missing a deadline costs reward -25% and stress +1; 3 turns later the parcel is <b>returned</b> (stress +2). Whatever exceeds capacity is <b>stored outside</b>, newest arrivals first, and rolls for theft every turn (overflow 1–2: 15%, 3–5: 30%, 6+: 50%). Fresh food drops to 50% reward after 3 turns and is discarded the turn after (+3). Fresh food at room temperature (not ❄) spoils twice as fast.</p>\n      <h3>Warehouse</h3><p>Overflow of 1–2: +1 stress, 3 or more: +2 — the real danger is theft of what\'s outside. Stress {stress} is game over. <b>Operating cost</b> (rent 120c + 10c per contract slot + facility upkeep) and the insurance premium are settled at month end.</p>\n      <h3>Contracts and the market</h3><p>Each contract has a number of remaining calls, and you can\'t buy new contracts mid-month. Replace contracts and buy upgrades and facilities in the month-end market. Replacing a contract loses its remaining calls and upgrades. Grades: Standard &lt; Trusted &lt; Expert &lt; Master.</p>\n      <h3>Carrier trust</h3><p>Trust accrues per <b>carrier</b> and survives contract changes. Per call: delivery +1, capacity 80%+ +1, special parcels with a specialist +1. The call screen previews the xp for this call.</p>\n      <table><tr><th>Level</th><th>xp</th><th>Effect</th></tr><tr><td>1</td><td>3</td><td>Capacity +1 per call</td></tr><tr><td>2</td><td>8</td><td>+1 parcel every 4th call</td></tr><tr><td>3</td><td>15</td><td>Signature ability (Cold: deadlines freeze / Bulk · Broker · Heavy · Frozen · Urgent: +1 parcel / Van: special bonus / Fragile Pro: +15c / Air: size 4 / Rail · Sea: payment delay -1)</td></tr></table>\n      <p>Fastest route: call the same carrier <b>fully loaded</b> (80%+) for +2–3xp each time — level 3 in 5–6 calls.</p></div>',
   },
   data:   {
     "ATTRS": {
@@ -1826,20 +1815,6 @@
         "desc": "Theft ×2, wetting, no arrivals this turn (they pile up next turn)"
       }
     },
-    "DIFFICULTIES": {
-      "rookie": {
-        "name": "Rookie",
-        "desc": "Arrivals ×0.85, op cost -30, dispatch fees ×0.8, prices ×0.9, theft/break/damages ×0.5, forecast 3 turns, stress limit 24. Score ×0.7. Unlock achievements don't count"
-      },
-      "normal": {
-        "name": "Regular",
-        "desc": "Default rules — every call costs money; keep the cash flowing"
-      },
-      "veteran": {
-        "name": "Veteran",
-        "desc": "Arrivals ×1.15, op cost +60, dispatch fees ×1.3, theft/break ×1.3, damages ×1.5, dual-attribute parcels +3%p, stress limit 16. Score ×1.4"
-      }
-    },
     "COMPANIES": {
       "local": {
         "name": "Local Parcel",
@@ -2004,124 +1979,34 @@
       "ops": "Operations",
       "income": "Income"
     },
-    "DAILY_VARIANTS": {
-      "fog": {
-        "name": "Fog",
-        "desc": "Arrivals shown 1 turn ahead"
-      },
-      "express": {
-        "name": "Rush",
-        "desc": "All deadlines -1 turn, reward +10"
-      },
-      "bigweek": {
-        "name": "Big Week",
-        "desc": "Size 4+ share doubled"
-      },
-      "inflation": {
-        "name": "Inflation",
-        "desc": "Market prices ×1.3, reward +10%"
-      },
-      "trustboom": {
-        "name": "Trust Boom",
-        "desc": "Trust xp ×2"
-      },
-      "repair": {
-        "name": "Renovation",
-        "desc": "Starting capacity -4, expansions -50%"
-      },
-      "picky": {
-        "name": "Picky Customers",
-        "desc": "Overdue reward -50%"
-      },
-      "generous": {
-        "name": "Generous Customers",
-        "desc": "Reward +15% on calls shipping 3+"
-      }
-    },
     "SCENARIOS": {
-      "quarter": {
-        "name": "Quarter (3 months)",
-        "desc": "Take over in the March moving season and run to May. A cycle is two weeks; six of them is one spring. The short run.",
-        "win": "Survive 6 cycles (3 months)",
-        "recommend": "Corner Courier"
+      "kr_spring": {
+        "name": "Spring (Mar–May)",
+        "desc": "Start in the March moving season and run to Family Month in May. Carriers rest on Mar 1, Children's Day and Buddha's Birthday. Your first three months"
       },
-      "halfyear": {
-        "name": "Half year (6 months)",
-        "desc": "March through the monsoon and the heat to August. You will need cold storage to clear summer.",
-        "win": "Survive 12 cycles (6 months) (score x1.25)",
-        "recommend": "Dawn Logistics"
+      "kr_summer": {
+        "name": "Summer (Jun–Aug)",
+        "desc": "Monsoon and heatwave. Outdoor stock gets wet, fresh goods spoil — no surviving without cold storage. Memorial Day and Liberation Day off"
       },
-      "standard": {
-        "name": "One Year (12 months)",
-        "desc": "The main run on the Korean calendar: starts in the March moving season and runs through monsoon, heat, Chuseok, the shopping festival and year-end to next February's Seollal. Customer trust doubles volume, and costs grow with it",
-        "win": "Survive 12 months (score ×1.5)",
-        "recommend": "Local Parcel"
+      "kr_autumn": {
+        "name": "Autumn (Sep–Nov)",
+        "desc": "Five days before Chuseok arrivals hit ×1.6 with deadlines one day shorter, then three holiday days with no trucks. Then Foundation Day, Hangul Day and the November sale"
       },
-      "peak": {
-        "name": "Peak Season",
-        "desc": "Calendar cut: Nov–Dec (starts at month-4 volume). On top of the sale and year-end volume: 3 surge turns (deadline -2), return grace 2. Reward +10, prices ×1.3, starting trucks +2",
-        "win": "Survive Nov–Dec + ship 50",
-        "recommend": "City Quick · Steel Depot"
+      "kr_winter": {
+        "name": "Winter (Dec–Feb)",
+        "desc": "Year-end volume ×1.4, Christmas and New Year off, blizzards, and the Seollal holiday in February. The tightest three months of the year"
       },
-      "heatwave": {
-        "name": "Heat Wave",
-        "desc": "Calendar cut: Jul–Aug (starts at month-5 volume). Fresh share ↑, arrivals +10%, room-temp spoilage ×3, 3 heat-alert turns a month",
-        "win": "Survive Jul–Aug + at most 3 discards",
-        "recommend": "Fresh Logistics"
+      "kr_h1": {
+        "name": "First half (Mar–Aug)",
+        "desc": "Spring and summer back to back — from moving season through monsoon and heat. Score ×1.25"
       },
-      "strike": {
-        "name": "Strike",
-        "desc": "One carrier type can't be called each month (announced at month start). Op cost +30",
-        "win": "Survive 12 months (score ×1.5)",
-        "recommend": "Startup"
+      "kr_h2": {
+        "name": "Second half (Sep–Feb)",
+        "desc": "Chuseok to Seollal. Both holidays and the year-end in one run. Score ×1.25"
       },
-      "port": {
-        "name": "Port Contract",
-        "desc": "Customs 20% · large 12%, XL 7%, arrivals -10%. Customs/large reward +20, standard -5",
-        "win": "Survive 12 months (score ×1.5)",
-        "recommend": "Global · Steel Depot"
-      },
-      "cashcrunch": {
-        "name": "Cash Crunch",
-        "desc": "Starting cash -50%, op cost 380, no refresh, market prices +10%. Revenue +10%, trust ×2",
-        "win": "Survive 12 months + final cash ≥ 2,500",
-        "recommend": "Penny Freight · National Post"
-      },
-      "blackfriday": {
-        "name": "Black Friday",
-        "desc": "One hellish November. On top of the sale: arrivals ×1.4, 3 surge turns, prices ×1.4, return grace 4. Reward +15, starting trucks +3",
-        "win": "Survive November + ship 30",
-        "recommend": "City Quick · Penny Freight"
-      },
-      "audit": {
-        "name": "Audit",
-        "desc": "All deadlines -1 turn, overdue reward -50%, stress +1 at month start",
-        "win": "Survive 12 months + at most 12 overdue deliveries",
-        "recommend": "National Post · Glasshouse"
-      },
-      "moving": {
-        "name": "Moving Season",
-        "desc": "Moving Center included, a storage offer guaranteed every 5 turns, storage fees ×1.5",
-        "win": "Survive 12 months + complete 12 storage contracts",
-        "recommend": "Steel Depot"
-      },
-      "bigdeal": {
-        "name": "Big Contract",
-        "desc": "One random customer sends 60% of the volume. Damages ×1.2",
-        "win": "Survive 12 months + that customer at trust lv 3",
-        "recommend": "City Quick"
-      },
-      "endless": {
-        "name": "Endless",
-        "desc": "Until game over. Arrivals +1/month from month 7, op cost +10/month from month 12",
-        "win": "None — chase the score",
-        "recommend": "—"
-      },
-      "daily": {
-        "name": "Daily Delivery",
-        "desc": "A random calendar month (set for the day) + 2 variant rules. Company assigned for the day, starting trucks +2",
-        "win": "Survive that month (one record per day)",
-        "recommend": "Assigned daily"
+      "kr_year": {
+        "name": "Full year (Mar–Feb)",
+        "desc": "One lap of the Korean calendar. Customer trust grows, volume doubles, and so does spending. Score ×1.5"
       }
     },
     "ACHIEVEMENTS": {
@@ -2131,7 +2016,7 @@
       },
       "two_clears": {
         "name": "Second Success",
-        "desc": "Clear any scenario twice"
+        "desc": "Finish any two runs"
       },
       "fresh30": {
         "name": "Thirty Fresh",
@@ -2189,53 +2074,21 @@
         "name": "Snow Run",
         "desc": "Ship 5 fresh parcels on blizzard turns"
       },
-      "landlord": {
-        "name": "Landlord",
-        "desc": "Clear Moving Season"
-      },
-      "partner": {
-        "name": "Partner",
-        "desc": "Clear Big Contract"
-      },
-      "veteran_clear": {
-        "name": "Veteran",
-        "desc": "Clear on Veteran difficulty"
-      },
       "first_clear": {
-        "name": "First Clear",
-        "desc": "Clear any scenario"
+        "name": "First Finish",
+        "desc": "Finish any run"
       },
       "busy_month": {
         "name": "Busy Month",
         "desc": "Ship 15+ in one month"
       },
-      "peak_clear": {
-        "name": "Peak Conqueror",
-        "desc": "Clear Peak Season"
-      },
-      "fresh20": {
-        "name": "Twenty Fresh",
-        "desc": "Ship 20 fresh food in total"
-      },
       "four_carriers": {
         "name": "Four Carriers",
-        "desc": "Clear with 4 slots filled by 4 different carriers"
-      },
-      "intl15": {
-        "name": "Fifteen Customs",
-        "desc": "Ship 15 customs cargo in total"
+        "desc": "Finish with 4 slots filled by 4 different carriers"
       },
       "rich_clear": {
         "name": "Rich Clear",
-        "desc": "Clear One Year with 1,000+ cash"
-      },
-      "half_clear": {
-        "name": "Full Year",
-        "desc": "Clear One Year (12 months)"
-      },
-      "three_unlocked": {
-        "name": "Three Companies",
-        "desc": "Unlock 3 companies"
+        "desc": "Finish a run with 1,000+ cash"
       },
       "veteran": {
         "name": "Veteran",
@@ -2350,12 +2203,36 @@
         "desc": "Clear Standard with all 9 companies"
       },
       "all_scenarios": {
-        "name": "All Scenarios",
-        "desc": "Clear all 10 scenarios except Endless"
+        "name": "Every Run",
+        "desc": "Finish every run at least once"
       },
-      "daily7": {
-        "name": "Daily 7",
-        "desc": "Clear the daily 7 days in a row"
+      "kr_spring_clear": {
+        "name": "Through Spring",
+        "desc": "Finish Spring (Mar–May) → unlocks Summer"
+      },
+      "kr_summer_clear": {
+        "name": "Through Summer",
+        "desc": "Finish Summer (Jun–Aug) → unlocks Autumn"
+      },
+      "kr_autumn_clear": {
+        "name": "Through Autumn",
+        "desc": "Finish Autumn (Sep–Nov) → unlocks Winter"
+      },
+      "kr_seasons": {
+        "name": "Four Seasons",
+        "desc": "Finish all four Korean quarter runs → unlocks both half-year runs"
+      },
+      "kr_half": {
+        "name": "Half-Year Boss",
+        "desc": "Finish either half-year run → unlocks Full Year"
+      },
+      "kr_year_clear": {
+        "name": "Full Lap",
+        "desc": "Finish the Full Year run"
+      },
+      "holiday_clear": {
+        "name": "Holiday Rush",
+        "desc": "Ship 15 parcels during holiday rush days"
       }
     }
   },

@@ -148,7 +148,7 @@
   function startLevel(n) {
     const P = Profile.get();
     // 마켓은 장 **끝**에 온다 (정산 직후). 배차를 다 쓴 그 자리에서 충전을 배우고, 예보로 다음 장을 준비한다.
-    game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: 'rookie', story: true, level: n, prep: false,
+    game = new Game({ scenario: M.DEFAULT_SCENARIO, company: 'local', perks: [], insurer: 'none', story: true, level: n, prep: false,
       companyName: P.campaign.name || T('lv.ownerShop'), carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
     closeModal(); startPlay({ intro: n === 1 });
@@ -369,45 +369,31 @@
     showHowTo(() => { const P2 = Profile.get(); P2.howSeen = true; Profile.save(); start(); });
   }
 
-  // ---------- 인수인계 (스토리 모드): 표준 한 해 · 동네 택배 · 퍽 없음 · 난이도만 고른다 ----------
-  // 인수인계를 한 번도 안 해 본 프로필이 '새 런'을 누르면: 막지는 않되 인수인계를 먼저 권한다
-  function suggestStory() {
-    const face = `<img src="${Story.SPRITES.smile}" width="64" height="64" style="image-rendering:pixelated;float:left;margin:0 10px 6px 0">`;
-    modal(T('title.tutorAsk'), `<p>${face}${T('title.tutorBody')}</p><div style="clear:both"></div>`,
-      [{ label: T('title.tutorSkip'), onClick: () => showScenarioSelect() }, { label: T('title.tutorGo'), cls: 'primary', onClick: () => showStoryStart() }]);
-  }
-  let storyDiff = 'rookie';
-  function showStoryStart() {
-    const diffRow = `<div class="diffrow">${['rookie', 'normal'].map(id => { const d = M.DIFFICULTIES[id]; return `<button class="btn small ${storyDiff === id ? 'on' : ''}" data-diff="${id}" title="${esc(d.desc)}">${d.icon} ${d.name}</button>`; }).join('')}</div><div class="d" style="font-size:11px;color:var(--dim);margin-bottom:6px">${esc(M.DIFFICULTIES[storyDiff].desc)}</div>`;
-    const face = `<img src="${Story.SPRITES.smile}" style="width:64px;height:64px;image-rendering:pixelated;float:left;margin:0 10px 6px 0;border:3px solid var(--line);background:#3a3555">`;
-    const m = modal(T('story.startTitle'), `<p>${face}${T('story.startBody')}</p><div style="clear:both"></div><div class="perk-count">${T('story.diffAsk')}</div>${diffRow}`, [{ label: T('btn.back'), onClick: showTitle }, { label: T('story.start'), cls: 'primary', onClick: () => withHowTo(() => { game = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: storyDiff, story: true, scripted: true, prep: false, demoMonths: demoLocked() ? demoMonths() : 0 }); closeModal(); startPlay(); }) }]);
-    m.querySelectorAll('[data-diff]').forEach(el => el.onclick = () => { SFX.select(); storyDiff = el.dataset.diff; showStoryStart(); });
-  }
-
   // ---------- 런 준비: 시나리오 → 회사 → 퍽 ----------
   function unlockText(achId) { const a = M.ACHIEVEMENTS[achId]; if (!a) return '🔒'; let pr = ''; try { if (a.prog) { const P = Profile.get(); const [h, n] = a.prog(P.stats, P); pr = ` (${Math.min(h, n)}/${n})`; } } catch (e) { } return `🔒 ${a.name}: ${a.desc}${pr}`; }
   const TIER_NAMES = () => [T('tier.0'), T('tier.1'), T('tier.2'), T('tier.3')];
-  const prep = { scenario: 'standard', company: 'local', perks: [], insurer: 'sturdy', difficulty: 'normal' };
+  const prep = { scenario: M.DEFAULT_SCENARIO, company: 'local', perks: [], insurer: 'sturdy' };
+  // 런 = 나라 달력 × 시작 달 × 길이. 나라별로 묶고, 그 안에서 분기 → 반기 → 한 해 순으로 놓는다.
   function showScenarioSelect() {
     const P = Profile.get(), lock = demoLocked();
-    const daily = window.dailyConfig(today());
-    const cards = Object.keys(M.SCENARIOS).map(id => {
+    if (!P.unlocked.scenarios.includes(prep.scenario)) prep.scenario = M.DEFAULT_SCENARIO;
+    const year = new Date().getFullYear();
+    const card = id => {
       const s = M.SCENARIOS[id], un = !lock && P.unlocked.scenarios.includes(id);
-      let extra = '';
-      if (id === 'daily') extra = `<div class="d">${T('prep.today')}: ${T('fmt.calOnly', { cal: daily.startMonth })} · ${esc(M.COMPANIES[daily.company].name)} · ${daily.variants.map(v => esc(M.DAILY_VARIANTS[v].name)).join(' + ')}${Profile.dailyDoneToday(daily.date) ? ` · <b>${T('prep.dailyDone')}</b>` : ''}</div>`;
       const rec = P.records[id]; const best = rec ? Math.max(0, ...Object.values(rec).map(r => r.bestScore)) : 0;
-      // 어느 해, 어느 나라 달력으로 도는지 — 해마다 요일과 영업일 수가 달라진다
-      const calId = (s.mods && s.mods.calendar) || 'kr', yr = (s.mods && s.mods.year) || new Date().getFullYear();
-      const when = `<div class="d" style="color:var(--dim);font-size:11px">${T('prep.calendar', { year: yr, place: esc((M.CALENDARS[calId] && M.CALENDARS[calId].name) || T('cal.' + calId + '.name')) })}</div>`;
-      return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">${s.months >= 99 ? '∞' : T('fmt.months', { n: s.months })}</small></span><span class="price">${best ? T('fmt.pts', { n: best }) : ''}</span></div>
-        ${when}<div class="d">${esc(s.desc)}<br>${T('prep.win')}: ${esc(s.win)} · ${T('prep.recommend')}: ${esc(s.recommend)}</div>${un ? extra : `<div class="d">${lock ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
+      const sm = s.mods.startMonth, em = ((sm - 1 + s.months / D.CYCLES_PER_MONTH - 1) % 12) + 1, y2 = year + Math.floor((sm - 1 + s.months / D.CYCLES_PER_MONTH - 1) / 12);
+      const when = T(y2 === year ? 'prep.runWhenSame' : 'prep.runWhenNext', { y1: year, m1: sm, y2, m2: em });
+      return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">${T('fmt.months', { n: s.months / D.CYCLES_PER_MONTH })}</small></span><span class="price">${best ? T('fmt.pts', { n: best }) : ''}</span></div>
+        <div class="d" style="color:var(--dim);font-size:11px">📅 ${esc(when)}</div><div class="d">${esc(s.desc)}</div>${un ? '' : `<div class="d">${lock ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
+    };
+    const countries = [...new Set(Object.values(M.SCENARIOS).map(s => s.country))];
+    const cards = countries.map(cc => {
+      const cal = M.CALENDARS[cc];
+      const head = `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${cal.icon || ''} ${esc(cal.name || T('cal.' + cc + '.name'))}</div>`;
+      return head + Object.keys(M.SPANS).map(sp => { const ids = Object.keys(M.SCENARIOS).filter(id => M.SCENARIOS[id].country === cc && M.SCENARIOS[id].span === sp); return ids.length ? `<div class="d" style="font-size:11px;color:var(--dim);margin:6px 0 2px">${esc(T('prep.span.' + sp))}</div>` + ids.map(card).join('') : ''; }).join('');
     }).join('');
-    const diffUn = id => !M.DIFFICULTIES[id].unlock || P.achievements[M.DIFFICULTIES[id].unlock];
-    if (!diffUn(prep.difficulty)) prep.difficulty = 'normal';
-    const diffRow = `<div class="diffrow">${Object.keys(M.DIFFICULTIES).map(id => { const d = M.DIFFICULTIES[id], un = diffUn(id); return `<button class="btn small ${prep.difficulty === id ? 'on' : ''} ${un ? '' : 'dis'}" data-diff="${id}" title="${esc(d.desc)}">${d.icon} ${d.name}</button>`; }).join('')}</div><div class="d" style="font-size:11px;color:var(--dim);margin-bottom:6px">${esc(M.DIFFICULTIES[prep.difficulty].desc)}${prep.scenario === 'daily' ? ` · ${T('prep.dailyNormal')}` : ''}</div>`;
-    const m = modal(T('prep.scenarioTitle'), `<div class="perk-count">${T('prep.step1')}</div>${diffRow}${cards}`, [{ label: T('btn.title'), onClick: showTitle }, { label: lock ? T('demo.cta') : T('prep.nextCompany'), cls: lock ? 'gold' : 'primary', onClick: () => { if (lock) return showDemoGate(showScenarioSelect); if (prep.scenario === 'daily') { prep.company = daily.company; showPerkSelect(daily); } else showCompanySelect(); } }]);
+    const m = modal(T('prep.scenarioTitle'), `<div class="perk-count">${T('prep.step1')}</div>${cards}`, [{ label: T('btn.title'), onClick: showTitle }, { label: lock ? T('demo.cta') : T('prep.nextCompany'), cls: lock ? 'gold' : 'primary', onClick: () => { if (lock) return showDemoGate(showScenarioSelect); showCompanySelect(); } }]);
     m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (lock) { SFX.click(); showDemoGate(showScenarioSelect); return; } if (!P.unlocked.scenarios.includes(id)) { toast(unlockText(M.SCENARIOS[id].unlock), 2500); return; } SFX.select(); prep.scenario = id; showScenarioSelect(); });
-    m.querySelectorAll('[data-diff]').forEach(el => el.onclick = () => { const id = el.dataset.diff; if (!diffUn(id)) { toast(unlockText(M.DIFFICULTIES[id].unlock), 2500); return; } SFX.select(); prep.difficulty = id; showScenarioSelect(); });
   }
   // 회사 시작 계약은 계열 이름(bulk…)으로 적혀 있다 → Game.resolveCenter 와 같은 규칙으로 센터 id 를 찾는다
   const GRADE_TIER = g => Math.max(0, ['normal', 'trusted', 'expert', 'master'].indexOf(g || 'normal'));
@@ -426,7 +412,7 @@
       return `<div class="card ${un ? '' : 'dis'} ${prep.company === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${co.icon} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${rec ? T('fmt.pts', { n: rec.bestScore }) : ''}</span></div>
         ${un ? companyInfo(co, id) : `<div class="d">${lock ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(co.unlock))}</div>`}</div>`;
     }).join('');
-    const m = modal(T('prep.companyTitle'), `<div class="perk-count">${T('prep.step2')} — ${esc(M.SCENARIOS[prep.scenario].name)}</div>${cards}`, [{ label: T('btn.back'), onClick: showScenarioSelect }, { label: lock ? T('demo.cta') : T('prep.nextPerk'), cls: lock ? 'gold' : 'primary', onClick: () => lock ? showDemoGate(showCompanySelect) : showPerkSelect(null) }]);
+    const m = modal(T('prep.companyTitle'), `<div class="perk-count">${T('prep.step2')} — ${esc(M.SCENARIOS[prep.scenario].name)}</div>${cards}`, [{ label: T('btn.back'), onClick: showScenarioSelect }, { label: lock ? T('demo.cta') : T('prep.nextPerk'), cls: lock ? 'gold' : 'primary', onClick: () => lock ? showDemoGate(showCompanySelect) : showPerkSelect() }]);
     m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (lock) { SFX.click(); showDemoGate(showCompanySelect); return; } if (!P.unlocked.companies.includes(id)) { toast(unlockText(M.COMPANIES[id].unlock), 2500); return; } SFX.select(); prep.company = id; showCompanySelect(); });
   }
   function perkConflict(pid) {
@@ -435,7 +421,7 @@
     if (prep.perks.some(o => o !== pid && M.PERKS[o].family === perk.family)) return T('prep.sameFamily', { family: M.PERK_FAMILIES[perk.family] });
     return null;
   }
-  function showPerkSelect(daily) {
+  function showPerkSelect() {
     const P = Profile.get(), slots = Profile.perkSlots();
     prep.perks = prep.perks.filter(p => P.unlocked.perks.includes(p) && !perkConflict(p)).slice(0, slots);
     const co = M.COMPANIES[prep.company];
@@ -443,25 +429,24 @@
       const pk = M.PERKS[id], un = P.unlocked.perks.includes(id), sel = prep.perks.includes(id), conflict = un && !sel ? perkConflict(id) : null;
       return `<div class="card ${!un || conflict ? 'dis' : ''} ${sel ? 'sel' : ''}" data-id="${id}"><div class="t">${esc(pk.name)}</div><div class="d">${un ? esc(pk.desc) + (conflict ? ` <span style="color:var(--orange)">(${esc(conflict)})</span>` : '') : esc(unlockText(pk.unlock))}</div></div>`;
     }).join('')).join('');
-    const head = `<div class="perk-count">${T('prep.step3')} — ${esc(M.SCENARIOS[prep.scenario].name)} · ${co.icon} ${esc(co.name)}${daily ? ` · ${T('prep.variants')}: ${daily.variants.map(v => esc(M.DAILY_VARIANTS[v].name + '(' + M.DAILY_VARIANTS[v].desc + ')')).join(', ')}` : ''}<br>${T('prep.perkCount', { n: prep.perks.length, slots })}</div>`;
+    const head = `<div class="perk-count">${T('prep.step3')} — ${esc(M.SCENARIOS[prep.scenario].name)} · ${co.icon} ${esc(co.name)}<br>${T('prep.perkCount', { n: prep.perks.length, slots })}</div>`;
     if (prep.story == null) prep.story = !(storySeen(P)); // 첫 런은 안내가 기본으로 켜진다
     const storyCard = `<div style="font-size:12px;color:var(--gold);margin:10px 0 4px">${T('prep.story')}</div><div class="card toggle ${prep.story ? 'sel' : ''}" id="prep-story"><div class="t"><span>${prep.story ? '☑' : '☐'} ${T('prep.story')}</span></div><div class="d">${T('prep.storyDesc')}</div></div>`;
     const noIns = !!(co.mods && co.mods.noInsurance);
     const insCards = storyCard + `<div style="font-size:12px;color:var(--gold);margin:10px 0 4px">${T('prep.insuranceHead')}</div>` + (noIns ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('prep.startupNoIns')}</div>` : Object.keys(M.INSURERS).map(id => { const I = M.INSURERS[id]; const fee = Math.max(0, Math.round((I.fee + ((co.mods && co.mods.premiumDelta || {})[id] || 0)) * ((co.mods && co.mods.premiumMult) || 1) * ((M.SCENARIOS[prep.scenario].mods || {}).premiumMult || 1))); return `<div class="card ins ${prep.insurer === id ? 'sel' : ''}" data-ins="${id}"><div class="t"><span>${I.icon} ${esc(I.name)}</span><span class="price">${fee ? T('fmt.perMonth', { n: fee }) : '0c'}</span></div><div class="d">${esc(I.desc)}${I.fans.length ? `<br><span style="color:var(--green)">${T('prep.fans', { list: I.fans.map(f => M.CUSTOMERS[f].icon + M.CUSTOMERS[f].name).join(' ') })}</span>` : ''}</div></div>`; }).join(''));
-    const m = modal(T('prep.perkTitle'), head + groups + insCards, [{ label: T('btn.back'), onClick: daily ? showScenarioSelect : showCompanySelect }, { label: T('prep.start'), cls: 'primary', onClick: () => startRun(daily) }]);
-    m.querySelectorAll('.card.ins').forEach(el => el.onclick = () => { SFX.select(); prep.insurer = el.dataset.ins; showPerkSelect(daily); });
-    m.querySelector('#prep-story').onclick = () => { SFX.select(); prep.story = !prep.story; showPerkSelect(daily); };
+    const m = modal(T('prep.perkTitle'), head + groups + insCards, [{ label: T('btn.back'), onClick: showCompanySelect }, { label: T('prep.start'), cls: 'primary', onClick: () => startRun() }]);
+    m.querySelectorAll('.card.ins').forEach(el => el.onclick = () => { SFX.select(); prep.insurer = el.dataset.ins; showPerkSelect(); });
+    m.querySelector('#prep-story').onclick = () => { SFX.select(); prep.story = !prep.story; showPerkSelect(); };
     m.querySelectorAll('.card:not(.ins):not(.toggle)').forEach(el => el.onclick = () => {
       const id = el.dataset.id;
       if (!P.unlocked.perks.includes(id)) { toast(unlockText(M.PERKS[id].unlock), 2500); return; }
       if (prep.perks.includes(id)) { prep.perks = prep.perks.filter(p => p !== id); SFX.cancel(); }
       else { const c = perkConflict(id); if (c) { toast(c); return; } if (prep.perks.length >= slots) { toast(T('prep.slotFull', { n: slots })); return; } prep.perks.push(id); SFX.select(); }
-      showPerkSelect(daily);
+      showPerkSelect();
     });
   }
-  function startRun(daily) {
-    const cfg = { scenario: prep.scenario, company: prep.company, perks: prep.perks.slice(), variants: [], insurer: prep.insurer, difficulty: prep.difficulty, prep: true, story: !!prep.story, demoMonths: demoLocked() ? demoMonths() : 0 };
-    if (daily) { cfg.seed = daily.seed; cfg.variants = daily.variants; cfg.date = daily.date; cfg.company = daily.company; cfg.startMonth = daily.startMonth; }
+  function startRun() {
+    const cfg = { scenario: prep.scenario, company: prep.company, perks: prep.perks.slice(), insurer: prep.insurer, prep: true, story: !!prep.story, demoMonths: demoLocked() ? demoMonths() : 0 };
     withHowTo(() => { game = new Game(cfg); closeModal(); startPlay(); });
   }
 
@@ -592,7 +577,7 @@
     // 아직 안 연 것은 화면에도 없다 (levels.js) — 평판 게이지·회사 줄은 레벨이 열어 준다
     $('#hud-right').hidden = !g.shows('rep') && !g.shows('perks');
     $('#stress-wrap').hidden = !g.shows('rep');
-    $('#hud-perks').innerHTML = !g.shows('perks') ? `<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName ? g.companyName() : g.company.name)}</a>` : [`<a class="hl" data-pop="company">${g.difficulty && (g.cfg.difficulty || 'normal') !== 'normal' ? g.difficulty.icon + esc(g.difficulty.name) + ' · ' : ''}${g.company.icon} ${esc(g.company.name)}</a>`, ...g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}">${esc(M.PERKS[p].name)}</a>`), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ') + (g.strikeCarrier ? ` · ✊${D.CARRIERS[g.strikeCarrier].short} ${T('hud.strike')}` : '');
+    $('#hud-perks').innerHTML = !g.shows('perks') ? `<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName ? g.companyName() : g.company.name)}</a>` : [`<a class="hl" data-pop="company">${g.company.icon} ${esc(g.company.name)}</a>`, ...g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}">${esc(M.PERKS[p].name)}</a>`), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ');
     $('#hud-perks').querySelectorAll('[data-pop]').forEach(el => el.onclick = () => { SFX.click(); if (el.dataset.pop === 'company') showCompanyInfo(); else if (el.dataset.pop === 'insurer') showInsurance(closeModal); else { const pk = M.PERKS[el.dataset.id]; modal(pk.name, `<p>${esc(pk.desc)}</p><p style="color:var(--dim);font-size:12px">${esc(T('hud.familyPerk', { family: M.PERK_FAMILIES[pk.family] }))}</p>`, [{ label: T('btn.close'), onClick: closeModal }]); } });
     const used = g.usedVolume(), cap = g.warehouse.cap, pct = used / cap * 100;
     const bu = $('#bar-usage'); bu.querySelector('i').style.width = Math.min(100, pct) + '%'; $('#usage-txt').textContent = `${used}/${cap} (${Math.round(pct)}%)`;
@@ -642,7 +627,7 @@
       if (!c) { btn.hidden = !g.shows('market') || i >= slotsOn; btn.innerHTML = `<div class="nm">${T('err.emptySlot')}</div><div class="sub">${T('hud.buyInMarket')}</div>`; btn.disabled = true; btn.className = 'btn contract'; continue; }
       btn.hidden = false;
       const car = D.CARRIERS[c.carrier], vcap = g.vehicleCap(c), elig = g.eligibleParcels(c), lv = g.trustLevel(c);
-      const can = g.canCall(c) && !busy, struck = g.isStruck(c);
+      const can = g.canCall(c) && !busy;
       btn.disabled = !can;
       const spare = c.calls === 0 && R.spareCall && !g.monthStats.spareUsed;
       const caps = g.contractCaps(c), fee = g.truckFee(c), simul = g.simulMax(c), eligVol = elig.reduce((s, p) => s + p.size, 0);
@@ -657,11 +642,11 @@
       // 파란 눈금은 계약된 배차 횟수 — 쓴 만큼 비어 간다. 다 쓰면 전부 빈 칸(0대라는 글자 대신)
       const callMax = Math.max(c.calls, c.maxCalls || c.calls);
       const callPips = callPipsHtml(c.calls, callMax);
-      const spent = c.calls === 0 && g.shows('calls') && !spare && !struck;
+      const spent = c.calls === 0 && g.shows('calls') && !spare;
       const cells = pips(pv.cells, vcap, pv.over, pv.trucks) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
       // 세로 목록 한 줄: 이름 · 싣는 색 · 적재 눈금 · 순수익 · 배차 눈금. 글자는 최소로 — 자세한 건 꾹 누르면
-      const callsHtml = struck ? T('hud.strike') : g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips;
+      const callsHtml = g.isOffTurn() ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips;
       const netHtml = spent || !pv.n ? '<span class="per">—</span>' : `<span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>`;
       btn.innerHTML = `<span class="cn">${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}</span>${takesDots(g, c, true)}<span class="cl">${spent ? '' : cells}</span>${netHtml}<span class="calls ${spent ? 'zero' : ''}">${callsHtml}</span>`;
     }
@@ -756,7 +741,6 @@
     const g = game, co = g.company;
     const custs = g.customerSummary().map(c => `<div class="d">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)}${c.id !== 'anon' ? ` — ${T('cust.trustLv', { n: c.level })}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('');
     const body = `<div class="d">${esc(co.tag)}</div>${companyInfo(co, g.cfg.company)}
-      <div class="d" style="margin-top:6px">${T('company.difficulty')}: ${g.difficulty.icon} ${esc(g.difficulty.name)} — ${esc(g.difficulty.desc)}</div>
       <div class="d" style="margin-top:6px">${T('company.warehouse', { cap: g.warehouse.cap, cold: g.warehouse.cold, frozen: g.warehouse.frozen || 0, xl: g.warehouse.xl })}${['coldvan', 'padvan', 'bigvan', 'vent'].filter(k => g.warehouse[k]).length ? ` · ${T('company.facilities')}: ` + ['coldvan', 'padvan', 'bigvan', 'vent'].filter(k => g.warehouse[k]).map(k => D.FACILITIES[k].name).join(', ') : ''}</div>
       <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('company.customers')}</div>${custs}
       ${g.perks.length ? `<div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('company.perks')}</div>${g.perks.map(p => `<div class="d">${esc(M.PERKS[p].name)} — ${esc(M.PERKS[p].desc)}</div>`).join('')}` : ''}`;
@@ -1413,13 +1397,13 @@
   // ---------- summary ----------
   function showSummary() {
     const s = game.summary, R = game.rules;
-    if (R.endless || game.month < R.months) BGM.stinger('fanfare', 0.9); // 마지막 달은 결과 화면의 팡파레 하나만
+    if (game.month < R.months) BGM.stinger('fanfare', 0.9); // 마지막 달은 결과 화면의 팡파레 하나만
     // 정산 화면이 답해야 하는 질문은 하나다: 이번 달 흑자야 적자야, 얼마야.
     // 그동안은 +2395 / -477 / -522 / -42 를 늘어놓고 덧셈은 플레이어에게 맡겼다.
     const net = s.net != null ? s.net : 0;
     const inst = game.month >= R.months ? instalmentDue(game) : 0;   // 장이 끝나는 정산이면 한 사장에게 낼 잔금 회차도 같이
     const head = `<div class="sumnet ${net >= 0 ? 'good' : 'bad'}"><span class="lbl">${T('sum.net')}</span><span class="amt">${net >= 0 ? '+' : ''}${net}c</span>
-      <span class="flow">${T('sum.netFlow', { from: s.cashStart != null ? s.cashStart : s.cash, to: s.cash })}${R.winCash ? ` · ${T('sum.goal', { n: R.winCash })}` : ''}</span></div>`;
+      <span class="flow">${T('sum.netFlow', { from: s.cashStart != null ? s.cashStart : s.cash, to: s.cash })}</span></div>`;
     const sec = k => `<div class="sumsec">${T('sum.sec' + k)}</div>`;
     const income = `${sec('Income')}<div class="kv">
       <span>${T('sum.revenue')}</span><span class="v good">+${s.revenue}</span>
@@ -1439,20 +1423,16 @@
       ${s.penalty ? `<span>${T('sum.penalty')}</span><span class="v bad">+${s.penalty}</span>` : ''}
       ${s.returned || s.stolen || s.broken ? `<span>${T('sum.rsb')}</span><span class="v bad">${s.returned || 0} / ${s.stolen || 0} / ${s.broken || 0}</span>` : ''}
       ${s.claims ? `<span>${T('sum.claims')}</span><span class="v bad">-${s.claims}${s.covered ? ` <small style="color:var(--green)">${T('sum.covered', { n: s.covered })}</small>` : ''}</span>` : ''}
-      ${s.discarded ? `<span>${T('sum.discarded')}</span><span class="v bad">${T('fmt.count', { n: s.discarded })}${R.winMaxDiscard != null ? ` ${T('sum.runDiscard', { n: game.run.discarded, max: R.winMaxDiscard })}` : ''}</span>` : ''}</div>`;
+      ${s.discarded ? `<span>${T('sum.discarded')}</span><span class="v bad">${T('fmt.count', { n: s.discarded })}</span>` : ''}</div>`;
     const state = `${sec('State')}<div class="kv">
       <span>${T('sum.callsWaits')}</span><span class="v">${T('fmt.calls', { n: s.calls })} / ${T('fmt.calls', { n: s.waits })}</span>
       <span>${T('sum.delivered')}</span><span class="v">${T('fmt.count', { n: s.delivered })}</span>
       ${!game.shows('rep') ? '' : `<span>${T('sum.rep')}</span><span class="v ${s.rep <= s.repCap * 0.45 ? 'bad' : ''}">${s.rep}/${s.repCap} <small>${esc(T('rep.tier.' + s.repTier))}${s.repDelta ? ` · ${s.repDelta > 0 ? '+' : ''}${s.repDelta}` : ''}${!s.repTierUp && game.repToNext() ? `<br>${T('sum.repToNext', { n: game.repToNext() })}` : ''}</small>${s.repTierUp ? `<br><small style="color:var(--gold)">${T('sum.repTierUp')}${repPerksHtml(s.repPerks)}</small>` : ''}</span>`}
       <span>${T('sum.usage')}</span><span class="v">${T('sum.usageVal', { pct: s.usage, n: s.left })}</span>
-      ${s.overdueVol ? `<span>${T('sum.overdueVol')}</span><span class="v bad">${T('fmt.cells', { n: s.overdueVol })}</span>` : ''}
-      ${bad === 0 && R.winMaxDiscard != null ? `<span>${T('sum.discarded')}</span><span class="v">${T('sum.runDiscard', { n: game.run.discarded, max: R.winMaxDiscard })}</span>` : ''}
-      ${R.winDelivered ? `<span>${T('sum.deliverGoal')}</span><span class="v">${game.run.delivered}/${T('fmt.count', { n: R.winDelivered })}</span>` : ''}
-      ${R.winStorage ? `<span>${T('sum.storageGoal')}</span><span class="v">${game.stats.storageDone}/${T('fmt.cases', { n: R.winStorage })}</span>` : ''}
-      ${R.winBigCustomer && game.bigCustomer ? `<span>${T('sum.bigCustomer')}</span><span class="v">${M.CUSTOMERS[game.bigCustomer].icon} ${esc(M.CUSTOMERS[game.bigCustomer].name)} ${T('common.trust')} ${game.customerLevel(game.bigCustomer)}/3</span>` : ''}</div>`;
+      ${s.overdueVol ? `<span>${T('sum.overdueVol')}</span><span class="v bad">${T('fmt.cells', { n: s.overdueVol })}</span>` : ''}</div>`;
     const custs = s.customers && game.shows('customers') ? `${sec('Cust')}` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${trustPips(c.month.lvStart, c.level)}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : '';
     const body = head + income + cost + incident + state + custs;
-    const last = !R.endless && game.month >= R.months;
+    const last = game.month >= R.months;
     modal(T('sum.title', { n: game.cycleLabel(s.month) }), body, [{ label: last ? T('sum.final') : game.shows('market') ? T('sum.toMarket') : T('sum.toNext', { n: game.cycleLabel(s.month + 1) }), cls: 'primary', onClick: () => {
       closeModal(); game.closeSummary(); game.takeEvents(); saveGame();
       // 마켓이 없는 런(레벨 1)은 정산 다음이 바로 다음 사이클 — 마켓 화면이 대신 해 주던 갱신을 여기서 한다
@@ -1513,9 +1493,9 @@
       const fcWarn = fcBlk.length ? `<div class="d fcwarn" id="mk-fcwarn">${T('mk.forecastBlocked', { list: fcBlk.map(t => D.PARCEL_TYPES[t].short).join(' · ') })}</div>` : '';
       const fcLine = `<div class="d"><a class="hl" id="mk-fctoggle">${T(mk.prep ? 'mk.forecastSumNow' : 'mk.forecastSum', { m: game.cycleLabel(nm), min: fcTot.min, max: fcTot.max })} ${fcOpen ? '▴' : '▾'}</a></div>${fcOpen ? `<div class="d fcline" id="mk-fc">${fcRows}</div>` : ''}${fcWarn}${seasonLine}`;
       const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span>${R.marketMaxBuy ? `<span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span>` : ''}</div>${whLine}${contracts}${fcLine}${prepLine}${items}
-        ${R.noRefresh || !game.shows('attrs') ? '' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
+        ${!game.shows('attrs') ? '' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
       // 마지막 사이클의 마켓을 닫으면 다음 사이클이 아니라 **장**이 끝난다
-      const lastCycle = !game.rules.endless && mk.month >= game.rules.months;
+      const lastCycle = mk.month >= game.rules.months;
       const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), body, [{ label: lastCycle ? T('mk.endChapter') : T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], game.shows('attrs') ? T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(12, Math.max(1, game.tableMonth(mk.month)))] * R.itemPriceMult * R.priceMult).toFixed(2) }) : '');
       const ft = m.querySelector('#mk-fctoggle'); if (ft) ft.onclick = () => { SFX.click(); fcOpen = !fcOpen; render(); };
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
@@ -1667,8 +1647,8 @@
     const got = (r.got || []).map(a => `<div class="card" style="cursor:default"><div class="t">🏆 ${esc(a.name)}</div>${a.unlocks.map(u => `<div class="d" style="color:var(--green)">${T('res.unlocked', { name: esc(u.name) })}</div>`).join('')}</div>`).join('');
     const demoNote = r.demo ? `<div class="card gold" style="cursor:default"><div class="t">🔒 ${T('demo.resultHead')}</div><div class="d">${T('demo.resultBody', { n: Math.ceil(r.monthsDone / D.CYCLES_PER_MONTH) })}</div></div>` : '';
     const body = `<p style="text-align:center">${esc(I18n.text(r.reason))}</p>${demoNote}<div class="big-num">${T('fmt.pts', { n: r.score })}${rec && r.score >= rec.bestScore && r.score > 0 ? ` ${T('res.best')}` : ''}</div>${got}
-      <div class="kv"><span>${T('res.scenarioCompany')}</span><span class="v">${esc(M.SCENARIOS[r.scenario].name)}${r.difficulty && r.difficulty !== 'normal' ? ` (${esc(M.DIFFICULTIES[r.difficulty].name)})` : ''} / ${esc(M.COMPANIES[r.company].name)}</span><span>${T('res.reached')}</span><span class="v">${T('fmt.monthTurn', { m: cycleName(r.month), t: r.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })}</span><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.cash')}</span><span class="v">${r.cash}c</span><span>${T('sum.rep')}</span><span class="v">${r.rep} <small>${esc(T('rep.tier.' + (r.repTier || 'unknown')))}</small></span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${r.perks.map(p => M.PERKS[p].name).join(', ') || T('common.none')}</span>${r.variants.length ? `<span>${T('prep.variants')}</span><span class="v">${r.variants.map(v => M.DAILY_VARIANTS[v].name).join(', ')}</span>` : ''}<span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
-    const again = r.scenario === 'daily' ? { label: T('res.toTitle'), cls: 'primary', onClick: () => { closeModal(); game = null; showTitle(); } } : { label: T('res.again'), cls: 'primary', onClick: () => { closeModal(); const cfg = game.cfg; game = new Game({ scenario: cfg.scenario, company: cfg.company, perks: cfg.perks, insurer: cfg.insurer, difficulty: cfg.difficulty, prep: true }); startPlay(); } };
+      <div class="kv"><span>${T('res.scenarioCompany')}</span><span class="v">${esc(M.SCENARIOS[r.scenario] ? M.SCENARIOS[r.scenario].name : r.scenario)} / ${esc(M.COMPANIES[r.company].name)}</span><span>${T('res.reached')}</span><span class="v">${T('fmt.monthTurn', { m: cycleName(r.month), t: r.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })}</span><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.cash')}</span><span class="v">${r.cash}c</span><span>${T('sum.rep')}</span><span class="v">${r.rep} <small>${esc(T('rep.tier.' + (r.repTier || 'unknown')))}</small></span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${r.perks.map(p => M.PERKS[p].name).join(', ') || T('common.none')}</span>${r.variants.length ? `<span>${T('prep.variants')}</span><span class="v">${r.variants.map(v => M.DAILY_VARIANTS[v].name).join(', ')}</span>` : ''}<span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
+    const again = { label: T('res.again'), cls: 'primary', onClick: () => { closeModal(); const cfg = game.cfg; game = new Game({ scenario: cfg.scenario, company: cfg.company, perks: cfg.perks, insurer: cfg.insurer, prep: true }); startPlay(); } };
     modal(r.demo ? T('demo.resultTitle') : r.win ? T(r.story ? 'res.winStory' : 'res.win') : T('res.over'), body, [{ label: T('res.toTitle'), onClick: () => { closeModal(); game = null; showTitle(); } }, r.demo ? { label: T('demo.cta'), cls: 'gold', onClick: () => showDemoGate(showResult) } : again]);
   }
   // ---------- 데모 안내: 본편에 무엇이 더 있는지 + 어디서 사는지 ----------
@@ -1690,7 +1670,7 @@
   function showRecords(back) {
     const P = Profile.get();
     const recs = Object.keys(P.records).map(sc => `<div style="margin-top:6px"><b>${esc(M.SCENARIOS[sc] ? M.SCENARIOS[sc].name : sc)}</b>: ${Object.keys(P.records[sc]).map(co => `${esc(M.COMPANIES[co].name)} ${T('fmt.pts', { n: P.records[sc][co].bestScore })}`).join(' · ')}</div>`).join('');
-    const body = `<div class="records"><p>${T('rec.head', { best: P.stats.bestScore, runs: P.stats.runs, clears: P.stats.clears })}${P.stats.dailyStreak ? ` · ${T('rec.dailyStreak', { n: P.stats.dailyStreak })}` : ''}</p>${recs}<hr>${P.recentRuns.length ? P.recentRuns.map(r => `<div>${r.date} · <b>${T('fmt.pts', { n: r.score })}</b> · ${r.win ? T('rec.win') : T('rec.lose')} · ${esc(M.SCENARIOS[r.scenario] ? M.SCENARIOS[r.scenario].name : r.scenario)} / ${esc(M.COMPANIES[r.company] ? M.COMPANIES[r.company].name : r.company)} (${T('fmt.monthTurn', { m: cycleName(r.month), t: r.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })})</div>`).join('') : `<p>${T('rec.empty')}</p>`}</div>`;
+    const body = `<div class="records"><p>${T('rec.head', { best: P.stats.bestScore, runs: P.stats.runs, clears: P.stats.clears })}</p>${recs}<hr>${P.recentRuns.length ? P.recentRuns.map(r => `<div>${r.date} · <b>${T('fmt.pts', { n: r.score })}</b> · ${r.win ? T('rec.win') : T('rec.lose')} · ${esc(M.SCENARIOS[r.scenario] ? M.SCENARIOS[r.scenario].name : r.scenario)} / ${esc(M.COMPANIES[r.company] ? M.COMPANIES[r.company].name : r.company)} (${T('fmt.monthTurn', { m: cycleName(r.month), t: r.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })})</div>`).join('') : `<p>${T('rec.empty')}</p>`}</div>`;
     modal(T('rec.title'), body, [{ label: T('btn.close'), onClick: back }]);
   }
 
@@ -1749,13 +1729,13 @@
     if (tab === 'companies') body += [0, 1, 2, 3].map(t => `<div class="perk-count">${TIER_NAMES()[t]}</div>` + Object.keys(M.COMPANIES).filter(id => (M.COMPANIES[id].tier || 0) === t).map(id => { const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id); const clears = P.stats.clearsByCompany[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? co.icon : '🔒'} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div>${un ? companyInfo(co, id) : `<div class="d">${esc(unlockText(co.unlock))}</div>`}</div>`; }).join('')).join('');
     else if (tab === 'carriers') { const live = game && game.phase !== 'over' && game.phase !== 'win'; body += `<div class="perk-count">${T('codex.carriersHead')}${live ? ` ${T('codex.liveRun')}` : ''}</div>` + Object.keys(D.FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${esc(D.FAMILIES[f].name)}</div>` + D.centersOf(f).map(k => { const car = D.CARRIERS[k]; return `<div class="card" style="cursor:default"><div class="t"><span>${car.badge || ''} ${esc(car.name)}${gradeBadge(car.grade)}</span><span class="price">${T('codex.carrierPrice', { vehicle: esc(car.vehicle || ''), cap: car.cap, fee: car.fee, trucks: car.trucks, price: car.price })}</span></div><div class="d">${esc(car.desc)}<br>${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.need ? ` · ${T('codex.need', { icons: car.need.map(a => D.ATTRS[a].icon).join('') })}` : ''}${car.onlyPlain ? ` · ${T('pd.plainOnly')}` : ''}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}${trustTrack(k, live ? game.trustXp(k) : null)}</div></div>`; }).join('')).join(''); }
     else if (tab === 'perks') body += `<div class="perk-count">${T('codex.perkSlots', { n: Profile.perkSlots() })}</div>` + Object.keys(M.PERK_FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${T('prep.family', { family: M.PERK_FAMILIES[f] })}</div>` + Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f).map(id => { const pk = M.PERKS[id], un = P.unlocked.perks.includes(id); return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t">${un ? '' : '🔒 '}${esc(pk.name)}</div><div class="d">${esc(pk.desc)}${un ? '' : `<br>${esc(unlockText(pk.unlock))}`}</div></div>`; }).join('')).join('');
-    else if (tab === 'scenarios') body += Object.keys(M.SCENARIOS).map(id => { const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id); const clears = P.stats.clearsByScenario[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? s.icon : '🔒'} ${esc(s.name)}</span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div><div class="d">${esc(s.desc)}<br>${T('prep.win')}: ${esc(s.win)}${un ? '' : `<br>${esc(unlockText(s.unlock))}`}</div></div>`; }).join('');
+    else if (tab === 'scenarios') body += Object.keys(M.SCENARIOS).map(id => { const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id); const clears = P.stats.clearsByScenario[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? s.icon : '🔒'} ${esc(s.name)}</span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div><div class="d">${esc(s.desc)}${un ? '' : `<br>${esc(unlockText(s.unlock))}`}</div></div>`; }).join('');
     else if (tab === 'achievements') {
       const groups = ['company', 'scenario', 'slot', 'multi', 'perk', 'none'].map(g => [g, T('codex.ach.' + g)]);
       body += groups.map(([g, nm]) => { const ids = Object.keys(M.ACHIEVEMENTS).filter(id => M.ACHIEVEMENTS[id].rewardType === g); if (!ids.length) return ''; return `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${nm}</div>` + ids.map(id => { const a = M.ACHIEVEMENTS[id], done = !!P.achievements[id]; const reward = a.rewardType === 'company' ? M.COMPANIES[a.reward].name : a.rewardType === 'perk' ? M.PERKS[a.reward].name : a.rewardType === 'scenario' ? M.SCENARIOS[a.reward].name : a.rewardType === 'slot' ? T('codex.slotReward', { n: a.reward }) : a.rewardType === 'multi' ? T('codex.multiReward') : ''; return `<div class="card ${done ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${done ? '🏆' : '⬜'} ${esc(a.name)}</span>${reward ? `<span class="price">${esc(reward)}</span>` : ''}</div><div class="d">${esc(a.desc)}</div></div>`; }).join(''); }).join('');
     } else {
       const s = P.stats, dt = s.deliveredByType;
-      body += `<div class="kv stats"><span>${T('stat.runsClears')}</span><span class="v">${s.runs} / ${s.clears}</span><span>${T('stat.best')}</span><span class="v">${s.bestScore}</span><span>${T('stat.delivered')}</span><span class="v">${T('fmt.count', { n: dt.normal + dt.fresh + dt.fragile + dt.intl + dt.large })}</span><span class="sub">　${D.PARCEL_TYPES.normal.short} / ${D.PARCEL_TYPES.fresh.short}</span><span class="v sub">${dt.normal} / ${dt.fresh}</span><span class="sub">　${D.PARCEL_TYPES.fragile.short} / ${D.PARCEL_TYPES.intl.short} / ${D.PARCEL_TYPES.large.short}</span><span class="v sub">${dt.fragile} / ${dt.intl} / ${dt.large}</span><span>${T('res.callsWaits')}</span><span class="v">${s.calls} / ${s.waits}</span><span>${T('stat.contracts')}</span><span class="v">${s.contractsBought}</span><span>${T('sum.discarded')}</span><span class="v">${s.discarded}</span><span>${T('stat.tidy')}</span><span class="v">${s.tidyMonths}</span><span>${T('stat.daily')}</span><span class="v">${T('fmt.days', { n: s.dailyStreak })}</span></div>
+      body += `<div class="kv stats"><span>${T('stat.runsClears')}</span><span class="v">${s.runs} / ${s.clears}</span><span>${T('stat.best')}</span><span class="v">${s.bestScore}</span><span>${T('stat.delivered')}</span><span class="v">${T('fmt.count', { n: dt.normal + dt.fresh + dt.fragile + dt.intl + dt.large })}</span><span class="sub">　${D.PARCEL_TYPES.normal.short} / ${D.PARCEL_TYPES.fresh.short}</span><span class="v sub">${dt.normal} / ${dt.fresh}</span><span class="sub">　${D.PARCEL_TYPES.fragile.short} / ${D.PARCEL_TYPES.intl.short} / ${D.PARCEL_TYPES.large.short}</span><span class="v sub">${dt.fragile} / ${dt.intl} / ${dt.large}</span><span>${T('res.callsWaits')}</span><span class="v">${s.calls} / ${s.waits}</span><span>${T('stat.contracts')}</span><span class="v">${s.contractsBought}</span><span>${T('sum.discarded')}</span><span class="v">${s.discarded}</span><span>${T('stat.tidy')}</span><span class="v">${s.tidyMonths}</span></div>
         <hr><p style="font-size:12px;color:var(--dim)">${T('stat.profileNote')}</p>
         <div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn small" id="cx-export" style="flex:1">${T('stat.export')}</button><button class="btn small" id="cx-import" style="flex:1">${T('stat.import')}</button></div>
         <p style="font-size:11px;color:var(--dim)">${T('stat.transferNote')}</p><button class="btn small warn" id="cx-reset">${T('stat.reset')}</button>`;
@@ -2039,7 +2019,7 @@
   function showMenu() {
     const g = game, R = g.rules;
     const info = !g.shows('perks') ? `<div class="d" style="font-size:12px;margin-bottom:6px">${g.company.icon} ${esc(g.companyName())}</div>`
-      : `<div class="d" style="font-size:12px;margin-bottom:6px">${esc(M.SCENARIOS[g.cfg.scenario].name)} · ${g.company.icon} ${esc(g.company.name)}<br><span style="color:var(--green)">＋ ${esc(g.company.passive)}</span><br><span style="color:var(--orange)">－ ${esc(g.company.weakness)}</span>${g.perks.length ? `<br>${T('company.perks')}: ` + g.perks.map(p => esc(M.PERKS[p].name + ' — ' + M.PERKS[p].desc)).join(`<br>${T('company.perks')}: `) : ''}${(g.cfg.variants || []).length ? `<br>${T('prep.variants')}: ` + g.cfg.variants.map(v => esc(M.DAILY_VARIANTS[v].name + ' — ' + M.DAILY_VARIANTS[v].desc)).join(', ') : ''}</div>`;
+      : `<div class="d" style="font-size:12px;margin-bottom:6px">${esc((M.SCENARIOS[g.cfg.scenario] || {}).name || '')} · ${g.company.icon} ${esc(g.company.name)}<br><span style="color:var(--green)">＋ ${esc(g.company.passive)}</span><br><span style="color:var(--orange)">－ ${esc(g.company.weakness)}</span>${g.perks.length ? `<br>${T('company.perks')}: ` + g.perks.map(p => esc(M.PERKS[p].name + ' — ' + M.PERKS[p].desc)).join(`<br>${T('company.perks')}: `) : ''}${(g.cfg.variants || []).length ? `<br>${T('prep.variants')}: ` + g.cfg.variants.map(v => esc(M.DAILY_VARIANTS[v].name + ' — ' + M.DAILY_VARIANTS[v].desc)).join(', ') : ''}</div>`;
     const m = modal(T('menu.title'), `${info}<p style="font-size:12px;color:var(--dim)">${T('menu.autosave')}</p><label style="display:flex;align-items:center;gap:8px;font-size:12px">${T('menu.volume')} <input type="range" id="vol" min="0" max="1" step="0.05" value="${opts.musicVol}" style="flex:1"></label>`, [
       { label: T('menu.continue'), cls: 'primary', onClick: closeModal },
       ...(g.shows('customers') ? [{ label: T('company.customers'), onClick: () => showCustomers(showMenu) }] : []),

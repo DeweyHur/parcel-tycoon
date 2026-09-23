@@ -1,4 +1,4 @@
-// 메타 진행 데이터: 회사 · 퍽 · 시나리오 · 도전과제 (docs/META_DESIGN.md v0.1)
+// 메타 진행 데이터: 회사 · 퍽 · 런(나라 달력 × 시작 달 × 길이) · 도전과제 (docs/META_DESIGN.md v0.1, 런 재편은 STORY_TUTORIAL_DESIGN.md 부록 T)
 // 이름·설명 등 텍스트 필드는 locales/<lang>.js 의 meta 섹션에 있고, i18n.js 가 같은 모양으로 덮어쓴다
 (function (root) {
 
@@ -77,13 +77,6 @@
   const CUSTOMER_ITEMS = { intlfragile: { type: 'intl', attrs: ['customs', 'fragile'], sizes: [1, 2] } };
   const CUSTOMER_SLOTS = 4; // 익명 제외 고객 최대 수
   // repTier: 이 평판 등급부터 마켓에 찾아온다 (0 무명 · 1 동네 소문 · 2 구내 유명 · 3 시내 최고)
-  // 난이도 (docs/CARRIER_CAPABILITY_DESIGN.md 4장): 시나리오 규칙 위에 곱해지는 얇은 층
-  const DIFFICULTIES = {
-    rookie:  { icon: '🌱', mods: { arrivalsMult: 0.85, opCostDelta: -20, feeMult: 0.8, itemPriceMult: 0.9, contractPriceMult: 0.9, facilityPriceMult: 0.9, theftMult: 0.5, breakMult: 0.5, claimMult: 0.5, upcomingTurns: 3, gameoverStress: 24, scoreMult: 0.7, noDualAttrs: true }, unlock: null },
-    normal:  { icon: '📦', mods: {}, unlock: null },
-    veteran: { icon: '🔥', mods: { arrivalsMult: 1.15, opCostDelta: 40, feeMult: 1.3, theftMult: 1.3, breakMult: 1.3, claimMult: 1.5, gameoverStress: 16, scoreMult: 1.4, dualAttrBonus: 3 }, unlock: 'first_clear' },
-  };
-
   const COMPANIES = {
     local: {
       customers: [['mart', 1], ['dawn', 0], ['glass', 0], ['anon', 0]],
@@ -181,18 +174,6 @@
   };
   const PERK_FAMILIES = {}; // 계열 id → 이름, locales/<lang>.js meta.PERK_FAMILIES
 
-  const DAILY_VARIANTS = {
-    fog:      { mods: { upcomingTurns: 1 } },
-    express:  { mods: { deadlineAll: -1, rewardAll: 10 } },
-    bigweek:  { mods: { bigWeight: 2 } },
-    inflation:{ mods: { itemPriceMult: 1.3, revenueMult: 1.1 } },
-    trustboom:{ mods: { trustXpMult: 2 } },
-    repair:   { mods: { capDelta: -4, facilityPriceMult: 0.5 } },
-    picky:    { mods: { overdueMult: 0.5 } },
-    generous: { mods: { bigCallBonus: { min: 3, mult: 1.15 } } },
-  };
-  const DAILY_CONFLICTS = [['picky', 'generous'], ['express', 'picky']];
-
   // ----- 나라별 달력 (docs/STORY_TUTORIAL_DESIGN.md 5장) -----
   // 한 해 런은 달력을 따라 흐른다. 달마다 입고 배수·품목 이동·날씨 가중·이벤트가 있어 플레이어가 "다음 달"을 예측할 수 있다.
   // months[cal] = { arrivalsMult, typeShift, weather(계절 기본 가중치에 곱), storageMult(보관 제안 확률 배율), storageFeeMult,
@@ -208,41 +189,54 @@
         6:  { arrivalsMult: 1.0,  typeShift: { fresh: 4 }, weather: { rain: 2.2 }, icon: '☔' },
         7:  { arrivalsMult: 0.95, typeShift: { fresh: 8, frozen: 4, normal: -6 }, weather: { rain: 1.6, heat: 1.4 }, heatAlerts: 1, icon: '🔥' },
         8:  { arrivalsMult: 0.9,  typeShift: { fresh: 10, frozen: 4, normal: -10 }, weather: { heat: 2.0 }, icon: '🏖' },
-        9:  { arrivalsMult: 1.25, typeShift: { fresh: 5, produce: 5, fragile: 5, large: 3, normal: -6 }, icon: '🎑',
-              events: [{ id: 'holiday_rush', half: 2, turns: [3, 5], arrivalsMult: 1.6, deadlineDelta: -1 }, { id: 'holiday_off', half: 2, turns: [6, 7], noCalls: true }] },
+        9:  { arrivalsMult: 1.25, typeShift: { fresh: 5, produce: 5, fragile: 5, large: 3, normal: -6 }, icon: '🎑' },
         10: { arrivalsMult: 1.05, typeShift: { produce: 8, intl: 2 }, storageMult: 1.5, storageFeeMult: 1.2, icon: '🍂' },
         11: { arrivalsMult: 1.3,  typeShift: { produce: 6, intl: 3, fragile: 3 }, weather: { rain: 0.8 }, icon: '🛒',
               events: [{ id: 'sale', half: 2, turns: [8, 12], arrivalsMult: 1.5, typeShift: { normal: 10 }, feeMult: { bulk: 0.9 } }] },
         12: { arrivalsMult: 1.4,  typeShift: { fragile: 8, frozen: 6, large: 5 }, weather: { snow: 1.0 }, returnGraceDelta: -1, icon: '🎄' },
         1:  { arrivalsMult: 0.85, typeShift: { frozen: 3 }, weather: { snow: 1.4 }, noInflation: true, icon: '❄' },
-        2:  { arrivalsMult: 1.3,  typeShift: { fresh: 5, produce: 5, fragile: 5, frozen: 3, normal: -6 }, weather: { snow: 0.7 }, icon: '🧧',
-              events: [{ id: 'holiday_rush', half: 2, turns: [3, 5], arrivalsMult: 1.6, deadlineDelta: -1 }, { id: 'holiday_off', half: 2, turns: [6, 7], noCalls: true }] },
+        2:  { arrivalsMult: 1.3,  typeShift: { fresh: 5, produce: 5, fragile: 5, frozen: 3, normal: -6 }, weather: { snow: 0.7 }, icon: '🧧' },
+      },
+      // ----- 공휴일: 실제 날짜 -----
+      // 명절(설·추석)은 음력이라 해마다 양력 날짜가 다르다. 표로 박는다(2025~2035, 그 밖의 해는 가장 가까운 해의 표를 쓴다).
+      // 연휴는 당일 앞뒤 하루씩 사흘. 일요일과 겹치면 연휴 다음 영업일이 대체공휴일 (게임은 토요일이 영업일이라 토요일 겹침은 그냥 그날이 쉰다).
+      // 연휴 앞 rushDays 영업일은 명절 폭주(입고 ×rushMult, 그 입고분 기한 rushDeadline). 연휴 당일은 업체 휴무(호출 불가, 입고는 계속).
+      // 한 해 런이 아니어도 그 기간을 지나면 자동으로 걸린다 — 시작 달이 다르면 겪는 명절이 다르다.
+      holidays: {
+        lunar: {   // 연도: [설날, 추석] (MM-DD). 부처님오신날은 단일 공휴일로 fixedByYear
+          2025: ['01-29', '10-06'], 2026: ['02-17', '09-25'], 2027: ['02-06', '09-15'], 2028: ['01-26', '10-03'], 2029: ['02-13', '09-22'], 2030: ['02-03', '09-12'],
+          2031: ['01-23', '10-01'], 2032: ['02-11', '09-19'], 2033: ['01-31', '09-08'], 2034: ['02-19', '09-27'], 2035: ['02-08', '09-16'],
+        },
+        buddha: { 2025: '05-05', 2026: '05-24', 2027: '05-13', 2028: '05-02', 2029: '05-20', 2030: '05-09', 2031: '05-28', 2032: '05-16', 2033: '05-06', 2034: '05-25', 2035: '05-15' },
+        lunarIds: ['seol', 'chuseok'],
+        // 양력 공휴일 [월, 일, id, 대체공휴일 여부]. 신정·현충일은 대체 없음
+        fixed: [[1, 1, 'newyear', false], [3, 1, 'samil', true], [5, 5, 'children', true], [6, 6, 'memorial', false], [8, 15, 'liberation', true], [10, 3, 'foundation', true], [10, 9, 'hangul', true], [12, 25, 'christmas', true]],
+        rushDays: 5, rushMult: 1.6, rushDeadline: -1,
       },
     },
   };
 
-  // 시나리오: 전부 한 해 달력 위에서 돈다. 짧은 것은 달력의 특정 달을 잘라낸 컷(startMonth + months)
+  // ----- 런 = 나라 달력 × 시작 달 × 길이 -----
+  // 테마 시나리오(성수기·폭염·파업…)는 걷어냈다. 이제 런은 "어느 나라의 달력에서, 언제 시작해, 얼마나 굴리는가"로만 정해진다.
+  // 명절·공휴일·계절은 달력(CALENDARS)이 실제 날짜로 넣어 주므로, 같은 석 달이라도 시작 달이 다르면 다른 판이 된다.
+  // months 는 사이클(반월) 수. 해금은 차례로: 봄 → 여름 → 가을 → 겨울 → (사계절 다 돌면) 상·하반기 → (반기 하나 돌면) 한 해.
+  // 나라가 늘면 같은 틀로 kr_ 대신 us_/jp_ 를 붙인다 (달력만 끼우면 된다).
+  const SPANS = { quarter: { months: 6, scoreMult: 1 }, half: { months: 12, scoreMult: 1.25 }, year: { months: 24, scoreMult: 1.5 } };
+  const RUN = (country, span, startMonth, icon, unlock) => ({ country, span, icon, months: SPANS[span].months, mods: { calendar: country, startMonth, scoreMult: SPANS[span].scoreMult }, unlock });
   const SCENARIOS = {
-    // 길이 세 가지: 분기(6사이클=3개월) · 반기(12=6개월) · 한 해(24=12개월). 전부 같은 한국 달력 위, 3월 시작
-    quarter:  { icon: '🌱', months: 6, mods: {}, unlock: null },
-    halfyear: { icon: '🍂', months: 12, mods: { scoreMult: 1.25 }, unlock: 'first_clear' },
-    standard: { icon: '📅', months: 24, mods: { scoreMult: 1.5 }, unlock: 'half_clear' },
-    peak:     { icon: '🎄', months: 4, mods: { startMonth: 11, monthOffset: 3, eventGoods: true, returnGrace: 2, burstDeadlineDelta: -2, arrivalsMult: 1.0, burstTurns: 3, rewardAll: 10, itemPriceMult: 1.3, startCallsDelta: 2, winDelivered: 50 }, unlock: 'busy_month' },
-    heatwave: { icon: '🌡️', months: 4, mods: { startMonth: 7, monthOffset: 4, customerWeights: { dawn: 2, ice: 2 }, customerClaimMult: { dawn: 2 }, typeShift: { fresh: 10, produce: 6, normal: -16 }, freshSizes: [2, 4, 7], warmMult: 3, heatAlerts: 3, arrivalsMult: 1.1, facilityPriceMult: { cold1: 0.7, cold2: 0.7 }, marketWeight: { cold: 1.5 }, winMaxDiscard: 3 }, unlock: 'fresh20' },
-    strike:   { icon: '✊', months: 24, mods: { strike: true, opCostDelta: 30, scoreMult: 1.5 }, unlock: 'four_carriers' },
-    port:     { icon: '🚢', months: 24, mods: { forceCustomers: ['import', 'luxury', 'factory'], noAnon: true, typeOverride: { normal: 40, fresh: 10, produce: 5, fragile: 13, intl: 20, large: 12 }, xlWeight: 7, arrivalsMult: 0.9, rewardDelta: { intl: 20, large: 20, normal: -5 }, xlDelta: 1, guaranteeCarriers: ['intl', 'large'], scoreMult: 1.5 }, unlock: 'intl15' },
-    cashcrunch:{ icon: '💸', months: 24, mods: { cashMult: 0.5, opCostFixed: 260, noRefresh: true, itemPriceMult: 1.1, revenueMult: 1.1, trustXpMult: 2, winCash: 2500, scoreMult: 1.5 }, unlock: 'rich_clear' },
-    blackfriday:{ icon: '🛒', months: 2, mods: { startMonth: 11, monthOffset: 2, returnGrace: 4, arrivalsMult: 1.4, burstTurns: 3, itemPriceMult: 1.4, rewardAll: 15, startCallsDelta: 3, winDelivered: 30 }, unlock: 'peak_clear' },
-    audit:    { icon: '📋', months: 24, mods: { premiumMult: 1.5, claimMult: 1.5, deadlineAll: -1, overdueMult: 0.5, monthlyStress: 1, opCostDelta: 0, winMaxOverdue: 12, scoreMult: 1.5 }, unlock: 'perfect_month' },
-    moving:   { icon: '🚚', months: 24, mods: { forceCustomers: ['mover'], storageOfferEvery: 5, storageOfferProb: 0.2, storageMax: 3, storageFeeMult: 1.5, winStorage: 12, scoreMult: 1.5 }, unlock: 'storage3' },
-    bigdeal:  { icon: '🤝', months: 24, mods: { bigCustomer: true, claimMult: 1.2, winBigCustomer: true, scoreMult: 1.5 }, unlock: 'cust_l3' },
-    endless:  { icon: '♾️', months: 99, mods: { endless: true }, unlock: 'half_clear' },
-    // 데일리: 달력의 무작위 한 달 컷 (그날 지정 달) + 변형 규칙 2개
-    daily:    { icon: '📆', months: 2, mods: { daily: true, startCallsDelta: 2, monthOffset: 3 }, unlock: 'three_unlocked' },
+    kr_spring: RUN('kr', 'quarter', 3,  '🌸', null),
+    kr_summer: RUN('kr', 'quarter', 6,  '☔', 'kr_spring_clear'),
+    kr_autumn: RUN('kr', 'quarter', 9,  '🎑', 'kr_summer_clear'),
+    kr_winter: RUN('kr', 'quarter', 12, '❄', 'kr_autumn_clear'),
+    kr_h1:     RUN('kr', 'half',    3,  '🌱', 'kr_seasons'),
+    kr_h2:     RUN('kr', 'half',    9,  '🍂', 'kr_seasons'),
+    kr_year:   RUN('kr', 'year',    3,  '📅', 'kr_half'),
   };
+  const DEFAULT_SCENARIO = 'kr_spring';
 
   // 도전과제: kind = run(런 중 즉시) | end(런 종료 시, 승리 필요 여부 needWin) | cum(누적) | meta(해금 상태)
   // check(s, p, r): s=game.stats, p=profile.stats, r=result(런 종료 시)
+  const KR_Q = ['kr_spring', 'kr_summer', 'kr_autumn', 'kr_winter'];
   const ACHIEVEMENTS = {
     // 회사 해금 — 1단계(하다 보면) → 2단계(누적 특화) → 3단계(도전)
     rookie:       { kind: 'cum', rewardType: 'company', reward: 'quick', check: (s, p) => p.runs >= 3, prog: p => [p.runs, 3] },
@@ -258,23 +252,23 @@
     nonstop:      { kind: 'run', rewardType: 'none', check: s => s.maxCallStreak >= 30 },
     unbreakable:  { kind: 'run', rewardType: 'none', check: s => s.onTimeByType.fragile >= 12 },
     patience:     { kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => s.calls / Math.max(1, r.monthsDone) <= 4 },
-    // 시나리오·슬롯 해금
-    cust_l3:      { kind: 'run', rewardType: 'scenario', reward: 'bigdeal', check: s => (s.customerL3 || 0) >= 1 },
-    storage3:     { kind: 'cum', rewardType: 'scenario', reward: 'moving', check: (s, p) => (p.storageDone || 0) >= 3, prog: p => [p.storageDone || 0, 3] },
+    // 런(시나리오) 해금 — 한국 달력을 차례로 연다
+    kr_spring_clear:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'kr_summer', check: (s, p, r) => r.scenario === 'kr_spring' },
+    kr_summer_clear:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'kr_autumn', check: (s, p, r) => r.scenario === 'kr_summer' },
+    kr_autumn_clear:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'kr_winter', check: (s, p, r) => r.scenario === 'kr_autumn' },
+    kr_seasons:   { kind: 'meta', rewardType: 'multi', reward: ['scenario:kr_h1', 'scenario:kr_h2'], check: (s, p) => KR_Q.every(k => p.clearsByScenario[k]), prog: p => [KR_Q.filter(k => p.clearsByScenario[k]).length, 4] },
+    kr_half:      { kind: 'meta', rewardType: 'scenario', reward: 'kr_year', check: (s, p) => !!(p.clearsByScenario.kr_h1 || p.clearsByScenario.kr_h2) },
+    kr_year_clear:{ kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.scenario === 'kr_year' },
+    // 기록용
+    cust_l3:      { kind: 'run', rewardType: 'none', check: s => (s.customerL3 || 0) >= 1 },
+    storage3:     { kind: 'cum', rewardType: 'none', check: (s, p) => (p.storageDone || 0) >= 3, prog: p => [p.storageDone || 0, 3] },
     noclaim2:     { kind: 'run', rewardType: 'none', check: s => !!s.noClaim2 },
     snowrun:      { kind: 'run', rewardType: 'none', check: s => (s.snowDelivered || 0) >= 5 },
-    landlord:     { kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.scenario === 'moving' },
-    partner:      { kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.scenario === 'bigdeal' },
-    veteran_clear:{ kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.difficulty === 'veteran' },
+    holiday_clear:{ kind: 'run', rewardType: 'none', check: s => (s.holidayRushDelivered || 0) >= 15 },
     first_clear:  { kind: 'end', needWin: true, rewardType: 'multi', reward: ['company:postal', 'slot:2'], check: () => true },
-    busy_month:   { kind: 'run', rewardType: 'scenario', reward: 'peak', check: s => s.maxMonthDelivered >= 15 },
-    peak_clear:   { kind: 'end', needWin: true, rewardType: 'scenario', reward: 'blackfriday', check: (s, p, r) => r.scenario === 'peak' },
-    fresh20:      { kind: 'cum', rewardType: 'scenario', reward: 'heatwave', check: (s, p) => p.deliveredByType.fresh >= 20, prog: p => [p.deliveredByType.fresh, 20] },
-    four_carriers:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'strike', check: s => s.distinctCarriersAtEnd >= 4 },
-    intl15:       { kind: 'cum', rewardType: 'scenario', reward: 'port', check: (s, p) => p.deliveredByType.intl >= 15, prog: p => [p.deliveredByType.intl, 15] },
-    rich_clear:   { kind: 'end', needWin: true, rewardType: 'scenario', reward: 'cashcrunch', check: (s, p, r) => r.scenario === 'standard' && r.cash >= 1000 },
-    half_clear:   { kind: 'end', needWin: true, rewardType: 'scenario', reward: 'endless', check: (s, p, r) => r.scenario === 'halfyear' },
-    three_unlocked:{ kind: 'meta', rewardType: 'scenario', reward: 'daily', check: (s, p, r, prof) => prof.unlocked.companies.length >= 3, prog: (p, prof) => [prof.unlocked.companies.length, 3] },
+    busy_month:   { kind: 'run', rewardType: 'none', check: s => s.maxMonthDelivered >= 15 },
+    four_carriers:{ kind: 'end', needWin: true, rewardType: 'none', check: s => s.distinctCarriersAtEnd >= 4 },
+    rich_clear:   { kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.cash >= 1000 },
     veteran:      { kind: 'meta', rewardType: 'slot', reward: 3, check: (s, p, r, prof) => prof.unlocked.companies.length >= 5, prog: (p, prof) => [prof.unlocked.companies.length, 5] },
     // 퍽 해금
     buyer:        { kind: 'cum', rewardType: 'perk', reward: 'prepay', check: (s, p) => p.contractsBought >= 10, prog: p => [p.contractsBought, 10] },
@@ -298,17 +292,16 @@
     rich:         { kind: 'end', needWin: true, rewardType: 'perk', reward: 'taxsave', check: (s, p, r) => r.cash >= 1500 },
     broke:        { kind: 'end', needWin: true, rewardType: 'perk', reward: 'investor', check: s => s.brokeMonthEnd },
     // 기록용
-    perfect_month:{ kind: 'run', rewardType: 'scenario', reward: 'audit', check: s => s.perfectMonths >= 1 },
+    perfect_month:{ kind: 'run', rewardType: 'none', check: s => s.perfectMonths >= 1 },
     full_house:   { kind: 'run', rewardType: 'none', check: s => s.fullNoPenalty },
     big_hand:     { kind: 'run', rewardType: 'none', check: s => s.maxSingleCall >= 8 },
     master_deal:  { kind: 'run', rewardType: 'none', check: s => s.masterOwned },
     trust_badge:  { kind: 'run', rewardType: 'none', check: s => s.maxTrustL3Simul >= 2 },
     millionaire:  { kind: 'run', rewardType: 'none', check: s => s.maxCash >= 2000 },
-    all_companies:{ kind: 'meta', rewardType: 'none', check: (s, p) => Object.keys(p.clearsByCompanyStandard || {}).length >= 9 },
-    all_scenarios:{ kind: 'meta', rewardType: 'none', check: (s, p) => Object.keys(p.clearsByScenario).filter(k => k !== 'endless').length >= 10 },
-    daily7:       { kind: 'meta', rewardType: 'none', check: (s, p) => p.dailyStreak >= 7 },
+    all_companies:{ kind: 'meta', rewardType: 'none', check: (s, p) => Object.keys(p.clearsByCompany || {}).length >= 9, prog: p => [Object.keys(p.clearsByCompany || {}).length, 9] },
+    all_scenarios:{ kind: 'meta', rewardType: 'none', check: (s, p) => Object.keys(SCENARIOS).every(k => p.clearsByScenario[k]), prog: p => [Object.keys(SCENARIOS).filter(k => p.clearsByScenario[k]).length, Object.keys(SCENARIOS).length] },
   };
 
-  const META = { CALENDARS, CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, DIFFICULTIES, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, DAILY_VARIANTS, DAILY_CONFLICTS, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['standard'], perkSlots: 1 } };
+  const META = { CALENDARS, CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, SPANS, DEFAULT_SCENARIO, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: [DEFAULT_SCENARIO], perkSlots: 1 } };
   if (typeof module !== 'undefined') module.exports = META; else root.META = META;
 })(typeof window !== 'undefined' ? window : globalThis);

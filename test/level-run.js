@@ -1,4 +1,4 @@
-// 캠페인 레벨 점검: node test/level-run.js [레벨] [rookie|normal]
+// 캠페인 레벨 점검: node test/level-run.js [레벨]
 // 레벨 런을 사람처럼(차가 차면 호출, 급하면 덜 차도 호출) 굴려 보고 턴마다 창고·자금을 찍는다.
 // 레벨 1은 실패가 없어야 한다 — 반송·폐기 0, 자금 흑자, 4사이클 완주.
 const { Game, DATA: D } = require('../www/js/game.js');
@@ -6,8 +6,8 @@ const I18n = require('../www/js/i18n.js'); globalThis.I18n = I18n; globalThis.DA
 const Story = require('../www/js/story.js');
 const LV = require('../www/js/levels.js');
 
-const level = +process.argv[2] || 1, diff = process.argv[3] || 'rookie';
-const g = new Game({ scenario: 'quarter', company: 'local', perks: [], insurer: 'none', difficulty: diff, story: true, level, prep: false });
+const level = +process.argv[2] || 1;
+const g = new Game({ scenario: 'kr_spring', company: 'local', perks: [], insurer: 'none', story: true, level, prep: false });
 const hit = {}; const note = k => { hit[k] = (hit[k] || 0) + 1; };
 function beats(ctx) { let b, n = 0; while ((b = Story.check(g, ctx)) && n++ < 10) note('beat:' + b.id); }
 
@@ -32,7 +32,7 @@ function bestCall() {
   return best;
 }
 
-console.log(`레벨 ${level} · 난이도 ${diff} · 시드 ${g.seed} · ${g.rules.months}사이클 · 시작 자금 ${g.cash}c · 창고 ${g.warehouse.cap}칸`);
+console.log(`레벨 ${level} · 시드 ${g.seed} · ${g.rules.months}사이클 · 시작 자금 ${g.cash}c · 창고 ${g.warehouse.cap}칸`);
 console.log(`켜진 기능: ${LV.FLAGS.filter(f => g.shows(f)).join(', ') || '(없음)'}`);
 beats({ kind: 'start' });
 let guard = 0;

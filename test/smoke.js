@@ -56,8 +56,9 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
     await page.waitForTimeout(400);
   }
   const scen = await page.evaluate(() => document.querySelector('#modal').textContent);
-  ok('시나리오에 분기·반기·한 해', /분기/.test(scen) && /반기/.test(scen) && /한 해/.test(scen));
-  ok('시나리오 카드에 연도·지역 달력', new RegExp(`${new Date().getFullYear()}년 · 한국 달력`).test(scen), (scen.match(/📅[^·]*·[^·]*달력/) || [''])[0].trim());
+  ok('런 선택에 한국 · 분기/반기/한 해 · 봄~겨울', /한국/.test(scen) && /분기/.test(scen) && /반기/.test(scen) && /한 해/.test(scen) && /봄/.test(scen) && /겨울/.test(scen));
+  ok('런 카드에 시작 해와 달', new RegExp(`${new Date().getFullYear()}년 3월 ~ 5월`).test(scen), (scen.match(/📅[^📅]{0,30}/) || [''])[0].trim());
+  ok('난이도 줄이 없다', !/수습|베테랑|정규/.test(scen));
   await shot('02b-scenarios');
   await page.evaluate(() => PT.showTitle());
   await page.waitForTimeout(300);
