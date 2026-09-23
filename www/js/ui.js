@@ -869,7 +869,7 @@
   function enhPips(g, c) {
     const used = g.enhList(c), n = g.enhSlots(c);
     let h = ''; for (let k = 0; k < n; k++) h += used[k] ? `<i class="on" title="${esc(D.ENHANCEMENTS[used[k]].name)}"></i>` : '<i></i>';
-    return `<span class="eslots" title="${esc(T('kind.enh'))} ${used.length}/${n}">${h}</span>`;
+    return `<span class="eslots" title="${esc(T('kind.enh'))} ${used.length}/${n}"><small>${esc(T('kind.enh'))}</small>${h}</span>`;
   }
   function miniTruck(g, c) {
     const n = g.baseCapacity(c);
@@ -895,6 +895,13 @@
       const pp = { type: t, size, attrs: T2.attrs, customs: T2.attrs.includes('customs') ? 1 : 0 };
       return g.canHandle(c, pp) && !g.breakProb(c, pp);      // 깨질 위험이 있으면 '받는다'고 할 수 없다
     });
+  }
+  // 마켓 매물이 받는 품목: 아직 계약이 아니니 의사 계약으로 판정한다 — 색 점 + 이름 (플레이 화면의 색 점과 같은 색)
+  function offerTakes(it) {
+    const pc = { carrier: it.carrier, grade: it.grade || 'normal', enh: {}, calls: 1, maxCalls: 1 };
+    const types = takesTypes(game, pc, true);
+    if (!types.length) return '';
+    return `<span class="cdtakes">${types.map(t => `<span><i style="background:${D.PARCEL_TYPES[t].css}"></i>${esc(D.PARCEL_TYPES[t].name)}</span>`).join('')}</span> `;
   }
   function takesDots(g, c, always) {
     const dots = takesTypes(g, c, always).map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('');
@@ -1445,7 +1452,7 @@
       const cards = mk.items.map((it, i) => {
         if (it.kind === 'refill') return ''; // 충전은 위 '현재 계약' 칸에서
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}${T('mk.capLine', { vehicle: esc(o.vehicle), cap: o.cap, trucks: o.trucks, total: o.total, fee: o.fee, per: o.per })}<span class="eslots" title="${esc(T('kind.enh'))}">${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span><br>${game.shows('attrs') ? `${o.badge}${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
+        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}${T('mk.capLine', { vehicle: esc(o.vehicle), cap: o.cap, trucks: o.trucks, total: o.total, fee: o.fee, per: o.per })}<br>${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge}${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
@@ -1459,7 +1466,7 @@
       const contracts = `<div id="mk-contracts"><div style="font-size:12px;color:var(--gold);margin:4px 0">${T('mk.currentContracts', { keep: R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : '' })}</div>` + game.contracts.slice(0, game.visibleSlots()).map((c, si) => {
         if (!c) return `<div class="card dis" style="cursor:default"><div class="t">${T('my.slot', { n: si + 1 })} · ${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>`;
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
-        return `<div class="card" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${T('my.remain', { calls: c.calls, max: c.maxCalls })}</span></div>
+        return `<div class="card" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
           <div class="crow"><span class="d">${miniTruck(game, c)}${takesDots(game, c, true)}${game.shows('market') ? enhPips(game, c) : ''}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
       }).join('') + '</div><hr>';
       const rc = game.refreshCost();

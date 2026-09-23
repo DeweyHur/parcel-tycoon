@@ -750,7 +750,10 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .tpips i.lost { background: none; box-shadow: inset 0 0 0 1px var(--red); }
 .tdot { display: inline-block; width: 7px; height: 7px; margin-right: 2px; border: 1px solid #0006; vertical-align: middle; }
 
-.eslots { display: inline-flex; gap: 2px; margin-left: 8px; vertical-align: middle; }
+.eslots { display: inline-flex; gap: 2px; margin-left: 8px; vertical-align: middle; align-items: center; }
+.eslots small { font-size: 10px; color: var(--dim); margin-right: 3px; }
+.card .price .pips.calls { vertical-align: middle; } .card .price small { color: var(--dim); font-size: 10px; }
+.card .cdtakes { display: inline-flex; margin: 2px 0; }
 .eslots i { width: 8px; height: 8px; transform: rotate(45deg); box-shadow: inset 0 0 0 1px #e8c46a99; }
 .eslots i.on { background: var(--gold); box-shadow: none; }
 
