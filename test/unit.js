@@ -760,4 +760,11 @@ t('택배는 쪼개지지 않는다: 7칸 차에 2칸짜리는 석 대(6칸)까�
   assert.ok(!bad.ok, '동시 1대에 2칸 넷은 못 싣는다');
 });
 
+t('포워더(항공·철도·해상)는 무역 고객(🛃 짐을 맡기는 화주)이 있어야 마켓에 온다', () => {
+  const g = NG(31); assert.ok(!g.hasTradeCustomer(), '동네 택배 시작 고객(큰마트·새벽·유리)엔 무역 고객이 없다');
+  const w = g._carrierWeights(); assert.ok(!w.air && !w.rail && !w.sea && w.bulk && w.intl, JSON.stringify(Object.keys(w)));
+  g.addCustomer('import'); assert.ok(g.hasTradeCustomer()); const w2 = g._carrierWeights(); assert.ok(w2.air && w2.rail && w2.sea);
+  const gl = new Game({ seed: 2, scenario: 'kr_year', company: 'global', noHolidays: true }); assert.ok(gl.hasTradeCustomer(), '글로벌 익스프레스는 수입상·명품관이 있어 처음부터 포워더가 열린다');
+});
+
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);

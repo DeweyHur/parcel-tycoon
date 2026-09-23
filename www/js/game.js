@@ -1810,7 +1810,12 @@
     // (입고 쪽은 _typeRatio 가 막는다 — 오지도 않는 ❆ 냉동을 위해 냉동고를 파는 것은 돈만 태우는 함정이다)
     // 이 계열 계약이 이 장에 나올 수 있는가. **매물을 거르기 전에 가중치에서 빼야 한다** —
     // 거르기만 하면 '막힌 품목 보장'이 철도·항공 같은 닫힌 계열을 골라 놓고, 그게 걸러져 해결책이 사라진다.
+    // 무역 고객: 🛃 통관 짐을 맡기는 화주(수입상·명품관)가 하나라도 있는가 — 포워더(항공·철도·해상)는 이들이 있어야 찾아온다
+    hasTradeCustomer() {
+      return Object.keys(this.customers || {}).some(id => { const cu = M.CUSTOMERS[id]; if (!cu || !cu.items) return false; return Object.keys(cu.items).some(k => (M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k) === 'intl'); });
+    }
     _familyOpen(fam) {
+      if (D.FAMILIES[fam] && D.FAMILIES[fam].needsTrade && !this.hasTradeCustomer()) return false;
       if (!this._shows) return true;
       const g = { cold: 'cold', frozen: 'frozen', fragile: 'attrs', intl: 'customs', large: 'bigsize', air: 'bigsize', rail: 'bigsize', sea: 'bigsize' }[fam];
       return !g || this.shows(g);

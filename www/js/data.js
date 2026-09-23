@@ -138,9 +138,11 @@
       fragile: { badge: '🚚', cap: 4,  fee: 69, trucks: 4, price: 90, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
       intl:    { badge: '🚚', cap: 8,  fee: 118, trucks: 3, price: 110, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
       large:   { badge: '🚚', cap: 10, fee: 142, trucks: 3, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true, rep: 'noh' },
-      air:     { badge: '✈', cap: 4,  fee: 48, trucks: 3, price: 120, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true },
-      rail:    { badge: '🚆', cap: 16, fee: 194, trucks: 2, price: 80, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true, rep: 'noh' },
-      sea:     { badge: '🚢', cap: 14, fee: 165, trucks: 2, price: 90, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true },
+      // 항공·철도·해상은 우리가 비행기·배를 부르는 게 아니다 — 창고에서 공항·화물역·항만까지 실어다 주는 **포워더**다.
+      // 그래서 무역 고객(수입상·명품관처럼 🛃 통관 짐을 맡기는 화주)이 있을 때만 마켓에 온다 (needsTrade)
+      air:     { badge: '✈', cap: 4,  fee: 48, trucks: 3, price: 120, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true, needsTrade: true },
+      rail:    { badge: '🚆', cap: 16, fee: 194, trucks: 2, price: 80, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true, rep: 'noh', needsTrade: true },
+      sea:     { badge: '🚢', cap: 14, fee: 165, trucks: 2, price: 90, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true, needsTrade: true },
     },
     // tier 공통 보정: 배차 +, 용량 +, 배차비 배율, 계약가 배율. 센터가 개별 값을 주면 그것이 우선
     TIERS: [

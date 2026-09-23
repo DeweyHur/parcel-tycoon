@@ -449,8 +449,8 @@
     'rep.greet.frozen': 'Kang from {center}. Frozen is gone the moment it leaves the freezer, so batch them up when you call. {cap} cells, {fee}c per truck, {trucks} trucks.',
     'rep.greet.large': 'Noh, {center}. Big stuff doesn\'t break on my truck. {cap} cells, {fee}c a truck, {trucks} trucks lined up. Only send me the size-4-plus ones.',
     'rep.greet.large.2': 'Noh, {center}. This one\'s a reefer heavy truck — ❄ big fresh goods ride too. {cap} cells, {fee}c a truck, {trucks} trucks.',
-    'rep.greet.rail': 'Noh, {center}. A train takes {cap} cells in one go. The money comes next turn, though. {trucks} runs, {fee}c each.',
-    'rep.greet.rail.1': 'Noh, {center}. Express freight — you get paid right away. {cap} cells, {fee}c a run, {trucks} runs.',
+    'rep.greet.rail': 'Noh, {center}. One trailer takes {cap} cells to the freight terminal. Money comes the turn after handover, though. {trucks} runs, {fee}c each.',
+    'rep.greet.rail.1': 'Noh, {center}. Express connection — you get paid right away. {cap} cells, {fee}c a run, {trucks} runs.',
     'market.refillName': '{name} renewal',
     'market.switchHint': 'Switch from {name} (higher-tier center, same line)',
     'err.refillFull': 'Trucks are already full',
@@ -1405,40 +1405,40 @@
         "desc": "Handles size 4+ parcels (break-safe). Large bonus · Elite — trucks +2 · cap +2 · fee −20% · ❄ cold-capable added"
       },
       "air0": {
-        "name": "Skyway Air",
-        "short": "Skyway",
-        "vehicle": "air container",
-        "desc": "Small (1-2) only. Handles customs & fragile safely. Pricey but fast · standard contract"
+        "name": "Airport Cargo Agent",
+        "short": "Airport",
+        "vehicle": "airport shuttle truck",
+        "desc": "A forwarder that hauls importers’ goods to the airport cargo terminal. Small (1-2) only, handles customs & fragile safely. Pricey but fast · standard contract"
       },
       "air1": {
-        "name": "Jet Cargo",
+        "name": "Jet Forwarding",
         "short": "Jet",
-        "vehicle": "air container",
-        "desc": "Small (1-2) only. Handles customs & fragile safely. Pricey but fast · Premium — trucks +1 · cap +1 · fee −10% · up to size 4"
+        "vehicle": "airport shuttle truck",
+        "desc": "Airport cargo forwarder. Handles customs & fragile safely. Pricey but fast · Premium — trucks +1 · cap +1 · fee −10% · up to size 4"
       },
       "rail0": {
-        "name": "Ironhorse Freight",
-        "short": "Ironhorse",
-        "vehicle": "freight train",
-        "desc": "Break-safe, big batches. Paid next turn · standard contract"
+        "name": "Rail Terminal Shuttle",
+        "short": "Rail shuttle",
+        "vehicle": "terminal trailer",
+        "desc": "A forwarder that hauls big batches to the freight terminal. Break-safe. Paid the turn after handover · standard contract"
       },
       "rail1": {
-        "name": "Bullet Cargo",
+        "name": "Bullet Forwarding",
         "short": "Bullet",
-        "vehicle": "express freight train",
-        "desc": "Break-safe, big batches. Paid next turn · Premium — trucks +1 · cap +1 · fee −10% · paid immediately"
+        "vehicle": "terminal trailer",
+        "desc": "Freight-terminal forwarder with an express connection. Break-safe · Premium — trucks +1 · cap +1 · fee −10% · paid immediately"
       },
       "sea0": {
-        "name": "Wave Shipping",
+        "name": "Wave Forwarding",
         "short": "Wave",
-        "vehicle": "container",
-        "desc": "Customs container, size 2+, break-safe. Paid in 2 turns · standard contract"
+        "vehicle": "port trailer",
+        "desc": "A forwarder that hauls importers’ containers to the port. Size 2+, customs & fragile safe. Paid in 2 turns · standard contract"
       },
       "sea1": {
-        "name": "Ocean Container",
+        "name": "Ocean Forwarding",
         "short": "Ocean",
-        "vehicle": "container",
-        "desc": "Customs container, size 2+, break-safe. Paid in 2 turns · Premium — trucks +1 · cap +1 · fee −10% · payment delay 1 turn"
+        "vehicle": "port trailer",
+        "desc": "Port forwarder. Size 2+, customs & fragile safe · Premium — trucks +1 · cap +1 · fee −10% · payment delay 1 turn"
       }
     },
     "FAMILIES": {
@@ -1448,9 +1448,9 @@
       "fragile": { "name": "Fragile" },
       "intl": { "name": "Customs" },
       "large": { "name": "Large" },
-      "air": { "name": "Air" },
-      "rail": { "name": "Rail" },
-      "sea": { "name": "Sea" }
+      "air": { "name": "Air forwarder" },
+      "rail": { "name": "Rail forwarder" },
+      "sea": { "name": "Port forwarder" }
     },
     "TRUST_PERK_TEXT": {
       "bulk": [
