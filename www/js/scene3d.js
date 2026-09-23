@@ -25,6 +25,18 @@ window.Scene3D = (function () {
   const SIGN = { bg: '#2a2740', line: '#0f0e1a', hi: '#3d3a5c', alt: '#eef6ff', unit: 0.036, scale: 2 };
   const FOOT = { 1: [1, 1, 0.65], 2: [2, 1, 0.78], 4: [2, 2, 1.18], 7: [3, 2, 1.85] }; // [w, d, h] — 화면에서 상자 크기와 적재량을 즉시 읽을 수 있게 높이를 강조한다.
   const TRUCK_PARK = 6.6, TRUCK_DOCK = 4.9, TRUCK_GONE = 12;
+  // 계열별 차 도색 (캡 · 띠 · 짐칸)
+  const TRUCK_PAINT = {
+    bulk:    { cab: 0xe0553d, stripe: 0x6c8cff },
+    cold:    { cab: 0x2fb5ad, stripe: 0xffffff, cargo: 0xe6fbf9 },
+    frozen:  { cab: 0x4a8fd6, stripe: 0xdff3ff, cargo: 0xdff3ff },
+    fragile: { cab: 0xf0a04b, stripe: 0x5a3a12, cargo: 0xf7e7cf },
+    intl:    { cab: 0x3f5fd8, stripe: 0xffd166 },
+    large:   { cab: 0x8a63c9, stripe: 0xf2ecd8, cargo: 0xd9cfe8 },
+    air:     { cab: 0xf2f2f2, stripe: 0x3f5fd8, cargo: 0xffffff },
+    rail:    { cab: 0x5b6270, stripe: 0xffd166, cargo: 0xb8bcc6 },
+    sea:     { cab: 0x2a5f8f, stripe: 0xf2ecd8, cargo: 0x9fb7c9 },
+  };
 
   function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
   // 지붕·기둥은 그림자를 던지지 않는다 (실내가 통째로 어두워진다). 받기는 한다
@@ -312,7 +324,8 @@ window.Scene3D = (function () {
       const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), this._mat(0x6b8f4e)); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; ground.receiveShadow = true; s.add(ground);
       // 건물(바닥·벽·지붕·냉장실·마당)은 착탈식이라 _syncBuilding 이 짓는다
       // 트럭 — this.truck 은 평소 마당에 서 있는 대표 차량, this.trucks 는 동시 배차용 풀 (필요할 때 늘어난다)
-      this.truck = this._makeTruck(); this.truck.position.set(TRUCK_PARK, 0, 3.6); s.add(this.truck);   // z 는 _syncBuilding 이 도로에 맞춘다
+      // 평소엔 차가 서 있지 않다 — 업체를 부르면 그 업체 색의 차가 와서 싣고 간다. 오프닝(truckTo)만 대표 차량을 쓴다
+      this.truck = this._makeTruck(); this.truck.position.set(TRUCK_PARK, 0, 3.6); this.truck.visible = false; s.add(this.truck);   // z 는 _syncBuilding 이 도로에 맞춘다
       this.trucks = [this.truck];
       // 도로
       const road = new THREE.Mesh(new THREE.PlaneGeometry(40, 3.4), this._mat(0x4a4a52)); road.rotation.x = -Math.PI / 2; road.position.set(14, -0.02, 3.6); road.receiveShadow = true; s.add(road); this.road = road;
@@ -433,6 +446,13 @@ window.Scene3D = (function () {
         z += w * CELL + 0.12;
       }
     }
+    // 업체 계열마다 차 색이 다르다 — 캡과 띠. 어느 업체가 왔는지 한눈에
+    _paintTruck(truck, carrier) {
+      const DA = window.DATA || {}; const fam = (DA.familyOf ? DA.familyOf(carrier) : carrier) || 'bulk';
+      const P = TRUCK_PAINT[fam] || TRUCK_PAINT.bulk;
+      const u = truck.userData; if (!u.cab) return;
+      u.cab.material.color.setHex(P.cab); u.stripe.material.color.setHex(P.stripe); u.cargo.material.color.setHex(P.cargo || 0xf2ecd8);
+    }
     _makeTruck() {
       const g = new THREE.Group();
       g.userData.inspect = { kind: 'truck' };
@@ -440,6 +460,7 @@ window.Scene3D = (function () {
       const cab = this._box(1.0, 1.0, 1.2, 0xe0553d); cab.position.set(-1.25, 0.75, 0); g.add(cab);
       const glass = this._box(0.2, 0.45, 1.0, 0x9ad8ff, { emissive: 0x224466 }); glass.position.set(-1.75, 0.9, 0); g.add(glass);
       const stripe = this._box(2.22, 0.22, 1.32, 0x6c8cff); stripe.position.set(0.4, 0.7, 0); g.add(stripe);
+      g.userData.cab = cab; g.userData.stripe = stripe; g.userData.cargo = cargo;
       for (const [x, z] of [[-1.15, 0.7], [-1.15, -0.7], [1.05, 0.7], [1.05, -0.7]]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.22, 8), this._mat(0x222230)); w.rotation.x = Math.PI / 2; w.position.set(x, 0.28, z); w.castShadow = true; g.add(w); }
       this.truckCargoY = 0.95;
       return g;
@@ -571,9 +592,10 @@ window.Scene3D = (function () {
       let remaining = total;
       for (let trip = 0; trip < total; trip++) {
         const truck = this.trucks[trip];
+        if (options.carrier) this._paintTruck(truck, options.carrier);
         const boxes = (loads[trip] || []).map(id => this.boxes.get(id)).filter(Boolean);
         const z = roadZ + (trip - (total - 1) / 2) * gap, startDelay = trip * 0.12;
-        truck.position.set(TRUCK_PARK, 0, z); truck.visible = true;
+        truck.position.set(TRUCK_PARK + 1.5, 0, z); truck.visible = true;
         if (options.onTruck) this._tween({}, {}, 0.001, ease, startDelay, () => options.onTruck(trip + 1, total));
         this._tween(truck.position, { x: TRUCK_DOCK }, 0.58, ease, startDelay, () => {
           boxes.forEach((b, i) => {
@@ -588,7 +610,7 @@ window.Scene3D = (function () {
           const wait = Math.max(0.38, boxes.length * 0.1 + 0.58);
           this._tween(truck.position, { x: TRUCK_GONE }, 0.68, ease, wait, () => {
             for (const b of boxes) { truck.remove(b); this.boxes.delete(b.userData.id); }
-            if (trip === 0) truck.position.set(TRUCK_PARK, 0, roadZ); else truck.visible = false;
+            truck.visible = false; truck.position.set(TRUCK_PARK, 0, roadZ);   // 싣고 간 차는 돌아오지 않는다 — 다음 호출 때 새로 온다
             remaining--;
             if (remaining === 0) { if (this.workers) this._setWorkerIdle(this.workers[1]); this.busy--; onDone && onDone(); }
           });
@@ -648,6 +670,7 @@ window.Scene3D = (function () {
     // 오프닝: 탑차가 도로를 따라 들어온다 (평소엔 화면 밖 대기 자리에 그냥 서 있다)
     truckTo(x, dur) {
       if (!this.truck) return;
+      this.truck.visible = true;
       this.dropTween('introtruck');
       this.tweens.push({ tag: 'introtruck', obj: this.truck.position, from: { x: this.truck.position.x }, to: { x }, dur: dur || 2.4, fn: ease, t: 0 });
     }

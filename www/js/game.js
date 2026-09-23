@@ -839,11 +839,12 @@
       const level = Math.min(count, C.max);
       return { count, mult: level >= 2 ? 1 + (level - 1) * C.step : 1, qualifies: count > 0 };
     }
-    // 한 호출에 부를 수 있는 최대 대수 — 남은 배차만큼. 담은 만큼 차가 저절로 붙고, 막히는 건 배차가 모자랄 때뿐이다
+    // 한 호출에 부를 수 있는 최대 대수 — 담은 만큼 차가 저절로 붙되 **두 대까지**(D.MAX_TRUCKS), 그리고 남은 배차만큼.
     // (캠페인 2장 'simul' 이 열리기 전엔 한 대씩 — 서장은 한 대로 배운다)
     simulMax(c) {
       if (!this.shows('simul')) return 1;
-      return Math.max(1, c.calls + (this.rules.spareCall && !this.monthStats.spareUsed && c.calls <= 0 ? 1 : 0));
+      const avail = c.calls + (this.rules.spareCall && !this.monthStats.spareUsed && c.calls <= 0 ? 1 : 0);
+      return Math.max(1, Math.min(D.MAX_TRUCKS, avail));
     }
     // 대당 배차비
     truckFee(c) {
@@ -1337,7 +1338,8 @@
       // 차량: 부피 합에 맞는 대수. 동시 대수·남은 배차·배차비 검사
       const vcap = this.vehicleCap(c), volume = chosen.reduce((s, p) => s + p.size, 0);
       let trucks = Math.max(this.trucksNeeded(c, chosen), trucksArg || 1);
-      if (!this.shows('simul') && trucks > 1) return { ok: false, msg: T('err.overTrucks', { n: 1, cap: vcap }) };
+      const maxT = this.shows('simul') ? D.MAX_TRUCKS : 1;
+      if (trucks > maxT) return { ok: false, msg: T('err.overTrucks', { n: maxT, cap: vcap * maxT }) };
       const avail = c.calls + (useSpare ? 1 : 0);
       if (trucks > avail) return { ok: false, msg: T('err.noTrucks', { n: c.calls }) };
       const fee = this.callFee(c, trucks);

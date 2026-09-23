@@ -974,7 +974,7 @@
     'call.net': '순수익',
     'call.instant': '⚡즉시 처리',
     'call.noTurn': '영업일을 쓰지 않음',
-    'call.maxSelect': "차량 용량 {cap}칸을 넘습니다 — 한 대 더 부르거나 덜어내세요",
+    'call.maxSelect': "한 호출은 {n}대까지 ({cap}칸) — 덜어내세요",
     'float.broken': '⚠ 파손! {short}',
     'float.delayed': '+{n}c ({delay#d}일 뒤)',
     'toast.custSuspend': '{name} 거래 중단 — 다음 달 재개',

@@ -83,11 +83,14 @@ t('차량: 부피 합으로 대수 결정, 배차비 즉시 차감, 대수만큼
   const r = g.callCarrier(i, [1, 2, 3]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 1); assert.equal(r.fee, D.FAMILIES.bulk.fee); assert.equal(c.calls, trucks - 1);
   assert.equal(g.cash, cash + r.revenue + ((r.missionUp && r.missionUp.bonus) || 0)); assert.equal(g.feesDue, D.FAMILIES.bulk.fee); assert.equal(r.revenue, 35 * 3); assert.ok(r.fill >= 0.8);
 });
-t('차량: 담은 만큼 차가 붙는다 — 한 대 용량을 넘기면 두 대, 막히는 건 남은 배차가 모자랄 때뿐', () => {
+t('차량: 담은 만큼 차가 붙는다 — 한 대 용량을 넘기면 두 대, 두 대가 상한(MAX_TRUCKS), 그 안에선 남은 배차가 모자랄 때만 거부', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2), P(4, 'normal', 2)];
-  assert.equal(g.simulMax(c), c.calls, '동시 한도 = 남은 배차');
+  assert.equal(D.MAX_TRUCKS, 2); assert.equal(g.simulMax(c), 2, '동시 한도 = min(2, 남은 배차)');
   let r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 2); assert.equal(r.fee, D.FAMILIES.bulk.fee * 2);   // 8칸 > 7칸 → 자동 2대
+  const g4 = EMPTY(2); const m = slot(g4, 'bulk');
+  g4.parcels = [1, 2, 3, 4, 5, 6, 7].map(id => P(id, 'normal', 2));
+  r = g4.callCarrier(m, [1, 2, 3, 4, 5, 6, 7]); assert.ok(!r.ok, '14칸 = 석 대 → 두 대 상한에 거부');
   const g2 = EMPTY(2); const j = slot(g2, 'bulk'), c2 = g2.contracts[j]; c2.calls = 1;
   g2.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2), P(4, 'normal', 2)];
   r = g2.callCarrier(j, [1, 2, 3, 4]); assert.ok(!r.ok && /배차/.test(r.msg), r.msg);   // 배차 1대 남음 → 거부

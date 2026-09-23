@@ -973,7 +973,7 @@
     'call.net': 'NET',
     'call.instant': '⚡Ship now',
     'call.noTurn': 'Does not use a turn',
-    'call.maxSelect': "Exceeds vehicle capacity {cap} — add a vehicle or remove parcels",
+    'call.maxSelect': "Up to {n} vehicles per call ({cap} cells) — remove some parcels",
     'float.broken': '⚠ Broken! {short}',
     'float.delayed': '+{n}c (in {delay#d} days)',
     'toast.custSuspend': '{name} suspended trade — resumes next month',

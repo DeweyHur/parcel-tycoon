@@ -146,7 +146,7 @@ window.Intro = (function () {
       scene.cineStep = null;
       scene.cine = false;
       scene.close(false);   // 건너뛰어도 앞면은 벗겨진 채로 (플레이 화면은 단면이다)
-      if (scene.truck && truckX !== null) { scene.dropTween('introtruck'); scene.truck.position.x = truckX; }
+      if (scene.truck && truckX !== null) { scene.dropTween('introtruck'); scene.truck.position.x = truckX; scene.truck.visible = false; }   // 평소 마당엔 차가 없다 — 부르면 온다
       sceneEl.style.flexBasis = '';
       app.classList.remove('cine', 'recall');
       document.body.classList.remove('cine');

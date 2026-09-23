@@ -1163,10 +1163,11 @@
     if (!p) { SFX.click(); showParcelDetail(id); return; }   // 이 차엔 못 싣는 것 — 왜 안 되는지 보여 준다
     if (pick.sel.has(id)) { pick.sel.delete(id); SFX.cancel(); }
     else {
-      // 담는 만큼 차가 붙는다. 막는 건 남은 배차가 모자랄 때뿐 (서장처럼 동시 호출이 아직 안 열렸으면 한 대)
-      const maxTrucks = game.simulMax(c);
+      // 담는 만큼 차가 붙는다 — 두 대까지. 막는 건 두 대를 넘거나 남은 배차가 모자랄 때 (서장처럼 동시 호출이 아직 안 열렸으면 한 대)
+      const maxTrucks = game.simulMax(c), hard = game.shows('simul') ? D.MAX_TRUCKS : 1;
       const picked = [...pick.sel].map(q => game.parcels.find(x => x.id === q)).filter(Boolean).concat([p]);
-      if (game.packTrucks(c, picked).length > maxTrucks) { toast(game.shows('simul') ? T('err.noTrucks', { n: c.calls }) : T('call.maxSelect', { cap: game.vehicleCap(c) })); return; }
+      const needT = game.packTrucks(c, picked).length;
+      if (needT > maxTrucks) { toast(needT > hard ? T('call.maxSelect', { n: hard, cap: game.vehicleCap(c) * hard }) : T('err.noTrucks', { n: c.calls })); return; }
       pick.sel.add(id); SFX.select();
     }
     renderAll();
@@ -1219,7 +1220,7 @@
     const selP = [...cm.sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
     const vol = selP.reduce((s, p) => s + p.size, 0);
     const packed = game.packTrucks(c, selP), need = Math.max(1, packed.length);
-    const trucks = Math.min(need, simul);   // 담은 만큼 붙는다 — 더하기·빼기 버튼 없음
+    const trucks = Math.min(need, simul);   // 담은 만큼 붙는다(두 대까지) — 더하기·빼기 버튼 없음
     const cap = vcap * trucks, callFee = game.callFee(c, trucks), baseIncome = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
     const fill = vol / cap;
     const chain = game.chainPreview(fill), chainIncome = Math.round(baseIncome * chain.mult);
@@ -1256,13 +1257,10 @@
 
   let pendingCall = null; // 방금 호출 결과 — afterTurn 에서 스토리 비트(첫 호출 등)에 넘긴다
   function doCall(i, ids, trucks) {
-    const contract = game.contracts[i], vehicleCap = game.vehicleCap(contract), sizes = new Map(game.parcels.map(p => [p.id, p.size]));
-    const loads = Array.from({ length: trucks }, () => []); let loadIndex = 0, loadVolume = 0;
-    for (const id of ids) {
-      const size = sizes.get(id) || 1;
-      if (loadVolume + size > vehicleCap && loadIndex < trucks - 1) { loadIndex++; loadVolume = 0; }
-      loads[loadIndex].push(id); loadVolume += size;
-    }
+    const contract = game.contracts[i];
+    // 차마다 실리는 상자는 포장 결과 그대로 (쪼개지 않는다) — 3D 트럭도 같은 나눔으로 싣는다
+    const packed = game.packTrucks(contract, ids.map(id => game.parcels.find(p => p.id === id)).filter(Boolean));
+    const loads = Array.from({ length: trucks }, (_, k) => (packed[k] || []).map(p => p.id));
     const r = game.callCarrier(i, ids, trucks);
     if (!r.ok) { toast(r.msg); return; }
     pendingCall = r;
@@ -1296,7 +1294,7 @@
       if (r.fee) setTimeout(() => floatText(T('call.fee', { fee: r.fee }), true, 30), 250);
       announceCustomers(events);
       afterTurn(events);
-    }, { trucks, loads, onTruck: () => SFX.truck() });
+    }, { trucks, loads, carrier: contract.carrier, onTruck: () => SFX.truck() });
     saveGame();
   }
   function announceCustomers(events) { let claim = 0; for (const e of events) { if (e.type === 'claim') claim += e.amount; if (e.type === 'custLevel') toastLater(`${M.CUSTOMERS[e.customer].icon} ${T('log.custLevel', { name: M.CUSTOMERS[e.customer].name, level: e.level })}`, 2200); if (e.type === 'custSuspend') toastLater(`${M.CUSTOMERS[e.customer].icon} ${T('toast.custSuspend', { name: M.CUSTOMERS[e.customer].name })}`, 2600); } if (claim) setTimeout(() => floatText(T('float.claim', { n: claim }), true, 50), 350); }

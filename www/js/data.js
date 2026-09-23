@@ -210,6 +210,8 @@
 
     CARRIER_L3: {},
 
+    // 한 호출에 붙는 차는 최대 두 대 — 차가 줄줄이 오는 것보다 용량을 늘리는 게 의미 있어야 한다
+    MAX_TRUCKS: 2,
     // 직접 배송: 대기 턴의 부가 행동. 택배 count개까지 골라 직접 배송 — 보상은 그대로, 대신 배송비(costBase + costPerSize×크기)를 낸다. 차량 시설로 확장
     SELF_DELIVERY: { count: 1, trips: 1, sizeMax: 2, costBase: 0, costPerSize: 5 },   // 직접 배송: 하루를 쓰지 않는 대신 보름에 trips 번 — 싸지만 드물다
 
