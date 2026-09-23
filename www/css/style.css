@@ -803,3 +803,5 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .kv { grid-template-columns: fit-content(45%) minmax(0, 1fr); }
 .kv .v { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 .kv .v small { white-space: normal; }
+.card .t .takes { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 4px; }
+.card .t .takes i { width: 8px; height: 8px; border: 1px solid #0008; }

@@ -82,6 +82,8 @@
     'mk.fcNext': "다음 보름",
     'mk.insChange': "바꾸기",
     'mk.enhNoTarget': '붙일 수 있는 계약이 없음 (강화 칸이 찼거나 이 업체는 못 받음)',
+    'mk.newContracts': "새 계약",
+    'mk.noEmptySlot': "자리 없음 — 사면 기존 계약과 바꿉니다",
     'mk.cantTake': '지금 계약으로 못 싣습니다',
     'mk.forecast': "{m}개월차 예상 물량(대략)",
     'log.monthStart': '── {y}년 {cal}월 {half:전반|후반} 시작 ──',

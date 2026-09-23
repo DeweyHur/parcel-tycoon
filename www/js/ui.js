@@ -1478,13 +1478,15 @@
       const emptyN = vis.filter(c => !c).length;
       const curCard = (c, si) => {
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
-        return `<div class="card cur" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
-          <div class="crow"><span class="d">${miniTruck(game, c)}${takesDots(game, c, true)}${game.shows('market') ? enhPips(game, c) : ''}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
+        return `<div class="card cur" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)} ${takesDots(game, c, true)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
+          <div class="crow"><span class="d">${miniTruck(game, c)}${game.shows('market') ? enhPips(game, c) : ''}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
       };
       const usedIdx = new Set();
-      const contractRows = vis.map((c, si) => { if (!c) return ''; const ups = mk.items.map((it, i) => it.kind === 'contract' && it.switchFrom === c.id ? (usedIdx.add(i), cards[i]) : '').join(''); return curCard(c, si) + ups; }).join('')
-        + mk.items.map((it, i) => it.kind === 'contract' && !usedIdx.has(i) ? cards[i] : '').join('');
-      const contractHead = `<div class="mkhead">${T('kind.contract')}${R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : ''}${emptyN ? ` <span class="slotnote">· ${T('mk.emptySlots', { n: emptyN })}</span>` : ''}</div>`;
+      const contractRows = vis.map((c, si) => { if (!c) return ''; const ups = mk.items.map((it, i) => it.kind === 'contract' && it.switchFrom === c.id ? (usedIdx.add(i), cards[i]) : '').join(''); return curCard(c, si) + ups; }).join('');
+      // 새 계열 매물(빈 슬롯에 넣는 것)은 따로 — 현재 계약 사이에 섞이면 방금 산 '빙하 냉동'이 두 장으로 보인다. 팔린 것은 위 계약 목록에 이미 있으니 안 그린다
+      const newRows = mk.items.map((it, i) => it.kind === 'contract' && !usedIdx.has(i) && !it.sold ? cards[i] : '').join('');
+      const newContracts = newRows ? `<div class="mkhead">${T('mk.newContracts')}${emptyN ? ` <span class="slotnote">· ${T('mk.emptySlots', { n: emptyN })}</span>` : ` <span class="slotnote" style="color:var(--dim)">· ${T('mk.noEmptySlot')}</span>`}</div>${newRows}` : '';
+      const contractHead = `<div class="mkhead">${T('kind.contract')}${R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : ''}</div>`;
       const contracts = `<div id="mk-contracts">${contractHead}${contractRows}</div>`;
       const ORDER = ['enh', 'fac', 'customer'];
       const items = ORDER.map(k => { const rows = mk.items.map((it, i) => it.kind === k ? cards[i] : '').filter(Boolean); return rows.length ? `<div class="mkhead">${T('kind.' + k)}</div>` + rows.join('') : ''; }).join('');
@@ -1499,7 +1501,7 @@
       const byType = {}; for (const f of game.customerForecast()) for (const t in f.range) { if (!(f.range[t][1] > 0)) continue; if (t !== 'normal' && !(f.special > 0)) continue; byType[t] = byType[t] || [0, 0]; byType[t][0] += f.range[t][0]; byType[t][1] += f.range[t][1]; }
       const fcParts = Object.keys(D.PARCEL_TYPES).filter(t => byType[t]).map(t => { const bad = !game.canTakeType(t); return `<span class="${bad ? 'fcwarn' : ''}" title="${esc(D.PARCEL_TYPES[t].name)}${bad ? ' — ' + esc(T('mk.cantTake')) : ''}"><i style="display:inline-block;width:8px;height:8px;background:${D.PARCEL_TYPES[t].css}"></i> ${rng(byType[t])}${bad ? '✖' : ''}</span>`; });
       const fcLine = nm <= game.monthsTotal() ? `<div class="d fcline1" id="mk-fc"><span class="lbl">${T(mk.prep ? 'mk.fcNow' : 'mk.fcNext')}</span>${fcParts.join(' ')}</div>` : '';
-      const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span>${R.marketMaxBuy ? `<span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span>` : ''}</div>${fcLine}${contracts}${items}${insurance}
+      const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span>${R.marketMaxBuy ? `<span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span>` : ''}</div>${fcLine}${contracts}${newContracts}${items}${insurance}
         ${!game.shows('attrs') ? '' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
       // 마지막 사이클의 마켓을 닫으면 다음 사이클이 아니라 **장**이 끝난다
       const lastCycle = mk.month >= game.rules.months;

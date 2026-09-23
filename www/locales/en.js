@@ -82,6 +82,8 @@
     'mk.fcNext': "Next half",
     'mk.insChange': "Change",
     'mk.enhNoTarget': 'No contract can take this (slots full or carrier can\u2019t)',
+    'mk.newContracts': "New contracts",
+    'mk.noEmptySlot': "no empty slot — buying replaces a contract",
     'mk.cantTake': 'Nothing you have can carry this',
     'mk.forecast': "Expected volume, month {m} (approx.)",
     'log.monthStart': '── {cal}/{y} {half:1st half|2nd half} begins ──',
