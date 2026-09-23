@@ -797,3 +797,9 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .card.upgrade .uplbl { color: var(--green); font-size: 10px; }
 .card .ospec { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .card .ospec .mktruck { margin-right: 0; }
+
+/* 정산·결과의 라벨/값 표: 값이 길면(등급 상승 줄 등) auto 열이 통째로 넓어져 라벨이 한 글자씩 접히고 값은 화면 밖으로 나갔다(유저 스크린샷).
+   라벨은 최대 45%까지만, 값은 남는 자리에서 줄을 바꾼다. */
+.kv { grid-template-columns: fit-content(45%) minmax(0, 1fr); }
+.kv .v { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+.kv .v small { white-space: normal; }
