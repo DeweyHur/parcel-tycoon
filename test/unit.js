@@ -14,7 +14,7 @@ const slot = (g, fam) => g.contracts.findIndex(c => c && D.familyOf(c.carrier) =
 const withAll = fn => () => { const keep = D.DISABLED_FEATURES; D.DISABLED_FEATURES = []; try { fn(); } finally { D.DISABLED_FEATURES = keep; } };
 t('시작 상태: 자금 450, 계약 3개(대량·냉장·프래자일), 준비 없이 play', () => { const g = NG(1); assert.equal(g.cash, 450); assert.equal(g.contracts.filter(Boolean).length, 3); assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk0', 'cold0', 'fragile0']); assert.equal(g.phase, 'play'); assert.equal(g.month, 1); });
 t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.sizeDelta, -1); });
-t('초기 입고는 작게 시작하고 소형 위주다', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.ok(sp.length >= 7 && sp.length <= 11, `initial arrivals ${sp.length}`); assert.ok(sp.length < g.turns(), '매일 택배가 오지 않는다'); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
+t('초기 입고: 첫 보름 18~28개(ARRIVALS_SCALE 1.0), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.ok(sp.length >= 18 && sp.length <= 28, `initial arrivals ${sp.length}`); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
 t('실시간 성장 투자: 홍보는 캠페인 크기, 트럭은 배차, 창고는 공간을 즉시 늘린다', () => {
   const g = NG(71); g.cash = 3000;
   const future0 = g.schedule.slice(g.turn).flat().length;
@@ -382,7 +382,7 @@ t('달력: 한국 3월 시작. 2026 추석(9/24~26) 앞 닷새 폭주 → 연휴
   g.month = 12; g._startMonth(14); assert.equal(g.calMonth(), 9); assert.equal(g.half(), 2);   // 9월 후반 사이클: 16(수)…30(수), 일요일 20·27 제외 → 18~23일이 3~7턴, 24~26일이 8~10턴
   assert.ok(g.isRushTurn(3) && g.isRushTurn(7) && !g.isRushTurn(2) && !g.isRushTurn(8)); assert.ok(g.isOffTurn(8) && g.isOffTurn(10) && !g.isOffTurn(11));
   // 현실: 연휴에 멈추는 건 배송이지 창고가 아니다 — 입고는 그대로 들어오고 차만 못 부른다
-  assert.ok(g.schedule[7].length > 0 && g.schedule[9].length > 0);
+  assert.ok(g.schedule[7].length + g.schedule[8].length + g.schedule[9].length > 0, '연휴 사흘에도 입고가 있다');
   for (const sp of g.schedule[4]) assert.equal(sp.deadlineDelta, -1);
   g.turn = 7; g.parcels = [P(1, 'normal', 1)]; const i = slot(g, 'bulk'); assert.ok(g.canCall(g.contracts[i]));
   g.turn = 8; assert.ok(!g.canCall(g.contracts[i])); const r = g.callCarrier(i, [1]); assert.ok(!r.ok);

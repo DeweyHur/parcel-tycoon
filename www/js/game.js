@@ -339,7 +339,7 @@
       const sf = this._scriptForecast(m); if (sf) return sf;
       const R = this.rules;
       const organic = Math.min(this.turns(m), D.GROWTH.organicArrivals);
-      const extra = Math.round(this._extraArrivals(Math.min(m, 6)) * 0.25 * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
+      const extra = Math.round(this._extraArrivals(Math.min(m, 6)) * D.ARRIVALS_SCALE * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
       const total = organic + extra;
       const w = this._customerWeightsFor(m); const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
       const ratio = this._typeRatio(m);
@@ -1184,7 +1184,7 @@
       const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
       for (const t of organicTurns) sched[t].push(gen());
       // 홍보 물량은 여기 없다 — 캠페인(runCampaign)으로 플레이어가 직접 끌어온다
-      let extra = Math.round(this._extraArrivals(m) * 0.25 * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
+      let extra = Math.round(this._extraArrivals(m) * D.ARRIVALS_SCALE * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
       const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
       for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
       // 태풍 턴: 입고 없음, 다음 턴에 몰림

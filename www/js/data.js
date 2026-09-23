@@ -52,7 +52,7 @@
     GROWTH: {
       organicArrivals: 6,
       // 홍보는 상시 물량이 아니라 '캠페인'으로 나간다 — 레벨은 한 번 열 때의 크기다
-      marketing: { costs: [60, 110, 180, 280, 420, 620], parcels: 3, campaign: { days: 3, per: 4, cost: 50 } },
+      marketing: { costs: [60, 110, 180, 280, 420, 620], parcels: 3, campaign: { days: 3, per: 6, cost: 50 } },
       fleet: { costs: [90, 150, 240, 360, 520, 720], calls: 1 },
       warehouse: { costs: [80, 140, 220, 340, 500, 700], cap: 6 },
       automation: { costs: [140, 240, 380, 560], feeCut: 0.04, laborCut: 0.08, unlock: { fleet: 2 } },
@@ -68,6 +68,9 @@
 
     // 월별 추가 입고 수 (기본 10 + 추가). 7개월차 이후는 무한 모드에서 확장
     EXTRA_ARRIVALS: { 1: 12, 2: 14, 3: 16, 4: 18, 5: 20, 6: 22 }, // 7개월차부터 22 + (m-6)×2
+    // 위 표에 곱하는 사이클당 배수. 투자 개편 때 0.25 로 눌러 놓았더니 자유 런 첫 보름이 10개(15칸)뿐이었다 — 캠페인 1장(51칸)보다도 적다.
+    // 1.0 이면 첫 보름 22개(36칸), 한 해 끝 무렵 90칸+평판 배수. 홍보 캠페인은 여기에 얹는 한 방이다 (부록 AU)
+    ARRIVALS_SCALE: 1.0,
     // 달력: 런은 START_MONTH(3월, 봄)에 시작해 계절대로 흐른다. 달별 편차·이벤트는 META.CALENDARS[나라] (docs/STORY_TUTORIAL_DESIGN.md 5장)
     START_MONTH: 3,
 
