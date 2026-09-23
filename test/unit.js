@@ -746,4 +746,18 @@ t('장이 달라도 달력은 이어진다 (cycleOffset)', () => {
   });
 });
 
+t('택배는 쪼개지지 않는다: 7칸 차에 2칸짜리는 석 대(6칸)까지, 넷이면 두 차 — 부피 합이 아니라 통째로 들어가는가로 대수를 센다', () => {
+  const g = EMPTY(21); const c = g.contracts[slot(g, 'bulk')]; g.trust[c.carrier] = 0; c.enh.cap = 0; c.enh.capDelta = 0;
+  const cap = g.vehicleCap(c); assert.equal(cap, 7, '기본 대량 차는 7칸');
+  for (let i = 0; i < 7; i++) g.parcels.push(P(100 + i, 'normal', 2));
+  assert.equal(g.packTrucks(c, g.parcels.slice(0, 4)).length, 2, '2칸 넷 = 8칸이지만 한 차(7칸)엔 셋(6칸)만 통째로 들어간다');
+  assert.equal(g.trucksNeeded(c, g.parcels.slice(0, 3)), 1);
+  assert.equal(g.trucksNeeded(c, 8), 2, '부피로 물으면 예전처럼 올림');
+  const r = g.autoPick(c, g.parcels.slice(), 2);
+  assert.equal(r.trucks, 2); assert.equal(r.vol, 12, '두 차에 6+6 — 7+5(=12) 도 아니고 7+7(=14) 도 아니다');
+  assert.ok(r.ids.length === 6);
+  const bad = g.callCarrier(g.contracts.indexOf(c), g.parcels.slice(0, 4).map(p => p.id));
+  assert.ok(!bad.ok, '동시 1대에 2칸 넷은 못 싣는다');
+});
+
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);

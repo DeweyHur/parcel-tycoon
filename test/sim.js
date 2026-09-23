@@ -20,7 +20,7 @@ function pickBest(g, threshold) {
     // 대수별로 담아보고 가장 좋은 대수 선택
     for (let trucks = 1; trucks <= simul; trucks++) {
       const cap = vcap * trucks; const pick = []; let vol = 0;
-      for (const p of sorted) { if (vol + p.size <= cap) { pick.push(p); vol += p.size; } }
+      for (const p of sorted) { if (vol + p.size <= cap && g.packTrucks(c, pick.concat([p])).length <= trucks) { pick.push(p); vol += p.size; } }   // 택배는 통째로 — 차에 걸쳐 실리지 않는다
       if (!pick.length) break;
       const urgent = pick.some(p => (p.type === 'fresh' && !p.inCold) || p.deadline <= 1 || p.overdue);
       const fill = vol / cap, income = pick.reduce((s, p) => s + p.reward, 0), cost = g.callFee(c, trucks);

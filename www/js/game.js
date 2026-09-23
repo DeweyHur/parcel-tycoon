@@ -857,7 +857,21 @@
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
     callFee(c, trucks) { const free = this.regularFreeLeft(c) > 0 ? 1 : 0; const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut;
       return Math.round(Math.max(0, trucks - free) * this.truckFee(c) * Math.max(0.7, 1 - cut)); }
-    trucksNeeded(c, volume) { return Math.max(1, Math.ceil(volume / this.vehicleCap(c))); }
+    // 택배는 쪼개지지 않는다 — 2칸짜리 하나가 두 차에 나뉘어 실릴 수는 없다(유저가 잡은 버그: 7칸 차에 2칸짜리 넷을 6+2 가 아니라 7+1 로 그리고 있었다).
+    // 큰 것부터 먼저 들어가는 자리에(first-fit decreasing) 담아 차 대수와 차별 적재를 정한다. 부피 합 ÷ 칸수 는 하한일 뿐이다.
+    packTrucks(c, parcels) {
+      const cap = this.vehicleCap(c), bins = [];
+      for (const p of parcels.slice().sort((a, b) => b.size - a.size)) {
+        let b = bins.find(x => x.vol + p.size <= cap);
+        if (!b) { b = { vol: 0, list: [] }; bins.push(b); }
+        b.vol += p.size; b.list.push(p);
+      }
+      return bins.map(b => b.list);
+    }
+    trucksNeeded(c, volumeOrParcels) {
+      if (Array.isArray(volumeOrParcels)) return Math.max(1, this.packTrucks(c, volumeOrParcels).length);
+      return Math.max(1, Math.ceil(volumeOrParcels / this.vehicleCap(c)));
+    }
     capacityBonusNote(c) {
       const R = this.rules, notes = [];
       if (this.shows('capBonus')) {
@@ -969,13 +983,18 @@
         return { take: sorted.filter(p => chosen.has(p.id)), v };
       };
       let trucks = Math.max(1, maxTrucks), r = fill(vcap * trucks), trimmed = false;
+      // 부피 합이 맞아도 통째로 안 들어갈 수 있다(7칸 차 둘에 2칸짜리 일곱 = 14칸이지만 6+6 이 한계) — 넘치면 급하지 않은 것부터 덜어낸다
+      const fits = take => this.packTrucks(c, take).length <= trucks;
+      while (r.take.length && !fits(r.take)) { const drop = r.take.slice().reverse().find(p => !urgent(p)) || r.take[r.take.length - 1]; r.take = r.take.filter(p => p !== drop); r.v -= drop.size; }
       // 마지막 차가 본전선(80%)도 못 채우면 그 차는 빼고 한 대 적게 다시 꽉 채운다
       for (;;) {
-        const tr = Math.ceil(r.v / vcap);
-        if (tr <= 1 || r.v - (tr - 1) * vcap >= vcap * 0.8) break;
-        r = fill(vcap * (tr - 1)); trimmed = true;
+        const packed = this.packTrucks(c, r.take), tr = Math.max(1, packed.length);
+        const lastVol = packed.length ? packed[packed.length - 1].reduce((s, p) => s + p.size, 0) : 0;
+        if (tr <= 1 || lastVol >= vcap * 0.8) break;
+        trucks = tr - 1; r = fill(vcap * trucks); trimmed = true;
+        while (r.take.length && !fits(r.take)) { const drop = r.take.slice().reverse().find(p => !urgent(p)) || r.take[r.take.length - 1]; r.take = r.take.filter(p => p !== drop); r.v -= drop.size; }
       }
-      return { ids: r.take.map(p => p.id), vol: r.v, trucks: Math.max(1, Math.ceil(r.v / vcap)), trimmed };
+      return { ids: r.take.map(p => p.id), vol: r.v, trucks: Math.max(1, this.packTrucks(c, r.take).length), trimmed };
     }
     canCall(c) {
       if (!c || this.isOffTurn()) return false;
@@ -1324,7 +1343,7 @@
       if (chosen.length === 0) return { ok: false, msg: T('err.nothingToShip') };
       // 차량: 부피 합에 맞는 대수. 동시 대수·남은 배차·배차비 검사
       const vcap = this.vehicleCap(c), volume = chosen.reduce((s, p) => s + p.size, 0);
-      let trucks = Math.max(this.trucksNeeded(c, volume), trucksArg || 1);
+      let trucks = Math.max(this.trucksNeeded(c, chosen), trucksArg || 1);
       if (trucks > this.simulMax(c)) return { ok: false, msg: T('err.overTrucks', { n: this.simulMax(c), cap: vcap * this.simulMax(c) }) };
       const avail = c.calls + (useSpare ? 1 : 0);
       if (trucks > avail) return { ok: false, msg: T('err.noTrucks', { n: c.calls }) };

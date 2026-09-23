@@ -950,11 +950,12 @@
   function loadPreview(g, c, elig) {
     const vcap = g.vehicleCap(c);
     const rewardOf = p => (p.reward != null ? p.reward : g.baseReward(p.type, p.baseSize));
-    const cellsOf = ps => { const out = []; for (const p of ps) for (let k = 0; k < p.size; k++) out.push(D.PARCEL_TYPES[p.type].css); return out; };
+    // 눈금은 차 단위로: 차마다 vcap 칸을 채우되 택배는 통째로 — 안 찬 칸은 빈 칸으로 남긴다
+    const cellsOf = ps => { const out = []; for (const truck of g.packTrucks(c, ps)) { const start = out.length; for (const p of truck) for (let k = 0; k < p.size; k++) out.push(D.PARCEL_TYPES[p.type].css); while (out.length < start + vcap) out.push(null); } return out; };
     const pack = (take, fee) => {
       const rest = elig.filter(p => !take.includes(p));
       const vol = take.reduce((s2, p) => s2 + p.size, 0), rev = take.reduce((s2, p) => s2 + rewardOf(p), 0);
-      return { n: take.length, vol, fill: vol / vcap, fee, rev, net: rev - fee, cells: cellsOf(take), over: cellsOf(rest) };
+      return { n: take.length, vol, fill: vol / vcap, fee, rev, net: rev - fee, cells: cellsOf(take), over: cellsOf(rest).filter(Boolean) };
     };
     try {
       const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
@@ -1163,9 +1164,9 @@
     if (pick.sel.has(id)) { pick.sel.delete(id); SFX.cancel(); }
     else {
       const vcap = game.vehicleCap(c), simul = game.simulMax(c);
-      const v = [...pick.sel].reduce((s, q) => s + (game.parcels.find(x => x.id === q) || { size: 0 }).size, 0) + p.size;
-      const maxCap = vcap * Math.min(simul, Math.max(1, c.calls));
-      if (v > maxCap) { toast(T('call.maxSelect', { cap: maxCap })); return; }
+      const maxTrucks = Math.min(simul, Math.max(1, c.calls)), maxCap = vcap * maxTrucks;
+      const picked = [...pick.sel].map(q => game.parcels.find(x => x.id === q)).filter(Boolean).concat([p]);
+      if (game.packTrucks(c, picked).length > maxTrucks) { toast(T('call.maxSelect', { cap: maxCap })); return; }
       pick.sel.add(id); SFX.select();
     }
     renderAll();
@@ -1217,14 +1218,15 @@
     const elig = game.eligibleParcels(c);
     const selP = [...cm.sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
     const vol = selP.reduce((s, p) => s + p.size, 0);
-    const need = vol ? game.trucksNeeded(c, vol) : 1;
+    const packed = game.packTrucks(c, selP), need = Math.max(1, packed.length);
     const trucks = Math.min(Math.max(need, 1 + cm.extra), Math.min(simul, Math.max(1, c.calls + (c.calls === 0 ? 1 : 0))));
     const cap = vcap * trucks, callFee = game.callFee(c, trucks), baseIncome = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
     const fill = vol / cap;
     const chain = game.chainPreview(fill), chainIncome = Math.round(baseIncome * chain.mult);
     const rush = game.rushPreview(vol, trucks, fill), income = rush ? Math.round(chainIncome * D.RUSH.bonus) : chainIncome;
-    const cargoCells = []; for (const p of selP) for (let n = 0; n < p.size; n++) cargoCells.push({ color: ptype(p).css, name: ptype(p).name });
-    const shells = Array.from({ length: trucks }, (_, ti) => { const cells = Array.from({ length: vcap }, (_, ci) => { const cargo = cargoCells[ti * vcap + ci]; return `<i class="truck-cell ${cargo ? 'filled' : ''}"${cargo ? ` style="background:${cargo.color}" title="${esc(cargo.name)}"` : ''}></i>`; }).join(''); return `<div class="truck-shell"><div class="truck-cells" style="--cols:${Math.min(6, vcap)}">${cells}</div></div>`; }).join('');
+    // 차마다 통째로 실린 택배만 — 한 택배의 칸이 두 차에 걸치지 않는다
+    const cargoOf = ti => { const out = []; for (const p of (packed[ti] || [])) for (let n = 0; n < p.size; n++) out.push({ color: ptype(p).css, name: ptype(p).name }); return out; };
+    const shells = Array.from({ length: trucks }, (_, ti) => { const cargoCells = cargoOf(ti); const cells = Array.from({ length: vcap }, (_, ci) => { const cargo = cargoCells[ci]; return `<i class="truck-cell ${cargo ? 'filled' : ''}"${cargo ? ` style="background:${cargo.color}" title="${esc(cargo.name)}"` : ''}></i>`; }).join(''); return `<div class="truck-shell"><div class="truck-cells" style="--cols:${Math.min(6, vcap)}">${cells}</div></div>`; }).join('');
     const ko = I18n.lang === 'ko', net = income - callFee;
     const tbtn = `${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}`;
     const gauge = `<div class="load-visual mini"><div class="truck-stack">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
