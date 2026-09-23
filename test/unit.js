@@ -83,18 +83,22 @@ t('차량: 부피 합으로 대수 결정, 배차비 즉시 차감, 대수만큼
   const r = g.callCarrier(i, [1, 2, 3]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 1); assert.equal(r.fee, D.FAMILIES.bulk.fee); assert.equal(c.calls, trucks - 1);
   assert.equal(g.cash, cash + r.revenue + ((r.missionUp && r.missionUp.bonus) || 0)); assert.equal(g.feesDue, D.FAMILIES.bulk.fee); assert.equal(r.revenue, 35 * 3); assert.ok(r.fill >= 0.8);
 });
-t('차량: 용량을 넘기면 동시 대수 한도(기본 1)에서 거부, 신뢰 1단계 대량은 2대', () => {
+t('차량: 담은 만큼 차가 붙는다 — 한 대 용량을 넘기면 두 대, 막히는 건 남은 배차가 모자랄 때뿐', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2), P(4, 'normal', 2)];
-  let r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(!r.ok); // 8칸 > 7칸, 동시 1대
-  g.trust.bulk0 = 3; assert.equal(g.simulMax(c), 2);
-  r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 2); assert.equal(r.fee, D.FAMILIES.bulk.fee * 2);
+  assert.equal(g.simulMax(c), c.calls, '동시 한도 = 남은 배차');
+  let r = g.callCarrier(i, [1, 2, 3, 4]); assert.ok(r.ok, r.msg); assert.equal(r.trucks, 2); assert.equal(r.fee, D.FAMILIES.bulk.fee * 2);   // 8칸 > 7칸 → 자동 2대
+  const g2 = EMPTY(2); const j = slot(g2, 'bulk'), c2 = g2.contracts[j]; c2.calls = 1;
+  g2.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2), P(4, 'normal', 2)];
+  r = g2.callCarrier(j, [1, 2, 3, 4]); assert.ok(!r.ok && /배차/.test(r.msg), r.msg);   // 배차 1대 남음 → 거부
+  const g3 = EMPTY(2); const k = slot(g3, 'bulk'); g3._shows = new Set(['market', 'calls']);
+  { g3.parcels = [P(1, 'normal', 2), P(2, 'normal', 2), P(3, 'normal', 2), P(4, 'normal', 2)]; r = g3.callCarrier(k, [1, 2, 3, 4]); assert.ok(!r.ok, '동시 호출이 안 열린 장은 한 대'); }
 });
 t('도크 러시: 창고를 72% 이상 채우면 임시 트럭 +2, 2대 이상으로 55%를 비우면 보상 35% 폭발', withAll(() => {
   const g = EMPTY(202); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.warehouse.cap = 12;
   g.parcels = [1, 2, 3, 4, 5, 6].map(id => P(id, 'normal', 2));
-  assert.ok(g.rushState().ready); assert.equal(g.simulMax(c), 3);
+  assert.ok(g.rushState().ready);
   const base = g.parcels.reduce((sum, p) => sum + p.reward, 0);
   const r = g.callCarrier(i, g.parcels.map(p => p.id), 2);
   assert.ok(r.ok, r.msg); assert.ok(r.rush); assert.equal(r.revenue, Math.round(base * D.RUSH.bonus));
@@ -134,7 +138,7 @@ t('센터: 상위 tier 센터 = 다른 센터와 신규 계약 (배차 +2·용�
   const g = EMPTY(3); const c = g._makeContract('bulk', 'trusted'); g.contracts[3] = c;
   assert.equal(c.carrier, 'bulk1'); assert.equal(c.grade, 'trusted'); assert.equal(g.trustLevel('bulk1'), 0); assert.equal(c.maxCalls, 7 + 2); assert.equal(g.vehicleCap(c), 6 + 1 + 1); assert.equal(g.truckFee(c), Math.round(D.FAMILIES.bulk.fee * 0.9));
   assert.equal(D.CARRIERS.bulk1.name, '빠른손 익스프레스'); assert.equal(D.GRADES.trusted.name, '프리미엄');
-  const e = g._makeContract('bulk2'); assert.ok(g.contractCaps(e).includes('fragile')); assert.equal(D.CARRIERS.bulk3.simul, 2); assert.equal(g.simulMax(g._makeContract('bulk3')), 2);
+  const e = g._makeContract('bulk2'); assert.ok(g.contractCaps(e).includes('fragile')); assert.ok(!('express' in D.ENHANCEMENTS), '동시 배차 강화 없음');
   assert.ok(g.contractCaps(g._makeContract('cold2')).includes('frozen')); assert.equal(D.CARRIERS.rail1.delay, 0);
 });
 t('운영비 내역: 임대 120 + 계약 10/슬롯 + 시설 유지비', () => { const g = EMPTY(2); const n = g.contracts.filter(Boolean).length; let b = g.opCostBreakdown(1); assert.equal(b.rent, 120); assert.equal(b.contracts, n * 10); assert.equal(b.total, 120 + n * 10 + b.facilities); g.contracts[0].grade = 'expert'; assert.equal(g.opCostBreakdown(1).contracts, (n - 1) * 10 + 60); g.contracts[0].grade = 'normal'; g.warehouse.cold1 = true; assert.equal(g.opCostBreakdown(1).facilities, b.facilities + 15); });
@@ -262,7 +266,7 @@ t('강화 칸: 등급만큼 아무 강화나, 특약도 여러 개, 칸이 차�
   assert.ok(g.buy(0, 0).ok); assert.ok(g.buy(1, 0).ok); assert.equal(g.enhUsed(c), 2); assert.equal(c.enh.limit, 2);
   const r = g.buy(2, 0); assert.ok(!r.ok);                     // 2칸 다 참
   const t = g._makeContract('cold', 'trusted'); g.contracts[1] = t; assert.equal(g.enhSlots(t), 3);
-  mk(['optFragile', 'optCustoms', 'express']);
+  mk(['optFragile', 'optCustoms', 'cap1']);
   assert.ok(g.buy(0, 1).ok); assert.ok(g.buy(1, 1).ok); assert.ok(g.buy(2, 1).ok);
   assert.ok(g.contractCaps(t).includes('fragile') && g.contractCaps(t).includes('customs')); assert.equal(g.enhUsed(t), 3);
 });
@@ -759,8 +763,8 @@ t('택배는 쪼개지지 않는다: 7칸 차에 2칸짜리는 석 대(6칸)까�
   const r = g.autoPick(c, g.parcels.slice(), 2);
   assert.equal(r.trucks, 2); assert.equal(r.vol, 12, '두 차에 6+6 — 7+5(=12) 도 아니고 7+7(=14) 도 아니다');
   assert.ok(r.ids.length === 6);
-  const bad = g.callCarrier(g.contracts.indexOf(c), g.parcels.slice(0, 4).map(p => p.id));
-  assert.ok(!bad.ok, '동시 1대에 2칸 넷은 못 싣는다');
+  const ok2 = g.callCarrier(g.contracts.indexOf(c), g.parcels.slice(0, 4).map(p => p.id));
+  assert.ok(ok2.ok && ok2.trucks === 2, '2칸 넷은 저절로 두 대 — 쪼개지 않고 3+1 로 실린다');
 });
 
 t('포워더(항공·철도·해상)는 무역 고객(🛃 짐을 맡기는 화주)이 있어야 마켓에 온다', () => {

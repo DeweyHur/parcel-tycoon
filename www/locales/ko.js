@@ -27,8 +27,6 @@
     'fmt.vehicleCap': "{vehicle} {cap}칸",
     'sum.fees': "배차비",
     'call.trucks': "차량 {n}대 · 적재 {vol}/{cap}칸",
-    'call.addTruck': "한 대 더 (+{fee}c)",
-    'call.removeTruck': "한 대 줄이기",
     'call.fee': "배차비 {fee}c (월말 후불)",
     'call.net': "순익 {net}c",
     'call.fillOk': "적재 효율 ✓ 신뢰 +1",
@@ -66,7 +64,6 @@
     'mission.max': 'A급 달성',
     'mission.up': '{grade}급 달성! +{bonus}c',
     'mission.toast': "보름 목표 {grade}급 달성 · 성장 보너스 +{bonus}c",
-    'call.simulMax': "동시 최대 {n}대",
     'mk.vehicleLine': "{vehicle} <b>{cap}</b>칸 · 대당 <b>{fee}</b>c · 월 <b>{trucks}</b>대",
     'mk.gradeVs': "표준 대비: 용량 {cap0}→{cap1}칸 · 월 {t0}→{t1}대 · 배차비 {f0}→{f1}c · 신뢰 {lv}단계 즉시",
     'grade.merit': "프리미엄 계약은 차량이 크고 배차가 많고 배차비가 싸며, 신뢰 특성이 즉시 열립니다",
@@ -210,7 +207,6 @@
     'xp.specialist': '전문 처리 +1',
     'xp.coldChain': '콜드체인 +1',
     'note.regular': "월 첫 배차 무료",
-    'note.express': '고속 배차: 동시 호출 +1대',
     'note.trust2': '신뢰 2단계 +1',
     'note.skip': '스킵 보너스: 이번 차량 +1칸',
     'note.waitStack': '마감 보너스: 이번 차량 +{n}칸',
@@ -393,9 +389,7 @@
     'hud.callsSpent': '계약된 횟수 모두 차감',
     'hud.contractSub': "실을 것 <b>{vol}</b>/{cap}칸{more} · {fee}c",
     'hud.noTurn': '영업일 소모 없음',
-    'hud.simulN': '동시 {n}대',
     'hud.regular': '정기',
-    'hud.express': '고속',
     'wait.overdue': '⏳초과 {n}',
     'wait.spoil': '🥀부패 {n}',
     'wait.frozenOver': '❆냉동 자리 없음 {n}',
@@ -447,7 +441,7 @@
     'rep.greet.generic': '{center} 담당자입니다. {vehicle} {cap}칸, 대당 {fee}c, 배차 {trucks}대로 시작합니다. 배차가 떨어지면 마켓에서 재계약해 주세요.',
     'rep.greet.bulk': '{center} 여 실장입니다! {vehicle} {cap}칸에 대당 {fee}c, 배차 {trucks}대. 일반 택배는 저희한테 몰아 주세요 — 꽉 채우면 개당 제일 쌉니다.',
     'rep.greet.bulk.2': '{center} 여 실장입니다. 이번 차는 완충재가 들어가서 ⚠ 파손주의도 안전하게 실어요. {cap}칸, 대당 {fee}c, 배차 {trucks}대.',
-    'rep.greet.bulk.3': '{center}, 여 실장입니다. 여기선 한 번에 두 대까지 붙여 드려요. {cap}칸짜리 완충 탑차 {trucks}대, 대당 {fee}c. 물량 걱정은 끝이에요.',
+    'rep.greet.bulk.3': '{center}, 여 실장입니다. 여기선 필요한 만큼 차를 붙여 드려요. {cap}칸짜리 완충 탑차 {trucks}대, 대당 {fee}c. 물량 걱정은 끝이에요.',
     'rep.greet.cold': '{center} 강 소장입니다. {vehicle} {cap}칸, 대당 {fee}c, 배차 {trucks}대. 신선은 냉장 구역에서 나오는 순간부터 시간이 갑니다. 늦지 않게 부르세요.',
     'rep.greet.cold.2': '{center} 강 소장입니다. 이 차엔 냉동칸이 있어요 — ❄ 냉장과 ❆ 냉동을 같이 싣습니다. {cap}칸, 대당 {fee}c, 배차 {trucks}대.',
     'rep.greet.frozen': '{center} 강 소장입니다. 냉동은 냉동실 밖으로 나가는 순간 끝이니까, 부르실 때 한 번에 모아서요. {cap}칸, 대당 {fee}c, 배차 {trucks}대.',
@@ -472,7 +466,6 @@
     'slot.switchAsk': '{from} 계약을 정리하고 <b>{to}</b>와 새로 계약합니다. 남은 배차 {calls}대는 사라지고, 신뢰도는 새 센터에서 0부터 시작합니다.',
     'cmp.cap': '탑차',
     'cmp.trucks': '배차',
-    'cmp.simul': '동시',
     'cmp.fee': '배차비',
     'cmp.size': '크기',
     'cmp.note': '남은 배차 {calls}대는 사라지고, 신뢰도는 새 센터 것으로 바뀝니다.',
@@ -659,7 +652,7 @@
     'story.l3self.2': '배송비는 싸고 <b>하루도 안 넘겨</b>. 대신 보름에 한 번뿐이야 — 아껴 써. 저 <b>직접 배송</b> 눌러 봐.',
     'story.l3selfPick.1': '급한 것부터 담아 놨어. 작은 것만 돼, 두 칸까지. 상자를 누르면 빼고 넣고.<br>다 됐으면 아래 <b>직접 배송</b> 버튼 — 누르면 들고 나가.',
     'story.l3trust.1': '이제 이거 보여 줄 때가 됐네. <b>신뢰도</b>야.',
-    'story.l3trust.2': '자네가 한길이랑 반년 가까이 거래했잖아. 그동안 쌓인 거야.<br>차 두 대가 붙은 것도 이것 때문이었어. 이제부턴 단계가 오르면 배차비도 싸져.',
+    'story.l3trust.2': '자네가 한길이랑 반년 가까이 거래했잖아. 그동안 쌓인 거야.<br>단계가 오르면 배차가 늘고, 배차비도 싸져.',
     'story.l3trust.3': '꽉 채워 보낼 때마다 오르고, 단계가 오르면 뭐가 하나씩 좋아져.',
     'story.l3switch.1': '위에 계약을 갈아타는 매물이 떴네. 차도 크고 배차도 많아.',
     'story.l3switch.2': '대신 <b>신뢰도는 0부터</b>야. 남은 배차도 같이 날아가고.<br>반년 쌓은 걸 버리는 거니까 잘 재 봐.',
@@ -1154,7 +1147,7 @@
     'my.limit': '배차 한도 +{n}대',
     'my.cap': '처리 용량 +{n}',
     'my.remain': "배차 {calls}/{max}대",
-    'my.line': '{vehicle} <b>{cap}</b>칸 · 대당 {fee}c · 동시 {simul}대',
+    'my.line': '{vehicle} <b>{cap}</b>칸 · 대당 {fee}c',
     'my.record': '이번 런 {calls}회 호출 · {n}개 처리',
     'my.others': '계약은 없지만 신뢰도가 남아 있는 업체',
     'my.note': '배차는 소모품(월초 리셋 없음, 마켓에서 재계약). 교체 시 잔여 배차·강화 소멸{keep}, 신뢰도는 센터별',
@@ -1298,7 +1291,7 @@
         "name": "메가허브 물류",
         "short": "메가허브",
         "vehicle": "완충 탑차",
-        "desc": "속성 없는 택배(크기 1~2)를 탑차에 실어 보낸다. 일반 특화의 축 · 마스터 — 배차 +3·용량 +3·배차비 −30% · ⚠ 파손 안전 추가 · 동시 2대"
+        "desc": "속성 없는 택배(크기 1~2)를 탑차에 실어 보낸다. 일반 특화의 축 · 마스터 — 배차 +3·용량 +3·배차비 −30% · ⚠ 파손 안전 추가"
       },
       "cold0": {
         "name": "새벽냉장",
@@ -1458,7 +1451,7 @@
     },
     "TRUST_PERK_TEXT": {
       "bulk": [
-        "동시 2대 호출",
+        "배차 +1대",
         "배차비 -30%",
         "일반 택배 보상 +5"
       ],
@@ -1474,7 +1467,7 @@
       ],
       "fragile": [
         "배차비 -20%",
-        "동시 2대 호출",
+        "용량 +1칸",
         "파손주의 보상 +15"
       ],
       "intl": [
@@ -1484,7 +1477,7 @@
       ],
       "large": [
         "초대형 점유 -1",
-        "동시 2대 호출",
+        "배차 +1대",
         "대형 보상 +10"
       ],
       "air": [
@@ -1539,10 +1532,6 @@
       "regular": {
         "name": "월 첫 배차 무료",
         "desc": "매월 첫 호출의 차 한 대 배차비 무료"
-      },
-      "express": {
-        "name": "동시 배차",
-        "desc": "한 호출에 부를 수 있는 대수 +1"
       },
       "seal": {
         "name": "신뢰도 인장",

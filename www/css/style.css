@@ -652,6 +652,11 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 #call-head .load-visual.mini .truck-stack { padding-bottom: 7px; }
 #call-head .load-visual.mini .truck-cells { min-height: 0; gap: 2px; }
 #call-head .load-visual.mini .truck-cell { min-height: 16px; min-width: 12px; }
+/* 차가 석 대 넘게 붙으면(담은 만큼 저절로 붙는다) 차 그림을 낮춰 택배 줄을 지킨다 */
+#call-head .load-visual.mini .truck-stack.many { gap: 3px; }
+#call-head .load-visual.mini .truck-stack.many .truck-shell { padding: 2px 18px 2px 3px; }
+#call-head .load-visual.mini .truck-stack.many .truck-shell::after { display: none; }
+#call-head .load-visual.mini .truck-stack.many .truck-cell { min-height: 9px; }
 #call-head .load-visual.mini { grid-template-columns: 1fr; }
 #call-head .load-visual.mini .load-money { grid-template-rows: none; grid-template-columns: repeat(3, 1fr); gap: 4px; min-width: 0; }
 #call-head .load-visual.mini .money-chip { padding: 2px 4px; font-size: 10px; display: flex; gap: 4px; justify-content: center; align-items: baseline; }

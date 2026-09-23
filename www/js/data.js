@@ -151,13 +151,13 @@
       { grade: 'expert',  trucks: 4, cap: 2, fee: 0.8,  price: 4.0 },
       { grade: 'master',  trucks: 6, cap: 3, fee: 0.7,  price: 7.0 },
     ],
-    // 센터 목록. 이름·설명은 locales data.CARRIERS[id]. extraCaps = 복합 능력(그 센터 차는 이 속성도 안전하게), sizeMax/delay/simul 개별 보정
+    // 센터 목록. 이름·설명은 locales data.CARRIERS[id]. extraCaps = 복합 능력(그 센터 차는 이 속성도 안전하게), sizeMax/delay 개별 보정
     CENTERS: {
       // 대량 (일반 특화의 축)
       bulk0:   { family: 'bulk', tier: 0 },
       bulk1:   { family: 'bulk', tier: 1 },
       bulk2:   { family: 'bulk', tier: 2, extraCaps: ['fragile'] },            // 완충 탑차: 파손도 안전
-      bulk3:   { family: 'bulk', tier: 3, extraCaps: ['fragile'], simul: 2 },  // 2대 동시
+      bulk3:   { family: 'bulk', tier: 3, extraCaps: ['fragile'] },
       // 냉장
       cold0:   { family: 'cold', tier: 0 },
       cold1:   { family: 'cold', tier: 1 },
@@ -194,14 +194,14 @@
     // CARRIERS = 센터별 완성 스탯 (계열 + tier + 개별). 게임 코드는 이 표만 본다. 키 = 센터 id, family/tier/grade 필드로 계열·등급을 안다
     CARRIERS: {},
     // 신뢰도 특성 (2장): 업체마다 1~3단계 효과. 문구는 locales data.TRUST_PERKS[carrier] = [t1, t2, t3]
-    // 키: simul 동시 대수 / feeMult 배차비 배율 / cap 용량 +칸 / rewardDelta{type} / bonusDelta{type} / freezeOnCall / coldZone·frozenZone 구역 +칸 / customsDelta 통관 대기 / noCustomsDelay / xlDelta 초대형 점유 -1 / sizeMax / customsBonus / delay / trucks
+    // 키: feeMult 배차비 배율 / cap 용량 +칸 / rewardDelta{type} / bonusDelta{type} / freezeOnCall / coldZone·frozenZone 구역 +칸 / customsDelta 통관 대기 / noCustomsDelay / xlDelta 초대형 점유 -1 / sizeMax / customsBonus / delay / trucks
     TRUST_PERKS: {
-      bulk:    [{ simul: 2 }, { feeMult: 0.7 }, { rewardDelta: { normal: 5 } }],
+      bulk:    [{ trucks: 1 }, { feeMult: 0.7 }, { rewardDelta: { normal: 5 } }],
       cold:    [{ cap: 2 }, { freezeOnCall: true }, { coldZone: 2 }],
       frozen:  [{ feeMult: 0.8 }, { cap: 2 }, { frozenZone: 2 }],
-      fragile: [{ feeMult: 0.8 }, { simul: 2 }, { bonusDelta: { fragile: 15 } }],
+      fragile: [{ feeMult: 0.8 }, { cap: 1 }, { bonusDelta: { fragile: 15 } }],
       intl:    [{ customsDelta: -1 }, { cap: 4 }, { noCustomsDelay: true }],
-      large:   [{ xlDelta: 1 }, { simul: 2 }, { bonusDelta: { large: 10 } }],
+      large:   [{ xlDelta: 1 }, { trucks: 1 }, { bonusDelta: { large: 10 } }],
       air:     [{ sizeMax: 4 }, { feeMult: 0.7 }, { customsBonus: 20 }],
       rail:    [{ delay: 0 }, { trucks: 1 }, { cap: 6 }],
       sea:     [{ delay: 1 }, { cap: 6 }, { delay: 0 }],
@@ -239,12 +239,11 @@
     // 강화 칸: 계약마다 등급만큼 칸이 있고, 어떤 강화든 한 칸씩 차지한다 (종류별 한도 없음). 다른 계약으로 못 옮긴다
     ENH_SLOTS: { normal: 2, trusted: 3, expert: 4, master: 5 },
     ENHANCEMENTS: {
-      // 차량 언어: limit = 배차 한도 +대, cap = 적재 보강 +칸(계약당 3회), regular = 월 첫 배차 무료, express = 동시 대수 +1
+      // 차량 언어: limit = 배차 한도 +대, cap = 적재 보강 +칸(계약당 3회), regular = 월 첫 배차 무료 (동시 대수 강화는 없다 — 차는 담은 만큼 붙는다)
       limit1:  { price: 90, kind: 'limit', value: 1 },
       limit2:  { price: 160, kind: 'limit', value: 2 },
       cap1:    { price: 140, kind: 'cap', value: 1 },
       regular: { price: 180, kind: 'regular' },
-      express: { price: 260, kind: 'express' },
       seal:    { price: 90, kind: 'trust', value: 3 },
       record:  { price: 170, kind: 'trust', value: 6 },
       // 속성 특약: 계약 하나에 속성 하나 추가 (계약당 1개, 교체 시 소멸, 특약 처리는 보너스 없음)
@@ -282,7 +281,7 @@
       trucks: c.trucks != null ? c.trucks : f.trucks + t.trucks, cap: c.cap != null ? c.cap : f.cap + t.cap,
       fee: c.fee != null ? c.fee : Math.round(f.fee * t.fee), price: 0,
       refill: c.refill != null ? c.refill : Math.round(f.price * 0.5 * (1 + c.tier * 0.5)),
-      sizeMax: c.sizeMax != null ? c.sizeMax : f.sizeMax, delay: c.delay != null ? c.delay : (f.delay || 0), simul: c.simul || 1,
+      sizeMax: c.sizeMax != null ? c.sizeMax : f.sizeMax, delay: c.delay != null ? c.delay : (f.delay || 0),
       need: 'need' in c ? c.need : f.need, campaign: !!c.campaign, rep: c.rep || f.rep, allowAttrs: c.allowAttrs || null });
   }
   // 계약값 = 대당 만차 수입의 25% × 배차 대수 = 배차 대수 × 배차비 × 0.5 — 재계약과 같은 규칙(부록 AS)

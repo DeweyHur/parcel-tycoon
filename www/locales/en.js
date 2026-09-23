@@ -27,8 +27,6 @@
     'fmt.vehicleCap': "{vehicle} {cap} slots",
     'sum.fees': "Dispatch fees",
     'call.trucks': "{n} vehicle{n:|s} · load {vol}/{cap} slots",
-    'call.addTruck': "Add a vehicle (+{fee}c)",
-    'call.removeTruck': "Remove a vehicle",
     'call.fee': "Dispatch fee {fee}c (due at month end)",
     'call.net': "Net {net}c",
     'call.fillOk': "Load efficiency ✓ trust +1",
@@ -66,7 +64,6 @@
     'mission.max': 'A GRADE',
     'mission.up': '{grade} GRADE! +{bonus}c',
     'mission.toast': "Fortnight target hit {grade} · growth bonus +{bonus}c",
-    'call.simulMax': "Max {n} at once",
     'mk.vehicleLine': "{vehicle} <b>{cap}</b> slots · <b>{fee}</b>c per vehicle · <b>{trucks}</b>/month",
     'mk.gradeVs': "vs Standard: capacity {cap0}→{cap1} · {t0}→{t1}/month · fee {f0}→{f1}c · trust lv {lv} immediately",
     'grade.merit': "Premium contracts bring bigger vehicles, more dispatches, cheaper fees and instant trust perks",
@@ -210,7 +207,6 @@
     'xp.specialist': 'specialist +1',
     'xp.coldChain': 'cold chain +1',
     'note.regular': "First dispatch free this month",
-    'note.express': 'express: +1 truck at once',
     'note.trust2': 'trust lv2 +1',
     'note.skip': 'skip bonus: +1 slot this truck',
     'note.waitStack': 'close-day bonus: +{n} slots this truck',
@@ -392,9 +388,7 @@
     'hud.callsSpent': 'all runs used',
     'hud.contractSub': "<b>{vol}</b>/{cap}{more} to load · {fee}c",
     'hud.noTurn': 'no turn',
-    'hud.simulN': '{n} at once',
     'hud.regular': 'regular',
-    'hud.express': 'express',
     'wait.overdue': '⏳overdue {n}',
     'wait.spoil': '🥀spoil {n}',
     'wait.frozenOver': '❆no freezer {n}',
@@ -446,7 +440,7 @@
     'rep.greet.generic': 'This is {center}. {vehicle}, {cap} cells, {fee}c per truck, {trucks} trucks to start. When you run out, refill at the market.',
     'rep.greet.bulk': 'Yeo from {center}! {vehicle}, {cap} cells at {fee}c per truck, {trucks} trucks. Send us all your plain parcels — full trucks are the cheapest per parcel.',
     'rep.greet.bulk.2': 'Yeo from {center}. These trucks are padded, so ⚠ fragile rides safe too. {cap} cells, {fee}c per truck, {trucks} trucks.',
-    'rep.greet.bulk.3': '{center}, Yeo here. We can send two trucks at once. {trucks} padded trucks of {cap} cells, {fee}c each. Volume won\'t be your problem anymore.',
+    'rep.greet.bulk.3': '{center}, Yeo here. We send as many trucks as you need. {trucks} padded trucks of {cap} cells, {fee}c each. Volume won\'t be your problem anymore.',
     'rep.greet.cold': 'Kang from {center}. {vehicle}, {cap} cells, {fee}c per truck, {trucks} trucks. Fresh goods start dying the moment they leave the cold zone. Don\'t call late.',
     'rep.greet.cold.2': 'Kang from {center}. This truck has a freezer compartment — ❄ cold and ❆ frozen ride together. {cap} cells, {fee}c per truck, {trucks} trucks.',
     'rep.greet.frozen': 'Kang from {center}. Frozen is gone the moment it leaves the freezer, so batch them up when you call. {cap} cells, {fee}c per truck, {trucks} trucks.',
@@ -471,7 +465,6 @@
     'slot.switchAsk': 'Ends the {from} contract and signs with <b>{to}</b>. The {calls} leftover trucks are lost, and trust starts from 0 with the new center.',
     'cmp.cap': 'Truck',
     'cmp.trucks': 'Calls',
-    'cmp.simul': 'At once',
     'cmp.fee': 'Fee',
     'cmp.size': 'Size',
     'cmp.note': 'Your {calls} remaining calls are dropped; trust switches to the new center.',
@@ -658,7 +651,7 @@
     'story.l3self.2': 'Cheap, and it <b>doesn\u2019t use the day</b>. But only once per half-month — save it. Tap <b>Deliver yourself</b>.',
     'story.l3selfPick.1': 'Pick what you\u2019ll carry today. Small only \u2014 two cells at most.',
     'story.l3trust.1': 'About time I showed you this. <b>Trust</b>.',
-    'story.l3trust.2': 'You\u2019ve run with Hangil near half a year. That\u2019s what built up.<br>The second truck came from this. From here on, each tier also cuts your dispatch fee.',
+    'story.l3trust.2': 'You\u2019ve run with Hangil near half a year. That\u2019s what built up.<br>Each tier adds a dispatch and cuts your dispatch fee.',
     'story.l3trust.3': 'It climbs every time you send a full truck, and each tier hands you something.',
     'story.l3switch.1': 'There\u2019s an offer to switch contracts up there. Bigger truck, more dispatches.',
     'story.l3switch.2': 'But <b>trust starts at zero</b>, and the dispatches you have left go with it.<br>You\u2019d be throwing away half a year. Weigh it.',
@@ -1153,7 +1146,7 @@
     'my.limit': 'dispatch limit +{n}',
     'my.cap': 'capacity +{n}',
     'my.remain': "{calls}/{max} trucks",
-    'my.line': '{vehicle} <b>{cap}</b> cells · {fee}c each · {simul} at once',
+    'my.line': '{vehicle} <b>{cap}</b> cells · {fee}c each',
     'my.record': '{calls} calls · {n} delivered this run',
     'my.others': 'Carriers with leftover trust but no contract',
     'my.note': 'Trucks are consumable (no monthly reset; full refills at the market). Replacing loses leftover trucks and upgrades{keep}; trust is per center',
@@ -1297,7 +1290,7 @@
         "name": "MegaHub Logistics",
         "short": "MegaHub",
         "vehicle": "padded box truck",
-        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Master — trucks +3 · cap +3 · fee −30% · ⚠ break-safe added · 2 trucks at once"
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Master — trucks +3 · cap +3 · fee −30% · ⚠ break-safe added"
       },
       "cold0": {
         "name": "Dawn Chill",
@@ -1457,7 +1450,7 @@
     },
     "TRUST_PERK_TEXT": {
       "bulk": [
-        "Call 2 trucks at once",
+        "Dispatches +1",
         "Dispatch fee -30%",
         "Standard parcel reward +5"
       ],
@@ -1473,7 +1466,7 @@
       ],
       "fragile": [
         "Dispatch fee -20%",
-        "Call 2 vans at once",
+        "Capacity +1",
         "Fragile reward +15"
       ],
       "intl": [
@@ -1483,7 +1476,7 @@
       ],
       "large": [
         "XL parcels take 1 less slot",
-        "Call 2 trucks at once",
+        "Dispatches +1",
         "Large reward +10"
       ],
       "air": [
@@ -1538,10 +1531,6 @@
       "regular": {
         "name": "Free First Dispatch",
         "desc": "The first truck of the first call each month is free"
-      },
-      "express": {
-        "name": "Double Dispatch",
-        "desc": "+1 vehicle per call"
       },
       "seal": {
         "name": "Trust Seal",

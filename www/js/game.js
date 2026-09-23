@@ -693,8 +693,8 @@
     // 신뢰도 특성: 현재 단계까지의 효과를 합친다 (뒤 단계가 같은 키를 덮는다)
     trustPerk(carrier, key) {
       // 신뢰도가 화면에 없는 장(서장·1장)에서는 돈에 닿는 혜택(배차비 할인·보상 가산 등)을 주지 않는다 —
-      // 안 보이는 할인 때문에 '절반 못 채우면 손해'라는 규칙이 화면과 어긋났다. 두 대 동시(simul)만 예외(l2two 가 가르친다)
-      if (!this.shows('trust') && key !== 'simul') return null;
+      // 안 보이는 할인 때문에 '절반 못 채우면 손해'라는 규칙이 화면과 어긋났다. 
+      if (!this.shows('trust')) return null;
       const lv = this.trustLevel(carrier), perks = D.TRUST_PERKS[FAM(carrier)] || []; let v = null;
       for (let i = 0; i < Math.min(lv, perks.length); i++) if (perks[i][key] != null) v = perks[i][key];
       return v;
@@ -796,7 +796,6 @@
       return Math.max(1, cap);
     }
     baseCapacity(c) { return this.vehicleCap(c); }
-    callCapacity(c) { return this.vehicleCap(c) * this.simulMax(c); }
     // 홍보 캠페인 — 투자로 키운 홍보를 '발동'해서 며칠 안에 물량을 끌어온다.
     // 상시 +N건이던 것을 발동형으로 바꾼 이유: 창고가 남아도는 보름을 플레이어가 직접 메울 수 있어야 하고,
     // 그렇게 채운 창고가 곧 일괄 출고의 밑천이 된다. 보름에 한 번.
@@ -840,11 +839,11 @@
       const level = Math.min(count, C.max);
       return { count, mult: level >= 2 ? 1 + (level - 1) * C.step : 1, qualifies: count > 0 };
     }
-    // 한 호출에 부를 수 있는 최대 대수
+    // 한 호출에 부를 수 있는 최대 대수 — 남은 배차만큼. 담은 만큼 차가 저절로 붙고, 막히는 건 배차가 모자랄 때뿐이다
+    // (캠페인 2장 'simul' 이 열리기 전엔 한 대씩 — 서장은 한 대로 배운다)
     simulMax(c) {
       if (!this.shows('simul')) return 1;
-      const base = Math.max(1, Math.max(D.CARRIERS[c.carrier].simul || 1, this.trustPerk(c.carrier, 'simul') || 1) + (+c.enh.express || 0));
-      return base + (this.rushState().ready ? D.RUSH.extraTrucks : 0);
+      return Math.max(1, c.calls + (this.rules.spareCall && !this.monthStats.spareUsed && c.calls <= 0 ? 1 : 0));
     }
     // 대당 배차비
     truckFee(c) {
@@ -887,11 +886,11 @@
     // 강화 칸 — 등급만큼. 어떤 강화든 한 칸 (신뢰 강화는 업체에 쌓이므로 칸을 안 먹는다)
     contractOpts(c) { const o = (c.enh.opts || []).slice(); if (c.enh.opt && !o.includes(c.enh.opt)) o.unshift(c.enh.opt); return o; }
     enhSlots(c) { return (D.ENH_SLOTS || {})[c.grade] || 2; }
-    enhUsed(c) { return (c.enh.limit || 0) + (c.enh.cap || 0) + (+c.enh.regular || 0) + (+c.enh.express || 0) + this.contractOpts(c).length; }
+    enhUsed(c) { return (c.enh.limit || 0) + (c.enh.cap || 0) + (+c.enh.regular || 0) + this.contractOpts(c).length; }
     // 장착된 강화 id 목록 (칸 표시용) — 한도 강화는 +1/+2 를 구분해 기억한다
     enhList(c) { const out = [], lim = (c.enh.limitIds || []).slice(0, c.enh.limit || 0); while (lim.length < (c.enh.limit || 0)) lim.push('limit1');
       const rep = (id, n) => { for (let k = 0; k < n; k++) out.push(id); };
-      out.push(...lim); rep('cap1', c.enh.cap || 0); rep('regular', +c.enh.regular || 0); rep('express', +c.enh.express || 0); out.push(...this.contractOpts(c)); return out; }
+      out.push(...lim); rep('cap1', c.enh.cap || 0); rep('regular', +c.enh.regular || 0); out.push(...this.contractOpts(c)); return out; }
     regularFreeLeft(c) { return Math.max(0, (+c.enh.regular || 0) - (c.freeUsed || 0)); }
     // 특약을 붙인 계약은 그 속성도 '받는 것'에 들어간다. caps 만 넓히고 need 를 그대로 두면
     // 전문 계열(냉장·파손·냉동·통관)은 특약을 붙여도 그 물건을 거절한다 — 특약이 아무 쓸모가 없어진다.
@@ -1338,7 +1337,7 @@
       // 차량: 부피 합에 맞는 대수. 동시 대수·남은 배차·배차비 검사
       const vcap = this.vehicleCap(c), volume = chosen.reduce((s, p) => s + p.size, 0);
       let trucks = Math.max(this.trucksNeeded(c, chosen), trucksArg || 1);
-      if (trucks > this.simulMax(c)) return { ok: false, msg: T('err.overTrucks', { n: this.simulMax(c), cap: vcap * this.simulMax(c) }) };
+      if (!this.shows('simul') && trucks > 1) return { ok: false, msg: T('err.overTrucks', { n: 1, cap: vcap }) };
       const avail = c.calls + (useSpare ? 1 : 0);
       if (trucks > avail) return { ok: false, msg: T('err.noTrucks', { n: c.calls }) };
       const fee = this.callFee(c, trucks);
@@ -1833,7 +1832,6 @@
       if (it.kind === 'enh') { const e = D.ENHANCEMENTS[it.enh]; if (!e) return true;
         if (e.kind === 'opt') { const g = attrGate[e.attr]; return !g || this.shows(g); }
         if (e.kind === 'trust') return this.shows('trust');
-        if (e.kind === 'express') return this.shows('simul');
         return true; }
       return true;
     }
@@ -2001,7 +1999,6 @@
         if (e.kind === 'limit') { c.enh.limit++; (c.enh.limitIds = c.enh.limitIds || []).push(it.enh); c.maxCalls += e.value; c.calls += e.value; }
         else if (e.kind === 'cap') { c.enh.cap++; }
         else if (e.kind === 'regular') { c.enh.regular = (+c.enh.regular || 0) + 1; }
-        else if (e.kind === 'express') { c.enh.express = (+c.enh.express || 0) + 1; }
         else if (e.kind === 'trust') this._addTrust(c.carrier, e.value);
         else if (e.kind === 'opt') {
           const car = D.CARRIERS[c.carrier];

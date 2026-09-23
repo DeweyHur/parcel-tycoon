@@ -1163,10 +1163,10 @@
     if (!p) { SFX.click(); showParcelDetail(id); return; }   // 이 차엔 못 싣는 것 — 왜 안 되는지 보여 준다
     if (pick.sel.has(id)) { pick.sel.delete(id); SFX.cancel(); }
     else {
-      const vcap = game.vehicleCap(c), simul = game.simulMax(c);
-      const maxTrucks = Math.min(simul, Math.max(1, c.calls)), maxCap = vcap * maxTrucks;
+      // 담는 만큼 차가 붙는다. 막는 건 남은 배차가 모자랄 때뿐 (서장처럼 동시 호출이 아직 안 열렸으면 한 대)
+      const maxTrucks = game.simulMax(c);
       const picked = [...pick.sel].map(q => game.parcels.find(x => x.id === q)).filter(Boolean).concat([p]);
-      if (game.packTrucks(c, picked).length > maxTrucks) { toast(T('call.maxSelect', { cap: maxCap })); return; }
+      if (game.packTrucks(c, picked).length > maxTrucks) { toast(game.shows('simul') ? T('err.noTrucks', { n: c.calls }) : T('call.maxSelect', { cap: game.vehicleCap(c) })); return; }
       pick.sel.add(id); SFX.select();
     }
     renderAll();
@@ -1219,7 +1219,7 @@
     const selP = [...cm.sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
     const vol = selP.reduce((s, p) => s + p.size, 0);
     const packed = game.packTrucks(c, selP), need = Math.max(1, packed.length);
-    const trucks = Math.min(Math.max(need, 1 + cm.extra), Math.min(simul, Math.max(1, c.calls + (c.calls === 0 ? 1 : 0))));
+    const trucks = Math.min(need, simul);   // 담은 만큼 붙는다 — 더하기·빼기 버튼 없음
     const cap = vcap * trucks, callFee = game.callFee(c, trucks), baseIncome = selP.reduce((s, p) => s + game.previewReward(c, p), 0);
     const fill = vol / cap;
     const chain = game.chainPreview(fill), chainIncome = Math.round(baseIncome * chain.mult);
@@ -1228,8 +1228,8 @@
     const cargoOf = ti => { const out = []; for (const p of (packed[ti] || [])) for (let n = 0; n < p.size; n++) out.push({ color: ptype(p).css, name: ptype(p).name }); return out; };
     const shells = Array.from({ length: trucks }, (_, ti) => { const cargoCells = cargoOf(ti); const cells = Array.from({ length: vcap }, (_, ci) => { const cargo = cargoCells[ci]; return `<i class="truck-cell ${cargo ? 'filled' : ''}"${cargo ? ` style="background:${cargo.color}" title="${esc(cargo.name)}"` : ''}></i>`; }).join(''); return `<div class="truck-shell"><div class="truck-cells" style="--cols:${Math.min(6, vcap)}">${cells}</div></div>`; }).join('');
     const ko = I18n.lang === 'ko', net = income - callFee;
-    const tbtn = `${trucks < Math.min(simul, c.calls) ? `<button class="btn small" id="truck-add">${T('call.addTruck', { fee })}</button>` : ''}${trucks > need && trucks > 1 ? `<button class="btn small" id="truck-del">${T('call.removeTruck')}</button>` : ''}`;
-    const gauge = `<div class="load-visual mini"><div class="truck-stack">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
+    const tbtn = '';
+    const gauge = `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
     const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
     const money = `${chain.count >= 2 && game.shows('chain') ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
@@ -1242,8 +1242,6 @@
     { const tl = head.querySelector('.trustline'); if (tl) bindHold(tl, () => showContractDetail(c)); }
     foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn primary${vol && vol >= cap ? ' full' : ''}" id="call-go"${cm.sel.size ? '' : ' disabled'}>${T('call.btn')}</button>`;
     head.hidden = foot.hidden = false;
-    const ta = head.querySelector('#truck-add'); if (ta) ta.onclick = () => { cm.extra = trucks; SFX.select(); renderAll(); };
-    const td = head.querySelector('#truck-del'); if (td) td.onclick = () => { cm.extra = Math.max(0, trucks - 2); SFX.cancel(); renderAll(); };
     foot.querySelector('#pick-urgent').onclick = () => {
       cm.sel.clear();
       const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
@@ -1571,7 +1569,6 @@
     const rows = [
       [T('cmp.cap'), game.vehicleCap(c), o.cap, 1, v => T('fmt.cells', { n: v })],
       [T('cmp.trucks'), c.maxCalls, o.trucks, 1, v => `${v}`],
-      [T('cmp.simul'), game.simulMax(c), Math.max(car1.simul || 1, 1), 1, v => `×${v}`],
       [T('cmp.fee'), game.truckFee(c), o.fee, -1, v => `${v}c`],
       [T('cmp.size'), game.contractSizeMax(c), car1.sizeMax, 1, v => `~${v}`],
     ];
@@ -1617,7 +1614,7 @@
     const enh = enhNames(g, c);
     const rep = Story.repOf(c.carrier);
     const body = `<div style="display:flex;gap:10px;align-items:flex-start"><img src="${Story.sprite(rep, 'smile')}" style="width:64px;height:64px;image-rendering:pixelated;border:3px solid var(--line);background:#3a3555;flex:0 0 64px"><div class="d">${rep === 'rep' ? '' : `<b>${esc(Story.repName(rep, c.carrier))}</b>`}${gradeBadge(c.grade)}<div class="cdtakes">${takesTypes(g, c, true).map(t => `<span><i style="background:${D.PARCEL_TYPES[t].css}"></i>${esc(D.PARCEL_TYPES[t].name)}</span>`).join('')}</div><div style="color:var(--dim);font-size:11px">${T('call.size', { min: car.sizeMin, max: g.contractSizeMax(c) })}</div></div></div>
-      <div class="kv" style="margin-top:8px">      <span>${esc(car.vehicle || '')}</span><span class="v">${T('fmt.cells', { n: g.vehicleCap(c) })} · ×${g.simulMax(c)}</span>
+      <div class="kv" style="margin-top:8px">      <span>${esc(car.vehicle || '')}</span><span class="v">${T('fmt.cells', { n: g.vehicleCap(c) })}</span>
       <span>${T('sum.fees')}</span><span class="v">${g.truckFee(c)}c${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}</span>
       <span>${T('cd.calls')}</span><span class="v ${c.calls === 0 ? 'bad' : ''}">${c.calls}/${c.maxCalls}</span>
       ${g.shows('trust') ? `<span>${T('common.trust')}</span><span class="v">${trustBar(g, c.carrier)}</span>` : ''}</div>
