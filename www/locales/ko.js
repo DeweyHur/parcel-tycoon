@@ -81,6 +81,7 @@
     'mk.fcNow': "이번 보름",
     'mk.fcNext': "다음 보름",
     'mk.insChange': "바꾸기",
+    'mk.enhNoTarget': '붙일 수 있는 계약이 없음 (강화 칸이 찼거나 이 업체는 못 받음)',
     'mk.cantTake': '지금 계약으로 못 싣습니다',
     'mk.forecast': "{m}개월차 예상 물량(대략)",
     'log.monthStart': '── {y}년 {cal}월 {half:전반|후반} 시작 ──',
@@ -1548,7 +1549,7 @@
       },
       "optFragile": {
         "name": "완충 포장 특약",
-        "desc": "이 계약이 ⚠ 파손을 안전하게 처리"
+        "desc": "이 계약이 ⚠ 파손을 안전하게 처리, 용량 -1칸 (완충재 자리)"
       },
       "optCold": {
         "name": "보냉 특약",

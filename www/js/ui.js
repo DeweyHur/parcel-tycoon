@@ -903,6 +903,18 @@
     if (!types.length) return '';
     return `<span class="cdtakes">${types.map(t => `<span><i style="background:${D.PARCEL_TYPES[t].css}"></i>${esc(D.PARCEL_TYPES[t].name)}</span>`).join('')}</span> `;
   }
+  // 이 강화를 지금 붙일 수 있는 계약 이름들 — 사기 전에 어디에 붙는지가 보여야 한다 (용달은 특약 불가, 이미 그 속성이 있으면 불가, 강화 칸이 다 찼으면 불가)
+  function enhTargets(key) {
+    const e = D.ENHANCEMENTS[key]; if (!e) return [];
+    return game.contracts.filter(c => {
+      if (!c || game.enhUsed(c) >= game.enhSlots(c)) return false;
+      if (e.kind !== 'opt') return true;
+      const car = D.CARRIERS[c.carrier];
+      if (car.onlyPlain || game.contractCaps(c).includes(e.attr)) return false;
+      if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return false;
+      return true;
+    }).map(c => game.contractName(c));
+  }
   function takesDots(g, c, always) {
     const dots = takesTypes(g, c, always).map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('');
     return dots ? `<span class="takes">${dots}</span>` : '';
@@ -1452,7 +1464,7 @@
         if (it.kind === 'refill') return ''; // 충전은 위 '현재 계약' 칸에서
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
         if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); const pc = { carrier: it.carrier, grade: it.grade || 'normal', enh: { limit: 0, cap: 0, capDelta: 0, regular: false, express: false, opt: null } }; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}<span class="ospec">${miniTruck(game, pc)} ${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> <b>${T('mk.feeEach', { n: o.fee })}</b> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span></span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge} ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
-        else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
+        else if (it.kind === 'enh') { const tg = enhTargets(it.enh); desc = `${D.ENHANCEMENTS[it.enh].desc}<br>${tg.length ? `<span style="color:var(--green)">→ ${tg.map(esc).join(' · ')}</span>` : `<span style="color:var(--red)">${T('mk.enhNoTarget')}</span>`}`; }
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
         else if (it.kind === 'fac') { const F = it.fac && D.FACILITIES[it.fac]; let prev = ''; if (F) { if (F.cap) prev = `${T('common.warehouse')} ${game.warehouse.cap} → ${game.warehouse.cap + Math.round(F.cap * R.facilityCapMult)}`; else if (F.cold) prev = `${D.ATTRS.cold.name} ${game.warehouse.cold} → ${Math.min(R.coldCapMax == null ? 99 : R.coldCapMax, game.warehouse.cold + F.cold)}`; else if (F.xl) prev = `${T('common.xl')} ${game.warehouse.xl} → ${game.warehouse.xl + F.xl}`; else if (F.frozen) prev = `${D.ATTRS.frozen.name} ${game.warehouse.frozen || 0} → ${(game.warehouse.frozen || 0) + F.frozen}`; } desc = F ? F.desc + (prev ? `<br><span style="color:var(--green)">${T('mk.afterBuy')} ${prev}</span>` : '') : T('mk.allFacilities'); }

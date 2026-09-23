@@ -246,7 +246,8 @@
       seal:    { price: 90, kind: 'trust', value: 3 },
       record:  { price: 170, kind: 'trust', value: 6 },
       // 속성 특약: 계약 하나에 속성 하나 추가 (계약당 1개, 교체 시 소멸, 특약 처리는 보너스 없음)
-      optFragile: { price: 150, kind: 'opt', attr: 'fragile' },
+      // 속성 특약은 언제나 대가가 있다 — 공짜 속성이면 사지 않을 이유가 없어진다 (완충재는 자리를 먹고, 보냉도 자리, 통관은 시간, 냉동은 자리+크기)
+      optFragile: { price: 150, kind: 'opt', attr: 'fragile', capDelta: -1 },
       optCold:    { price: 170, kind: 'opt', attr: 'cold', capDelta: -1 },
       optCustoms: { price: 190, kind: 'opt', attr: 'customs', callsDelta: -1 },
       optFrozen:  { price: 220, kind: 'opt', attr: 'frozen', capDelta: -1, maxSizeMax: 4 },
