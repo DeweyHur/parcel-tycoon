@@ -1118,7 +1118,7 @@
     }
     // 월말 정산 후 예상 자금: 현금 + 지연 입금 − 후불 배차비 − 운영비 − 보험료 − 차입 상환(원금+이자)
     projectedCash() {
-      const pending = (this.pendingRevenue || []).reduce((s, x) => s + (x.amount || 0), 0);
+      const pending = (this.pendingRevenue || []).filter(x => (x.due != null ? x.due : this.month) <= this.month).reduce((s, x) => s + (x.amount || 0), 0);   // 이번 정산에 만기 오는 어음만
       const op = this.opCostBreakdown(this.month).total;
       const prem = this.insurer === 'none' ? 0 : this.premium();
       const loan = this.debt > 0 ? this.debt + Math.ceil(this.debt * D.LOAN.interest) : 0;
@@ -1282,12 +1282,6 @@
       this._assignCold();
       for (const p of arrived) this.emit('arrive', { parcel: p });
       this.totalTurn = (this.totalTurn || 0) + 1;
-      // 지연 입금 (철도·해상)
-      if (this.pendingRevenue && this.pendingRevenue.length) {
-        const due = this.pendingRevenue.filter(x => x.turn <= this.totalTurn); this.pendingRevenue = this.pendingRevenue.filter(x => x.turn > this.totalTurn);
-        for (const x of due) { this.cash += x.amount; this.monthStats.revenue += x.amount; this.run.revenue += x.amount; this.say('log.paid', { name: x.name, amount: x.amount, count: x.count }); this.emit('paid', x); }
-        this.stats.maxCash = Math.max(this.stats.maxCash, this.cash);
-      }
       // 냉동: 냉동 구역에 못 들어가면 즉시 폐기
       for (const p of arrived) if (this._attrs(p).includes('frozen') && !p.inFrozen) this._discardParcel(p, MSG('why.noFrozenZone'), 2, 'discard');
       this._assignCold();
@@ -1436,7 +1430,8 @@
       c.successCalls++; c.totalCalls++; c.delivered += chosen.length;
       const pd = this.trustPerk(c.carrier, 'delay');
       const delay = pd != null ? pd : (car.delay || 0);
-      if (delay > 0) { (this.pendingRevenue = this.pendingRevenue || []).push({ turn: (this.totalTurn || 0) + delay + 1, amount: revenue, count: chosen.length, name: car.name }); }
+      // 지연 입금은 어음이다 — 사이클 단위로, delay 사이클 뒤 정산 때 현금이 된다 (1 = 보름 뒤 정산, 2 = 한 달 뒤)
+      if (delay > 0) { (this.pendingRevenue = this.pendingRevenue || []).push({ due: this.month + delay, amount: revenue, count: chosen.length, name: car.name }); }
       else { this.cash += revenue; this.monthStats.revenue += revenue; this.run.revenue += revenue; }
       const missionUp = this._missionEarn(revenue);
       this.monthStats.calls++; this.monthStats.delivered += chosen.length;
@@ -1635,6 +1630,13 @@
       this.cash -= opCost; ms.spent += opCost; this.run.spent += opCost;
       const feesDue = this.feesDue; this.cash -= feesDue; this.feesDue = 0; // 후불 배차비·배송비 정산
       const premium = this._settlePremium();
+      // 어음 만기: 이번 정산까지 만기가 온 어음은 현금으로 (옛 세이브의 turn 어음은 이번 정산에)
+      let notesPaid = 0, notesCount = 0;
+      if (this.pendingRevenue && this.pendingRevenue.length) {
+        const due = this.pendingRevenue.filter(x => (x.due != null ? x.due : this.month) <= this.month); this.pendingRevenue = this.pendingRevenue.filter(x => !due.includes(x));
+        for (const x of due) { this.cash += x.amount; ms.revenue += x.amount; this.run.revenue += x.amount; notesPaid += x.amount; notesCount++; this.say('log.paid', { name: x.name, amount: x.amount, count: x.count }); this.emit('paid', x); }
+        this.stats.maxCash = Math.max(this.stats.maxCash, this.cash);
+      }
       let closing = 0;
       if (R.closingBonus && this.usage() <= R.closingBonus.usage) { closing = R.closingBonus.amount; this.cash += closing; }
             if (R.erosion) { const cands = this.contracts.filter(c => c && this.startContractIds.includes(c.id) && c.maxCalls > 1); if (cands.length) { const c = this.rng.pick(cands); c.maxCalls--; c.calls = Math.min(c.calls, c.maxCalls); this.say('log.erosion', { name: this.contractName(c) }); } }
@@ -1659,7 +1661,7 @@
       if (this.contracts.filter(Boolean).length >= 4 && this.contracts.every(c => c && c.calls === 0)) this.stats.zeroCallsMonthEnd = true;
       if (this.cash >= 0 && this.cash <= 100) this.stats.brokeMonthEnd = true;
       this.summary = { month: this.month, revenue: ms.revenue, opCost, opCostDetail: this._lastOpCost, calls: ms.calls, waits: ms.waits,
-        delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, selfCost: ms.selfCost || 0, fees: ms.fees || 0, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, customers: this.customerSummary(),
+        delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, selfCost: ms.selfCost || 0, fees: ms.fees || 0, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, notesPaid, notesCount, notesLeft: (this.pendingRevenue || []).reduce((a, x) => a + x.amount, 0), customers: this.customerSummary(),
         cash: this.cash, cashStart: ms.cashStart != null ? ms.cashStart : this.cash, net: this.cash - (ms.cashStart != null ? ms.cashStart : this.cash),
         rep: this.rep, repCap: this.repCap(), repTier: this.repTierId(), repClean, repTierUp, repPerks, repDelta: this.rep - (ms.repStart != null ? ms.repStart : this.rep), usage: Math.round(this.usage() * 100), left: this.parcels.length };
       // 단기 금융: 지난달 차입 상환(원금+이자) → 그래도 음수면 새로 차입해 0으로 맞춤

@@ -1422,6 +1422,7 @@
     const income = `${sec('Income')}<div class="kv">
       <span>${T('sum.revenue')}</span><span class="v good">+${s.revenue}</span>
       ${s.storageIncome ? `<span>${T('sum.storageIncome')}</span><span class="v good">+${s.storageIncome}</span>` : ''}
+      ${s.notesPaid ? `<span>${T('sum.notesPaid')}</span><span class="v good">+${s.notesPaid} <small>${T('sum.notesCount', { n: s.notesCount })}</small></span>` : ''}${s.notesLeft ? `<span>${T('sum.notesLeft')}</span><span class="v"><small>+${s.notesLeft}</small></span>` : ''}
       ${s.closing ? `<span>${T('sum.closing')}</span><span class="v good">+${s.closing}</span>` : ''}
       ${s.loan && s.loan.borrowed ? `<span>${T('sum.loan')}</span><span class="v" style="color:var(--orange)">+${s.loan.borrowed}</span><span class="sub" style="grid-column:1/-1;white-space:normal;color:var(--orange)">${T('sum.loanNote', { debt: s.loan.debt, interest: Math.ceil(s.loan.debt * D.LOAN.interest), limit: D.LOAN.limit })}</span>` : ''}</div>`;
     const cost = `${sec('Cost')}<div class="kv">

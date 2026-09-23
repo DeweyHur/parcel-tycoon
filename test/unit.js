@@ -200,10 +200,13 @@ t('파손: ⚠ 능력 없는 업체(철도 제외)는 25% 파손, 프래자일·
   const p = { id: 1, type: 'fragile', size: 2, attrs: ['fragile'] };
   assert.equal(g.breakProb(bulk, p), 0.25); assert.equal(g.breakProb(fr, p), 0); bulk.enh.opt = 'optFragile'; assert.equal(g.breakProb(bulk, p), 0);
 });
-t('지연 입금: 철도는 다음 턴, 신뢰 1단계면 즉시', () => {
+t('지연 입금은 어음: 철도(포워더)는 다음 정산(보름 뒤)에 현금, 신뢰 1단계면 즉시', () => {
   const g = EMPTY(4); g.contracts[3] = g._makeContract('rail', 'normal'); g.parcels = [P(1, 'normal', 2)];
-  const cash = g.cash; const r = g.callCarrier(3, [1]); assert.ok(r.ok, r.msg); assert.equal(r.delay, 1); assert.equal(g.cash, cash); assert.equal(g.feesDue, r.fee); adv(g); assert.equal(g.cash, cash + r.revenue);
-  g.trust.rail0 = 3; g.contracts[3].calls = 1; g.parcels = [P(2, 'normal', 2)]; const r2 = g.callCarrier(3, [2]); assert.ok(r2.ok, r2.msg); assert.equal(r2.delay, 0);
+  const cash = g.cash; const r = g.callCarrier(3, [1]); assert.ok(r.ok, r.msg); assert.equal(r.delay, 1); assert.equal(g.cash, cash); assert.equal(g.feesDue, r.fee);
+  adv(g); assert.equal(g.cash, cash, '다음 턴에는 아직 안 들어온다 — 어음이다'); assert.equal(g.pendingRevenue[0].due, 2, '만기는 다음 사이클 정산');
+  g.cash = 5000; while (g.phase === 'play') adv(g); assert.equal(g.summary.notesPaid, 0, '이번 정산엔 만기가 아니다'); assert.equal(g.summary.notesLeft, r.revenue);
+  g.closeSummary(); g.closeMarket(); g.schedule = g.schedule.map(() => []); g.parcels = []; g.rep = g.repCap(); g.cash = 5000; while (g.phase === 'play') adv(g); assert.equal(g.summary.notesPaid, r.revenue, '다음 사이클 정산에 만기'); assert.equal(g.summary.notesCount, 1);
+  const h = EMPTY(4); h.contracts[3] = h._makeContract('rail', 'normal'); h.trust.rail0 = 3; h.parcels = [P(2, 'normal', 2)]; const r2 = h.callCarrier(3, [2]); assert.ok(r2.ok, r2.msg); assert.equal(r2.delay, 0, '신뢰 1단계 특성: 즉시 입금');
 });
 t('월말 정산 → 마켓 → 다음 달, 배차비는 정산에', () => {
   const g = EMPTY(9); g.parcels = [P(1, 'normal', 1)]; g.callCarrier(slot(g, 'bulk'), [1]); while (g.phase === 'play') adv(g);
