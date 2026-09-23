@@ -666,7 +666,7 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 #call-foot { display: flex; gap: 6px; align-items: center; padding: 6px 8px 8px; border-top: 3px solid var(--line); background: var(--panel); }
 #call-foot .sp { flex: 1; }
 #call-foot .btn.primary { min-width: 84px; }
-#app.calling:not(.cine) #scene { flex: 0 0 28%; min-height: 120px; }
+#app.calling:not(.cine) #scene { flex: 0 1000 28%; min-height: 120px; }   /* 재고 네 줄이 먼저다 — 모자라면 창고 화면이 양보한다 */
 #app.calling #panel { flex: 1 1 auto; }
 
 /* 지금 패널 위에 서 있는 차 */
@@ -753,3 +753,32 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .eslots { display: inline-flex; gap: 2px; margin-left: 8px; vertical-align: middle; }
 .eslots i { width: 8px; height: 8px; transform: rotate(45deg); box-shadow: inset 0 0 0 1px #e8c46a99; }
 .eslots i.on { background: var(--gold); box-shadow: none; }
+
+/* ── 재고는 네 줄이 언제나 보인다 ──
+   폰(390~412×800 안팎)에서 계약 목록·호출 머리판·창고 화면이 자리를 다 먹고 재고가 두 줄만 남았다.
+   판단은 재고를 보고 하는 것이라 순서를 바꾼다: 창고 화면이 먼저 양보하고(최소 120px 까지),
+   그다음 호출 머리판·계약 줄이 촘촘해지고, 재고 네 줄(.prow 4개)은 어떤 화면에서도 지킨다. */
+#app:not(.cine) #scene { flex: 0 1000 44%; min-height: 120px; }
+/* 재고 칸의 flex-basis 를 0 으로 두고 최소 높이만 네 줄로 잡는다 — 그래야 패널이 '내용 전부'가 아니라 '네 줄'만 요구하고, 남는 자리는 창고 화면이 제 몫(28~44%)까지 가져간다 */
+#warehouse-details { flex: 1 1 0; min-height: calc(4 * 43px + 28px); }
+@media (max-height: 820px) {
+  #call-head { padding: 4px 8px 3px; }
+  #call-head .ch-top .caps { display: none; }
+  #call-head .load-visual.mini { margin: 3px 0 1px; }
+  #call-head .load-visual.mini .truck-cell { min-height: 13px; }
+  #call-head .load-visual.mini .money-chip { padding: 1px 4px; }
+  #call-head .load-visual.mini .money-chip b { font-size: 13px; }
+  #call-foot { padding: 4px 8px 5px; }
+  #contract-strip { gap: 3px; }
+  #contract-strip .contract { padding: 3px 8px; }
+  .bars { padding-top: 3px; }
+  #wait-btn { min-height: 38px; }
+}
+@media (max-height: 760px) {
+  .prow { padding: 3px 0; }
+  #warehouse-details { min-height: calc(4 * 41px + 10px); }
+  #call-foot .btn { padding: 3px 8px; }
+  #contract-strip .contract { padding: 2px 8px; }
+  #action-main .btn { min-height: 0; }
+  #wait-btn { min-height: 34px; }
+}
