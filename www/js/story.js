@@ -117,7 +117,7 @@
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
     { id: 'l1summary', kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'smile' }] },
-    { id: 'l1usage', kind: 'turn', when: g => usage(g) >= 0.75, pages: [{ expr: 'worry', hl: '#bar-usage' }] },
+    { id: 'l1usage', kind: 'turn', when: g => usage(g) >= 0.75, pages: [{ expr: 'worry', hl: '#scene' }] },
     { id: 'l1last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }, { expr: 'think' }] },
   ];
 
@@ -158,7 +158,7 @@
     { id: 'l2two', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'smile', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#call-head .load-visual' }] },
     // 넘쳐 본 다음에 확장을 판다
     { id: 'l2cap', kind: 'market', when: g => !!capItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'fac' && /^expand/.test(it.fac || '')) }] },
-    { id: 'l2usage', kind: 'turn', when: g => usage(g) >= 0.9, pages: [{ expr: 'worry', hl: '#bar-usage' }] },
+    { id: 'l2usage', kind: 'turn', when: g => usage(g) >= 0.9, pages: [{ expr: 'worry', hl: '#scene' }] },
     { id: 'l2last', kind: 'turn', when: g => g.turn >= Math.max(2, g.turns() - 2), pages: [{ expr: 'smile' }] },
   ];
 
@@ -183,7 +183,7 @@
     { id: 'l3forecast', kind: 'turn', when: g => g.upcoming().some(u => u.weather === 'rain'), pages: [{ expr: 'neutral', hl: '#upcoming' }] },
     // 창고가 넘쳐 마당으로 나갔다
     { id: 'l3yard', kind: 'turn', when: g => g.outdoorVolume() > 0, pages: [
-      { expr: 'worry', hl: '#bar-usage' },
+      { expr: 'worry', hl: '#scene' },
       { expr: 'neutral', hl: '#parcels' },
     ] },
     // 마당에 나가 있는데 비가 온다
@@ -226,7 +226,7 @@
     ] },
     // 캠페인: 3장(4월 후반)에 — 2장은 폭주 직전이라 끌어올 때가 아니었다. id 는 그대로(game.campaignOpen 이 본다)
     // 캠페인은 '창고가 빈 날'을 두 번 겪은 다음에 — 비어 노는 게 아깝다는 걸 느낀 뒤라야 버튼이 뜻이 있다
-    { id: 'l3invest', kind: 'turn', when: g => (g.emptyDays || 0) >= 2, act: () => {}, pages: [{ expr: 'think', hl: '#bar-usage' }, { expr: 'smile', hl: '#invest-btn', gate: true }] },
+    { id: 'l3invest', kind: 'turn', when: g => (g.emptyDays || 0) >= 2, act: () => {}, pages: [{ expr: 'think', hl: '#scene' }, { expr: 'smile', hl: '#invest-btn', gate: true }] },
     { id: 'l3campGo', kind: 'modal', modal: 'growth', when: (g, ctx) => ctx.ready, pages: [{ expr: 'neutral', hl: '#camp-go', gate: true }] },
     { id: 'l3campDone', kind: 'turn', when: g => g.campaignCycle === g.month, pages: [{ expr: 'laugh', hl: '#upcoming' }] },
     // 첫날 고객사 택배가 이미 있으면 여기서 바로 꾹 누르기를 시킨다 (따로 l4cust 로 미루지 않는다)
@@ -244,9 +244,9 @@
     // ❄ 가 실제로 들어온 날
     { id: 'l4cold', kind: 'turn', when: g => !!firstOf(g, 'fresh'), pages: [
       { expr: 'neutral', hl: '#parcels' },
-      { expr: 'worry', hl: '#bar-cold' },
+      { expr: 'worry', hl: '#scene' },
     ] },
-    { id: 'l4coldFull', kind: 'turn', when: g => g.warehouse.cold > 0 && g.coldUsed && g.coldUsed() >= g.warehouse.cold, pages: [{ expr: 'worry', hl: '#bar-cold' }] },
+    { id: 'l4coldFull', kind: 'turn', when: g => g.warehouse.cold > 0 && g.coldUsed && g.coldUsed() >= g.warehouse.cold, pages: [{ expr: 'worry', hl: '#scene' }] },
     // 직접 배송 — '우리 차' 카드. 계약 차가 모자랄 때 내가 하나씩 나른다 (2장에서는 계약 하나 더가 답이었다)
     { id: 'l3self', kind: 'turn', when: g => g.selfEligible().length > 0 && (!!outOfCalls(g) || g.turn >= 3), pages: [
       { expr: 'think', hl: '#cself' },
@@ -335,7 +335,7 @@
     ] },
     { id: 'l6frozen', kind: 'turn', when: g => g.parcels.some(p => p.type === 'frozen'), pages: [
       { expr: 'neutral', hl: '#parcels' },
-      { expr: 'worry', hl: '#bar-cold' },
+      { expr: 'worry', hl: '#scene' },
     ] },
     // 설 — 폭주가 먼저 오고 연휴에 차가 안 온다
     { id: 'l6holiday', kind: 'turn', when: offSoon, pages: [
@@ -361,7 +361,7 @@
     { id: 'intro', months: [1], kind: 'start', when: () => true, pages: [{ expr: 'smile' }, { expr: 'neutral', hl: '#parcels' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
     // 첫 대기 팝업(1개월차): intro 가 '대기'를 누르랬으니, 낯선 팝업에서 어디를 눌러야 하는지까지 짚어 준다. 이 한 번만.
     { id: 'waitFirst', months: [1], kind: 'modal', modal: 'wait', when: g => g.story.seen.includes('intro'), pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
-    { id: 'usage', months: [1], kind: 'turn', when: g => g.turn >= 2, pages: [{ expr: 'neutral', hl: '#bar-usage' }] },
+    { id: 'usage', months: [1], kind: 'turn', when: g => g.turn >= 2, pages: [{ expr: 'neutral', hl: '#scene' }] },
     { id: 'callReady', months: [1], kind: 'turn', when: g => g.turn >= 3 || bestReadySlot(g).fill >= 0.8, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     // 호출 팝업 안: 자동 선택 버튼 → 호출 버튼. 팝업이 다시 그려질 때마다 ctx.sel(선택 수)로 확인한다
     { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
@@ -374,8 +374,8 @@
     // 배차 소진: 이 게임에서 제일 많이 막히는 지점 — 배차는 월초에 안 채워진다
     { id: 'callsOut', needs: 'calls', months: [1, 2, 3], kind: 'turn', when: g => !!outOfCalls(g), pages: [{ expr: 'worry', hl: '#actions' }, { expr: 'neutral' }] },
     { id: 'deadline1', months: [1, 2, 3], kind: 'turn', when: g => g.parcels.some(p => !p.overdue && p.deadline <= 1 && !(p.customs > 0)), pages: [{ expr: 'worry', hl: '#parcels' }] },
-    { id: 'usage76', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.76, pages: [{ expr: 'worry', hl: '#bar-usage' }, { expr: 'neutral', hl: '#upcoming' }] },
-    { id: 'usage91', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.91, pages: [{ expr: 'shock', hl: '#bar-usage' }] },
+    { id: 'usage76', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.76, pages: [{ expr: 'worry', hl: '#scene' }, { expr: 'neutral', hl: '#upcoming' }] },
+    { id: 'usage91', months: [1, 2, 3], kind: 'turn', when: g => usage(g) >= 0.91, pages: [{ expr: 'shock', hl: '#scene' }] },
     // 첫 일요일: 왜 차를 못 부르는지, 마당을 왜 비워야 하는지. 마지막 페이지에서 직접 고르게 한다
     { id: 'weekend', months: [1, 2], kind: 'weekend', when: () => true, pages: [{ expr: 'neutral' }, { expr: 'neutral', hl: '.wkopts .wkc', gate: true }] },
     // 마당에 물건이 나가 있는 채로 맞는 일요일 — 알바를 쓸지 결정하는 자리

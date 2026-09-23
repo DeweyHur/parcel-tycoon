@@ -20,6 +20,7 @@ window.Scene3D = (function () {
     cold: ['X..X..X', '.X.X.X.', '..XXX..', 'XXXXXXX', '..XXX..', '.X.X.X.', 'X..X..X'],
     frozen: ['X..X..X', '.XXXXX.', '.XXXXX.', 'XXXXXXX', '.XXXXX.', '.XXXXX.', 'X..X..X'],   // 두툼한 얼음 결정 (냉장의 가는 눈송이와 구분)
     rain: ['...XXX...', '.XXXXXXX.', 'XXXXXXXXX', 'XXXXXXXXX', '.........', '..X..X..X', '.X..X..X.', 'X..X..X..'],
+    box: ['XXXXXXX', 'X..X..X', 'XXXXXXX', 'X.....X', 'X.....X', 'X.....X', 'XXXXXXX'],   // 상자 — 창고 칸 수 간판
   };
   const SIGN = { bg: '#2a2740', line: '#0f0e1a', hi: '#3d3a5c', alt: '#eef6ff', unit: 0.036, scale: 2 };
   const FOOT = { 1: [1, 1, 0.65], 2: [2, 1, 0.78], 4: [2, 2, 1.18], 7: [3, 2, 1.85] }; // [w, d, h] — 화면에서 상자 크기와 적재량을 즉시 읽을 수 있게 높이를 강조한다.
@@ -57,6 +58,8 @@ window.Scene3D = (function () {
       // 픽셀 폰트가 늦게 로드되면 간판을 다시 굽는다
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.signCache = null; if (this.tileCaps) this._buildTiles(...this.tileCaps); });
       window.addEventListener('resize', () => this.resize());
+      // 패널이 늘고 줄면(호출 모드·재고 줄 수·모달) 창고 화면 높이가 창 크기 없이도 바뀐다 — 그때마다 캔버스와 카메라를 다시 맞춘다. 안 하면 캔버스가 세로로 늘어나 모델이 찌그러진다
+      if (typeof ResizeObserver !== 'undefined') { let last = ''; new ResizeObserver(() => { if (this.cine) return; const k = this.container.clientWidth + 'x' + this.container.clientHeight; if (k !== last) { last = k; this.resize(); } }).observe(this.container); }
       this._loop();
     }
     resize() {
@@ -76,7 +79,10 @@ window.Scene3D = (function () {
       const spanX = (Z.x1 + 1.2 - Z.x0) / 11, spanZ = (Z.yardZ0 + Z.YARD.depth * CELL + 0.3 - BACK_Z) / 6.35;
       const k = Math.max(0.96, Math.min(1, Math.max(spanX, spanZ)));   // 작아져도 너무 붙지는 않는다 — 건물이 자라는 게 보여야 하니까
       if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.15 * k; this.camY = 0.45 + 6.45 * k; this.camZ = 0.65 + 8.2 * k; this.camLook = [fx, 0.45, 0.65]; }
-      else { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a); const kk = Math.max(1, need / 12.1); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.45 + 6.45 * kk * k; this.camZ = 0.65 + 8.2 * kk * k; this.camLook = [fx, 0.45, 0.65]; }
+      else { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a);
+        // 폰에서 3D 가 200px 안팎으로 납작해지면(a≈1.6~2.2) 가로는 다 들어와도 세로가 잘린다 — 앞뒤(마당~뒷벽)가 들어올 때까지 물러난다
+        const tall = Math.max(1, 1 + (a - 1.15) * 0.62);
+        const kk = Math.max(1, need / 12.1, tall); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.45 + 6.45 * kk * k; this.camZ = 0.65 + 8.2 * kk * k; this.camLook = [fx, 0.45, 0.65]; }
       // 재고 서랍을 접으면 화면은 커지지만 카메라가 모델에 붙어 버리지 않게 한 걸음 물러나 전체 창고·마당·차량을 담는다.
       const collapsed = !!(this.container.closest('#app') && this.container.closest('#app').classList.contains('warehouse-collapsed'));
       if (collapsed) {
@@ -161,7 +167,7 @@ window.Scene3D = (function () {
         // 트럭 왕복·직접 배송처럼 한창 움직이는 중이면 건드리지 않는다.
         if (!this.busy) { this._setWorkerIdle(indoor, Math.random() * 0.3); this._setWorkerIdle(outdoor, 0.3 + Math.random() * 0.3); }
       }
-      this.tileCaps = null;   // 구역이 바뀌었으니 바닥 타일도 다시
+      this.tileCaps = null; this.tileSig = null;   // 구역이 바뀌었으니 바닥 타일도 다시
       this.resize();
       return true;
     }
@@ -339,10 +345,13 @@ window.Scene3D = (function () {
       if (this.snowPts.visible) { const a = this.snowPts.geometry.attributes.position; for (let i = 0; i < 320; i++) { a.array[i * 3 + 1] -= 1.4 * dt; a.array[i * 3] += Math.sin(this.time * 1.5 + i) * 0.4 * dt; if (a.array[i * 3 + 1] < 0) { a.array[i * 3 + 1] = 9; a.array[i * 3] = -9 + Math.random() * 18; } } a.needsUpdate = true; }
     }
     // 용량 타일: 창고 안 바닥에 용량만큼 타일을 깔아 남은 자리를 눈으로 보게 한다 (택배 1칸 ≈ 타일 1개)
-    _buildTiles(cap, cold, frozen) {
+    // use = { main, cold, frozen, yard }: 지금 찬 칸 — 간판이 '냉장 2/6'처럼 읽는다 (패널의 창고·냉장 막대를 모델로 옮겼다)
+    _buildTiles(cap, cold, frozen, use) {
       if (this.tiles) this.scene.remove(this.tiles);
+      use = use || (this.tileCaps && this.tileCaps[3]) || null;
       const Z = this.Z, MAIN = Z.MAIN, COLD = Z.COLD, YARD = Z.YARD;
-      const g = new THREE.Group(); this.tiles = g; this.tileCaps = [cap, cold, frozen];
+      const g = new THREE.Group(); this.tiles = g; this.tileCaps = [cap, cold, frozen, use];
+      const n = (k, tot) => use ? `${use[k]}/${tot}` : String(tot);
       const tile = (zone, i, color) => { const x = i % zone.cells, z = Math.floor(i / zone.cells); const m = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 0.08, CELL - 0.08), new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.55 })); m.rotation.x = -Math.PI / 2; m.position.set(zone.x0 + (x + 0.5) * CELL, zone === COLD ? 0.145 : 0.075, zone.z0 + (z + 0.5) * CELL); m.receiveShadow = true; g.add(m); };
       for (let i = 0; i < Math.min(cap, MAIN.cells * MAIN.depth); i++) tile(MAIN, i, 0xb9b9c6);
       for (let i = 0; i < Math.min(cold, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x8fd0dc);
@@ -356,9 +365,11 @@ window.Scene3D = (function () {
         sp.scale.set(t.vw * SIGN.unit, t.vh * SIGN.unit, 1); sp.position.set(x, y || 0.9, z); g.add(sp);
       };
       const A = window.DATA.ATTRS, OUT = window.I18n ? window.I18n.t('hud.outdoorLabel') : '';
-      if (cold > 0) sign('cold', A.cold.name, '#5ee0d8', COLD.x0 + 0.9, COLD.z0 + 0.1, 1.7);
-      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('frozen', A.frozen.name, '#9ad7ff', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, COLD.z0 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
-      sign('rain', OUT, '#c9a06c', YARD.x0 + 0.9, YARD.z0 + YARD.depth * CELL - 0.15, 0.62);   // 마당 앞자락, 낮게 — 건물 벽에 걸쳐 뜨면 안이 뚫려 보인다
+      // 창고·냉장 간판은 앞자락에 낮게 — 뒤쪽 높은 자리는 HUD 상자가 덮는다(폰에서 3D 가 200px 안팎일 때)
+      sign('box', `${window.I18n ? window.I18n.t('common.warehouse') : ''} ${n('main', cap)}`.trim(), '#e8c46a', MAIN.x0 + MAIN.cells * CELL * 0.5, MAIN.z0 + MAIN.depth * CELL - 0.2, 0.62);
+      if (cold > 0) sign('cold', `${A.cold.name} ${n('cold', cold)}`, '#5ee0d8', COLD.x0 + 0.9, COLD.z0 + COLD.depth * CELL - 0.2, 0.62);
+      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('frozen', `${A.frozen.name} ${n('frozen', frozen)}`, '#9ad7ff', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, COLD.z0 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
+      sign('rain', use && use.yard ? `${OUT} ${use.yard}` : OUT, '#c9a06c', YARD.x0 + 0.9, YARD.z0 + YARD.depth * CELL - 0.15, 0.62);   // 마당 앞자락, 낮게 — 건물 벽에 걸쳐 뜨면 안이 뚫려 보인다
       g.visible = !this.closed;   // 완성 건물(오프닝)일 때는 바닥 표시가 벽을 뚫고 보이면 안 된다
       this.scene.add(g);
     }
@@ -482,7 +493,9 @@ window.Scene3D = (function () {
       // 창고가 바뀌었으면 건물부터 다시 짓는다 (착탈식 모듈) — 그 다음 바닥 타일
       if (game.warehouse) { this._syncBuilding(game.warehouse, { silent: !this._synced }); this._synced = true; }
       this._syncGrowthVisuals(game.growth);
-      { const wh = game.warehouse, caps = [wh.cap, wh.cold, wh.frozen || 0]; if (!this.tiles || !this.tileCaps || caps.some((v, i) => v !== this.tileCaps[i])) this._buildTiles(...caps); }
+      { const wh = game.warehouse, use = { main: game.usedVolume ? game.usedVolume() : 0, cold: game.coldUsed ? game.coldUsed() : 0, frozen: game.frozenUsed ? game.frozenUsed() : 0, yard: game.outdoorVolume ? game.outdoorVolume() : 0 };
+        const sig = [wh.cap, wh.cold, wh.frozen || 0, use.main, use.cold, use.frozen, use.yard].join('/');
+        if (!this.tiles || this.tileSig !== sig) { this.tileSig = sig; this._buildTiles(wh.cap, wh.cold, wh.frozen || 0, use); } }
       if (game.upcoming) { const u = game.upcoming()[0]; this._syncGhosts(u && u.specs ? u.specs : [], D); }
       const cold = [], main = [], yard = [];
       const items = [];

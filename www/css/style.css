@@ -754,13 +754,18 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .eslots i { width: 8px; height: 8px; transform: rotate(45deg); box-shadow: inset 0 0 0 1px #e8c46a99; }
 .eslots i.on { background: var(--gold); box-shadow: none; }
 
-/* ── 재고는 네 줄이 언제나 보인다 ──
-   폰(390~412×800 안팎)에서 계약 목록·호출 머리판·창고 화면이 자리를 다 먹고 재고가 두 줄만 남았다.
-   판단은 재고를 보고 하는 것이라 순서를 바꾼다: 창고 화면이 먼저 양보하고(최소 120px 까지),
-   그다음 호출 머리판·계약 줄이 촘촘해지고, 재고 네 줄(.prow 4개)은 어떤 화면에서도 지킨다. */
-#app:not(.cine) #scene { flex: 0 1000 44%; min-height: 120px; }
-/* 재고 칸의 flex-basis 를 0 으로 두고 최소 높이만 네 줄로 잡는다 — 그래야 패널이 '내용 전부'가 아니라 '네 줄'만 요구하고, 남는 자리는 창고 화면이 제 몫(28~44%)까지 가져간다 */
-#warehouse-details { flex: 1 1 0; min-height: calc(4 * 43px + 28px); }
+/* ── 재고는 딱 네 줄, 모델은 제 몫 ──
+   유저: "이렇게 하면 모델링이 하나도 안 보여. 택배는 4줄까지, 줄간격도 줄여. 창고/냉장도 그냥 모델에서 보게 하자."
+   그래서 창고·냉장 막대와 호출 머리판의 힌트 줄을 뺐고(간판이 '창고 12/24' 를 읽는다), 재고 칸은 **네 줄로 고정**(나머지는 스크롤),
+   줄 간격을 줄였다. 남는 자리는 전부 창고 화면(3D)이 가진다. */
+#app:not(.cine) #scene { flex: 1 1 auto; min-height: 150px; }
+#app.calling:not(.cine) #scene { flex: 1 1 auto; min-height: 150px; }
+#panel { flex: 0 0 auto; }
+#warehouse-details { flex: 0 0 auto; min-height: 0; }
+#parcels { flex: 0 0 auto; min-height: 0; max-height: calc(4 * 37px + 6px); padding-top: 2px; gap: 0; }
+.prow { padding: 2px 0; }
+.prow .ptile i { height: 22px; }
+#call-head .load-hint { display: none; }
 @media (max-height: 820px) {
   #call-head { padding: 4px 8px 3px; }
   #call-head .ch-top .caps { display: none; }
@@ -771,12 +776,9 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
   #call-foot { padding: 4px 8px 5px; }
   #contract-strip { gap: 3px; }
   #contract-strip .contract { padding: 3px 8px; }
-  .bars { padding-top: 3px; }
   #wait-btn { min-height: 38px; }
 }
 @media (max-height: 760px) {
-  .prow { padding: 3px 0; }
-  #warehouse-details { min-height: calc(4 * 41px + 10px); }
   #call-foot .btn { padding: 3px 8px; }
   #contract-strip .contract { padding: 2px 8px; }
   #action-main .btn { min-height: 0; }
