@@ -1444,7 +1444,6 @@
   }
 
   // ---------- market ----------
-  let fcOpen = false;   // 마켓의 다음 달 예상 물량 내역 펼침 여부
   function showMarket() {
     const mk = game.market, R = game.rules;
     BGM.play('market');
@@ -1452,56 +1451,48 @@
       const cards = mk.items.map((it, i) => {
         if (it.kind === 'refill') return ''; // 충전은 위 '현재 계약' 칸에서
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}${T('mk.capLine', { vehicle: esc(o.vehicle), cap: o.cap, trucks: o.trucks, total: o.total, fee: o.fee, per: o.per })}<br>${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge}${o.caps} · ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
+        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); const pc = { carrier: it.carrier, grade: it.grade || 'normal', enh: { limit: 0, cap: 0, capDelta: 0, regular: false, express: false, opt: null } }; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}<span class="ospec">${miniTruck(game, pc)} ${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> <b>${T('mk.feeEach', { n: o.fee })}</b> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span></span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge} ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') desc = D.ENHANCEMENTS[it.enh].desc;
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
         else if (it.kind === 'fac') { const F = it.fac && D.FACILITIES[it.fac]; let prev = ''; if (F) { if (F.cap) prev = `${T('common.warehouse')} ${game.warehouse.cap} → ${game.warehouse.cap + Math.round(F.cap * R.facilityCapMult)}`; else if (F.cold) prev = `${D.ATTRS.cold.name} ${game.warehouse.cold} → ${Math.min(R.coldCapMax == null ? 99 : R.coldCapMax, game.warehouse.cold + F.cold)}`; else if (F.xl) prev = `${T('common.xl')} ${game.warehouse.xl} → ${game.warehouse.xl + F.xl}`; else if (F.frozen) prev = `${D.ATTRS.frozen.name} ${game.warehouse.frozen || 0} → ${(game.warehouse.frozen || 0) + F.frozen}`; } desc = F ? F.desc + (prev ? `<br><span style="color:var(--green)">${T('mk.afterBuy')} ${prev}</span>` : '') : T('mk.allFacilities'); }
-        return `<div class="card ${it.sold ? 'sold' : ''}" id="mk-card-${Story.mkKey(it)}" data-i="${i}"><div class="t"><span>${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
+        const up = it.kind === 'contract' && it.switchFrom;
+        return `<div class="card ${it.sold ? 'sold' : ''} ${up ? 'upgrade' : ''}" id="mk-card-${Story.mkKey(it)}" data-i="${i}"><div class="t"><span>${up ? `<small class="uplbl">↑ ${T('mk.upgrade')}</small> ` : ''}${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
       });
-      // 종류별로 묶어 준다 — 12장이 한 줄로 늘어서면 뭘 비교하는지 알 수 없다
-      const ORDER = ['contract', 'enh', 'fac', 'customer', 'item'];
-      const items = ORDER.map(k => { const rows = mk.items.map((it, i) => it.kind === k ? cards[i] : '').filter(Boolean); return rows.length ? `<div class="mkhead">${T('kind.' + k)}</div>` + rows.join('') : ''; }).join('');
-      // 현재 계약: 맨 위. 카드마다 상세 버튼 + 배차 충전 버튼(정액·남은 배차는 버려짐)
-      const contracts = `<div id="mk-contracts"><div style="font-size:12px;color:var(--gold);margin:4px 0">${T('mk.currentContracts', { keep: R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : '' })}</div>` + game.contracts.slice(0, game.visibleSlots()).map((c, si) => {
-        if (!c) return `<div class="card dis" style="cursor:default"><div class="t">${T('my.slot', { n: si + 1 })} · ${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>`;
+      // 계약 섹션 하나: 현재 계약 카드 → 그 바로 아래 같은 계열 업그레이드 매물 → 그 뒤 새 계열 매물. 빈 슬롯은 카드 대신 머리글에 알린다
+      const vis = game.contracts.slice(0, game.visibleSlots());
+      const emptyN = vis.filter(c => !c).length;
+      const curCard = (c, si) => {
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
-        return `<div class="card" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
+        return `<div class="card cur" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
           <div class="crow"><span class="d">${miniTruck(game, c)}${takesDots(game, c, true)}${game.shows('market') ? enhPips(game, c) : ''}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
-      }).join('') + '</div><hr>';
+      };
+      const usedIdx = new Set();
+      const contractRows = vis.map((c, si) => { if (!c) return ''; const ups = mk.items.map((it, i) => it.kind === 'contract' && it.switchFrom === c.id ? (usedIdx.add(i), cards[i]) : '').join(''); return curCard(c, si) + ups; }).join('')
+        + mk.items.map((it, i) => it.kind === 'contract' && !usedIdx.has(i) ? cards[i] : '').join('');
+      const contractHead = `<div class="mkhead">${T('kind.contract')}${R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : ''}${emptyN ? ` <span class="slotnote">· ${T('mk.emptySlots', { n: emptyN })}</span>` : ''}</div>`;
+      const contracts = `<div id="mk-contracts">${contractHead}${contractRows}</div>`;
+      const ORDER = ['enh', 'fac', 'customer'];
+      const items = ORDER.map(k => { const rows = mk.items.map((it, i) => it.kind === k ? cards[i] : '').filter(Boolean); return rows.length ? `<div class="mkhead">${T('kind.' + k)}</div>` + rows.join('') : ''; }).join('');
+      // 보험 섹션: 지금 든 보험 한 줄 + 바꾸기, 그 아래 1회성 보험 매물
+      const insRows = mk.items.map((it, i) => it.kind === 'item' ? cards[i] : '').filter(Boolean).join('');
+      const I = M.INSURERS[game.insurer];
+      const insurance = game.shows('insurance') && !R.noInsurance ? `<div class="mkhead">${T('kind.item')}</div><div class="card cur" style="cursor:default"><div class="t"><span>${I.icon} ${esc(I.name)}</span><span class="price">${game.insurer === 'none' ? '' : T('fmt.perMonth', { n: game.premium() })}</span></div><div class="crow"><span class="d">${esc(I.desc)}</span><span class="ob"><button class="btn small" id="mk-ins">${T('mk.insChange')}</button></span></div></div>${insRows}` : insRows ? `<div class="mkhead">${T('kind.item')}</div>${insRows}` : '';
       const rc = game.refreshCost();
-      const wh = game.warehouse, used = game.usedVolume(), outd = game.outdoorVolume();
-      // 안 열린 것은 줄에서 뺀다 — 냉장 0/0 · 초대형 0/0 · 보험 · 고객은 그 장에 존재하지 않는 것들이다
-      const whLine = `<div class="pickinfo whinfo"><span>${T('common.warehouse')} <b class="${used > wh.cap ? 'bad' : ''}">${used}/${wh.cap}</b></span>${game.shows('cold') ? `<span>${D.ATTRS.cold.name} <b>${game.coldUsed()}/${wh.cold}</b></span>` : ''}${game.shows('frozen') && (wh.frozen || game.frozenUsed()) ? `<span>${D.ATTRS.frozen.name} <b>${game.frozenUsed()}/${wh.frozen || 0}</b></span>` : ''}${game.shows('bigsize') ? `<span>${T('common.xl')} <b>${game.parcels.filter(p => p.baseSize >= 7).length}/${wh.xl}</b></span>` : ''}${outd ? `<span class="bad">${T('hud.outdoorTag')} ${T('fmt.cells', { n: outd })}</span>` : ''}${game.shows('insurance') ? `<button class="btn small" id="mk-ins">${T('kind.item')}</button>` : ''}${game.shows('customers') ? `<button class="btn small" id="mk-cust">${T('kind.customer')}</button>` : ''}</div>`;
-      const up = mk.prep ? game.upcoming() : [];
-      const prepLine = '';   // 준비 마켓의 '1개월차 시작 전 · 입고 예정 · 날씨' 줄은 뺐다 — HUD 칩(내일·모레)이 같은 정보를 든다
-      // 못 받는 종류는 그 줄에서 바로 붉게 — 요약 경고만 있으면 '무엇이' 문제인지 눈으로 못 찾는다.
-      // 대본 런은 예상이 정확해서 min===max 라 범위 표기가 어색하다 → 한 숫자로, 0개인 종류는 아예 빼고
+      const nm = mk.prep ? game.month : game.month + 1;
+      // 예상 물량: 종류별 색 점 + 개수 한 줄. 지금 계약으로 못 받는 종류는 붉게 ✖ — 긴 문장도 펼침도 없다
       const rng = r => r[0] === r[1] ? `${r[0]}` : `${r[0]}~${r[1]}`;
-      const fcRows = game.customerForecast().map(f => { const cu = M.CUSTOMERS[f.id];
-        const parts = ['normal', ...(f.special > 0 ? f.types : [])].filter(t => f.range[t] && f.range[t][1] > 0).map(t => {
-          const bad = !game.canTakeType(t);
-          return `<span class="${bad ? 'fcwarn' : ''}"${bad ? ` title="${esc(T('mk.cantTake'))}"` : ''}><i style="display:inline-block;width:7px;height:7px;background:${D.PARCEL_TYPES[t].css}"></i>${D.PARCEL_TYPES[t].short} ${rng(f.range[t])}${bad ? ' ✖' : ''}</span>`;
-        });
-        return `<span class="fc">${cu.icon} ${esc(cu.name)} <b>${rng([f.min, f.max])}</b> <small>${parts.join(' · ')}</small></span>`; }).join('');
-      const nm = mk.prep ? game.month : game.month + 1, cal = game.calMonth(nm);
-      const seasonLine = nm <= game.monthsTotal() && game.shows('attrs') ? `<div class="d" style="color:var(--dim)">${T(mk.prep ? 'mk.seasonLineNow' : 'mk.seasonLine', { cal, season: T('season.' + game.season(nm)), note: T(`cal.${game.rules.calendar}.${cal}.note`) })}</div>` : '';
-      const fcAll = game.customerForecast();
-      const fcTot = fcAll.reduce((a, f) => ({ min: a.min + f.min, max: a.max + f.max }), { min: 0, max: 0 });
-      // 예상 물량 중 지금 계약으로 못 받는 종류 — 마켓이 그걸 사라고 말해 주는 자리다
-      const fcBlk = game.forecastBlocked(nm);
-      const fcWarn = fcBlk.length ? `<div class="d fcwarn" id="mk-fcwarn">${T('mk.forecastBlocked', { list: fcBlk.map(t => D.PARCEL_TYPES[t].short).join(' · ') })}</div>` : '';
-      const fcLine = `<div class="d"><a class="hl" id="mk-fctoggle">${T(mk.prep ? 'mk.forecastSumNow' : 'mk.forecastSum', { m: game.cycleLabel(nm), min: fcTot.min, max: fcTot.max })} ${fcOpen ? '▴' : '▾'}</a></div>${fcOpen ? `<div class="d fcline" id="mk-fc">${fcRows}</div>` : ''}${fcWarn}${seasonLine}`;
-      const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span>${R.marketMaxBuy ? `<span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span>` : ''}</div>${whLine}${contracts}${fcLine}${prepLine}${items}
+      const byType = {}; for (const f of game.customerForecast()) for (const t in f.range) { if (!(f.range[t][1] > 0)) continue; if (t !== 'normal' && !(f.special > 0)) continue; byType[t] = byType[t] || [0, 0]; byType[t][0] += f.range[t][0]; byType[t][1] += f.range[t][1]; }
+      const fcParts = Object.keys(D.PARCEL_TYPES).filter(t => byType[t]).map(t => { const bad = !game.canTakeType(t); return `<span class="${bad ? 'fcwarn' : ''}" title="${esc(D.PARCEL_TYPES[t].name)}${bad ? ' — ' + esc(T('mk.cantTake')) : ''}"><i style="display:inline-block;width:8px;height:8px;background:${D.PARCEL_TYPES[t].css}"></i> ${rng(byType[t])}${bad ? '✖' : ''}</span>`; });
+      const fcLine = nm <= game.monthsTotal() ? `<div class="d fcline1" id="mk-fc"><span class="lbl">${T(mk.prep ? 'mk.fcNow' : 'mk.fcNext')}</span>${fcParts.join(' ')}</div>` : '';
+      const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span>${R.marketMaxBuy ? `<span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span>` : ''}</div>${fcLine}${contracts}${items}${insurance}
         ${!game.shows('attrs') ? '' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
       // 마지막 사이클의 마켓을 닫으면 다음 사이클이 아니라 **장**이 끝난다
       const lastCycle = mk.month >= game.rules.months;
       const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), body, [{ label: lastCycle ? T('mk.endChapter') : T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], game.shows('attrs') ? T('mk.priceMult', { n: (D.PRICE_MULT[Math.min(12, Math.max(1, game.tableMonth(mk.month)))] * R.itemPriceMult * R.priceMult).toFixed(2) }) : '');
-      const ft = m.querySelector('#mk-fctoggle'); if (ft) ft.onclick = () => { SFX.click(); fcOpen = !fcOpen; render(); };
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
-      storyCheck({ kind: 'market', bought: mk.bought, fcOpen });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
+      storyCheck({ kind: 'market', bought: mk.bought, fcOpen: true });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
       const bind = (sel, fn) => { const el = m.querySelector(sel); if (el) el.onclick = fn; };
-      bind('#mk-cust', () => { SFX.click(); showCustomers(render); });
       bind('#mk-ins', () => { SFX.click(); showInsurance(render); });
       m.querySelectorAll('[data-detail]').forEach(b => b.onclick = e => { e.stopPropagation(); SFX.click(); showContractDetail(game.contracts[+b.dataset.detail], render); });
       m.querySelectorAll('[data-refill]').forEach(b => b.onclick = e => { e.stopPropagation(); const it = mk.items[+b.dataset.refill]; const c = game.contracts.find(x => x && x.id === it.contractId);

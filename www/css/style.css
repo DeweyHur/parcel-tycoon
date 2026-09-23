@@ -787,3 +787,13 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
   #action-main .btn { min-height: 0; }
   #wait-btn { min-height: 34px; }
 }
+
+/* ── 마켓 재구성: 예상 물량 한 줄 · 계약 아래 업그레이드 · 빈 슬롯은 머리글에 · 보험 섹션 ── */
+.fcline1 { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 4px 8px 6px; font-size: 12px; }
+.fcline1 .lbl { color: var(--dim); margin-right: 2px; }
+.fcline1 .fcwarn { color: var(--red); }
+.mkhead .slotnote { color: var(--gold); font-weight: 400; }
+.card.upgrade { margin-left: 14px; border-color: #6a6390; }
+.card.upgrade .uplbl { color: var(--green); font-size: 10px; }
+.card .ospec { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.card .ospec .mktruck { margin-right: 0; }

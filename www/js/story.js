@@ -280,7 +280,7 @@
     { id: 'l5repDrop', kind: 'any', when: g => g.repDropped, pages: [{ expr: 'worry', hl: '#hud-right' }] },
     { id: 'l5repUp', kind: 'summary', when: g => !!(g.summary && g.summary.repTierUp), pages: [{ expr: 'laugh' }, { expr: 'smile' }] },
     // 4칸 대형 — 오기 전에 마켓이 먼저
-    { id: 'l5bigWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!bigItem(g), pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
+    { id: 'l5bigWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!bigItem(g), pages: [{ expr: 'worry', hl: '#mk-fc' }] },
     { id: 'l5bigCar', kind: 'market', when: g => !!bigItem(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && ['large', 'rail', 'sea'].includes(root.DATA.familyOf(it.carrier))) }] },
     { id: 'l5big', kind: 'turn', when: g => g.parcels.some(p => p.size >= 4), pages: [{ expr: 'neutral', hl: '#parcels' }] },
     // 보험
@@ -327,7 +327,7 @@
       { expr: 'neutral', hl: '.wkopts .wkc', gate: true },
     ] },
     // ❆ 냉동 — 오기 전에 마켓이 먼저. 그런데 이번엔 계약 자리가 없다
-    { id: 'l6frozenWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!optItem(g), pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
+    { id: 'l6frozenWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!optItem(g), pages: [{ expr: 'worry', hl: '#mk-fc' }] },
     { id: 'l6frozenCar', kind: 'market', when: g => !!frozenCar(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen') }] },
     { id: 'l6freezer', kind: 'market', when: g => !!freezerFac(g), pages: [
       { expr: 'neutral', hl: g => cardSel(g, it => it.kind === 'fac' && /^freezer/.test(it.fac || '')) },
@@ -391,7 +391,7 @@
     { id: 'marketFc', needs: 'market', months: [1], kind: 'market', when: (g, ctx) => !ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fctoggle', gate: true }] },
     { id: 'marketFcOpen', needs: 'market', months: [1], kind: 'market', when: (g, ctx) => !!ctx.fcOpen, pages: [{ expr: 'neutral', hl: '#mk-fc' }] },
     // 다음 사이클에 못 싣는 게 온다 — 마켓이 마지막 기회다. 어느 달이든
-    { id: 'marketBlocked', needs: 'market', kind: 'market', when: g => g.forecastBlocked().length > 0, pages: [{ expr: 'worry', hl: '#mk-fcwarn' }] },
+    { id: 'marketBlocked', needs: 'market', kind: 'market', when: g => g.forecastBlocked().length > 0, pages: [{ expr: 'worry', hl: '#mk-fc' }] },
     { id: 'market1b', needs: 'market', months: [1], kind: 'market', when: () => true, pages: [{ expr: 'neutral' }] },
     // ----- 4월 (2개월차): 고객과 돈 -----
     // 고객 설명은 말로 하면 안 들어온다. 택배를 직접 누르게 하고 상세 팝업에서 짚는다.
