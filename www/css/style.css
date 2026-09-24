@@ -179,7 +179,9 @@ body { touch-action: manipulation; }
 /* 회사 카드: 특색 칩 한 줄 */
 .co-row { display: flex; flex-wrap: wrap; gap: 3px 8px; align-items: center; font-size: 12px; margin-top: 2px; }
 .co-chip { color: var(--ink); white-space: nowrap; } .co-chip b { margin-left: 1px; }
-.co-row.mons { gap: 3px 2px; font-size: 14px; } .co-row.mons .co-plus { font-size: 12px; margin-left: 6px; }
+.co-row.mons { gap: 3px 2px; font-size: 14px; } .co-row.mons .co-cts { margin: 4px 0 2px; } .co-ct { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; padding: 2px 0; border-top: 1px dashed #ffffff18; } .co-ct .cn { color: var(--ink); } .co-ct small { color: var(--dim); }
+.co-ct .takes { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 4px; } .co-ct .takes i { width: 8px; height: 8px; border: 1px solid #0008; }
+.co-plus { font-size: 12px; margin-left: 6px; }
 .co-plus { color: var(--green); white-space: nowrap; } .co-minus { color: var(--orange); white-space: nowrap; }
 .card.co-lock { padding-top: 4px; padding-bottom: 4px; } .card.co-lock .t { font-weight: 400; font-size: 13px; }
 .card.sold { opacity: .4; }

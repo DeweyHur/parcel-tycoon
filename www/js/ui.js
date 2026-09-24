@@ -406,17 +406,27 @@
   function startCenter(c) { return D.CARRIERS[c.carrier] ? c.carrier : (D.centerFor(c.carrier, GRADE_TIER(c.grade)) || null); }
   // 회사 카드는 특색만 아이콘으로: 창고·자금 칩 한 줄 + 장점/약점의 이름만. 긴 설명과 계약은 고른 카드에서만 펼친다
   const traitName = t => String(t || '').split(/[:：]/)[0].trim();
-  function companyInfo(co, id, open) {
+  function companyInfo(co, id, open, cards) {
     const W = co.warehouse, chip = (ic, v, label) => `<span class="co-chip" title="${esc(label)}">${ic}<b>${v}</b></span>`;
     const stats = (W ? chip('📦', W.cap, T('common.warehouse')) + (W.cold ? chip('❄', W.cold, D.ATTRS.cold.name) : '') + (W.xl ? chip('🛋', W.xl, T('common.xl')) : '') : chip('🎲', '?', T('prep.warehouseRandom'))) + chip('💰', co.cash, T('hud.cash'));
     const none = !co.weakness || co.weakness === T('common.none');
     const traits = `<span class="co-plus">＋${esc(traitName(co.passive))}</span>${none ? '' : `<span class="co-minus">－${esc(traitName(co.weakness))}</span>`}`;
     let out = `<div class="co-row">${stats}${open ? '' : traits}</div>`;
-    if (open) {
+    if (open && cards) out += companyContracts(id);
+    else if (open) {
       const ct = co.contracts ? co.contracts.map(c => { const k = startCenter(c); const car = k && D.CARRIERS[k]; if (!car) return String(c.carrier); return `${car.short || car.name || k}${c.grade === 'trusted' ? '★' : ''} ${T('fmt.trucks', { n: c.calls != null ? c.calls : car.trucks + ((D.GRADES[c.grade || 'normal'] || {}).calls || 0) })}`; }).join(', ') : T('prep.contractsRandom');
-      out += `<div class="d">🚚 ${esc(ct)}</div><div class="d" style="color:var(--green)">＋ ${esc(co.passive)}</div>${none ? '' : `<div class="d" style="color:var(--orange)">－ ${esc(co.weakness)}</div>`}`;
+      out += `<div class="d">🚚 ${esc(ct)}</div>`;
     }
+    if (open) out += `<div class="d" style="color:var(--green)">＋ ${esc(co.passive)}</div>${none ? '' : `<div class="d" style="color:var(--orange)">－ ${esc(co.weakness)}</div>`}`;
     return out;
+  }
+  // 고른 회사의 시작 계약을 마켓의 '현재 계약' 카드와 같은 그림으로: 이름·등급 · 싣는 색 · 트럭 칸 · 배차 눈금 · 배차비.
+  // 회사 보정(배차 +1, 차 칸 ±)까지 들어간 실제 값이어야 하니 그 회사·런으로 판을 하나 만들어 읽는다 (저장하지 않는다)
+  function companyContracts(id) {
+    const co = M.COMPANIES[id];
+    if (co.mods && co.mods.randomStart) return `<div class="d">🎲 ${esc(T('prep.contractsRandom'))}</div>`;
+    let g; try { g = new Game({ scenario: prep.scenario, company: id, perks: [], insurer: 'none', prep: true }); } catch (e) { return ''; }
+    return `<div class="co-cts">` + g.contracts.filter(Boolean).map(c => `<div class="co-ct"><span class="cn">${esc(g.contractName(c))}${gradeBadge(c.grade)} ${takesDots(g, c, true)}</span><span>${miniTruck(g, c)}${callPipsHtml(c.calls, c.maxCalls || c.calls)} <small>${T('mk.feeEach', { n: g.truckFee(c) })}</small></span></div>`).join('') + `</div>`;
   }
   // 잠긴 카드는 진행도만 (조건 문장은 누르면 토스트로)
   function unlockProg(achId) { const a = M.ACHIEVEMENTS[achId]; try { if (a && a.prog) { const P = Profile.get(); const [h, n] = a.prog(P.stats, P); return `${Math.min(h, n)}/${n}`; } } catch (e) { } return ''; }
@@ -427,8 +437,8 @@
       const co = M.COMPANIES[id], un = !lock && P.unlocked.companies.includes(id);
       const rec = (P.records[prep.scenario] || {})[id];
       if (!un) return `<div class="card dis co-lock" data-id="${id}"><div class="t"><span>🔒 ${co.icon} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${lock ? '' : esc(unlockProg(co.unlock))}</span></div></div>`;
-      return `<div class="card ${prep.company === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${co.icon} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${rec ? T('fmt.pts', { n: rec.bestScore }) : ''}</span></div>
-        ${companyInfo(co, id, prep.company === id)}</div>`;
+      return `<div class="card ${prep.company === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${co.icon} ${esc(co.name)}</span><span class="price">${rec ? T('fmt.pts', { n: rec.bestScore }) : ''}</span></div>
+        ${companyInfo(co, id, prep.company === id, true)}</div>`;
     }).join('');
     const m = modal(T('prep.companyTitle'), `<div class="perk-count">${T('prep.step2')} — ${esc(M.SCENARIOS[prep.scenario].name)}</div>${cards}`, [{ label: T('btn.back'), onClick: showScenarioSelect }, { label: lock ? T('demo.cta') : T('prep.nextPerk'), cls: lock ? 'gold' : 'primary', onClick: () => lock ? showDemoGate(showCompanySelect) : showPerkSelect() }]);
     m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (lock) { SFX.click(); showDemoGate(showCompanySelect); return; } if (!P.unlocked.companies.includes(id)) { toast(unlockText(M.COMPANIES[id].unlock), 2500); return; } SFX.select(); prep.company = id; showCompanySelect(); });
