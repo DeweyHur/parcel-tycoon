@@ -978,12 +978,20 @@
       return pack(take, g.truckFee(c));
     }
   }
-  function trustBar(g, carrier) {
+  // 「신뢰 Lv1 ▓▓░░ 3/8」 — 라벨 + 단계 + 다음 단계까지 게이지. 강화 칸 옆에 숫자만 서면 강화 진행도로 읽힌다.
+  // gain 을 주면(호출 머리판) 이 호출로 오를 만큼이 게이지 끝에 반짝이는 조각으로 붙고 숫자는 6→8. 최고 단계면 아무것도 안 붙는다.
+  function trustBar(g, carrier, gain) {
     if (g && !g.shows('trust')) return '';
     const lv = g.trustLevel(carrier), nx = g.trustNext(carrier);
-    // 「신뢰 Lv1 ▓▓░░ 3/8」 — 라벨 + 단계 + 다음 단계까지 게이지. 강화 칸 옆에 숫자만 서면 강화 진행도로 읽힌다
     const pct = nx ? Math.round(100 * Math.min(1, nx.have / Math.max(1, nx.need))) : 100;
-    return `<span class="trust" title="${nx ? T('trust.next', { have: nx.have, need: nx.need, effect: nx.effect }) : T('trust.max')}"><small>${esc(T('common.trust'))}</small><b class="tlv">Lv${lv}</b><span class="tbar"><i style="width:${pct}%"></i></span><small class="tnum">${nx ? `${nx.have}/${nx.need}` : 'MAX'}</small></span>`;
+    const gp = nx && gain ? Math.round(100 * Math.min(1, (nx.have + gain) / Math.max(1, nx.need))) - pct : 0;
+    const num = !nx ? 'MAX' : gain ? `${nx.have}<b class="arrow">→</b>${nx.have + gain}` : `${nx.have}/${nx.need}`;
+    return `<span class="trust" title="${nx ? T('trust.next', { have: nx.have, need: nx.need, effect: nx.effect }) : T('trust.max')}"><small>${esc(T('common.trust'))}</small><b class="tlv">Lv${lv}</b><span class="tbar"><i style="width:${pct}%"></i>${gp > 0 ? `<i class="gain" style="width:${gp}%"></i>` : ''}</span><small class="tnum">${num}</small></span>`;
+  }
+  // 단계별 효과 세 줄 — 이른 단계는 밝게, 아직인 단계는 흐리게. 호출 머리판 오른쪽 빈 자리에 선다
+  function trustLevels(g, carrier) {
+    const lv = g.trustLevel(carrier);
+    return `<span class="tlvs">${[1, 2, 3].map(k => `<span class="${k <= lv ? 'on' : ''}"><b>Lv${k}</b> ${esc(D.trustEffectText(carrier, k))}</span>`).join('')}</span>`;
   }
   // 신뢰도 트랙: 단계별 효과·필요 xp·달성 여부. xp가 null이면 진행도 없이 정적 표시(도감)
   function trustTrack(carrier, xp) {
@@ -1247,7 +1255,7 @@
     const riskLine = riskSel.length ? `<div class="riskline">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
     let trust = '';
-    if (game.shows('trust')) { const tg = game.trustGainPreview(c, vol, trucks); trust = `<div class="trustline" title="${esc(T('call.trustHold'))}">${trustBar(game, c.carrier)} ${T('call.xpShort', { xp: tg.xp })}</div>`; }
+    if (game.shows('trust')) { const tg = game.trustGainPreview(c, vol, trucks); const maxed = !game.trustNext(c.carrier); trust = `<div class="trustline" title="${esc(T('call.trustHold'))}">${trustBar(game, c.carrier, maxed || !cm.sel.size ? 0 : tg.xp)}${trustLevels(game, c.carrier)}</div>`; }
     head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}${tbtn ? `<span class="tbtn">${tbtn}</span>` : ''}</div>${gauge}${hint}${money}${riskLine}${trust}`;
     // 신뢰 줄은 꾹 누르면 단계표(다음 단계·효과)가 나온다
     { const tl = head.querySelector('.trustline'); if (tl) bindHold(tl, () => showContractDetail(c)); }
