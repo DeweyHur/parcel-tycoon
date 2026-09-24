@@ -30,7 +30,8 @@
       { id: 'city',    cap: 70, arrivals: 1.60, opCost: 1.45, unlock: ['intl', 'large', 'frozen'] },// 시내 최고
     ],
     CYCLES_PER_MONTH: 2,   // 한 사이클 = 2주. 달력 한 달 = 전반·후반 두 사이클
-    REP_GAIN: { fullTruck: 1, cleanMonth: 2, custLevel: 2 },
+    // 평판도 신뢰와 같은 축 — 기한보다 얼마나 일찍 보냈나. 호출마다 택배 점수 합(+2/+1/0/−2)을 earlyDiv 로 나눠 ±earlyMax 안에서 (차 꽉 채우기 +1 은 뺐다)
+    REP_GAIN: { cleanMonth: 2, custLevel: 2, earlyDiv: 5, earlyMax: 3 },
     OPERATING_COST: 120,   // 월 기본 임대(창고·인건비). 여기에 계약 유지비 + 시설 유지비가 더해진다
     OPCOST_CONTRACT: { normal: 10, trusted: 30, expert: 60, master: 100 },   // 계약 등급별 월 유지비 — 프리미엄은 수입도 지출도 크다
     // 배차비·배송비는 후불: 월중에 쌓였다가 월말 정산에서 빠진다. 정산 후 자금이 음수면 단기 차입으로 메우고
@@ -108,14 +109,16 @@
     ATTRS: { cold: { icon: '❄' }, fragile: { icon: '⚠' }, customs: { icon: '🛃' }, frozen: { icon: '❆' }, produce: { icon: '🌾' } },
     // 업체 매칭에 관여하는 속성 (🌾 농산물은 날씨 속성이라 아무 업체나 처리)
     GATING_ATTRS: ['cold', 'fragile', 'customs', 'frozen'],
+    // 크기: 일반·파손·신선·냉동은 소형(1)부터 — 깨지는 것·신선·냉동은 보통 작다. 농산물은 2부터, 통관·대형은 4부터.
+    // 특수 소형의 보상은 낮다(전문 보너스가 개당 붙어 칸당 수지가 크기 2와 같아지도록 22/20/22). sizeWeight 는 그 종류만의 크기 가중치(없으면 SIZE_WEIGHT)
     PARCEL_TYPES: {
       normal:  { attrs: [],          sizes: [1, 2],  deadline: 4, bonus: 0,  reward: { 1: 25, 2: 35, 4: 50, 7: 80 },  color: 0xc9a06c, css: '#c9a06c' },
-      fresh:   { attrs: ['cold'],    sizes: [2, 4],  deadline: 3, bonus: 15, reward: { 1: 40, 2: 60, 4: 90, 7: 130 }, color: 0x5ee0d8, css: '#5ee0d8' },
+      fresh:   { attrs: ['cold'],    sizes: [1, 2, 4],  deadline: 3, bonus: 15, reward: { 1: 22, 2: 60, 4: 90, 7: 130 }, sizeWeight: { 1: 30 }, color: 0x5ee0d8, css: '#5ee0d8' },
       produce: { attrs: ['produce'], sizes: [2, 4],  deadline: 4, bonus: 10, reward: { 1: 35, 2: 50, 4: 75, 7: 110 }, color: 0x9acd5a, css: '#9acd5a' },
-      fragile: { attrs: ['fragile'], sizes: [2, 4],  deadline: 5, bonus: 20, reward: { 1: 40, 2: 60, 4: 95, 7: 135 }, color: 0xf0a04b, css: '#f0a04b' },
+      fragile: { attrs: ['fragile'], sizes: [1, 2, 4],  deadline: 5, bonus: 20, reward: { 1: 20, 2: 60, 4: 95, 7: 135 }, sizeWeight: { 1: 30 }, color: 0xf0a04b, css: '#f0a04b' },
       intl:    { attrs: ['customs'], sizes: [4, 7],  deadline: 5, bonus: 25, reward: { 1: 50, 2: 75, 4: 110, 7: 150 }, color: 0x6c8cff, css: '#6c8cff' },
       large:   { attrs: [],          sizes: [4, 7],  deadline: 6, bonus: 30, reward: { 1: 45, 2: 65, 4: 100, 7: 140 }, color: 0xb08bd8, css: '#b08bd8' },
-      frozen:  { attrs: ['frozen'],  sizes: [2, 4],  deadline: 5, bonus: 25, reward: { 1: 45, 2: 70, 4: 105, 7: 145 }, color: 0x9ad7ff, css: '#9ad7ff' },
+      frozen:  { attrs: ['frozen'],  sizes: [1, 2, 4],  deadline: 5, bonus: 25, reward: { 1: 22, 2: 70, 4: 105, 7: 145 }, sizeWeight: { 1: 30 }, color: 0x9ad7ff, css: '#9ad7ff' },
     },
     FRESH_TURNS: 3,
     // 신선: 냉장 구역 밖에서 WARM_LIMIT턴 지나면 폐기 (폭염 경보 턴은 즉시). 냉동: 냉동 구역 밖이면 즉시
@@ -248,7 +251,7 @@
     },
 
     // 업체 신뢰도 (런 내, 업체별 누적 — 계약을 바꿔도 유지)
-    TRUST_LEVELS: [0, 3, 8, 15],
+    TRUST_LEVELS: [0, 6, 16, 30],   // 택배 한 개 = 최대 2xp (반 점 없이 정수만) 라 눈금도 두 배
     TRUST_EFFECTS: [], // 단계 0 문구 — locales data.TRUST_EFFECTS[0]
     // 단계별 효과 문구 (마켓 카드·호출 모달·도감이 같은 문자열을 읽는다)
     trustEffectText(carrier, lv) { const f = DATA.familyOf ? DATA.familyOf(carrier) : carrier; if (lv >= 1 && DATA.TRUST_PERK_TEXT[f]) return DATA.TRUST_PERK_TEXT[f][lv - 1]; return DATA.TRUST_EFFECTS[0]; },
@@ -262,8 +265,8 @@
       limit2:  { price: 160, kind: 'limit', value: 2, icon: '🚛' },
       cap1:    { price: 140, kind: 'cap', value: 1, icon: '📦' },
       regular: { price: 180, kind: 'regular', icon: '🎫' },
-      seal:    { price: 90, kind: 'trust', value: 3, icon: '🤝' },
-      record:  { price: 170, kind: 'trust', value: 6, icon: '📜' },
+      seal:    { price: 90, kind: 'trust', value: 6, icon: '🔖' },
+      record:  { price: 170, kind: 'trust', value: 12, icon: '📜' },
       // 속성 특약: 계약 하나에 속성 하나 추가 (계약당 1개, 교체 시 소멸, 특약 처리는 보너스 없음)
       // 속성 특약은 언제나 대가가 있다 — 공짜 속성이면 사지 않을 이유가 없어진다 (완충재는 자리를 먹고, 보냉도 자리, 통관은 시간, 냉동은 자리+크기)
       optFragile: { price: 150, kind: 'opt', attr: 'fragile', capDelta: -1, icon: '⚠', tint: 'fragile' },

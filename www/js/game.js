@@ -735,14 +735,33 @@
     trustXp(c) { return this.trust[typeof c === 'string' ? c : c.carrier] || 0; }
     trustLevel(c) { const xp = this.trustXp(c); let lv = 0; for (let i = 1; i < D.TRUST_LEVELS.length; i++) if (xp >= D.TRUST_LEVELS[i]) lv = i; return lv; }
     trustNext(c) { const lv = this.trustLevel(c), k = typeof c === 'string' ? c : c.carrier; return lv >= 3 ? null : { need: D.TRUST_LEVELS[lv + 1], have: this.trustXp(c), effect: D.trustEffectText(k, lv + 1) }; }
-    // 이 호출로 얻을 신뢰도 경험치 예상 (정상 처리 +1, 적재 효율 80% 이상 +1)
-    trustGainPreview(c, volume, trucks) {
-      const R = this.rules, cap = this.vehicleCap(c) * Math.max(1, trucks || 1);
-      let xp = 1; const parts = [T('xp.base')];
-      if (volume >= cap * 0.8) { xp++; parts.push(T('xp.cap80')); }
-      if (c.carrier === 'cold' && R.coldTrustBonus) { xp += R.coldTrustBonus; parts.push(T('xp.coldChain')); }
-      xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
-      return { xp, parts };
+    // 업체 신뢰는 **기한보다 얼마나 일찍 보내느냐**로 쌓인다 — 차를 꽉 채우는 것과는 상관없다.
+    // 택배마다: 들어오자마자(기한의 3/4 이상 남음) +2 · 여유 있게(2/5 이상) +1 · 기한 맞춰서 0 · 늦으면 −2. (반 점 대신 눈금을 두 배로 — TRUST_LEVELS 6/16/30)
+    // 기한이 없는 첫 사이클(캠페인)은 나이로: 그날 0일 +2 · 하루 +1.
+    trustScorePer(p) {
+      if (p.overdue) return -2;
+      if (p.noDeadline) return p.age <= 0 ? 2 : p.age === 1 ? 1 : 0;
+      const total = Math.max(1, p.deadline0 || (p.deadline + (p.age || 0))), ratio = p.deadline / total;
+      return ratio >= 0.75 ? 2 : ratio >= 0.4 ? 1 : 0;
+    }
+    trustScore(parcels) {
+      let early = 0, half = 0, late = 0, sum = 0;
+      for (const p of parcels) { const s = this.trustScorePer(p); sum += s; if (s >= 2) early++; else if (s > 0) half++; else if (s < 0) late++; }
+      return { xp: sum, early, half, late };
+    }
+    // 이 호출로 오르내릴 평판 — 같은 점수를 REP_GAIN.earlyDiv 로 나눠 ±earlyMax 안에서 (0 을 향해 반올림)
+    repDeltaFor(parcels) {
+      const G = D.REP_GAIN, s = this.trustScore(parcels || []).xp;
+      const d = Math.trunc(s / (G.earlyDiv || 5));
+      return Math.max(-(G.earlyMax || 3), Math.min(G.earlyMax || 3, d));
+    }
+    // 이 호출로 얻을 신뢰도 경험치 예상 (담은 택배 기준)
+    trustGainPreview(c, parcels) {
+      const R = this.rules, ts = this.trustScore(parcels || []);
+      let xp = ts.xp;
+      if (xp > 0 && c.carrier === 'cold' && R.coldTrustBonus) xp += R.coldTrustBonus;
+      if (xp > 0) xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
+      return { xp, early: ts.early, half: ts.half, late: ts.late };
     }
     // 한 번 나갈 때 싣는 개수 (대형 트럭 +1)
     selfCount() { return Math.max(1, D.SELF_DELIVERY.count + this.rules.selfCapDelta + (this.warehouse.bigvan ? 1 : 0)); }
@@ -1312,7 +1331,7 @@
       }
       let allowed = sizes || D.PARCEL_TYPES[type].sizes;
       if (type === 'fresh' && R.freshSizes && !sizes) allowed = R.freshSizes;
-      const w = {}; for (const s of allowed) { let wt = D.SIZE_WEIGHT[s]; if (s === 7 && R.xlWeight != null) wt = R.xlWeight; if (s >= 4) wt *= R.bigWeight; if (cust.sizeBias === 'small' && s >= 2) wt *= s >= 4 ? 0.2 : 0.6; if (cust.sizeBias === 'big' && s < 4) wt *= 0.3; if (cust.sizeBias === 'mid' && s !== 2) wt *= 0.5; w[s] = wt; }
+      const w = {}; for (const s of allowed) { let wt = (D.PARCEL_TYPES[type].sizeWeight || {})[s] || D.SIZE_WEIGHT[s]; if (s === 7 && R.xlWeight != null) wt = R.xlWeight; if (s >= 4) wt *= R.bigWeight; if (cust.sizeBias === 'small' && s >= 2) wt *= s >= 4 ? 0.2 : 0.6; if (cust.sizeBias === 'big' && s < 4) wt *= 0.3; if (cust.sizeBias === 'mid' && s !== 2) wt *= 0.5; w[s] = wt; }
       // 냉동: 냉동 구역보다 큰 택배는 오지 않는다 (구역이 0이면 신선으로)
       if (type === 'frozen') { const fz = this.warehouse.frozen || 0; const ok = {}; for (const s in w) if (+s <= fz) ok[s] = w[s]; if (!Object.keys(ok).length) { type = 'fresh'; } else { for (const s in w) delete w[s]; Object.assign(w, ok); } }
       // 대형(4칸 이상)이 아직 안 열린 장에는 어떤 품목도 4칸으로 오지 않는다 —
@@ -1339,6 +1358,7 @@
         deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1,
         // 첫 사이클에는 기한을 붙이지 않는다 — '차를 꽉 채워 보낸다'를 먼저 익히고, 기한은 그 다음에 배운다 (levels.js noDeadlineCycles)
         noDeadline: this.month <= (R.noDeadlineCycles || 0) };
+      p.deadline0 = p.deadline;   // 처음 기한 — 얼마나 일찍 보냈는지(신뢰)를 잰다
       if (attrs.includes('customs')) { p.customs = R.customsWait + (this.trustPerkAny('customsDelta') || 0); if (this.rng.next() < R.customsDelayProb && this.items.customsBond !== this.month && !this.trustPerkAny('noCustomsDelay')) { p.customs += 1; p.customsDelayed = true; } if (cust.rule && cust.rule.kind === 'customsFast') p.customs += cust.rule.delta; const cd = this.customerPerk(customer, 'customsDelta'); if (cd) p.customs += cd; p.customs = Math.max(0, p.customs); p.coldDuringCustoms = true; }
       return p;
     }
@@ -1415,7 +1435,7 @@
       this.feesDue += fee; this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
       if (this.regularFreeLeft(c) > 0) c.freeUsed = (c.freeUsed || 0) + 1;
       const fill = volume / (vcap * trucks);
-      if (fill >= 0.8) { this.stats.fullTrucks++; this.addRep(D.REP_GAIN.fullTruck, MSG('why.repFull')); }
+      if (fill >= 0.8) this.stats.fullTrucks++;
 
       const lv = this.trustLevel(c);
       const specialistAll = false;
@@ -1485,11 +1505,11 @@
         this.stats.rushes++; this.stats.rushBonus += rushBonus;
         this.addRep(D.RUSH.rep, MSG('why.rush'));
       }
-      if (onTime === 0) xp = 0;
-      if (xp > 0 && fill >= 0.8) xp += 1;
-      if (xp > 0 && c.carrier === 'cold' && R.coldTrustBonus) xp += R.coldTrustBonus;
-      if (xp > 0) xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
+      // 신뢰와 평판: 얼마나 일찍 보냈나 (기한 맞춰 보내면 0, 늦으면 깎인다)
+      xp = this.trustGainPreview(c, chosen).xp;
       this._addTrust(c.carrier, xp);
+      const repD = this.repDeltaFor(chosen);
+      if (repD) this.addRep(repD, MSG(repD > 0 ? 'why.repEarly' : 'why.repLate'));
       // 배차 대수 소모
       let refunded = false;
       if (useSpare) { this.monthStats.spareUsed = true; this.say('log.spareCall'); c.calls = Math.max(0, c.calls - (trucks - 1)); }

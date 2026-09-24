@@ -767,7 +767,8 @@
     const max = M.CUSTOMER_LEVELS.length - 1;
     let h = '';
     for (let i = 1; i <= max; i++) h += `<i class="${i <= to ? (i > from ? 'new' : 'on') : i <= from ? 'lost' : ''}"></i>`;
-    return `<span class="tpips" title="${esc(T('common.trust'))} ${to}/${max}">🤝${h}</span>`;
+    // 「신뢰 Lv2 ▮▮▯▯▯」 — 🤝 아이콘만으로는 강화 칸인지 신뢰인지 안 읽혔다
+    return `<span class="tpips" title="${esc(T('common.trust'))} ${to}/${max}"><small>${esc(T('common.trust'))}</small> <b>Lv${to}</b>${h}</span>`;
   }
   function showRepInfo() {
     const g = game, floor = g.repFloor(), cap = g.repCap(), top = g.repTier >= D.REP_TIERS.length - 1;
@@ -963,16 +964,20 @@
     return `<span class="cdtakes">${types.map(t => `<span><i style="background:${D.PARCEL_TYPES[t].css}"></i>${esc(D.PARCEL_TYPES[t].name)}</span>`).join('')}</span> `;
   }
   // 이 강화를 지금 붙일 수 있는 계약 이름들 — 사기 전에 어디에 붙는지가 보여야 한다 (용달은 특약 불가, 이미 그 속성이 있으면 불가, 강화 칸이 다 찼으면 불가)
+  // 이 강화를 이 계약에 붙일 수 없는 이유 (null 이면 붙일 수 있음) — 마켓 카드의 대상 목록과 적용 팝업의 회색 처리가 같은 판단을 쓴다
+  function enhBlock(key, c) {
+    const e = D.ENHANCEMENTS[key]; if (!e || !c) return 'none';
+    if (e.kind === 'trust') return null;   // 신뢰 xp 아이템은 칸을 안 쓴다
+    if (game.enhUsed(c) >= game.enhSlots(c)) return 'full';
+    if (e.kind !== 'opt') return null;
+    const car = D.CARRIERS[c.carrier];
+    if (car.onlyPlain) return 'plain';
+    if (game.contractCaps(c).includes(e.attr)) return 'has';
+    if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return 'size';
+    return null;
+  }
   function enhTargets(key) {
-    const e = D.ENHANCEMENTS[key]; if (!e) return [];
-    return game.contracts.filter(c => {
-      if (!c || game.enhUsed(c) >= game.enhSlots(c)) return false;
-      if (e.kind !== 'opt') return true;
-      const car = D.CARRIERS[c.carrier];
-      if (car.onlyPlain || game.contractCaps(c).includes(e.attr)) return false;
-      if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return false;
-      return true;
-    }).map(c => game.contractName(c));
+    return game.contracts.filter(c => c && !enhBlock(key, c)).map(c => game.contractName(c));
   }
   function takesDots(g, c, always) {
     const dots = takesTypes(g, c, always).map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('');
@@ -1033,9 +1038,12 @@
     if (g && !g.shows('trust')) return '';
     const lv = g.trustLevel(carrier), nx = g.trustNext(carrier);
     const pct = nx ? Math.round(100 * Math.min(1, nx.have / Math.max(1, nx.need))) : 100;
-    const gp = nx && gain ? Math.round(100 * Math.min(1, (nx.have + gain) / Math.max(1, nx.need))) - pct : 0;
-    const num = !nx ? 'MAX' : gain ? `${nx.have}<b class="arrow">→</b>${nx.have + gain}` : `${nx.have}/${nx.need}`;
-    return `<span class="trust" title="${nx ? T('trust.next', { have: nx.have, need: nx.need, effect: nx.effect }) : T('trust.max')}"><small>${esc(T('common.trust'))}</small><b class="tlv">Lv${lv}</b><span class="tbar"><i style="width:${pct}%"></i>${gp > 0 ? `<i class="gain" style="width:${gp}%"></i>` : ''}</span><small class="tnum">${num}</small></span>`;
+    // 늦은 택배를 실으면 깎인다 — 그만큼은 빨간 조각으로, 숫자는 6→5
+    const after = nx && gain ? Math.max(0, nx.have + gain) : (nx ? nx.have : 0);
+    const pctAfter = nx ? Math.round(100 * Math.min(1, after / Math.max(1, nx.need))) : 100;
+    const bar = gain > 0 ? `<i style="width:${pct}%"></i><i class="gain" style="width:${pctAfter - pct}%"></i>` : gain < 0 ? `<i style="width:${pctAfter}%"></i><i class="loss" style="width:${pct - pctAfter}%"></i>` : `<i style="width:${pct}%"></i>`;
+    const num = !nx ? 'MAX' : gain ? `${nx.have}<b class="arrow">→</b><span class="${gain < 0 ? 'bad' : ''}">${after}</span>` : `${nx.have}/${nx.need}`;
+    return `<span class="trust" title="${nx ? T('trust.next', { have: nx.have, need: nx.need, effect: nx.effect }) : T('trust.max')}"><small>${esc(T('common.trust'))}</small><b class="tlv">Lv${lv}</b><span class="tbar">${bar}</span><small class="tnum">${num}</small></span>`;
   }
   // 단계별 효과 세 줄 — 이른 단계는 밝게, 아직인 단계는 흐리게. 호출 머리판 오른쪽 빈 자리에 선다
   function trustLevels(g, carrier) {
@@ -1304,7 +1312,7 @@
     const riskLine = riskSel.length ? `<div class="riskline">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
     let trust = '';
-    if (game.shows('trust')) { const tg = game.trustGainPreview(c, vol, trucks); const maxed = !game.trustNext(c.carrier); trust = `<div class="trustline" title="${esc(T('call.trustHold'))}">${trustBar(game, c.carrier, maxed || !cm.sel.size ? 0 : tg.xp)}${trustLevels(game, c.carrier)}</div>`; }
+    if (game.shows('trust')) { const tg = game.trustGainPreview(c, selP); const maxed = !game.trustNext(c.carrier); trust = `<div class="trustline" title="${esc(T('call.trustHold'))}">${trustBar(game, c.carrier, maxed || !cm.sel.size ? 0 : tg.xp)}${trustLevels(game, c.carrier)}</div>`; }
     head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}${tbtn ? `<span class="tbtn">${tbtn}</span>` : ''}</div>${gauge}${hint}${money}${riskLine}${trust}`;
     // 신뢰 줄은 꾹 누르면 단계표(다음 단계·효과)가 나온다
     { const tl = head.querySelector('.trustline'); if (tl) bindHold(tl, () => showContractDetail(c)); }
@@ -1545,6 +1553,9 @@
       // 계약 섹션 하나: 현재 계약 카드 → 그 바로 아래 같은 계열 업그레이드 매물 → 그 뒤 새 계열 매물. 빈 슬롯은 카드 대신 머리글에 알린다
       const vis = game.contracts.slice(0, game.visibleSlots());
       const emptyN = vis.filter(c => !c).length;
+      // 사는 건 네 슬롯 중 첫 빈 칸으로 들어간다(보이는 슬롯과 무관). 그러니 '자리 없음'은 네 칸이 정말 다 찼을 때만 —
+      // 캠페인 초반엔 빈 슬롯을 숨기니(숙제처럼 보여서) 그땐 아무 말도 안 붙인다
+      const anyFree = game.contracts.slice(0, D.CONTRACT_SLOTS).some(c => !c);
       const curCard = (c, si) => {
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
         return `<div class="card cur" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)} ${takesDots(game, c, true)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}"><small class="lbl">${esc(T('cd.calls'))}</small> ${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
@@ -1554,7 +1565,7 @@
       const contractRows = vis.map((c, si) => { if (!c) return ''; const ups = mk.items.map((it, i) => it.kind === 'contract' && it.switchFrom === c.id ? (usedIdx.add(i), cards[i]) : '').join(''); return curCard(c, si) + ups; }).join('');
       // 새 계열 매물(빈 슬롯에 넣는 것)은 따로 — 현재 계약 사이에 섞이면 방금 산 '빙하 냉동'이 두 장으로 보인다. 팔린 것은 위 계약 목록에 이미 있으니 안 그린다
       const newRows = mk.items.map((it, i) => it.kind === 'contract' && !usedIdx.has(i) && !it.sold ? cards[i] : '').join('');
-      const newContracts = newRows ? `<div class="mkhead">${T('mk.newContracts')}${emptyN ? ` <span class="slotnote">· ${T('mk.emptySlots', { n: emptyN })}</span>` : ` <span class="slotnote" style="color:var(--dim)">· ${T('mk.noEmptySlot')}</span>`}</div>${newRows}` : '';
+      const newContracts = newRows ? `<div class="mkhead">${T('mk.newContracts')}${emptyN ? ` <span class="slotnote">· ${T('mk.emptySlots', { n: emptyN })}</span>` : anyFree ? '' : ` <span class="slotnote" style="color:var(--dim)">· ${T('mk.noEmptySlot')}</span>`}</div>${newRows}` : '';
       const contractHead = `<div class="mkhead">${T('kind.contract')}${R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : ''}</div>`;
       const contracts = `<div id="mk-contracts">${contractHead}${contractRows}</div>`;
       // 섹션: 강화 · 시설 · 광고(새 매체·매체 강화) · 성장 투자 · 고객
@@ -1698,10 +1709,11 @@
     const body = `<p style="font-size:12px;color:var(--dim)">${isContract ? T('slot.pickReplace') : T('slot.pickApply')}</p>` + game.contracts.slice(0, game.visibleSlots()).map((c, s) => {
       if (!c) return isContract ? `<div class="card" data-s="${s}"><div class="t">${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>` : '';
       const tb = trustBar(game, c.carrier);
-      const full = !isContract && D.ENHANCEMENTS[it.enh] && D.ENHANCEMENTS[it.enh].kind !== 'trust' && game.enhUsed(c) >= game.enhSlots(c);
+      // 못 붙이는 계약은 회색으로, 이유 한 줄과 함께 (칸이 참 · 일반 전용 · 이미 처리 · 크기 초과)
+      const block = isContract ? null : enhBlock(it.enh, c);
       const names = enhNames(game, c);
-      const info = isContract ? `${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}` : `${enhPips(game, c)}${names.length ? ` ${names.join(' · ')}` : ''}`;
-      return `<div class="card ${full ? 'dis' : ''}" data-s="${s}"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span></div><div class="d">${info}</div></div>`;
+      const info = isContract ? `${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}` : `${enhPips(game, c)}${names.length ? ` ${names.join(' · ')}` : ''}${block ? `<br><span class="why">${T('slot.block.' + block)}</span>` : ''}`;
+      return `<div class="card ${block ? 'dis' : ''}" data-s="${s}"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span></div><div class="d">${info}</div></div>`;
     }).join('');
     const m = modal(it.name, body, [{ label: T('btn.cancel'), onClick: back }]);
     const doBuy = (s) => { if (isContract) return buyContractInto(it, idx, s, back); const r = game.buy(idx, s); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back(); } else toast(r.msg); };

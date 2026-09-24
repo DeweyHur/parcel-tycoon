@@ -173,12 +173,15 @@ t('단기 금융: 정산 후 음수면 차입해 0, 다음 정산에 원금+이�
   assert.equal(g.debt, 0); assert.equal(g.summary.loan.repaid, debt); assert.equal(g.summary.loan.interest, Math.ceil(debt * 0.15));
   g.closeSummary(); g.closeMarket(); g.cash = 0; g.feesDue = 900; g.turn = D.TURNS_PER_MONTH; g._endMonth(); assert.equal(g.phase, 'over');
 });
-t('신뢰도: 적재 80% 이상이면 +1, 특성은 업체마다 다름(냉장 1단계 용량 +2, 3단계 냉장 구역 +2)', () => {
+t('신뢰도: 기한보다 일찍 보낼수록 오른다 — 들어오자마자 +2 · 여유 있게 +1 · 기한 맞춰 0 · 늦으면 −2 (꽉 채우기와 무관), 특성은 업체마다 다름', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
-  g.parcels = [P(1, 'normal', 1)]; g.callCarrier(i, [1]); assert.equal(g.trust.bulk0, 1); // 1/7 → 기본 +1만
-  g.parcels = [P(2, 'normal', 2), P(3, 'normal', 2), P(4, 'normal', 2)]; g.callCarrier(i, [2, 3, 4]); assert.equal(g.trust.bulk0, 3); // 6/7 ≥ 0.8 → +2
-  const cc = g.contracts[slot(g, 'cold')]; const cap0 = g.vehicleCap(cc); g._addTrust('cold0', 3); assert.equal(g.vehicleCap(cc), cap0 + 2);
-  const cold0 = g.warehouse.cold; g._addTrust('cold0', 12); assert.equal(g.trustLevel('cold0'), 3); assert.equal(g.warehouse.cold, cold0 + 2);
+  g.parcels = [P(1, 'normal', 1, { deadline0: 4, deadline: 4 })]; g.callCarrier(i, [1]); assert.equal(g.trust.bulk0, 2, '들어온 날 한 개 → +2 (반 차여도)');
+  g.parcels = [P(2, 'normal', 2, { deadline0: 4, deadline: 1 }), P(3, 'normal', 2, { deadline0: 4, deadline: 1 }), P(4, 'normal', 2, { deadline0: 4, deadline: 1 })]; g.callCarrier(i, [2, 3, 4]); assert.equal(g.trust.bulk0, 2, '기한 맞춰 꽉 채워도 0');
+  g.parcels = [P(5, 'normal', 2, { deadline0: 4, deadline: 2 }), P(6, 'normal', 2, { deadline0: 4, deadline: 2 })]; g.callCarrier(i, [5, 6]); assert.equal(g.trust.bulk0, 4, '여유 있게 둘 → +1+1');
+  g.parcels = [P(7, 'normal', 2, { deadline0: 4, deadline: 0, overdue: true }), P(8, 'normal', 2, { deadline0: 4, deadline: 0, overdue: true })]; g.callCarrier(i, [7, 8]); assert.equal(g.trust.bulk0, 0, '늦은 둘 → −4');
+  assert.equal(g.trustGainPreview(c, [P(9, 'normal', 2, { deadline0: 4, deadline: 4 }), P(10, 'normal', 2, { deadline0: 4, deadline: 0, overdue: true })]).xp, 0, '미리보기도 같은 셈');
+  const cc = g.contracts[slot(g, 'cold')]; const cap0 = g.vehicleCap(cc); g._addTrust('cold0', 6); assert.equal(g.vehicleCap(cc), cap0 + 2);
+  const cold0 = g.warehouse.cold; g._addTrust('cold0', 24); assert.equal(g.trustLevel('cold0'), 3); assert.equal(g.warehouse.cold, cold0 + 2);
   assert.equal(D.trustEffectText('cold', 1), '용량 +2칸'); assert.equal(D.trustEffectText('rail', 2), '배차 한도 +1대');
 });
 t('센터: 상위 tier 센터 = 다른 센터와 신규 계약 (배차 +2·용량 +1·배차비 -10%, 신뢰도는 센터별 새로 시작), 복합 능력', () => {
@@ -239,7 +242,7 @@ t('통관: 대기 중 기한 정지·일반 업체 불가, 통관 대행은 가�
   assert.ok(!g.canHandle(bulk, p)); g.contracts[3] = g._makeContract('intl', 'normal'); assert.ok(g.canHandle(g.contracts[3], p));
   const d = p.deadline; adv(g); assert.equal(p.deadline, d);
 });
-t('통관 대행 신뢰 1단계: 통관 대기 -1', () => { const g = EMPTY(4); g.contracts[3] = g._makeContract('intl', 'normal'); g.trust.intl0 = 3; g.rules.customsDelayProb = 0; const p = g._spawnParcel({ type: 'intl', size: 4 }); assert.equal(p.customs, 1); });
+t('통관 대행 신뢰 1단계: 통관 대기 -1', () => { const g = EMPTY(4); g.contracts[3] = g._makeContract('intl', 'normal'); g.trust.intl0 = 6; g.rules.customsDelayProb = 0; const p = g._spawnParcel({ type: 'intl', size: 4 }); assert.equal(p.customs, 1); });
 t('냉동: 냉동 구역 없으면 즉시 폐기, 냉동 물류만 처리, 구역보다 큰 냉동은 오지 않음', () => {
   const g = EMPTY(4, { perks: ['skip', 'longdeal'] }); g.warehouse.frozen = 2; g.schedule[g.turn] = [{ type: 'frozen', size: 2 }, { type: 'frozen', size: 2 }];
   const s0 = g.rep; adv(g); assert.equal(g.parcels.filter(p => p.type === 'frozen').length, 1); assert.equal(g.rep, s0 - 2);
@@ -257,7 +260,7 @@ t('지연 입금은 어음: 철도(포워더)는 다음 정산(보름 뒤)에 �
   adv(g); assert.equal(g.cash, cash, '다음 턴에는 아직 안 들어온다 — 어음이다'); assert.equal(g.pendingRevenue[0].due, 2, '만기는 다음 사이클 정산');
   g.cash = 5000; while (g.phase === 'play') adv(g); assert.equal(g.summary.notesPaid, 0, '이번 정산엔 만기가 아니다'); assert.equal(g.summary.notesLeft, r.revenue);
   g.closeSummary(); g.closeMarket(); g.schedule = g.schedule.map(() => []); g.parcels = []; g.rep = g.repCap(); g.cash = 5000; while (g.phase === 'play') adv(g); assert.equal(g.summary.notesPaid, r.revenue, '다음 사이클 정산에 만기'); assert.equal(g.summary.notesCount, 1);
-  const h = EMPTY(4); h.contracts[3] = h._makeContract('rail', 'normal'); h.trust.rail0 = 3; h.parcels = [P(2, 'normal', 2)]; const r2 = h.callCarrier(3, [2]); assert.ok(r2.ok, r2.msg); assert.equal(r2.delay, 0, '신뢰 1단계 특성: 즉시 입금');
+  const h = EMPTY(4); h.contracts[3] = h._makeContract('rail', 'normal'); h.trust.rail0 = 6; h.parcels = [P(2, 'normal', 2)]; const r2 = h.callCarrier(3, [2]); assert.ok(r2.ok, r2.msg); assert.equal(r2.delay, 0, '신뢰 1단계 특성: 즉시 입금');
 });
 t('월말 정산 → 마켓 → 다음 달, 배차비는 정산에', () => {
   const g = EMPTY(9); g.parcels = [P(1, 'normal', 1)]; g.callCarrier(slot(g, 'bulk'), [1]); while (g.phase === 'play') adv(g);
@@ -680,9 +683,10 @@ t('회사 선택 화면: 시작 계약(계열 이름)이 모두 실제 센터로
     assert.ok(D.CARRIERS[k].trucks > 0, id + ' ' + c.carrier + ' → trucks 없음');
   }
 });
-t('배차비 규칙: 차를 80% 채우면 똔똔 (fee ≈ 0.8 × 용량 × 칸당 보상)', () => {
-  // 계열이 싣는 종류들의 칸당 보상(전문 보너스 포함) 평균으로 기대 배차비를 다시 구해 본다.
-  // 보상표나 용량을 건드리면 여기서 걸린다 — "꽉 채워 보내라"가 수지로 성립하는지가 이 한 줄에 걸려 있다.
+t('배차비 규칙: 차를 반 채우면 똔똔 (fee ≈ 0.5 × 용량 × 칸당 보상, 크기 등장 가중 평균 ±15%)', () => {
+  // 계열이 싣는 종류들의 칸당 보상(전문 보너스 포함)을 크기 등장 비율로 가중 평균해 기대 배차비를 다시 구해 본다.
+  // 보상표나 용량을 건드리면 여기서 걸린다 — "채워 보내라"가 수지로 성립하는지가 이 한 줄에 걸려 있다.
+  // (특수 소형(1)이 열리기 전엔 단순 평균 ±2 였다 — 크기 셋을 단순 평균하면 소형이 과대평가된다)
   const carries = { bulk: ['normal'], cold: ['fresh', 'produce'], frozen: ['frozen'], fragile: ['fragile'],
     intl: ['intl'], large: ['large', 'normal'], air: ['normal', 'fragile', 'intl'],
     rail: ['normal', 'fresh', 'fragile', 'large'], sea: ['normal', 'intl', 'large', 'fragile'] };
@@ -690,9 +694,10 @@ t('배차비 규칙: 차를 80% 채우면 똔똔 (fee ≈ 0.8 × 용량 × 칸�
     const F = D.FAMILIES[f]; let n2 = 0, sum = 0;
     for (const t2 of carries[f]) { const T2 = D.PARCEL_TYPES[t2];
       for (const sz of T2.sizes) { if (sz < F.sizeMin || sz > F.sizeMax) continue;
-        sum += (T2.reward[sz] + ([].concat(F.specialist || []).includes(t2) ? T2.bonus : 0)) / sz; n2++; } }
+        const w = (T2.sizeWeight || {})[sz] || D.SIZE_WEIGHT[sz];
+        sum += w * (T2.reward[sz] + ([].concat(F.specialist || []).includes(t2) ? T2.bonus : 0)) / sz; n2 += w; } }
     const want = Math.round(D.FILL_BREAKEVEN * F.cap * (n2 ? sum / n2 : 20));
-    assert.ok(Math.abs(F.fee - want) <= 2, `${f}: fee ${F.fee} ≠ ${want} (80% 적재 똔똔)`);
+    assert.ok(Math.abs(F.fee - want) <= Math.max(2, want * 0.15), `${f}: fee ${F.fee} ≠ ${want} (반 적재 똔똔)`);
   }
 });
 t('세이브 왕복: 서장(레벨 1) 이어하기 — level·_shows 가 살아 있다', () => {
