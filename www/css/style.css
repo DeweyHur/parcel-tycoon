@@ -60,6 +60,10 @@ body { touch-action: manipulation; }
 .chip { display: inline-flex; align-items: center; gap: 3px; background: var(--panel2); border: 2px solid var(--line); padding: 1px 5px; color: var(--ink); font-size: 12px; }
 .chip i { width: 8px; height: 8px; display: inline-block; border: 1px solid var(--line); }
 /* 입고 예정: 칸 수를 숫자로 적지 않고 칸만큼 상자를 늘어놓는다 (택배 하나가 한 묶음) */
+#upcoming > .chip { flex: 0 0 auto; white-space: nowrap; }
+#upcoming .chip.up { flex: 0 1 auto; min-width: 0; align-items: flex-start; white-space: normal; }
+#upcoming .chip .ahead { white-space: nowrap; flex: 0 0 auto; }
+#upcoming .chip .boxes { display: flex; flex-wrap: wrap; gap: 1px 0; min-width: 0; align-content: flex-start; }
 #upcoming .chip .box { display: inline-flex; gap: 1px; margin-left: 3px; }
 #upcoming .chip .box i { width: 7px; height: 9px; border: 1px solid #0006; }
 #upcoming .chip .more { color: var(--dim); margin-left: 2px; }
