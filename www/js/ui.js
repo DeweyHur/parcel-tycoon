@@ -145,11 +145,12 @@
     BGM.play('title');
   }
   // 레벨 런: 난이도·회사·퍽을 묻지 않는다. 소개는 박 반장이 게임 안에서 한다
+  // 간판: 서장·1장(인수인계)은 언제나 한 사장의 「한성창고」다 — 상호는 1장 끝 가계약에서 짓는다. 이름을 지은 뒤 서장을 다시 해도 그때는 아직 한 사장 가게다
   function startLevel(n) {
     const P = Profile.get();
     // 마켓은 장 **끝**에 온다 (정산 직후). 배차를 다 쓴 그 자리에서 충전을 배우고, 예보로 다음 장을 준비한다.
     game = new Game({ scenario: M.DEFAULT_SCENARIO, company: 'local', perks: [], insurer: 'none', story: true, level: n, prep: false,
-      companyName: P.campaign.name || T('lv.ownerShop'), carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
+      companyName: (n > 2 && P.campaign.name) || T('lv.ownerShop'), carry: n > 1 ? ((P.campaign.carryAt && P.campaign.carryAt[n]) || P.campaign.carry || null) : null });
     // 서장을 시작할 때마다 오프닝 씬을 튼다 (이어하기는 아니다 — 그건 startPlay 를 바로 부른다)
     closeModal(); startPlay({ intro: n === 1 });
   }
@@ -222,6 +223,7 @@
       // 마지막 장 — 인수인계가 끝났다. 엔딩 씬 한 번 보여 주고 타이틀로
       closeModal();
       { const P3 = Profile.get(); P3.story = Object.assign({}, P3.story, { seen: true, done: true }); Profile.save(); }
+      if (scene && scene.setShopName) scene.setShopName(P.campaign.name || T('lv.nameDefault'), { silent: true });   // 엔딩은 내 간판을 올려다본다
       if (window.Intro && scene) Intro.play(scene, () => showTitle(), { outro: true, params: { name: esc(P.campaign.name || T('lv.nameDefault')) } });
       else showTitle();
     };

@@ -61,6 +61,7 @@ window.Scene3D = (function () {
       this.renderer.domElement.style.cursor = 'pointer';
       this.renderer.domElement.addEventListener('pointerup', e => this._inspectAt(e));
       this.parts = {};                     // 착탈식 모듈: shell · cold · yard · van
+      this.shopName = window.I18n ? window.I18n.t('lv.ownerShop') : '';   // 상호 간판 — 게임이 붙으면 sync 가 그 런의 상호로 바꾼다
       this.Z = this._zonesFor(BARE);   // 첫 프레임: 냉장·냉동 없는 맨 창고 (sync 가 곧 진짜 창고로 덮는다)
       this._buildTerrain();
       this._syncBuilding(BARE);
@@ -68,7 +69,7 @@ window.Scene3D = (function () {
       this.weather = 'sunny';
       this.resize();
       // 픽셀 폰트가 늦게 로드되면 간판을 다시 굽는다
-      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.signCache = null; if (this.tileCaps) this._buildTiles(...this.tileCaps); });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.signCache = null; this.shopCache = null; this._syncShopSigns(false); if (this.tileCaps) this._buildTiles(...this.tileCaps); });
       window.addEventListener('resize', () => this.resize());
       // 패널이 늘고 줄면(호출 모드·재고 줄 수·모달) 창고 화면 높이가 창 크기 없이도 바뀐다 — 그때마다 캔버스와 카메라를 다시 맞춘다. 안 하면 캔버스가 세로로 늘어나 모델이 찌그러진다
       if (typeof ResizeObserver !== 'undefined') { let last = ''; new ResizeObserver(() => { if (this.cine) return; const k = this.container.clientWidth + 'x' + this.container.clientHeight; if (k !== last) { last = k; this.resize(); } }).observe(this.container); }
@@ -161,6 +162,7 @@ window.Scene3D = (function () {
       put('yard', this._makeYardPad(Z), 0.5);
       const vans = ['coldvan', 'padvan', 'bigvan'].filter(k => wh[k]);
       put('van', vans.length ? this._makeVan(Z, vans[0]) : null, 1.4);
+      this._syncShopSigns(!first);
       if (this.parts.front) { this.parts.front.visible = !!this.closed; this._setAlpha(this.parts.front, 1); }
       if (this.road) { this.road.position.x = Z.x1 + 0.6 + 20; this.road.position.z = Z.roadZ; }   // 도로는 마당 너머, 건물 오른쪽으로
       if (this.truck) this.truck.position.z = Z.roadZ;
@@ -242,6 +244,76 @@ window.Scene3D = (function () {
       return g;
     }
     // 차량 시설을 사면 마당에 그 차가 선다 (냉장 밴 · 완충 밴 · 대형 밴)
+    // ---------- 상호 간판 ----------
+    // 서장·1장(인수인계)에는 한 사장의 「한성창고」가 걸려 있고, 가계약서에 도장을 찍으면 내가 지은 이름으로 갈아 단다.
+    // 두 군데에 건다: 뒤쪽 지붕 위 입간판(플레이 화면 — 앞면이 벗겨져 있어도 보인다)과
+    // 셔터 위 인방(오프닝·엔딩의 완성 건물 — 앞면과 함께 들렸다 사라진다). 앞면이 씌워져 있을 때 지붕 간판은 숨긴다(같은 이름이 두 번 보인다).
+    setShopName(name, opts) {
+      name = String(name || '').trim();
+      if (!name || name === this.shopName) return false;
+      this.shopName = name;
+      this._syncShopSigns(!(opts && opts.silent));   // 간판을 갈아 달 때는 위에서 내려앉는다
+      return true;
+    }
+    _syncShopSigns(drop) {
+      const Z = this.Z, name = this.shopName;
+      if (this.parts.shopRoof) this.scene.remove(this.parts.shopRoof);
+      this.parts.shopRoof = null;
+      const f = this.parts.front;
+      if (f) [...f.children].filter(o => o.userData.shopSign).forEach(o => f.remove(o));
+      if (!name || !Z) return;
+      const w = Z.x1 - Z.x0, cx = (Z.x0 + Z.x1) / 2;
+      // 지붕 입간판: 뒤쪽 지붕 끝에 다리 둘로 세운다
+      const roof = this._shopBoard(name, 0.52, w - 1.4, true);
+      roof.userData.inspect = { kind: 'warehouse' };
+      roof.position.set(cx, 3.31, BACK_Z - 0.02);
+      roof.visible = !this.closed;
+      this.parts.shopRoof = roof; this.scene.add(roof);
+      if (drop) this._dropIn(roof, 1.1);
+      // 셔터 위 인방 간판 (앞면 그룹의 자식)
+      if (f) {
+        const front = this._shopBoard(name, 0.5, w - 1.0, false);
+        front.userData.shopSign = true;
+        front.position.set(cx, 2.57, Z.frontZ + 0.16);
+        f.add(front);
+        if (f.visible && drop) this._dropIn(front, 0.8);
+      }
+    }
+    // 간판 한 장: 테두리 상자 + 이름 판. h 는 판 높이, maxW 를 넘으면 비율대로 줄인다. legs 면 다리를 달아 바닥(y=0)에 세운다
+    _shopBoard(name, h, maxW, legs) {
+      const t = this._shopTexture(name), aspect = t.w / t.h;
+      let bw = h * aspect, bh = h;
+      if (bw > maxW) { bw = Math.max(0.6, maxW); bh = bw / aspect; }
+      const g = new THREE.Group(), lift = legs ? 0.16 : 0;
+      const frame = noShadow(this._box(bw + 0.08, bh + 0.08, 0.08, 0x0f0e1a)); frame.position.y = lift + bh / 2; g.add(frame);
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(bw, bh), new THREE.MeshBasicMaterial({ map: t.tex }));
+      face.position.set(0, lift + bh / 2, 0.045); g.add(face);
+      if (legs) for (const x of [-bw * 0.32, bw * 0.32]) { const l = noShadow(this._box(0.07, lift + 0.04, 0.07, 0x35314f)); l.position.set(x, (lift + 0.04) / 2, 0); g.add(l); }
+      return g;
+    }
+    // 이름 판 텍스처: 구역 표지와 같은 도트 결 (1배로 찍고 정수배 확대). 남색 판에 노란 굵은 글씨
+    _shopTexture(name) {
+      this.shopCache = this.shopCache || {};
+      if (this.shopCache[name]) return this.shopCache[name];
+      const F = "bold 11px 'Galmuri11', monospace";
+      const probe = document.createElement('canvas').getContext('2d'); probe.font = F;
+      const tw = Math.ceil(probe.measureText(name).width);
+      const vw = tw + 2 * 2 + 2 * 6, vh = 19;                    // 테두리 2 + 여백 6
+      const s1 = document.createElement('canvas'); s1.width = vw; s1.height = vh;
+      const x1 = s1.getContext('2d');
+      const px = (x, y, w, h, col) => { x1.fillStyle = col; x1.fillRect(x, y, w, h); };
+      px(0, 0, vw, vh, SIGN.line); px(2, 2, vw - 4, vh - 4, SIGN.bg); px(2, 2, vw - 4, 1, SIGN.hi);
+      px(4, 4, 1, 1, '#ffd166'); px(vw - 5, 4, 1, 1, '#ffd166'); px(4, vh - 5, 1, 1, '#ffd166'); px(vw - 5, vh - 5, 1, 1, '#ffd166');   // 네 귀 리벳
+      x1.font = F; x1.textBaseline = 'middle'; x1.textAlign = 'center';
+      x1.fillStyle = SIGN.line; x1.fillText(name, vw / 2 + 1, vh / 2 + 1);
+      x1.fillStyle = '#ffd166'; x1.fillText(name, vw / 2, vh / 2);
+      const S = 4, c = document.createElement('canvas'); c.width = vw * S; c.height = vh * S;
+      const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.drawImage(s1, 0, 0, c.width, c.height);
+      const tex = new THREE.CanvasTexture(c);
+      tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+      const out = { tex, w: vw, h: vh };
+      this.shopCache[name] = out; return out;
+    }
     _makeVan(Z, kind) {
       const color = kind === 'coldvan' ? 0x5ee0d8 : kind === 'padvan' ? 0xf0a04b : 0xb08bd8;
       const g = new THREE.Group();
@@ -529,6 +601,7 @@ window.Scene3D = (function () {
       const D = window.DATA;
       if (game.weatherNow) this.setWeather(game.weatherNow());
       // 창고가 바뀌었으면 건물부터 다시 짓는다 (착탈식 모듈) — 그 다음 바닥 타일
+      if (game.companyName) this.setShopName(game.companyName(), { silent: !this._synced });   // 저장한 판을 처음 열 때는 조용히, 장이 넘어가며 이름이 바뀌면 내려앉는다
       if (game.warehouse) { this._syncBuilding(game.warehouse, { silent: !this._synced }); this._synced = true; }
       this._syncGrowthVisuals(game.growth);
       { const wh = game.warehouse, use = { main: game.usedVolume ? game.usedVolume() : 0, cold: game.coldUsed ? game.coldUsed() : 0, frozen: game.frozenUsed ? game.frozenUsed() : 0, yard: game.outdoorVolume ? game.outdoorVolume() : 0 };
@@ -671,6 +744,7 @@ window.Scene3D = (function () {
       if (!f) return;
       this.tweens = this.tweens.filter(t => t.tag !== 'front');
       if (this.tiles) this.tiles.visible = !on;
+      if (this.parts.shopRoof) this.parts.shopRoof.visible = !on;
       if (on) { f.visible = true; f.position.y = 0; this._setAlpha(f, 1); return; }
       if (!animate) { f.visible = false; f.position.y = 0; this._setAlpha(f, 1); return; }
       const box = { y: 0, a: 1 };
