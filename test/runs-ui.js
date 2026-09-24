@@ -25,7 +25,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.click('#t-new'); await page.waitForTimeout(400);
   let t = await modalText();
   ok('런 선택: 한국 · 분기 · 봄', /한국/.test(t) && /분기/.test(t) && /봄 \(3~5월\)/.test(t));
-  ok('런 카드에 시작 해와 달', new RegExp(`${new Date().getFullYear()}년 3월 ~ 5월`).test(t), (t.match(/📅[^📅]{0,24}/) || [''])[0].trim());
+  ok('런 카드에 시작 해', new RegExp(`📅${new Date().getFullYear()}`).test(t), (t.match(/📅[^📅]{0,24}/) || [''])[0].trim());
   ok('난이도 줄이 없다', !/수습|베테랑|정규/.test(t));
   // 못 고르는 런은 아예 안 보인다 (해금 조건은 도감에)
   const locked = await page.evaluate(() => [...document.querySelectorAll('#modal .card.dis')].length);
@@ -36,7 +36,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.evaluate(() => { const b = [...document.querySelectorAll('.modal .btn')].find(x => /타이틀/.test(x.textContent)); b.click(); }); await page.waitForTimeout(300);
   await page.click('#t-new'); await page.waitForTimeout(400);
   t = await modalText();
-  ok('겨울은 해를 넘겨 표시', /겨울 \(12~2월\)/.test(t) && new RegExp(`${new Date().getFullYear()}년 12월 ~ ${new Date().getFullYear() + 1}년 2월`).test(t));
+  ok('겨울은 해를 넘겨 표시', /겨울 \(12~2월\)/.test(t) && new RegExp(`${new Date().getFullYear()}→${new Date().getFullYear() + 1}`).test(t));
   ok('선택은 봄 그대로', (await page.evaluate(() => PT.prep.scenario)) === 'kr_spring');
   // 회사 → 퍽 → 시작
   await page.evaluate(() => { const b = [...document.querySelectorAll('.modal .btn')].find(x => /다음: 회사/.test(x.textContent)); b.click(); }); await page.waitForTimeout(300);

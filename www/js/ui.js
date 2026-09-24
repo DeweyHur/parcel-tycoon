@@ -382,8 +382,13 @@
       const rec = P.records[id]; const best = rec ? Math.max(0, ...Object.values(rec).map(r => r.bestScore)) : 0;
       const sm = s.mods.startMonth, em = ((sm - 1 + s.months / D.CYCLES_PER_MONTH - 1) % 12) + 1, y2 = year + Math.floor((sm - 1 + s.months / D.CYCLES_PER_MONTH - 1) / 12);
       const when = T(y2 === year ? 'prep.runWhenSame' : 'prep.runWhenNext', { y1: year, m1: sm, y2, m2: em });
-      return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">${T('fmt.months', { n: s.months / D.CYCLES_PER_MONTH })}</small></span><span class="price">${best ? T('fmt.pts', { n: best }) : ''}</span></div>
-        <div class="d" style="color:var(--dim);font-size:11px">📅 ${esc(when)}</div><div class="d">${esc(s.desc)}</div>${un ? '' : `<div class="d">${lock ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
+      // 줄글 대신 달력 칩: 석 달이면 달마다 아이콘+이름, 그보다 길면 아이콘만 줄지어. 긴 런은 점수 배율
+      const nM = s.months / D.CYCLES_PER_MONTH, cal = M.CALENDARS[s.country] || { months: {} };
+      const mons = Array.from({ length: nM }, (_, i) => ((sm - 1 + i) % 12) + 1);
+      const chips = mons.map(mo => { const ic = (cal.months[mo] || {}).icon || ''; const lb = T('cal.' + s.country + '.' + mo + '.label'); return nM <= 3 ? `<span class="co-chip">${ic}${esc(lb)}</span>` : `<span title="${esc(lb)}">${ic}</span>`; }).join('');
+      const mult = s.mods.scoreMult && s.mods.scoreMult !== 1 ? `<span class="co-plus">⭐×${s.mods.scoreMult}</span>` : '';
+      return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">📅${esc(when)}</small></span><span class="price">${best ? T('fmt.pts', { n: best }) : ''}</span></div>
+        <div class="co-row${nM > 3 ? ' mons' : ''}">${chips}${mult}</div>${un ? '' : `<div class="d">${lock ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
     };
     // 아직 못 고르는 런은 보여 주지 않는다 (해금 조건은 도감에 있다). 체험판은 전부 잠겨 있으니 그대로 보여 주고 누르면 안내로
     const avail = id => lock || P.unlocked.scenarios.includes(id);
