@@ -397,19 +397,31 @@
   // 회사 시작 계약은 계열 이름(bulk…)으로 적혀 있다 → Game.resolveCenter 와 같은 규칙으로 센터 id 를 찾는다
   const GRADE_TIER = g => Math.max(0, ['normal', 'trusted', 'expert', 'master'].indexOf(g || 'normal'));
   function startCenter(c) { return D.CARRIERS[c.carrier] ? c.carrier : (D.centerFor(c.carrier, GRADE_TIER(c.grade)) || null); }
-  function companyInfo(co, id) {
-    const wh = co.warehouse ? T('prep.warehouse', { cap: co.warehouse.cap, cold: co.warehouse.cold, xl: co.warehouse.xl }) : T('prep.warehouseRandom');
-    const ct = co.contracts ? co.contracts.map(c => { const k = startCenter(c); const car = k && D.CARRIERS[k]; if (!car) return String(c.carrier); return `${car.short || car.name || k}${c.grade === 'trusted' ? '★' : ''} ${T('fmt.trucks', { n: c.calls != null ? c.calls : car.trucks + ((D.GRADES[c.grade || 'normal'] || {}).calls || 0) })}`; }).join(', ') : T('prep.contractsRandom');
-    return `<div class="d">${wh} · ${T('hud.cash')} ${co.cash}<br>${T('prep.contracts')}: ${esc(ct)}</div><div class="d" style="color:var(--green)">＋ ${esc(co.passive)}</div><div class="d" style="color:var(--orange)">－ ${esc(co.weakness)}</div>`;
+  // 회사 카드는 특색만 아이콘으로: 창고·자금 칩 한 줄 + 장점/약점의 이름만. 긴 설명과 계약은 고른 카드에서만 펼친다
+  const traitName = t => String(t || '').split(/[:：]/)[0].trim();
+  function companyInfo(co, id, open) {
+    const W = co.warehouse, chip = (ic, v, label) => `<span class="co-chip" title="${esc(label)}">${ic}<b>${v}</b></span>`;
+    const stats = (W ? chip('📦', W.cap, T('common.warehouse')) + (W.cold ? chip('❄', W.cold, D.ATTRS.cold.name) : '') + (W.xl ? chip('🛋', W.xl, T('common.xl')) : '') : chip('🎲', '?', T('prep.warehouseRandom'))) + chip('💰', co.cash, T('hud.cash'));
+    const none = !co.weakness || co.weakness === T('common.none');
+    const traits = `<span class="co-plus">＋${esc(traitName(co.passive))}</span>${none ? '' : `<span class="co-minus">－${esc(traitName(co.weakness))}</span>`}`;
+    let out = `<div class="co-row">${stats}${open ? '' : traits}</div>`;
+    if (open) {
+      const ct = co.contracts ? co.contracts.map(c => { const k = startCenter(c); const car = k && D.CARRIERS[k]; if (!car) return String(c.carrier); return `${car.short || car.name || k}${c.grade === 'trusted' ? '★' : ''} ${T('fmt.trucks', { n: c.calls != null ? c.calls : car.trucks + ((D.GRADES[c.grade || 'normal'] || {}).calls || 0) })}`; }).join(', ') : T('prep.contractsRandom');
+      out += `<div class="d">🚚 ${esc(ct)}</div><div class="d" style="color:var(--green)">＋ ${esc(co.passive)}</div>${none ? '' : `<div class="d" style="color:var(--orange)">－ ${esc(co.weakness)}</div>`}`;
+    }
+    return out;
   }
+  // 잠긴 카드는 진행도만 (조건 문장은 누르면 토스트로)
+  function unlockProg(achId) { const a = M.ACHIEVEMENTS[achId]; try { if (a && a.prog) { const P = Profile.get(); const [h, n] = a.prog(P.stats, P); return `${Math.min(h, n)}/${n}`; } } catch (e) { } return ''; }
   function showCompanySelect() {
     const P = Profile.get(), lock = demoLocked();
     if (!P.unlocked.companies.includes(prep.company)) prep.company = 'local';
     const cards = Object.keys(M.COMPANIES).sort((x, y) => (M.COMPANIES[x].tier || 0) - (M.COMPANIES[y].tier || 0)).map(id => {
       const co = M.COMPANIES[id], un = !lock && P.unlocked.companies.includes(id);
       const rec = (P.records[prep.scenario] || {})[id];
-      return `<div class="card ${un ? '' : 'dis'} ${prep.company === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${co.icon} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${rec ? T('fmt.pts', { n: rec.bestScore }) : ''}</span></div>
-        ${un ? companyInfo(co, id) : `<div class="d">${lock ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(co.unlock))}</div>`}</div>`;
+      if (!un) return `<div class="card dis co-lock" data-id="${id}"><div class="t"><span>🔒 ${co.icon} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${lock ? '' : esc(unlockProg(co.unlock))}</span></div></div>`;
+      return `<div class="card ${prep.company === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${co.icon} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${rec ? T('fmt.pts', { n: rec.bestScore }) : ''}</span></div>
+        ${companyInfo(co, id, prep.company === id)}</div>`;
     }).join('');
     const m = modal(T('prep.companyTitle'), `<div class="perk-count">${T('prep.step2')} — ${esc(M.SCENARIOS[prep.scenario].name)}</div>${cards}`, [{ label: T('btn.back'), onClick: showScenarioSelect }, { label: lock ? T('demo.cta') : T('prep.nextPerk'), cls: lock ? 'gold' : 'primary', onClick: () => lock ? showDemoGate(showCompanySelect) : showPerkSelect() }]);
     m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (lock) { SFX.click(); showDemoGate(showCompanySelect); return; } if (!P.unlocked.companies.includes(id)) { toast(unlockText(M.COMPANIES[id].unlock), 2500); return; } SFX.select(); prep.company = id; showCompanySelect(); });
@@ -742,7 +754,7 @@
   function showCompanyInfo() {
     const g = game, co = g.company;
     const custs = g.customerSummary().map(c => `<div class="d">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)}${c.id !== 'anon' ? ` — ${T('cust.trustLv', { n: c.level })}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('');
-    const body = `<div class="d">${esc(co.tag)}</div>${companyInfo(co, g.cfg.company)}
+    const body = `<div class="d">${esc(co.tag)}</div>${companyInfo(co, g.cfg.company, true)}
       <div class="d" style="margin-top:6px">${T('company.warehouse', { cap: g.warehouse.cap, cold: g.warehouse.cold, frozen: g.warehouse.frozen || 0, xl: g.warehouse.xl })}${['coldvan', 'padvan', 'bigvan', 'vent'].filter(k => g.warehouse[k]).length ? ` · ${T('company.facilities')}: ` + ['coldvan', 'padvan', 'bigvan', 'vent'].filter(k => g.warehouse[k]).map(k => D.FACILITIES[k].name).join(', ') : ''}</div>
       <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('company.customers')}</div>${custs}
       ${g.perks.length ? `<div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('company.perks')}</div>${g.perks.map(p => `<div class="d">${esc(M.PERKS[p].name)} — ${esc(M.PERKS[p].desc)}</div>`).join('')}` : ''}`;
@@ -1742,7 +1754,7 @@
     const P = Profile.get();
     const tabs = ['companies', 'carriers', 'perks', 'scenarios', 'achievements', 'stats'].map(id => [id, T('codex.tab.' + id)]);
     let body = `<div class="tabs">${tabs.map(([id, nm]) => `<button class="btn small ${tab === id ? 'gold' : ''}" data-tab="${id}">${nm}</button>`).join('')}</div>`;
-    if (tab === 'companies') body += [0, 1, 2, 3].map(t => `<div class="perk-count">${TIER_NAMES()[t]}</div>` + Object.keys(M.COMPANIES).filter(id => (M.COMPANIES[id].tier || 0) === t).map(id => { const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id); const clears = P.stats.clearsByCompany[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? co.icon : '🔒'} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div>${un ? companyInfo(co, id) : `<div class="d">${esc(unlockText(co.unlock))}</div>`}</div>`; }).join('')).join('');
+    if (tab === 'companies') body += [0, 1, 2, 3].map(t => `<div class="perk-count">${TIER_NAMES()[t]}</div>` + Object.keys(M.COMPANIES).filter(id => (M.COMPANIES[id].tier || 0) === t).map(id => { const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id); const clears = P.stats.clearsByCompany[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? co.icon : '🔒'} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div>${un ? companyInfo(co, id, true) : `<div class="d">${esc(unlockText(co.unlock))}</div>`}</div>`; }).join('')).join('');
     else if (tab === 'carriers') { const live = game && game.phase !== 'over' && game.phase !== 'win'; body += `<div class="perk-count">${T('codex.carriersHead')}${live ? ` ${T('codex.liveRun')}` : ''}</div>` + Object.keys(D.FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${esc(D.FAMILIES[f].name)}</div>` + D.centersOf(f).map(k => { const car = D.CARRIERS[k]; return `<div class="card" style="cursor:default"><div class="t"><span>${car.badge || ''} ${esc(car.name)}${gradeBadge(car.grade)}</span><span class="price">${T('codex.carrierPrice', { vehicle: esc(car.vehicle || ''), cap: car.cap, fee: car.fee, trucks: car.trucks, price: car.price })}</span></div><div class="d">${esc(car.desc)}<br>${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.need ? ` · ${T('codex.need', { icons: car.need.map(a => D.ATTRS[a].icon).join('') })}` : ''}${car.onlyPlain ? ` · ${T('pd.plainOnly')}` : ''}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}${trustTrack(k, live ? game.trustXp(k) : null)}</div></div>`; }).join('')).join(''); }
     else if (tab === 'perks') body += `<div class="perk-count">${T('codex.perkSlots', { n: Profile.perkSlots() })}</div>` + Object.keys(M.PERK_FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${T('prep.family', { family: M.PERK_FAMILIES[f] })}</div>` + Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f).map(id => { const pk = M.PERKS[id], un = P.unlocked.perks.includes(id); return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t">${un ? '' : '🔒 '}${esc(pk.name)}</div><div class="d">${esc(pk.desc)}${un ? '' : `<br>${esc(unlockText(pk.unlock))}`}</div></div>`; }).join('')).join('');
     else if (tab === 'scenarios') body += Object.keys(M.SCENARIOS).map(id => { const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id); const clears = P.stats.clearsByScenario[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? s.icon : '🔒'} ${esc(s.name)}</span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div><div class="d">${esc(s.desc)}${un ? '' : `<br>${esc(unlockText(s.unlock))}`}</div></div>`; }).join('');
