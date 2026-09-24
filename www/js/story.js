@@ -112,7 +112,7 @@
     { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 6, pages: [
       { expr: 'neutral', hl: '#call-head .load-visual' },
       { speaker: 'yeo', expr: 'smile', hl: '#call-head .load-visual' },
-      { expr: 'neutral', hl: '#call-foot .btn.primary', gate: g => bestReadySlot(g).slot >= 0 },
+      { expr: 'neutral', hl: '#wait-btn', gate: g => bestReadySlot(g).slot >= 0 },
     ] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
@@ -252,7 +252,7 @@
       { expr: 'think', hl: '#cself' },
       { expr: 'neutral', hl: '#cself', gate: true },
     ] },
-    { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => !!ctx.self, pages: [{ expr: 'neutral', hl: '#self-go', gate: true }] },
+    { id: 'l3selfPick', kind: 'modal', modal: 'wait', when: (g, ctx) => !!ctx.self, pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
     { id: 'l4risk', kind: 'modal', modal: 'call', when: (g, ctx) => (ctx.risk || 0) > 0, pages: [{ expr: 'worry', hl: '#call-head .riskline' }] },
     // 🌾 상하는 것
     { id: 'l4produce', kind: 'turn', when: g => !!firstOf(g, 'produce'), pages: [{ expr: 'neutral', hl: '#parcels' }] },
@@ -364,10 +364,10 @@
     { id: 'usage', months: [1], kind: 'turn', when: g => g.turn >= 2, pages: [{ expr: 'neutral', hl: '#scene' }] },
     { id: 'callReady', months: [1], kind: 'turn', when: g => g.turn >= 3 || bestReadySlot(g).fill >= 0.8, pages: [{ expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; } }, { expr: 'neutral', hl: g => { const b = bestReadySlot(g); return b.slot >= 0 ? '#c' + b.slot : '#actions'; }, gate: g => bestReadySlot(g).slot >= 0 }] },
     // 호출 팝업 안: 자동 선택 버튼 → 호출 버튼. 팝업이 다시 그려질 때마다 ctx.sel(선택 수)로 확인한다
-    { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#pick-urgent', gate: true }] },
+    { id: 'callModal', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'neutral', hl: '#parcels', gate: true }] },
     // 차가 두 대 붙는 첫 순간. 자동으로 붙는 거라 설명이 없으면 배차가 왜 2대 줄었는지 모른다 (대본 1개월차 8턴에 정확히 12칸이 온다)
     { id: 'trucks2', needs: 'simul', months: [1, 2, 3], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && ctx.trucks > 1, pages: [{ expr: 'neutral', hl: '#call-head .load-visual' }, { expr: 'smile', hl: '#call-head .load-visual' }] },
-    { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#parcels' }, { expr: 'neutral', hl: '#call-foot .btn.primary', gate: true }] },
+    { id: 'callGo', months: [1, 2], kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0, pages: [{ expr: 'smile', hl: '#parcels' }, { expr: 'neutral', hl: '#wait-btn', gate: true }] },
     { id: 'firstCall', months: [1, 2], kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: g => repOf(g.contracts.find(c => c && c.totalCalls > 0) ? g.contracts.find(c => c && c.totalCalls > 0).carrier : 'bulk0'), expr: 'smile', k: () => 'story.firstCall.rep' }, { expr: 'neutral', k: () => 'story.firstCall.2' }] },
     // 안내가 끝났다는 걸 말로 못 박아 준다. 이게 없으면 언제까지 시키는 대로 해야 하는지 알 수 없다.
     { id: 'handOff', months: [1], kind: 'turn', when: g => g.story.seen.includes('firstCall'), pages: [{ expr: 'smile' }] },
@@ -405,7 +405,7 @@
     { id: 'noContract', months: [2, 3], kind: 'turn', when: g => g.parcels.some(p => !(p.customs > 0) && attrsOf(g, p).some(a => gating.includes(a)) && !handleable(g, p)), pages: [{ expr: 'worry' }, { expr: 'neutral', hl: '#cself', gate: true }] },
     // 대기 팝업 안 (noContract 다음): 직접 배송할 택배 하나 → 대기 버튼
     { id: 'waitSelf', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('noContract') && ctx.picked === 0 && ctx.elig > 0, pages: [{ expr: 'neutral', hl: '#parcels .ptile:not(.dis)', gate: true }] },
-    { id: 'waitGo', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('waitSelf') && ctx.picked > 0, pages: [{ expr: 'neutral', hl: '#self-go', gate: true }] },
+    { id: 'waitGo', months: [2, 3], kind: 'modal', modal: 'wait', when: (g, ctx) => g.story.seen.includes('waitSelf') && ctx.picked > 0, pages: [{ expr: 'neutral', hl: '#wait-btn', gate: true }] },
     { id: 'offer', needs: 'storage', months: [2, 3], kind: 'turn', when: g => !!g.offer, pages: [{ expr: 'neutral', hl: '#offer' }, { expr: 'think' }] },
     { id: 'cash', months: [2, 3], kind: 'turn', when: g => g.projectedCash().total < 0 || g.debt > 0, pages: [{ expr: 'think', hl: '#hud-left' }, { expr: 'worry' }] },
     { id: 'summary2', months: [2], kind: 'summary', when: () => true, pages: [{ expr: 'neutral' }] },

@@ -141,7 +141,7 @@ body { touch-action: manipulation; }
 .pips.calls b.on { background: #8fb8ff; color: #1b2340; box-shadow: none; }
 .calls.zero .pips i { box-shadow: inset 0 0 0 1px #ffffff33; }
 .contract .sub .spent { color: var(--dim); white-space: normal; }
-.contract.ready { border-color: var(--gold); }
+/* '부를 수 있음'(ready)·'만차 가능'(full) 강조는 뺐다 — 노란 테두리는 진짜 고른 카드(picked)에만 */
 #wait-btn, #self-btn { font-size: 14px; text-align: center; font-weight: 700; }
 #wait-btn small, #self-btn small { display: block; font-size: 11px; font-weight: 400; color: var(--ink); line-height: 1.35; }
 #wait-btn small .wrisk { color: var(--orange); font-weight: 700; }
@@ -686,10 +686,8 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 
 /* 만차 가능 — 눌러 보라는 반짝임 (강제 아님) */
 @keyframes fullGlow { 50% { box-shadow: 0 0 0 2px #7ee08a, 0 0 14px #7ee08aaa; } }
-#contract-strip .contract.full { border-color: var(--green); animation: fullGlow 1s steps(2) infinite; }
 #contract-strip .contract { position: relative; }
-#contract-strip .contract.full::before { content: attr(data-full); position: absolute; right: 4px; bottom: 3px; font-size: 9px; color: var(--green); }
-#call-go.full { animation: fullGlow 1s steps(2) infinite; }
+#wait-btn.call { background: #b98a1e; border-color: var(--gold); }
 
 /* 마켓 현재 계약: 칸 수 대신 작은 트럭 */
 .mktruck { display: inline-flex; align-items: center; gap: 1px; padding: 2px 2px 2px 3px; margin-right: 6px; background: #34324b; border: 2px solid #11101d; vertical-align: middle; }

@@ -584,20 +584,21 @@
     $('#upcoming').innerHTML = up.slice(0, 2).map((u, i) => {
       const mark = `<b class="ahead">${T(i ? 'hud.dayAfter' : 'hud.tomorrow')}</b>`;
       const wx = u.weather && g.shows('weather') ? `${M.WEATHER[u.weather].icon} ` : '';
-      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${mark} ${wx}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}${(() => {
+      // 이름표는 한 줄, 상자 묶음은 두 줄까지 접힌다 — 폰 폭에서 '내일'이 세로로 쪼개지던 것
+      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${mark} ${wx}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}<span class="boxes">${(() => {
         let drawn = 0; const out = [];
         for (const sp of u.specs) {
-          if (drawn >= 12) { out.push('<b class="more">⋯</b>'); break; }
-          const t = D.PARCEL_TYPES[sp.type], n = Math.min(sp.size, 12 - drawn); drawn += n;
+          if (drawn >= 16) { out.push('<b class="more">⋯</b>'); break; }
+          const t = D.PARCEL_TYPES[sp.type], n = Math.min(sp.size, 16 - drawn); drawn += n;
           out.push(`<span class="box" title="${esc(t.name)}" aria-label="${esc(t.name)} ${sp.size}">${`<i style="background:${t.css}"></i>`.repeat(n)}</span>`);
         }
         return out.join('');
-      })()}</span>`;
+      })()}</span></span>`;
       // 월말 정산은 '호출 없음' 버튼 아래에 이미 적혀 있다 — 칩으로 또 띄우면 같은 말이 두 번
       if (u.turn > g.turns()) return '';
       return `<span class="chip none">-</span>`;
     }).join('');
-    if (g.isWeekendAfter(g.turn)) $('#upcoming').innerHTML += `<span class="chip none">🛌 ${T('hud.weekend')}</span>`;
+    // 토요일의 '🛌 일요일' 칩은 뺐다 — 내일·모레는 영업일 기준이고, 쉬는 건 아래 「휴식」 버튼이 이미 말한다
     const wxNow = g.weatherNow(), W = M.WEATHER[wxNow], showWx = g.shows('weather');
     if (showWx) $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.name + (W.desc ? ' — ' + W.desc : ''))}">${W.icon}</span>` + $('#upcoming').innerHTML;
     $('#wxline').onclick = () => { SFX.click(); showWeatherInfo(); };
@@ -656,6 +657,12 @@
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
     const f = g.forecast();
     renderOps(g, f);
+    // 카드를 눌러 차를 세웠으면 이 버튼이 곧 호출(또는 직접 배송) 버튼이다. 카드를 다시 눌러 풀면 「호출 없음」으로 돌아온다
+    if (pickAction) {
+      wb.className = 'btn primary call'; wb.disabled = busy || g.phase !== 'play' || !pickAction.on;
+      wb.innerHTML = `${pickAction.label}<small>${pickAction.sub}</small>`;
+      renderCoach(); return;
+    }
     const warn = [];
     if (f.overdue) warn.push(T('wait.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wait.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wait.frozenOver', { n: f.frozenOver }));
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
@@ -1096,8 +1103,8 @@
   // 마지막으로 고른 계약의 차가 패널 위에 늘 서 있고, 창고 상자는 그 차에 실을 것을 고르는 판이다.
   // 계약 카드를 누르면 그 차로 바뀌고, 호출을 누르면 바로 실어 간다.
   // 선택은 그날·그 차 동안 유지되고, 날이 바뀌거나 차를 바꾸거나 한 번 보내면 다시 자동으로 담는다.
-  let pick = null;       // { i, sel: Set<id>, extra, turn, auto }
-  let lastSlot = 0;
+  let pick = null;       // { i, sel: Set<id>, turn, auto, tapped }
+  let pickAction = null; // 차가 서 있을 때 아래 큰 버튼이 할 일 { label, sub, on }
   let lastCallCtx = null, lastCallSig = '';
   // 차는 늘 서 있어서 '팝업을 연 순간'이 없다. 대신 서 있는 차의 상태(몇 대·몇 칸·위험)가 바뀌면
   // 그때 비트를 확인한다 — 처음 두 대가 붙는 순간(l2two) 같은 대사가 탭 없이도 나온다.
@@ -1123,14 +1130,14 @@
     } catch (e) { /* 자동 선택이 안 되면 빈 채로 */ }
     return sel;
   }
+  // 차는 카드를 눌러야 선다 — 저절로 서 있는 차는 없다(그래야 '선택된 것만 노랗다'). 턴이 넘어가면 선택은 풀린다.
   function ensurePick() {
     const g = game;
-    if (!g || g.phase !== 'play') { pick = null; return null; }
+    if (!g || g.phase !== 'play' || !pick) { pick = null; return null; }
+    const i = pick.i;
     const ok = k => k === SELF ? selfOk() : !!(g.contracts[k] && g.canCall(g.contracts[k]));
-    let i = pick ? pick.i : lastSlot;
-    if (!ok(i)) { i = g.contracts.findIndex((c, k) => ok(k)); if (i < 0 && selfOk()) i = SELF; }
-    if (i < 0) { pick = null; return null; }
-    if (!pick || pick.i !== i || pick.turn !== g.turn || pick.auto) pick = { i, sel: autoSel(i, pick && pick.tapped), extra: 0, turn: g.turn, auto: false };
+    if (!ok(i) || pick.turn !== g.turn) { pick = null; return null; }
+    if (pick.auto) pick = { i, sel: autoSel(i, true), turn: g.turn, auto: false, tapped: true };
     const elig = new Set((i === SELF ? g.selfEligible() : g.eligibleParcels(g.contracts[i])).map(p => p.id));
     for (const id of [...pick.sel]) if (!elig.has(id)) pick.sel.delete(id);   // 그새 나간 것은 뺀다
     return pick;
@@ -1139,9 +1146,9 @@
     if (busy || game.phase !== 'play') return;
     if (i === SELF ? !selfOk() : !game.canCall(game.contracts[i])) return;
     SFX.resume(); SFX.click();
-    lastSlot = i;
-    // 다른 차를 고르면 그 차에 맞게 새로 담는다. 같은 차를 다시 누르면 자동 선택으로 되돌린다.
-    pick = { i, auto: true, tapped: true };
+    // 다른 차를 고르면 그 차에 맞게 새로 담는다. 같은 차를 다시 누르면 선택이 풀리고 아래 버튼은 「호출 없음」으로 돌아간다.
+    if (pick && pick.i === i) { pick = null; SFX.cancel(); renderAll(); return; }
+    pick = { i, auto: true, tapped: true, turn: game.turn };
     renderAll();
     const pc = $('#parcels'); if (pc) pc.scrollTop = 0;
     if (lastCallCtx) storyCheck(lastCallCtx);
@@ -1202,16 +1209,15 @@
     head.innerHTML = `<div class="ch-top"><b>🚐 ${T('self.card')}</b><span class="caps">${vans ? `${T('wm.vans')}: ${esc(vans)}` : T('wm.noVans')}${blocked ? ` · ${T('wm.blocked', { n: blocked })}` : ''}</span></div>
       <div class="load-visual mini"><div class="truck-stack"><div class="truck-shell van"><div class="truck-cells" style="--cols:${Math.min(6, n)}">${cells}</div></div></div><div class="load-money"><span class="money-chip">${T('call.earn')}<b>+${pl.income}c</b></span><span class="money-chip cost">${T('call.cost')}<b>−${pl.cost}c</b></span><span class="money-chip net">${T('call.net')}<b>${pl.net >= 0 ? '+' : ''}${pl.net}c</b></span></div></div>
       `;
-    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn primary" id="self-go"${pl.picked.length ? '' : ' disabled'}>${T('self.go')}</button>`;
-    foot.querySelector('#self-go').onclick = () => { if (!pl.picked.length || busy) return; SFX.click(); doSelf(pl.picked.map(p => p.id)); };
-    head.hidden = foot.hidden = false;
-    foot.querySelector('#pick-urgent').onclick = () => { pick.sel.clear(); sortByUrgency(elig).slice(0, n).forEach(p => pick.sel.add(p.id)); SFX.select(); renderAll(); };
-    foot.querySelector('#pick-clear').onclick = () => { pick.sel.clear(); SFX.cancel(); renderAll(); };
+    head.hidden = false; foot.hidden = true; foot.innerHTML = '';
+    // 보내기는 아래 큰 버튼(직접 배송 N개)이 맡는다 — 자동 선택·선택 해제·따로 선 호출 버튼 줄은 없앴다
+    pickAction = { label: T('self.go'), sub: pl.picked.length ? `${T('call.net')} ${pl.net >= 0 ? '+' : ''}${pl.net}c · ${pl.picked.length}` : T('call.pickNone'), on: pl.picked.length ? () => doSelf(pl.picked.map(p => p.id)) : null };
     lastCallCtx = { kind: 'modal', modal: 'wait', self: true, picked: pl.picked.length, elig: elig.length, outdoor: g.outdoorVolume() };
     callCtxChanged();
   }
   function renderCallBar() {
     const head = $('#call-head'), foot = $('#call-foot');
+    pickAction = null;
     if (!pick) { head.hidden = foot.hidden = true; head.innerHTML = foot.innerHTML = ''; lastCallCtx = null; return; }
     if (pick.i === SELF) return renderSelfBar(head, foot);
     const cm = pick, i = cm.i, c = game.contracts[i];
@@ -1241,16 +1247,9 @@
     head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}${tbtn ? `<span class="tbtn">${tbtn}</span>` : ''}</div>${gauge}${hint}${money}${riskLine}${trust}`;
     // 신뢰 줄은 꾹 누르면 단계표(다음 단계·효과)가 나온다
     { const tl = head.querySelector('.trustline'); if (tl) bindHold(tl, () => showContractDetail(c)); }
-    foot.innerHTML = `<button class="btn small" id="pick-urgent">${T('call.pickUrgent')}</button><button class="btn small" id="pick-clear">${T('call.pickClear')}</button><span class="sp"></span><button class="btn primary${vol && vol >= cap ? ' full' : ''}" id="call-go"${cm.sel.size ? '' : ' disabled'}>${T('call.btn')}</button>`;
-    head.hidden = foot.hidden = false;
-    foot.querySelector('#pick-urgent').onclick = () => {
-      cm.sel.clear();
-      const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
-      game.autoPick(c, sorted, pickTrucks(game, c)).ids.forEach(id => cm.sel.add(id));
-      SFX.select(); renderAll();
-    };
-    foot.querySelector('#pick-clear').onclick = () => { cm.sel.clear(); SFX.cancel(); renderAll(); };
-    foot.querySelector('#call-go').onclick = () => { if (!cm.sel.size || busy) return; SFX.click(); const ids = [...cm.sel]; cm.auto = true; doCall(i, ids, trucks); };
+    head.hidden = false; foot.hidden = true; foot.innerHTML = '';
+    // 호출은 아래 큰 버튼이 맡는다 — 카드를 누른 차 이름과 순수익·대수를 그 버튼에 적는다
+    pickAction = { label: `${car.badge || '🚚'} ${T('call.btn')} · ${esc(car.short || game.contractName(c))}`, sub: cm.sel.size ? `${T('call.net')} ${net >= 0 ? '+' : ''}${net}c · ${T('fmt.trucks', { n: trucks })} · ${vol}/${cap}` : T('call.pickNone'), on: cm.sel.size ? () => { const ids = [...cm.sel]; cm.auto = true; doCall(i, ids, trucks); } : null };
     lastCallCtx = { kind: 'modal', modal: 'call', sel: cm.sel.size, elig: elig.length, slot: i, trucks, vol, risk: riskSel.length };
     callCtxChanged();
   }
@@ -2053,7 +2052,7 @@
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) $('#c' + i).onclick = () => onContractTap(i);
     $('#cself').onclick = () => onContractTap(SELF);
     $('#hud-cash-box').onclick = () => { SFX.click(); hudDueOpen = !hudDueOpen; renderAll(); };
-    $('#wait-btn').onclick = () => doWait(null);
+    $('#wait-btn').onclick = () => { if (busy) return; if (pickAction && pickAction.on) { SFX.click(); pickAction.on(); } else doWait(null); };
     $('#invest-btn').onclick = () => { if (game) { SFX.click(); showGrowth(); } };
     $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
     $('#hud-month').onclick = () => { if (game) { SFX.click(); showCalendar(closeModal); } };

@@ -232,10 +232,10 @@ const say = m => { console.log(m); log.push(m); };
         check(cm.calling && !cm.modal && cm.head, '차를 부르면 팝업 없이 패널이 호출 판이 된다');
         check(cm.tiles > 0 && cm.sel > 0, `창고 상자가 이미 골라져 있다 — ${cm.sel}/${cm.tiles}`);
         const t = await page.$('#parcels .ptile.sel');
-        if (t) { await safeClick(t); await page.waitForTimeout(120); const after = await page.$$eval('#parcels .ptile.sel', els => els.length); check(after === cm.sel - 1, `상자를 누르면 빠진다 — ${cm.sel} → ${after}`); await safeClick('#pick-urgent'); await page.waitForTimeout(120); }
+        if (t) { await safeClick(t); await page.waitForTimeout(120); const after = await page.$$eval('#parcels .ptile.sel', els => els.length); check(after === cm.sel - 1, `상자를 누르면 빠진다 — ${cm.sel} → ${after}`); await safeClick('#c' + act); await page.waitForTimeout(120); await safeClick('#c' + act); await page.waitForTimeout(120); }
       }
       await readBeat(); await passGate();
-      if (await safeClick('#call-foot .btn.primary:not([disabled])')) { calls++; await page.waitForTimeout(500); await readBeat(); continue; }
+      if (await safeClick('#wait-btn.call:not([disabled])')) { calls++; await page.waitForTimeout(500); await readBeat(); continue; }
       await safeClick('#call-cancel');
       await page.waitForTimeout(100);
     }
