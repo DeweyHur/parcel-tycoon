@@ -981,8 +981,9 @@
   function trustBar(g, carrier) {
     if (g && !g.shows('trust')) return '';
     const lv = g.trustLevel(carrier), nx = g.trustNext(carrier);
-    const bars = [1, 2, 3].map(i => `<i class="${i <= lv ? 'on' : ''}"></i>`).join('');
-    return `<span class="trust" title="${nx ? T('trust.next', { have: nx.have, need: nx.need, effect: nx.effect }) : T('trust.max')}">${bars}${nx ? ` ${nx.have}/${nx.need}` : ' MAX'}</span>`;
+    // 「신뢰 Lv1 ▓▓░░ 3/8」 — 라벨 + 단계 + 다음 단계까지 게이지. 강화 칸 옆에 숫자만 서면 강화 진행도로 읽힌다
+    const pct = nx ? Math.round(100 * Math.min(1, nx.have / Math.max(1, nx.need))) : 100;
+    return `<span class="trust" title="${nx ? T('trust.next', { have: nx.have, need: nx.need, effect: nx.effect }) : T('trust.max')}"><small>${esc(T('common.trust'))}</small><b class="tlv">Lv${lv}</b><span class="tbar"><i style="width:${pct}%"></i></span><small class="tnum">${nx ? `${nx.have}/${nx.need}` : 'MAX'}</small></span>`;
   }
   // 신뢰도 트랙: 단계별 효과·필요 xp·달성 여부. xp가 null이면 진행도 없이 정적 표시(도감)
   function trustTrack(carrier, xp) {
@@ -1477,7 +1478,7 @@
       const emptyN = vis.filter(c => !c).length;
       const curCard = (c, si) => {
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
-        return `<div class="card cur" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)} ${takesDots(game, c, true)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}">${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
+        return `<div class="card cur" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)} ${takesDots(game, c, true)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}"><small class="lbl">${esc(T('cd.calls'))}</small> ${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
           <div class="crow"><span class="d">${miniTruck(game, c)}${game.shows('market') ? enhPips(game, c) : ''}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
       };
       const usedIdx = new Set();
