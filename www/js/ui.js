@@ -872,10 +872,13 @@
   // 이 계약이 받아 주는 품목 — 색 점 하나가 한 종류다. 속성이 안 열린 장에서는 전부 일반이라 안 그린다.
   // 칸 수를 숫자 대신 작은 트럭으로 — 빈 칸이 곧 용량이다
   // 강화 칸: 등급만큼 네모. 찬 칸은 금색, 빈 칸은 테두리만 — 이름은 길게 누르면(title)
-  function enhNames(g, c) { const cnt = {}; for (const id of g.enhList(c)) cnt[id] = (cnt[id] || 0) + 1; return Object.keys(cnt).map(id => D.ENHANCEMENTS[id].name + (cnt[id] > 1 ? ` ×${cnt[id]}` : '')); }
+  // 강화 아이콘 — 마켓 카드 제목·계약 강화 칸·상세에 같은 그림. 속성 특약은 택배 색 바탕
+  function enhIcon(id) { const e = D.ENHANCEMENTS[id]; if (!e || !e.icon) return ''; return `<span class="eicon${e.tint ? ' tint' : ''}"${e.tint ? ` style="background:${D.PARCEL_TYPES[e.tint].css}"` : ''} title="${esc(e.name)}">${e.icon}</span>`; }
+  function enhNames(g, c) { const cnt = {}; for (const id of g.enhList(c)) cnt[id] = (cnt[id] || 0) + 1; return Object.keys(cnt).map(id => enhIcon(id) + D.ENHANCEMENTS[id].name + (cnt[id] > 1 ? ` ×${cnt[id]}` : '')); }
+  // 강화 칸: 빈 칸은 테두리만, 끼운 칸엔 그 강화의 아이콘
   function enhPips(g, c) {
     const used = g.enhList(c), n = g.enhSlots(c);
-    let h = ''; for (let k = 0; k < n; k++) h += used[k] ? `<i class="on" title="${esc(D.ENHANCEMENTS[used[k]].name)}"></i>` : '<i></i>';
+    let h = ''; for (let k = 0; k < n; k++) h += used[k] ? `<i class="on" title="${esc(D.ENHANCEMENTS[used[k]].name)}">${enhIcon(used[k])}</i>` : '<i></i>';
     return `<span class="eslots" title="${esc(T('kind.enh'))} ${used.length}/${n}"><small>${esc(T('kind.enh'))}</small>${h}</span>`;
   }
   function miniTruck(g, c) {
@@ -1467,7 +1470,7 @@
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
         else if (it.kind === 'fac') { const F = it.fac && D.FACILITIES[it.fac]; let prev = ''; if (F) { if (F.cap) prev = `${T('common.warehouse')} ${game.warehouse.cap} → ${game.warehouse.cap + Math.round(F.cap * R.facilityCapMult)}`; else if (F.cold) prev = `${D.ATTRS.cold.name} ${game.warehouse.cold} → ${Math.min(R.coldCapMax == null ? 99 : R.coldCapMax, game.warehouse.cold + F.cold)}`; else if (F.xl) prev = `${T('common.xl')} ${game.warehouse.xl} → ${game.warehouse.xl + F.xl}`; else if (F.frozen) prev = `${D.ATTRS.frozen.name} ${game.warehouse.frozen || 0} → ${(game.warehouse.frozen || 0) + F.frozen}`; } desc = F ? F.desc + (prev ? `<br><span style="color:var(--green)">${T('mk.afterBuy')} ${prev}</span>` : '') : T('mk.allFacilities'); }
         const up = it.kind === 'contract' && it.switchFrom;
-        return `<div class="card ${it.sold ? 'sold' : ''} ${up ? 'upgrade' : ''}" id="mk-card-${Story.mkKey(it)}" data-i="${i}"><div class="t"><span>${up ? `<small class="uplbl">↑ ${T('mk.upgrade')}</small> ` : ''}${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
+        return `<div class="card ${it.sold ? 'sold' : ''} ${up ? 'upgrade' : ''}" id="mk-card-${Story.mkKey(it)}" data-i="${i}"><div class="t"><span>${up ? `<small class="uplbl">↑ ${T('mk.upgrade')}</small> ` : ''}${it.kind === 'enh' ? enhIcon(it.enh) : ''}${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
       });
       // 계약 섹션 하나: 현재 계약 카드 → 그 바로 아래 같은 계열 업그레이드 매물 → 그 뒤 새 계열 매물. 빈 슬롯은 카드 대신 머리글에 알린다
       const vis = game.contracts.slice(0, game.visibleSlots());

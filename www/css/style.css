@@ -761,8 +761,12 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .eslots small { font-size: 10px; color: var(--dim); margin-right: 3px; }
 .card .price .pips.calls { vertical-align: middle; } .card .price small { color: var(--dim); font-size: 10px; }
 .card .cdtakes { display: inline-flex; margin: 2px 0; }
-.eslots i { width: 8px; height: 8px; transform: rotate(45deg); box-shadow: inset 0 0 0 1px #e8c46a99; }
-.eslots i.on { background: var(--gold); box-shadow: none; }
+.eslots i { width: 16px; height: 16px; box-sizing: border-box; border: 1px dashed #e8c46a99; display: inline-flex; align-items: center; justify-content: center; }
+.eslots i.on { border: 1px solid var(--gold); background: #3a3555; }
+.eslots i.on .eicon { margin: 0; }
+/* 강화 아이콘 — 마켓 카드 제목·강화 칸·상세 공통. 속성 특약은 택배 색 바탕 */
+.eicon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; font-size: 11px; line-height: 1; margin-right: 4px; vertical-align: -2px; border: 1px solid #0008; background: #4a4568; color: #f4ecd8; }
+.eicon.tint { color: #1b1a2e; }
 
 /* ── 재고는 딱 네 줄, 모델은 제 몫 ──
    유저: "이렇게 하면 모델링이 하나도 안 보여. 택배는 4줄까지, 줄간격도 줄여. 창고/냉장도 그냥 모델에서 보게 하자."

@@ -242,18 +242,19 @@
     ENH_SLOTS: { normal: 2, trusted: 3, expert: 4, master: 5 },
     ENHANCEMENTS: {
       // 차량 언어: limit = 배차 한도 +대, cap = 적재 보강 +칸(계약당 3회), regular = 월 첫 배차 무료 (동시 대수 강화는 없다 — 차는 담은 만큼 붙는다)
-      limit1:  { price: 90, kind: 'limit', value: 1 },
-      limit2:  { price: 160, kind: 'limit', value: 2 },
-      cap1:    { price: 140, kind: 'cap', value: 1 },
-      regular: { price: 180, kind: 'regular' },
-      seal:    { price: 90, kind: 'trust', value: 3 },
-      record:  { price: 170, kind: 'trust', value: 6 },
+      // icon: 마켓 카드·계약의 강화 칸에 그려지는 아이콘 (속성 특약은 그 속성 아이콘, 색은 택배 색)
+      limit1:  { price: 90, kind: 'limit', value: 1, icon: '🚚' },
+      limit2:  { price: 160, kind: 'limit', value: 2, icon: '🚛' },
+      cap1:    { price: 140, kind: 'cap', value: 1, icon: '📦' },
+      regular: { price: 180, kind: 'regular', icon: '🎫' },
+      seal:    { price: 90, kind: 'trust', value: 3, icon: '🤝' },
+      record:  { price: 170, kind: 'trust', value: 6, icon: '📜' },
       // 속성 특약: 계약 하나에 속성 하나 추가 (계약당 1개, 교체 시 소멸, 특약 처리는 보너스 없음)
       // 속성 특약은 언제나 대가가 있다 — 공짜 속성이면 사지 않을 이유가 없어진다 (완충재는 자리를 먹고, 보냉도 자리, 통관은 시간, 냉동은 자리+크기)
-      optFragile: { price: 150, kind: 'opt', attr: 'fragile', capDelta: -1 },
-      optCold:    { price: 170, kind: 'opt', attr: 'cold', capDelta: -1 },
-      optCustoms: { price: 190, kind: 'opt', attr: 'customs', callsDelta: -1 },
-      optFrozen:  { price: 220, kind: 'opt', attr: 'frozen', capDelta: -1, maxSizeMax: 4 },
+      optFragile: { price: 150, kind: 'opt', attr: 'fragile', capDelta: -1, icon: '⚠', tint: 'fragile' },
+      optCold:    { price: 170, kind: 'opt', attr: 'cold', capDelta: -1, icon: '❄', tint: 'fresh' },
+      optCustoms: { price: 190, kind: 'opt', attr: 'customs', callsDelta: -1, icon: '🛃', tint: 'intl' },
+      optFrozen:  { price: 220, kind: 'opt', attr: 'frozen', capDelta: -1, maxSizeMax: 4, icon: '❆', tint: 'frozen' },
     },
     FACILITIES: {
       expand1: { price: 160, upkeep: 15, cap: 8 },

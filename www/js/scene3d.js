@@ -396,6 +396,23 @@ window.Scene3D = (function () {
       ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(icon, 32, 36);
       const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; this.iconCache[icon] = tex; return tex;
     }
+    // 속성 딱지: 대사·목록의 ⚠(픽셀 폰트에선 '!' 상자)와 같은 그림 — 주황 네모에 굵은 '!'
+    _tagTexture(text, bg, fg) {
+      this.tagCache = this.tagCache || {}; const key = text + bg + fg;
+      if (this.tagCache[key]) return this.tagCache[key];
+      const c = document.createElement('canvas'); c.width = c.height = 64; const ctx = c.getContext('2d');
+      ctx.fillStyle = '#1b1a2e'; ctx.fillRect(0, 0, 64, 64); ctx.fillStyle = bg; ctx.fillRect(6, 6, 52, 52);
+      ctx.fillStyle = fg; ctx.font = "bold 44px 'Galmuri11', monospace"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, 32, 36);
+      const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.NearestFilter; this.tagCache[key] = tex; return tex;
+    }
+    _tagMark(text, bg, fg, w, h, d) {
+      const size = Math.min(0.42, Math.max(0.3, w * CELL * 0.45));
+      const mat = new THREE.MeshBasicMaterial({ map: this._tagTexture(text, bg, fg), transparent: true, depthWrite: false });
+      const g = new THREE.Group();
+      const top = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat); top.rotation.x = -Math.PI / 2; top.position.set((w * CELL) / 4, h / 2 + 0.035, d * CELL / 6); g.add(top);   // 윗면 오른쪽 (고객 딱지는 왼쪽)
+      const front = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat); front.position.set(0, h * 0.1, d * CELL / 2 + 0.01); g.add(front);   // 앞면
+      return g;
+    }
     // 구역 표지: 픽셀 간판 (UI와 같은 각진 테두리 + 오프셋 그림자 + Galmuri 도트 폰트)
     _signTexture(iconKey, label, accent) {
       this.signCache = this.signCache || {}; const key = iconKey + '|' + label + '|' + accent;
@@ -545,7 +562,7 @@ window.Scene3D = (function () {
             const strap = this._box(0.1, h + 0.025, d * CELL - 0.035, accents[valueTier]); b.add(strap);
             const seal = this._box(0.24, 0.055, 0.24, valueTier === 3 ? 0xffffff : 0xfff1a8, valueTier === 3 ? { emissive: 0x7a4d00 } : undefined); seal.position.set(0, h / 2 + 0.055, 0); seal.rotation.y = Math.PI / 4; b.add(seal);
           }
-          if (p.type === 'fragile') { const mark = this._box(0.12, h * 0.5, 0.05, 0xb8453b); mark.position.set(0, 0, d * CELL / 2 - 0.02); b.add(mark); }
+          if (p.type === 'fragile') b.add(this._tagMark('!', '#f0a04b', '#1b1a2e', w, h, d));   // 깨지는 것 — 대사 속 ⚠ 상자와 같은 '!' 딱지
           if (p.type === 'intl') { const mark = this._box(w * CELL * 0.4, 0.05, 0.16, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
           if (p.type === 'fresh') { const mark = this._box(w * CELL * 0.5, 0.04, d * CELL * 0.5, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
           b.userData = { h, id: p.id, valueTier, inspect: { kind: 'parcel', id: p.id } };
