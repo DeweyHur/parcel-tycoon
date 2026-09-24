@@ -1850,7 +1850,7 @@
   // 대사 속 속성 아이콘(⚠❄❆🌾🛃)은 픽셀 글꼴이 흑백으로 그린다 — 그 종류 색 상자에 얹어 창고 상자와 같은 색으로 보이게
   const ICON_TYPE = { '⚠': 'fragile', '❄': 'fresh', '❆': 'frozen', '🌾': 'produce', '🛃': 'intl' };
   function tintIcons(html) {
-    return html.replace(/(<[^>]*>)|([⚠❄❆🌾🛃])\uFE0F?/gu, (m, tag, ic) => tag ? tag : `<span class="sicon" style="background:${D.PARCEL_TYPES[ICON_TYPE[ic]].css}">${ic}</span>`);
+    return html.replace(/(<[^>]*>)|([⚠❄❆🌾🛃])\uFE0F?/gu, (m, tag, ic) => tag ? tag : `<span class="sicon" style="background:${D.PARCEL_TYPES[ICON_TYPE[ic]].css}" title="${esc(D.PARCEL_TYPES[ICON_TYPE[ic]].name)}">${ic}</span>`);
   }
   function showStoryBeat(beat, after) {
     const el = $('#story'); let i = 0; storyBusy = true; clearGate();
