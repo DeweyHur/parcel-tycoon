@@ -101,18 +101,19 @@
       { expr: 'smile' },
       { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },
-    // 차는 늘 패널 위에 서 있다. 부를 만해지면 박 반장이 그 차를 가리키고,
-    // 여 실장이 그 자리에서 처음 인사한다 — 그가 가리키는 차 그림이 바로 눈앞에 있다.
-    // 상자는 이미 자동으로 담겨 있으니, 담긴 것을 보고 바로 호출로 간다.
+    // 차는 카드를 눌러야 선다. 부를 만해지면 박 반장이 카드를 가리켜 누르게 하고(l1call),
+    // 차가 서면 여 실장이 그 자리에서 처음 인사하고 아래 호출 버튼을 짚는다(l1callGo).
     // 둘째 날: 들어온 게 없어 아직 적다. 여기서 '부를까?' 하고 헤매지 않게, 한 번 더 넘기는 것도 짚어서 누르게 한다
     { id: 'l1wait2', kind: 'turn', when: g => g.turn >= 2 && bestReadySlot(g).fill < 0.8 && !g.story.seen.includes('l1call'), pages: [
-      { expr: 'think', hl: '#call-head .load-visual' },
+      { expr: 'think', hl: '#c0' },
       { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },
     { id: 'l1call', kind: 'turn', when: g => bestReadySlot(g).fill >= 0.8 || g.turn >= 6, pages: [
-      { expr: 'neutral', hl: '#call-head .load-visual' },
+      { expr: 'neutral', hl: '#c0', gate: g => bestReadySlot(g).slot >= 0 },
+    ] },
+    { id: 'l1callGo', kind: 'modal', modal: 'call', when: (g, ctx) => ctx.sel > 0 && g.story.seen.includes('l1call'), pages: [
       { speaker: 'yeo', expr: 'smile', hl: '#call-head .load-visual' },
-      { expr: 'neutral', hl: '#wait-btn', gate: g => bestReadySlot(g).slot >= 0 },
+      { expr: 'neutral', hl: '#wait-btn', gate: true },
     ] },
     { id: 'l1first', kind: 'call', when: (g, ctx) => ctx.result && ctx.result.ok, pages: [{ expr: 'laugh' }, { speaker: 'yeo', expr: 'smile' }, { expr: 'neutral' }] },
     { id: 'l1free', kind: 'turn', when: g => g.story.seen.includes('l1first'), pages: [{ expr: 'smile' }] },
