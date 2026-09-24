@@ -385,11 +385,13 @@
       return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">${T('fmt.months', { n: s.months / D.CYCLES_PER_MONTH })}</small></span><span class="price">${best ? T('fmt.pts', { n: best }) : ''}</span></div>
         <div class="d" style="color:var(--dim);font-size:11px">📅 ${esc(when)}</div><div class="d">${esc(s.desc)}</div>${un ? '' : `<div class="d">${lock ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
     };
-    const countries = [...new Set(Object.values(M.SCENARIOS).map(s => s.country))];
+    // 아직 못 고르는 런은 보여 주지 않는다 (해금 조건은 도감에 있다). 체험판은 전부 잠겨 있으니 그대로 보여 주고 누르면 안내로
+    const avail = id => lock || P.unlocked.scenarios.includes(id);
+    const countries = [...new Set(Object.keys(M.SCENARIOS).filter(avail).map(id => M.SCENARIOS[id].country))];
     const cards = countries.map(cc => {
       const cal = M.CALENDARS[cc];
       const head = `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${cal.icon || ''} ${esc(cal.name || T('cal.' + cc + '.name'))}</div>`;
-      return head + Object.keys(M.SPANS).map(sp => { const ids = Object.keys(M.SCENARIOS).filter(id => M.SCENARIOS[id].country === cc && M.SCENARIOS[id].span === sp); return ids.length ? `<div class="d" style="font-size:11px;color:var(--dim);margin:6px 0 2px">${esc(T('prep.span.' + sp))}</div>` + ids.map(card).join('') : ''; }).join('');
+      return head + Object.keys(M.SPANS).map(sp => { const ids = Object.keys(M.SCENARIOS).filter(id => avail(id) && M.SCENARIOS[id].country === cc && M.SCENARIOS[id].span === sp); return ids.length ? `<div class="d" style="font-size:11px;color:var(--dim);margin:6px 0 2px">${esc(T('prep.span.' + sp))}</div>` + ids.map(card).join('') : ''; }).join('');
     }).join('');
     const m = modal(T('prep.scenarioTitle'), `<div class="perk-count">${T('prep.step1')}</div>${cards}`, [{ label: T('btn.title'), onClick: showTitle }, { label: lock ? T('demo.cta') : T('prep.nextCompany'), cls: lock ? 'gold' : 'primary', onClick: () => { if (lock) return showDemoGate(showScenarioSelect); showCompanySelect(); } }]);
     m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (lock) { SFX.click(); showDemoGate(showScenarioSelect); return; } if (!P.unlocked.scenarios.includes(id)) { toast(unlockText(M.SCENARIOS[id].unlock), 2500); return; } SFX.select(); prep.scenario = id; showScenarioSelect(); });
@@ -416,7 +418,7 @@
   function showCompanySelect() {
     const P = Profile.get(), lock = demoLocked();
     if (!P.unlocked.companies.includes(prep.company)) prep.company = 'local';
-    const cards = Object.keys(M.COMPANIES).sort((x, y) => (M.COMPANIES[x].tier || 0) - (M.COMPANIES[y].tier || 0)).map(id => {
+    const cards = Object.keys(M.COMPANIES).filter(id => lock || P.unlocked.companies.includes(id)).sort((x, y) => (M.COMPANIES[x].tier || 0) - (M.COMPANIES[y].tier || 0)).map(id => {
       const co = M.COMPANIES[id], un = !lock && P.unlocked.companies.includes(id);
       const rec = (P.records[prep.scenario] || {})[id];
       if (!un) return `<div class="card dis co-lock" data-id="${id}"><div class="t"><span>🔒 ${co.icon} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${lock ? '' : esc(unlockProg(co.unlock))}</span></div></div>`;
@@ -436,7 +438,7 @@
     const P = Profile.get(), slots = Profile.perkSlots();
     prep.perks = prep.perks.filter(p => P.unlocked.perks.includes(p) && !perkConflict(p)).slice(0, slots);
     const co = M.COMPANIES[prep.company];
-    const groups = Object.keys(M.PERK_FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${T('prep.family', { family: M.PERK_FAMILIES[f] })}</div>` + Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f).map(id => {
+    const groups = Object.keys(M.PERK_FAMILIES).filter(f => Object.keys(M.PERKS).some(id => M.PERKS[id].family === f && P.unlocked.perks.includes(id))).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${T('prep.family', { family: M.PERK_FAMILIES[f] })}</div>` + Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f && P.unlocked.perks.includes(id)).map(id => {
       const pk = M.PERKS[id], un = P.unlocked.perks.includes(id), sel = prep.perks.includes(id), conflict = un && !sel ? perkConflict(id) : null;
       return `<div class="card ${!un || conflict ? 'dis' : ''} ${sel ? 'sel' : ''}" data-id="${id}"><div class="t">${esc(pk.name)}</div><div class="d">${un ? esc(pk.desc) + (conflict ? ` <span style="color:var(--orange)">(${esc(conflict)})</span>` : '') : esc(unlockText(pk.unlock))}</div></div>`;
     }).join('')).join('');

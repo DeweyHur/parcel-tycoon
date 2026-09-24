@@ -24,17 +24,20 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('타이틀에 새 런', !!(await page.$('#t-new')));
   await page.click('#t-new'); await page.waitForTimeout(400);
   let t = await modalText();
-  ok('런 선택: 한국 · 분기/반기/한 해 · 봄~겨울', /한국/.test(t) && /분기/.test(t) && /반기/.test(t) && /한 해/.test(t) && /봄 \(3~5월\)/.test(t) && /겨울 \(12~2월\)/.test(t));
+  ok('런 선택: 한국 · 분기 · 봄', /한국/.test(t) && /분기/.test(t) && /봄 \(3~5월\)/.test(t));
   ok('런 카드에 시작 해와 달', new RegExp(`${new Date().getFullYear()}년 3월 ~ 5월`).test(t), (t.match(/📅[^📅]{0,24}/) || [''])[0].trim());
-  ok('겨울은 해를 넘겨 표시', new RegExp(`${new Date().getFullYear()}년 12월 ~ ${new Date().getFullYear() + 1}년 2월`).test(t));
   ok('난이도 줄이 없다', !/수습|베테랑|정규/.test(t));
-  ok('여름은 잠겨 있고 해금 조건이 봄 완주', /봄을 넘기다/.test(t));
+  // 못 고르는 런은 아예 안 보인다 (해금 조건은 도감에)
   const locked = await page.evaluate(() => [...document.querySelectorAll('#modal .card.dis')].length);
-  ok('잠긴 카드 6개', locked === 6, String(locked));
+  ok('잠긴 런 카드가 없다', locked === 0 && !/여름 \(6~8월\)/.test(t) && !/반기/.test(t) && !/한 해/.test(t), String(locked));
   await shot('runs-01-select');
-  // 잠긴 카드 탭 → 토스트, 선택 안 바뀜
-  await page.evaluate(() => document.querySelector('#modal .card[data-id="kr_winter"]').click()); await page.waitForTimeout(200);
-  ok('잠긴 런은 선택되지 않는다', (await page.evaluate(() => PT.prep.scenario)) === 'kr_spring');
+  // 겨울을 풀면 나타나고, 해를 넘겨 표시된다
+  await page.evaluate(() => { const P = Profile.get(); P.unlocked.scenarios.push('kr_winter'); Profile.save(); });
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.modal .btn')].find(x => /타이틀/.test(x.textContent)); b.click(); }); await page.waitForTimeout(300);
+  await page.click('#t-new'); await page.waitForTimeout(400);
+  t = await modalText();
+  ok('겨울은 해를 넘겨 표시', /겨울 \(12~2월\)/.test(t) && new RegExp(`${new Date().getFullYear()}년 12월 ~ ${new Date().getFullYear() + 1}년 2월`).test(t));
+  ok('선택은 봄 그대로', (await page.evaluate(() => PT.prep.scenario)) === 'kr_spring');
   // 회사 → 퍽 → 시작
   await page.evaluate(() => { const b = [...document.querySelectorAll('.modal .btn')].find(x => /다음: 회사/.test(x.textContent)); b.click(); }); await page.waitForTimeout(300);
   t = await modalText(); ok('회사 화면 머리에 런 이름', /봄 \(3~5월\)/.test(t));
@@ -73,7 +76,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.click('#t-codex'); await page.waitForTimeout(300);
   await page.evaluate(() => document.querySelector('.modal [data-tab="scenarios"]').click()); await page.waitForTimeout(300);
   t = await modalText();
-  ok('도감 런 탭에 7종, 잠긴 것은 해금 조건', (t.match(/\(3~5월\)|\(6~8월\)|\(9~11월\)|\(12~2월\)|\(3~8월\)|\(9~2월\)|이듬해/g) || []).length >= 7 && /가을을 넘기다/.test(t), t.slice(0, 80));
+  ok('도감 런 탭에 7종, 잠긴 것은 해금 조건', (t.match(/\(3~5월\)|\(6~8월\)|\(9~11월\)|\(12~2월\)|\(3~8월\)|\(9~2월\)|이듬해/g) || []).length >= 7 && /여름을 넘기다/.test(t), t.slice(0, 80));
   await shot('runs-03-codex');
   await page.evaluate(() => document.querySelector('.modal [data-tab="achievements"]') && document.querySelector('.modal [data-tab="achievements"]').click()); await page.waitForTimeout(300);
   t = await modalText();
