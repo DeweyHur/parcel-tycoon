@@ -846,8 +846,11 @@
       const used = mp.left <= 0;
       const open = this.shows('invest') && this.campaignOpen() && mp.owned;
       const mult = this.campaignMult(), A = D.AD_MEDIA[mp.id] || {};
+      // 같은 매체는 돌고 있는 동안 또 집행하지 못한다 — 끝나면(남은 날 0) 다음 눈금을 쓸 수 있다
+      const cur = (this.campaignRuns || []).find(r => r.m === this.month && r.end > this.turn && r.media === mp.id);
+      const activeLeft = cur ? cur.end - this.turn : 0;
       return { id: mp.id, level: open ? mp.level : 0, parcels: Math.max(1, Math.round(mp.parcels * mult)), rep: Math.floor((A.rep || 0) * mult), mult, stack: this.campaignStack(),
-        days: mp.days, cost: mp.cost, runs: mp.runs, left: mp.left, used, ready: open && !used };
+        days: mp.days, cost: mp.cost, runs: mp.runs, left: mp.left, used, active: activeLeft > 0, activeLeft, ready: open && !used && !activeLeft };
     }
     // 스토리 캠페인에서는 '창고가 빈 날 이틀'을 겪고 박 반장이 소개한 뒤에 열린다. 자유 런·안내 끔이면 처음부터
     campaignOpen() { return !this.level || !this.story || this.story.off || (this.story.seen || []).includes('l3invest'); }
@@ -855,6 +858,7 @@
       const p = this.campaignPlan(id);
       if (!p.level || !this.shows('invest')) return { ok: false, reason: 'locked' };
       if (p.used) return { ok: false, reason: 'used' };
+      if (p.active) return { ok: false, reason: 'active', left: p.activeLeft };
       if (this.cash < p.cost) return { ok: false, reason: 'cash', cost: p.cost };
       this.cash -= p.cost;
       const roll = this._campaignRoll(p.id);   // 눈금을 쓰기 전에 굴린다 — 미리보기와 같은 '몇 번째' 씨앗

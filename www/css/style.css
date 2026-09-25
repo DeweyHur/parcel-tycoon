@@ -869,3 +869,4 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .camp-half { color: var(--orange); font-size: 10px; border: 1px solid var(--orange); padding: 0 3px; margin-left: 4px; }
 #invest-btn .camp-act { display: block; font-size: 10px; color: var(--ink); line-height: 1.2; }
 #invest-btn.active { border-color: var(--gold); }
+.growth-buy .camp-on { color: var(--gold); font-size: 11px; }

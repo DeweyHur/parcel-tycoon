@@ -54,6 +54,7 @@
     'camp.half': '겹침 {n}',
     'camp.halfTip': '아직 물량이 들어오는 캠페인과 겹쳐 효과가 반감됩니다 (끝난 뒤에 하면 온전)',
     'camp.activeTip': '{name} — {n}일 더 물량이 들어옵니다',
+    'camp.activeNow': '진행 중 · {n}일 남음',
     'camp.runs': "횟수",
     'media.fx.parcels': "끌어오는 택배 수",
     'media.fx.days': "며칠 안에 들어오나",

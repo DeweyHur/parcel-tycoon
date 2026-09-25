@@ -2051,14 +2051,14 @@
       const mp = g.mediaPlan(id), cp = g.campaignPlan(id), ok = cp.ready && g.cash >= cp.cost;
       return `<button class="growth-card" data-media="${id}" ${k === 0 ? 'id="camp-go"' : ''} ${ok ? '' : 'disabled'}>
         <span class="growth-icon">${D.AD_MEDIA[id].icon}</span><span class="growth-copy"><b>${esc(T('media.' + id))}</b>${mediaEffect(id)}</span>
-        <span class="growth-buy"><span class="camp-runs"><small>${esc(T('camp.runs'))}</small> ${callPipsHtml(mp.left, mp.runs)}</span><b>${mp.cost}c</b><small>${T('media.run')}</small></span></button>`;
+        <span class="growth-buy"><span class="camp-runs"><small>${esc(T('camp.runs'))}</small> ${callPipsHtml(mp.left, mp.runs)}</span>${cp.active ? `<b class="camp-on">${esc(T('camp.activeNow', { n: cp.activeLeft }))}</b>` : `<b>${mp.cost}c</b><small>${T('media.run')}</small>`}</span></button>`;
     }).join('');
     const body = `<div class="growth-grid">${cards}</div>`;
     const m = modal(T('camp.title'), body, [{ label: T('btn.close'), onClick: closeModal }]);
     storyCheck({ kind: 'modal', modal: 'growth', ready: cp0.ready && g.cash >= cp0.cost });
     m.querySelectorAll('[data-media]').forEach(el => el.onclick = () => {
       const r = g.runCampaign(el.dataset.media);
-      if (!r.ok) { toast(r.reason === 'cash' ? T('camp.needCash', { n: r.cost }) : T('camp.used')); return; }
+      if (!r.ok) { toast(r.reason === 'cash' ? T('camp.needCash', { n: r.cost }) : r.reason === 'active' ? T('camp.activeNow', { n: r.left }) : T('camp.used')); return; }
       SFX.buy(); toast(T('camp.toast', { n: r.n, days: r.days }), 2600);
       g.takeEvents(); saveGame(); closeModal(); renderAll();
       storyCheck({ kind: 'turn' });

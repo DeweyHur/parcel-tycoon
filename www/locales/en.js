@@ -54,6 +54,7 @@
     'camp.half': 'overlap {n}',
     'camp.halfTip': 'Overlaps a campaign still delivering — effect halved (run it after that one ends for full effect)',
     'camp.activeTip': '{name} — parcels keep arriving for {n} more day(s)',
+    'camp.activeNow': 'Running · {n} day(s) left',
     'camp.runs': "Runs",
     'media.fx.parcels': "Parcels pulled in",
     'media.fx.days': "Arrive within",
