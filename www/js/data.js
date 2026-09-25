@@ -25,13 +25,13 @@
     // 돈이 느는 만큼 압박도 같이 늘어야 후반이 헐거워지지 않는다. unlock = 이 등급부터 들어오기 시작하는 품목.
     REP_TIERS: [
       { id: 'unknown', cap: 20, arrivals: 1.0,  opCost: 1.0,  unlock: [] },               // 무명 — 동네 사람들만 안다 (대형·통관·냉동 없음: 시작 계약으로 다 실을 수 있어야 한다)
-      { id: 'local',   cap: 35, arrivals: 1.1, opCost: 1.10, unlock: ['intl', 'large'] }, // 동네 소문 — 🛃 통관·대형이 들어오기 시작
-      { id: 'ward',    cap: 50, arrivals: 1.2, opCost: 1.25, unlock: ['intl', 'large', 'frozen'] },// 구내 유명 — ❆ 냉동까지
-      { id: 'city',    cap: 70, arrivals: 1.35, opCost: 1.45, unlock: ['intl', 'large', 'frozen'] },// 시내 최고
+      { id: 'local',   cap: 35, arrivals: 1.15, opCost: 1.10, unlock: ['intl', 'large'] }, // 동네 소문 — 🛃 통관·대형이 들어오기 시작
+      { id: 'ward',    cap: 50, arrivals: 1.35, opCost: 1.25, unlock: ['intl', 'large', 'frozen'] },// 구내 유명 — ❆ 냉동까지
+      { id: 'city',    cap: 70, arrivals: 1.60, opCost: 1.45, unlock: ['intl', 'large', 'frozen'] },// 시내 최고
     ],
     CYCLES_PER_MONTH: 2,   // 한 사이클 = 2주. 달력 한 달 = 전반·후반 두 사이클
     // 평판도 신뢰와 같은 축 — 기한보다 얼마나 일찍 보냈나. 호출마다 택배 점수 합(+2/+1/0/−2)을 earlyDiv 로 나눠 ±earlyMax 안에서 (차 꽉 채우기 +1 은 뺐다)
-    REP_GAIN: { cleanMonth: 2, custLevel: 2, earlyDiv: 10, earlyMax: 2 },
+    REP_GAIN: { cleanMonth: 2, custLevel: 2, earlyDiv: 5, earlyMax: 3 },
     OPERATING_COST: 120,   // 월 기본 임대(창고·인건비). 여기에 계약 유지비 + 시설 유지비가 더해진다
     OPCOST_CONTRACT: { normal: 10, trusted: 30, expert: 60, master: 100 },   // 계약 등급별 월 유지비 — 프리미엄은 수입도 지출도 크다
     // 배차비·배송비는 후불: 월중에 쌓였다가 월말 정산에서 빠진다. 정산 후 자금이 음수면 단기 차입으로 메우고
@@ -87,8 +87,8 @@
     // 위 표에 곱하는 사이클당 배수. 투자 개편 때 0.25 로 눌러 놓았더니 자유 런 첫 보름이 10개(15칸)뿐이었다 — 캠페인 1장(51칸)보다도 적다.
     // 1.0 이면 첫 보름 22개(36칸), 한 해 끝 무렵 90칸+평판 배수. 홍보 캠페인은 여기에 얹는 한 방이다 (부록 AU)
     ARRIVALS_SCALE: 2.0,
-    // 자유 런의 계약 배차 한도 배수 — 물량을 두 배로 올리며 같이 올렸다(시작 계약만으로 첫 보름을 버틸 수 있게). 캠페인은 levels.js BASE_MODS 가 1 로 되돌린다
-    CALLS_SCALE: 1.5,
+    // 자유 런의 계약 배차 한도 배수. 물량 ×2 때 1.5 로 올렸다가 되돌렸다 — 시작 계약이 셋(일반을 받는 차도 여럿)이라 첫 달엔 필요 없다 (유저)
+    CALLS_SCALE: 1,
     // 달력: 런은 START_MONTH(3월, 봄)에 시작해 계절대로 흐른다. 달별 편차·이벤트는 META.CALENDARS[나라] (docs/STORY_TUTORIAL_DESIGN.md 5장)
     START_MONTH: 3,
 
