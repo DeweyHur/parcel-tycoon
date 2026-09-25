@@ -1169,7 +1169,7 @@
       // 준비 마켓: 1개월차 첫 턴 전에 시작 자금으로 계약·시설·보험을 갖출 수 있다 (입고 예정이 보인다)
       if (m === 1 && this.cfg.prep && !this.prepDone) {
         this.prepDone = true; this.phase = 'market';
-        this.market = { items: this._genMarketItems(), bought: 0, refreshes: 0, month: 0, prep: true, freeRefresh: this.rules.freeRefresh + 1 };
+        this.market = { items: this._genMarketItems(this.month), bought: 0, refreshes: 0, month: 0, prep: true, freeRefresh: this.rules.freeRefresh + 1 };
         this.say('log.prepMarket');
         return;
       }
@@ -1732,7 +1732,7 @@
     // ----- market -----
     _openMarket() {
       this.phase = 'market';
-      this.market = { items: this._genMarketItems(), bought: 0, refreshes: 0, month: this.month, freeRefresh: this.rules.freeRefresh };
+      this.market = { items: this._genMarketItems(this.month + 1), bought: 0, refreshes: 0, month: this.month, freeRefresh: this.rules.freeRefresh };
       this.say('log.marketOpen', { cal: this.calMonth(), half: this.half(), max: this.rules.marketMaxBuy });
     }
     _carrierWeights() {
@@ -1837,7 +1837,8 @@
         return true; }
       return true;
     }
-    _genMarketItems() {
+    // fm: 이 마켓 뒤에 올 사이클 (예보를 읽을 달). 새로고침은 비워 두면 forecastBlocked 가 market 상태로 고른다
+    _genMarketItems(fm) {
       const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(m))] * R.itemPriceMult * R.priceMult;
       const sc = this.script(m);
       // 대본이 명시한 매물은 거르지 않는다. 플래그 문은 **무작위 마켓**이 안 열린 기능의 물건을 파는 것을 막는 장치지,
@@ -1851,16 +1852,20 @@
       // 계열 + 등급 → 센터. 이미 그 계열 계약이 있으면 더 높은 tier 센터만 나온다(다른 센터와 신규 계약 = 갈아타기)
       const centerFor = (fam, grade) => { const k = D.centerFor(fam, tierOf(grade)); if (!k) return null; const own = ownedFam(fam); if (own && D.CARRIERS[k].tier <= D.CARRIERS[own.carrier].tier) { const up = D.centersOf(fam).find(x => D.CARRIERS[x].tier === D.CARRIERS[own.carrier].tier + 1 && D.CARRIERS[x].tier <= Math.max(tierOf(grade), 1)); return up || null; } return k; };
       const forced = R.guaranteeCarriers.filter(k => weights[k]).map(k => ({ family: k }));
-      // 막힌 속성 보장: 처리할 계약이 없는 특수 택배가 있으면 그것을 처리할 계열을 반드시 하나 배치
+      // 막힌 속성 보장: 처리할 계약이 없는 특수 택배가 있으면 그것을 처리할 계열을 반드시 배치한다.
+      // 창고에 있는 것(blockedTypes)뿐 아니라 **다음 사이클 예보**에서 못 싣는다고 ✗ 로 뜬 종류도 — 준비 마켓은 창고가 비어 있어서
+      // 예보만 보고 '대형 0~2 ✗' 를 띄워 놓고 해결책은 안 파는 일이 있었다. 계약 매물 칸 수만큼 서로 다른 종류를 보장한다
       if (R.guaranteeBlocked) {
-        for (const bt of this.blockedTypes()) {
+        const blocked = this.blockedTypes();
+        for (const t of this.forecastBlocked(fm)) if (t !== 'normal' && !blocked.some(b => b.type === t)) { const P = D.PARCEL_TYPES[t]; const rng = this.customerForecast(fm || this.month).reduce((a, f) => a + ((f.range[t] || [0, 0])[1]), 0); blocked.push({ type: t, maxSize: Math.max(...P.sizes), count: rng, soon: true }); }
+        for (const bt of blocked) {
+          if (forced.length >= R.marketContractSlots) break;
           const pp = { type: bt.type, size: bt.maxSize, customs: 0 };
           const safe = fam => { const car = D.CARRIERS[D.centerFor(fam, 0)]; return this._carrierAccepts(car, pp) && (!D.PARCEL_TYPES[bt.type].attrs.includes('fragile') || car.caps.includes('fragile')); };
-          if (forced.some(f => safe(f.family))) break;
+          if (forced.some(f => safe(f.family))) continue;
           const cand = {}; for (const k of Object.keys(weights)) if (safe(k)) cand[k] = weights[k];
           if (!Object.keys(cand).length) continue;
-          forced.unshift({ family: this.rng.weighted(cand), hint: T('market.hint', { short: D.PARCEL_TYPES[bt.type].short, count: bt.count }) });
-          break;
+          forced.push({ family: this.rng.weighted(cand), hint: T(bt.soon ? 'market.hintSoon' : 'market.hint', { short: D.PARCEL_TYPES[bt.type].short, count: bt.count }) });
         }
       }
       for (let i = 0; i < R.marketContractSlots; i++) {
