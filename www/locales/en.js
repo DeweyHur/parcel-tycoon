@@ -361,6 +361,7 @@
     'rep.tier.city': 'City-wide',
     'log.repTierUp': '⭐ Word got around — {name} (rep cap {cap})',
     'toast.repTierUp': '⭐ {name}',
+    'why.repAd': 'Ad campaign',
     'why.repPenalty': 'an incident',
     'why.repMonthly': 'this month',
     'why.repFull': 'a full truck',

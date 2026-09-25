@@ -31,6 +31,7 @@ t('광고 집행: 전단지로 시작, 보름에 한 번, 며칠 안에 물량�
   const g = NG(73); g.cash = 3000;
   const F = D.AD_MEDIA.flyer;
   assert.deepEqual(g.ownedMedia(), ['flyer'], '처음엔 전단지만 가진다');
+  assert.equal(g.rep, Math.round(g.rules.gameoverStress * D.START_REP), '자유 런은 평판 막대 절반에서 시작한다 — 가득 차 있으면 채울 게 없다');
   assert.equal(g.campaignPlan().level, 1, '전단지 Lv1 로 바로 집행할 수 있다');
   assert.equal(g.campaignPlan().parcels, F.per);
   assert.equal(g.campaignPlan('radio').level, 0, '없는 매체는 집행 못 한다'); assert.equal(g.runCampaign('radio').ok, false);
@@ -46,7 +47,9 @@ t('광고 집행: 전단지로 시작, 보름에 한 번, 며칠 안에 물량�
   assert.equal(plan.parcels, F.per + F.perUp);
   assert.equal(plan.cost, F.cost + F.costUp);
   const before = g.schedule.slice(g.turn).flat().length, cash0 = g.cash;
+  const rep0 = g.rep;
   const r = g.runCampaign('flyer'); assert.ok(r.ok, '캠페인이 열린다');
+  assert.equal(g.rep, Math.min(g.repCap(), rep0 + D.AD_MEDIA.flyer.rep), '광고를 돌리면 평판이 오른다');
   assert.equal(g.schedule.slice(g.turn).flat().length, before + plan.parcels, '그만큼 물량이 붙는다');
   assert.equal(g.cash, cash0 - plan.cost);
   const win = g.schedule.slice(g.turn, g.turn + plan.days).flat().length;
@@ -330,7 +333,7 @@ t('날씨: 폭설이면 야외 신선 안 썩고 도난 절반, 태풍 턴 입�
 t('보험: 든든화재 50% 보장, 프리미어 반송 스트레스 면제, 마켓에서 갈아타기', () => {
   const g = EMPTY(3, { insurer: 'sturdy', perks: ['skip', 'longdeal'] }); assert.equal(g.premium(), 60); g.parcels = [P(6, 'fragile', 2, { deadline: 1, customer: 'glass' })]; const cash = g.cash; adv(g); adv(g); adv(g);
   assert.equal(cash - g.cash, 60); assert.equal(g.monthStats.insClaims, 1);
-  const h = EMPTY(3, { insurer: 'premier', perks: ['skip', 'longdeal'] }); h.parcels = [P(6, 'normal', 1, { deadline: 1 })]; adv(h); adv(h); adv(h); assert.equal(h.stats.returned, 1); assert.equal(h.rep, h.rules.gameoverStress); // 기한 초과 자체는 감점 0, 프리미어는 반송 −2 면제
+  const h = EMPTY(3, { insurer: 'premier', perks: ['skip', 'longdeal'] }); h.parcels = [P(6, 'normal', 1, { deadline: 1 })]; const rep0 = h.rep; adv(h); adv(h); adv(h); assert.equal(h.stats.returned, 1); assert.equal(h.rep, rep0); // 기한 초과 자체는 감점 0, 프리미어는 반송 −2 면제
   while (h.phase === 'play') adv(h); h.closeSummary(); assert.ok(h.setInsurer('coldguard').ok); assert.equal(h.insurer, 'coldguard');
 });
 t('보관 계약: 수락 → 점유 → 회수 xp +2, 조기 반환 위약금', () => {

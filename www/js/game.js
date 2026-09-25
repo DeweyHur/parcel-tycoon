@@ -134,6 +134,7 @@
       this.rep = this.rules.gameoverStress;   // 전임 창고장이 물려준 평판에서 시작한다
       // 평판이 처음 열리는 장은 상한보다 낮게 시작한다 — 가득 찬 막대로 시작하면 채울 게 없다
       if (this.level && this.level.startRep != null) this.rep = Math.min(this.rep, this.level.startRep);
+      else if (!this.level) this.rep = Math.round(this.rules.gameoverStress * D.START_REP);
       this._initCompany();
       this._initCustomers();
       this.insurer = this.rules.noInsurance ? 'none' : (cfg.insurer && M.INSURERS[cfg.insurer] ? cfg.insurer : 'none');
@@ -831,6 +832,7 @@
       this.cash -= p.cost;
       this.campaignCycle = this.month;
       const n = this._injectGrowthDemand(this.schedule, p.parcels, this.turn, this.month, this.turn + p.days, D.AD_MEDIA[p.id].mix);
+      const rg = D.AD_MEDIA[p.id].rep || 0; if (rg) this.addRep(rg, MSG('why.repAd'));
       this.say('log.campaign', { n, days: p.days, cost: p.cost });
       this.emit('campaign', { n, days: p.days, cost: p.cost, media: p.id });
       return { ok: true, n, days: p.days, cost: p.cost, media: p.id };

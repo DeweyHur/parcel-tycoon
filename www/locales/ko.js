@@ -362,6 +362,7 @@
     'rep.tier.city': '시내 최고',
     'log.repTierUp': '⭐ 소문이 퍼졌습니다 — {name} (평판 상한 {cap})',
     'toast.repTierUp': '⭐ {name}',
+    'why.repAd': '광고 집행',
     'why.repPenalty': '사고',
     'why.repMonthly': '이번 달 사정',
     'why.repFull': '차를 꽉 채워 보냄',

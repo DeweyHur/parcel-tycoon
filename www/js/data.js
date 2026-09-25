@@ -16,6 +16,7 @@
       { id: 'parttime', cost: 50, noTheft: true, needOutdoor: true }, // 알바: 야적 지킴 — 이번 주말 도난 없음
     ],
     START_CASH: 450,
+    START_REP: 0.5,        // 자유 런은 1단계 상한의 이만큼에서 시작한다 — 가득 찬 막대로 시작하면 채울 게 없고, 첫 정산에 저절로 등급이 오른다
     GAMEOVER_STRESS: 20,   // (구) 스트레스 한계 → 지금은 1단계 평판 상한. rules.gameoverStress 로 난이도가 얹힌다
     // 평판: 키우는 지표. 0 이 되면 아무도 맡기지 않는다 = 런 종료.
     // 사고(반송·도난·파손·폐기·창고 초과)는 깎고, 꽉 채운 호출·무사고 정산·고객 신뢰 상승은 올린다.
@@ -61,13 +62,13 @@
     },
 
     // 광고 매체 — 마켓에서 계약·강화하고, 플레이 중 📣 로 가진 매체 하나를 골라 집행한다(보름에 한 번).
-    // 레벨이 오르면 건수·집행비가 같이 오른다. mix: 그 매체가 끌어오는 종류 가중(월별 비율에 곱한다 — 평판 문은 그대로)
+    // 집행하면 동네에 이름이 알려져 평판이 오른다(rep). 레벨이 오르면 건수·집행비가 같이 오른다. mix: 그 매체가 끌어오는 종류 가중(월별 비율에 곱한다 — 평판 문은 그대로)
     // 전단지는 처음부터 가진다. 버스·옥외는 대형을 더 부르지만 대형은 평판(동네 소문)이 열어야 온다
     AD_MEDIA: {
-      flyer: { icon: '📰', price: 0,   per: 4,  perUp: 2, cost: 40,  costUp: 15, days: 2, max: 4, upPrice: 70,  mix: { normal: 2 } },
-      sns:   { icon: '📱', price: 120, per: 6,  perUp: 3, cost: 70,  costUp: 20, days: 2, max: 4, upPrice: 100, mix: { fresh: 2.5, produce: 2 } },
-      radio: { icon: '📻', price: 160, per: 8,  perUp: 4, cost: 90,  costUp: 25, days: 3, max: 4, upPrice: 130, mix: {} },
-      bus:   { icon: '🚌', price: 240, per: 12, perUp: 5, cost: 140, costUp: 35, days: 4, max: 4, upPrice: 180, mix: { large: 3, fragile: 1.5 } },
+      flyer: { icon: '📰', rep: 1, price: 0,   per: 4,  perUp: 2, cost: 40,  costUp: 15, days: 2, max: 4, upPrice: 70,  mix: { normal: 2 } },
+      sns:   { icon: '📱', rep: 1, price: 120, per: 6,  perUp: 3, cost: 70,  costUp: 20, days: 2, max: 4, upPrice: 100, mix: { fresh: 2.5, produce: 2 } },
+      radio: { icon: '📻', rep: 2, price: 160, per: 8,  perUp: 4, cost: 90,  costUp: 25, days: 3, max: 4, upPrice: 130, mix: {} },
+      bus:   { icon: '🚌', rep: 2, price: 240, per: 12, perUp: 5, cost: 140, costUp: 35, days: 4, max: 4, upPrice: 180, mix: { large: 3, fragile: 1.5 } },
     },
     // 창고 구역: 바닥은 아무 크기나, 랙·복층은 올릴 수 있는 크기에 한도가 있다
     AREAS: { rack: { maxSize: 2 }, mezz: { maxSize: 4 } },
