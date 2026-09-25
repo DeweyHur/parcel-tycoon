@@ -377,7 +377,7 @@
   // ---------- 런 준비: 시나리오 → 회사 → 퍽 ----------
   function unlockText(achId) { const a = M.ACHIEVEMENTS[achId]; if (!a) return '🔒'; let pr = ''; try { if (a.prog) { const P = Profile.get(); const [h, n] = a.prog(P.stats, P); pr = ` (${Math.min(h, n)}/${n})`; } } catch (e) { } return `🔒 ${a.name}: ${a.desc}${pr}`; }
   const TIER_NAMES = () => [T('tier.0'), T('tier.1'), T('tier.2'), T('tier.3')];
-  const prep = { scenario: M.DEFAULT_SCENARIO, company: 'local', perks: [], insurer: 'sturdy' };
+  const prep = { scenario: M.DEFAULT_SCENARIO, company: 'local', perks: [], insurer: 'none' };   // 기본은 무보험 — 보험은 골라서 드는 것
   // 한국 달력 런에는 회사를 고르지 않는다 — 한 번에 여는 것이 너무 많다. 기본 판(local)으로 시작하고, 간판은 내 상호다
   const COMPANY_FREE = { kr: true };
   const noCompany = () => !!COMPANY_FREE[(M.SCENARIOS[prep.scenario] || {}).country];
