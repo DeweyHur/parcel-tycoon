@@ -253,7 +253,7 @@
     },
 
     // 업체 신뢰도 (런 내, 업체별 누적 — 계약을 바꿔도 유지)
-    TRUST_LEVELS: [0, 6, 16, 30],   // 택배 한 개 = 최대 2xp (반 점 없이 정수만) 라 눈금도 두 배
+    TRUST_LEVELS: [0, 3, 8, 15],    // 차 한 대 = −2~+2xp (실은 택배 점수 평균)
     TRUST_EFFECTS: [], // 단계 0 문구 — locales data.TRUST_EFFECTS[0]
     // 단계별 효과 문구 (마켓 카드·호출 모달·도감이 같은 문자열을 읽는다)
     trustEffectText(carrier, lv) { const f = DATA.familyOf ? DATA.familyOf(carrier) : carrier; if (lv >= 1 && DATA.TRUST_PERK_TEXT[f]) return DATA.TRUST_PERK_TEXT[f][lv - 1]; return DATA.TRUST_EFFECTS[0]; },
@@ -267,8 +267,8 @@
       limit2:  { price: 160, kind: 'limit', value: 2, icon: '🚛' },
       cap1:    { price: 140, kind: 'cap', value: 1, icon: '📦' },
       regular: { price: 180, kind: 'regular', icon: '🎫' },
-      seal:    { price: 90, kind: 'trust', value: 6, icon: '🔖' },
-      record:  { price: 170, kind: 'trust', value: 12, icon: '📜' },
+      seal:    { price: 90, kind: 'trust', value: 2, icon: '🔖' },
+      record:  { price: 170, kind: 'trust', value: 4, icon: '📜' },
       // 속성 특약: 계약 하나에 속성 하나 추가 (계약당 1개, 교체 시 소멸, 특약 처리는 보너스 없음)
       // 속성 특약은 언제나 대가가 있다 — 공짜 속성이면 사지 않을 이유가 없어진다 (완충재는 자리를 먹고, 보냉도 자리, 통관은 시간, 냉동은 자리+크기)
       optFragile: { price: 150, kind: 'opt', attr: 'fragile', capDelta: -1, icon: '⚠', tint: 'fragile' },

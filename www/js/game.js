@@ -36,7 +36,7 @@
     months: 3, scoreMult: 1, calendar: 'kr', monthOffset: 0,
     cashDelta: 0, cashMult: 1, opCostFixed: null, opCostDelta: 0, opCostRandom: null, lateOpCost: null,
     firstCallBonus: 0, freshExtra: 0, coldTrustBonus: 0, rewardMult: {}, rewardDelta: {}, rewardAll: 0, revenueMult: 1, bonusDelta: 0,
-    banCarriers: [], marketWeight: {}, bigSizeDelta: 0, sizeDelta: 0, storeBigDelta: 0, carrierCapDelta: {}, coldCapMax: null, callsDelta: 0, startCallsDelta: 0, callsMult: D.CALLS_SCALE || 1,
+    banCarriers: [], marketWeight: {}, bigSizeDelta: 0, sizeDelta: 0, storeBigDelta: 0, carrierCapDelta: {}, coldCapMax: null, callsDelta: 0, startCallsDelta: 0, startFacilities: [], callsMult: D.CALLS_SCALE || 1,
     facilityCapMult: 1, carrierStartTrust: {}, gradeShift: 0, deadlineDelta: {}, deadlineAll: 0, bigCallPenalty: null,
     priceMult: 1, contractPriceMult: 1, itemPriceMult: 1, facilityPriceMult: 1, waitStack: 0, skipBonus: 0,
     randomStart: false, freeRefresh: 0, marketContractSlots: 2, erosion: false, stressRelief: null, keepCalls: 0, marketMaxBuy: D.MARKET_MAX_BUY, expertFrom: 1,
@@ -182,6 +182,10 @@
       const mw = this.level && this.level.minWarehouse;
       if (mw) for (const k of ['cap', 'cold', 'frozen', 'xl']) if (mw[k] != null) wh[k] = Math.max(wh[k] || 0, mw[k]);
       wh.cap += R.capDelta; wh.xl += R.xlDelta;
+      // 퍽이 주는 시작 시설(선반 증설 → 선반 랙) — 마켓에서 산 것과 똑같이: 칸·구역·시설 표시(3D 랙·유지비)
+      for (const fid of R.startFacilities || []) { const f = D.FACILITIES[fid]; if (!f || wh[fid]) continue;
+        if (f.cap) { const add = Math.round(f.cap * (R.facilityCapMult || 1)); wh.cap += add; if (f.area) wh[f.area + 'Cap'] = (wh[f.area + 'Cap'] || 0) + add; }
+        if (f.cold) wh.cold = (wh.cold || 0) + f.cold; if (f.xl) wh.xl = (wh.xl || 0) + f.xl; wh[fid] = true; }
       if (R.coldCapMax != null) wh.cold = Math.min(wh.cold, R.coldCapMax);
       if (wh.frozen == null) wh.frozen = R.coldCapMax === 0 ? 0 : (wh.cold > 0 ? D.WAREHOUSE.frozen : 0);
       if (R.frozenCapMax != null) wh.frozen = Math.min(wh.frozen, R.frozenCapMax);
@@ -758,7 +762,9 @@
     // 이 호출로 얻을 신뢰도 경험치 예상 (담은 택배 기준)
     trustGainPreview(c, parcels) {
       const R = this.rules, ts = this.trustScore(parcels || []);
-      let xp = ts.xp;
+      // 차 한 대에 −2 ~ +2 — 실은 택배 점수의 평균을 반올림 (여러 개 실었다고 한 번에 몇 단계씩 오르지 않게)
+      const n = (parcels || []).length;
+      let xp = n ? Math.max(-2, Math.min(2, Math.round(ts.xp / n))) : 0;
       if (xp > 0 && c.carrier === 'cold' && R.coldTrustBonus) xp += R.coldTrustBonus;
       if (xp > 0) xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       return { xp, early: ts.early, half: ts.half, late: ts.late };
@@ -785,10 +791,12 @@
     selfCan(p) {
       if (!this.shows('self')) return false;
       if (p.size > this.selfSizeMax()) return false;
-      for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return false; if (a === 'fragile' && !this.warehouse.padvan) return false; if (a === 'customs' && (p.customs || 0) > 0) return false; }
+      for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return false; if (a === 'customs' && (p.customs || 0) > 0) return false; }
       return true;
     }
-    selfBlockReason(p) { if (p.size > this.selfSizeMax()) return T('self.needBigVan'); for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return T('self.needColdVan'); if (a === 'fragile' && !this.warehouse.padvan) return T('self.needPadVan'); if (a === 'customs' && (p.customs || 0) > 0) return T('self.customsWait'); } return null; }
+    selfBlockReason(p) { if (p.size > this.selfSizeMax()) return T('self.needBigVan'); for (const a of this._attrs(p)) { if ((a === 'cold' || a === 'frozen') && !this.warehouse.coldvan) return T('self.needColdVan'); if (a === 'customs' && (p.customs || 0) > 0) return T('self.customsWait'); } return null; }
+    // 직접 배송 파손 확률 — ⚠ 도 실을 수는 있다. 완충 포장차가 없으면 능력 없는 업체와 같은 확률로 깨진다
+    selfBreakProb(p) { if (!this._attrs(p).includes('fragile') || this.warehouse.padvan) return 0; return Math.min(0.95, D.BREAK_PROB * this.rules.breakMult * (this.customerPerk(p.customer, 'breakMult') || 1)); }
     // 자체 배송 대상: 대기열 앞의 일반 택배를 부피 한도(칸)까지
     selfEligible() { return this.parcels.filter(p => this.selfCan(p)); }
     canSelfDeliver() { return this.phase === 'play' && this.selfEligible().length > 0; }
@@ -966,7 +974,8 @@
       need = need === undefined ? car.need : need;
       const attrs = (p.attrs || D.PARCEL_TYPES[p.type].attrs).filter(a => D.GATING_ATTRS.includes(a) || (need || []).includes(a));
       if (p.size < car.sizeMin || p.size > sizeMax) return false;
-      if (car.onlyPlain && attrs.filter(a => D.GATING_ATTRS.includes(a)).length) return false;
+      // 일반 전용(대량) 차도 ⚠ 는 싣는다 — 파손 능력이 없으니 깨질 확률을 안고(breakProb). 규칙 문구 「능력 없는 업체로 보내면 파손 확률」 그대로
+      if (car.onlyPlain && attrs.filter(a => D.GATING_ATTRS.includes(a) && a !== 'fragile').length) return false;
       if (car.allowAttrs && attrs.some(a => D.GATING_ATTRS.includes(a) && !car.allowAttrs.includes(a))) return false;
       if (need && !need.some(a => attrs.includes(a))) return false;
       if (attrs.includes('frozen') && !caps.includes('frozen')) return false;
@@ -997,7 +1006,7 @@
       return out;
     }
     // 지금 어떤 계약으로도(배차 유무와 무관) 안 되고 직접 배송도 막힌 택배
-    unhandled() { return this.parcels.filter(p => !this.contracts.some(c => c && this.canHandle(c, p) && this.breakProb(c, p) === 0) && !this.selfCan(p)); }
+    unhandled() { return this.parcels.filter(p => !this.contracts.some(c => c && this.canHandle(c, p) && this.breakProb(c, p) === 0) && !(this.selfCan(p) && this.selfBreakProb(p) === 0)); }
     // 이 계약이 못 받는 것 — 계약 화면에서 보여 준다
     contractBlocks(c) {
       const car = D.CARRIERS[c.carrier], caps = this.contractCaps(c), max = this.contractSizeMax(c);
@@ -1558,8 +1567,14 @@
       if (chosen.length > this.selfCount()) return { ok: false, msg: T('err.selfLimit', { n: this.selfCount() }) };
       const cost = chosen.reduce((s, p) => s + this.selfCost(p), 0);
       this.feesDue += cost; this.monthStats.spent += cost; this.run.spent += cost; this.monthStats.selfCost = (this.monthStats.selfCost || 0) + cost;
-      let revenue = 0;
+      let revenue = 0, broken = 0;
       for (const p of chosen) {
+        const bp = this.selfBreakProb(p);
+        if (bp > 0 && this.rng.next() < bp) {
+          broken++; this.monthStats.broken++; this.stats.broken++;
+          this._discardParcel(p, MSG('why.brokenInTransit', { name: T('self.card') }), 2, 'broken');
+          continue;
+        }
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
         r = Math.round(r * (R.rewardMult[p.type] || 1));
         if (p.wet) r = Math.round(r * 0.8);
@@ -1573,14 +1588,15 @@
       }
       revenue = Math.round(revenue * R.revenueMult);
       this.cash += revenue;
-      this.monthStats.revenue += revenue; this.monthStats.delivered += chosen.length;
-      this.run.revenue += revenue; this.run.delivered += chosen.length;
-      if (this.isRushTurn()) this.stats.holidayRushDelivered = (this.stats.holidayRushDelivered || 0) + chosen.length;
+      const ok = chosen.length - broken;
+      this.monthStats.revenue += revenue; this.monthStats.delivered += ok;
+      this.run.revenue += revenue; this.run.delivered += ok;
+      if (this.isRushTurn()) this.stats.holidayRushDelivered = (this.stats.holidayRushDelivered || 0) + ok;
       this.stats.selfCalls++;
       this.stats.maxCash = Math.max(this.stats.maxCash, this.cash);
       this._assignCold();
       this.emit('call', { contract: null, self: true, count: chosen.length, revenue, cost });
-      return { ok: true, revenue, cost, count: chosen.length, ids: chosen.map(p => p.id) };
+      return { ok: true, revenue, cost, count: chosen.length, broken, ids: chosen.map(p => p.id) };
     }
     _updateTrustStats() {
       const seen = new Set(this.contracts.filter(Boolean).map(c => c.carrier));
@@ -1856,7 +1872,7 @@
     canTakeType(t) {
       const T = D.PARCEL_TYPES[t]; if (!T) return true;
       const covers = this.contracts.filter(Boolean);
-      return (T.sizes || [1, 2]).some(sz => { const p = { type: t, size: sz, customs: 0 }; return covers.some(c => this.canHandle(c, p) && this.breakProb(c, p) === 0) || this.selfCan(p); });
+      return (T.sizes || [1, 2]).some(sz => { const p = { type: t, size: sz, customs: 0 }; return covers.some(c => this.canHandle(c, p) && this.breakProb(c, p) === 0) || (this.selfCan(p) && !this.selfBreakProb(p)); });
     }
     // 다음 사이클 예상 중 못 받는 종류. **화면에 뜬 예상 그대로** 판정한다 —
     // 보이는 줄과 붉은 줄이 어긋나면 플레이어는 어느 쪽도 믿지 않는다

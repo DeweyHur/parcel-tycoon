@@ -464,6 +464,15 @@
     if (prep.perks.some(o => o !== pid && M.PERKS[o].family === perk.family)) return T('prep.sameFamily', { family: M.PERK_FAMILIES[perk.family] });
     return null;
   }
+  // 퍽 아이콘 — 장착 칸·HUD·메뉴·도감이 같은 그림을 쓴다(슬롯에 끼우는 느낌)
+  const PERK_ICON = { longdeal: '📝', prepay: '💳', protect: '🛡', regularco: '🤝', spare: '🚚', bundle: '📦', compact: '🗜', coldpro: '❄', tempyard: '⛺', shelves: '🗄', freezer: '🧊', yard: '🛋', skip: '⏭', insure: '☂', tent: '🏕', breath: '😮‍💨', overtime: '🌙', foresight: '🔭', emergency: '🚨', regulars: '👥', premium: '💎', closing: '📅', consult: '🧑‍💼', taxsave: '🧾', investor: '💰' };
+  const perkIcon = id => PERK_ICON[id] || ({ contract: '📝', warehouse: '🏠', ops: '⚙', income: '💰' })[(M.PERKS[id] || {}).family] || '✨';
+  // 장착 칸: 끼운 칸엔 아이콘(+이름 작게), 빈 칸은 점선
+  function perkSlotsHtml(ids, slots, opts) {
+    opts = opts || {};
+    return `<span class="pslots">${Array.from({ length: Math.max(slots, ids.length) }, (_, k) => { const id = ids[k];
+      return id ? `<span class="pslot on" data-id="${id}" title="${esc(M.PERKS[id].name + ' — ' + M.PERKS[id].desc)}"><i>${perkIcon(id)}</i>${opts.names ? `<small>${esc(M.PERKS[id].name)}</small>` : ''}${opts.remove ? '<b>✕</b>' : ''}</span>` : `<span class="pslot"><i>＋</i>${opts.names ? `<small>${esc(T('prep.slotEmpty'))}</small>` : ''}</span>`; }).join('')}</span>`;
+  }
   function showPerkSelect() {
     const P = Profile.get(), slots = Profile.perkSlots();
     prep.perks = prep.perks.filter(p => P.unlocked.perks.includes(p) && !perkConflict(p)).slice(0, slots);
@@ -474,9 +483,9 @@
     const ids = Object.keys(M.PERKS).filter(id => P.unlocked.perks.includes(id)).sort((a, b) => fams.indexOf(M.PERKS[a].family) - fams.indexOf(M.PERKS[b].family));
     const perkCard = id => {
       const pk = M.PERKS[id], sel = prep.perks.includes(id), swap = prep.perks.some(o => M.PERKS[o].family === pk.family), conflict = !sel && !swap ? perkConflict(id) : null;   // 같은 계열은 누르면 갈아 끼우니 흐리게 하지 않는다
-      return `<div class="card pk ${conflict ? 'dis' : ''} ${sel ? 'sel' : ''}" data-id="${id}" title="${esc(pk.desc)}"><div class="fam">${esc(M.PERK_FAMILIES[pk.family])}</div><div class="t">${esc(pk.name)}</div><div class="d">${esc(pk.short || pk.desc)}</div></div>`;
+      return `<div class="card pk ${conflict ? 'dis' : ''} ${sel ? 'sel' : ''}" data-id="${id}" title="${esc(pk.desc)}"><div class="t"><span class="pk-ic">${perkIcon(id)}</span>${esc(pk.name)}</div><div class="d">${esc(pk.short || pk.desc)}</div></div>`;
     };
-    const worn = Array.from({ length: slots }, (_, k) => { const id = prep.perks[k]; return id ? `<span class="slot on" data-id="${id}">${esc(M.PERKS[id].name)} ✕</span>` : `<span class="slot">${esc(T('prep.slotEmpty'))}</span>`; }).join('');
+    const worn = perkSlotsHtml(prep.perks, slots, { names: true, remove: true });
     const head = `<div class="perk-count">${prepStep(3)} — ${esc(M.SCENARIOS[prep.scenario].name)}${noCompany() ? '' : ` · ${co.icon} ${esc(co.name)}`}</div><div class="worn"><b>${T('prep.perkCount', { n: prep.perks.length, slots })}</b>${worn}</div>`;
     const groups = `<div class="pgrid">${ids.map(perkCard).join('')}</div>`;
     if (prep.story == null) prep.story = !(storySeen(P)); // 첫 런은 안내가 기본으로 켜진다
@@ -485,7 +494,7 @@
     const insCards = storyCard + `<div class="pk-head">${T('prep.insuranceShort')}</div>` + (noIns ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('prep.startupNoIns')}</div>` : `<div class="pgrid">` + Object.keys(M.INSURERS).map(id => { const I = M.INSURERS[id]; const fee = Math.max(0, Math.round((I.fee + ((co.mods && co.mods.premiumDelta || {})[id] || 0)) * ((co.mods && co.mods.premiumMult) || 1) * ((M.SCENARIOS[prep.scenario].mods || {}).premiumMult || 1))); return `<div class="card pk ins ${prep.insurer === id ? 'sel' : ''}" data-ins="${id}" title="${esc(I.desc)}"><div class="fam">${fee ? T('fmt.perMonth', { n: fee }) : '0c'}</div><div class="t">${I.icon} ${esc(I.name)}</div><div class="d">${esc(I.short || I.desc)}${I.fans.length ? ` ${I.fans.map(f => M.CUSTOMERS[f].icon).join('')}` : ''}</div></div>`; }).join('') + `</div>`);
     const m = modal(T('prep.perkTitle'), head + groups + insCards, [{ label: T('btn.back'), onClick: () => noCompany() ? showScenarioSelect() : showCompanySelect() }, { label: T('prep.start'), cls: 'primary', onClick: () => startRun() }]);
     m.querySelectorAll('.card.ins').forEach(el => el.onclick = () => { SFX.select(); prep.insurer = el.dataset.ins; showPerkSelect(); });
-    m.querySelectorAll('.worn .slot.on').forEach(el => el.onclick = () => { SFX.cancel(); prep.perks = prep.perks.filter(p => p !== el.dataset.id); showPerkSelect(); });
+    m.querySelectorAll('.worn .pslot.on').forEach(el => el.onclick = () => { SFX.cancel(); prep.perks = prep.perks.filter(p => p !== el.dataset.id); showPerkSelect(); });
     m.querySelector('#prep-story').onclick = () => { SFX.select(); prep.story = !prep.story; showPerkSelect(); };
     m.querySelectorAll('.card.pk:not(.ins)').forEach(el => el.onclick = () => {
       const id = el.dataset.id;
@@ -640,7 +649,7 @@
     // 아직 안 연 것은 화면에도 없다 (levels.js) — 평판 게이지·회사 줄은 레벨이 열어 준다
     $('#hud-right').hidden = !g.shows('rep') && !g.shows('perks');
     $('#stress-wrap').hidden = !g.shows('rep');
-    $('#hud-perks').innerHTML = !g.shows('perks') ? `<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName ? g.companyName() : g.company.name)}</a>` : [`<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName())}</a>`, ...g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}">${esc(M.PERKS[p].name)}</a>`), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ');
+    $('#hud-perks').innerHTML = !g.shows('perks') ? `<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName ? g.companyName() : g.company.name)}</a>` : [`<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName())}</a>`, ...(g.perks.length ? [`<span class="hud-pk">${g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}" title="${esc(M.PERKS[p].name)}">${perkIcon(p)}</a>`).join('')}</span>`] : []), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ');
     $('#hud-perks').querySelectorAll('[data-pop]').forEach(el => el.onclick = () => { SFX.click(); if (el.dataset.pop === 'company') showCompanyInfo(); else if (el.dataset.pop === 'insurer') showInsurance(closeModal); else { const pk = M.PERKS[el.dataset.id]; modal(pk.name, `<p>${esc(pk.desc)}</p><p style="color:var(--dim);font-size:12px">${esc(T('hud.familyPerk', { family: M.PERK_FAMILIES[pk.family] }))}</p>`, [{ label: T('btn.close'), onClick: closeModal }]); } });
     // 창고·냉장 막대는 패널에서 뺐다 — 3D 간판이 '창고 12/24 · 냉장 2/6' 을 읽는다 (scene3d _buildTiles)
     const up = g.upcoming();
@@ -655,7 +664,7 @@
     }).join('');
     // 토요일의 '🛌 일요일' 칩은 뺐다 — 내일·모레는 영업일 기준이고, 쉬는 건 아래 「휴식」 버튼이 이미 말한다
     const wxNow = g.weatherNow(), W = M.WEATHER[wxNow], showWx = g.shows('weather');
-    if (showWx) $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.name + (W.desc ? ' — ' + W.desc : ''))}">${W.icon}</span>` + $('#upcoming').innerHTML;
+    if (showWx) $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.name + (W.desc ? ' — ' + W.desc : ''))}"><b class="ahead">${T('hud.today')}</b> ${W.icon}</span>` + $('#upcoming').innerHTML;
     $('#wxline').onclick = () => { SFX.click(); showWeatherInfo(); };
     $('#wxline').className = 'wxline ' + wxNow; $('#wxline').innerHTML = wxNow !== 'sunny' ? `${W.icon} ${esc(W.desc)}` : ''; $('#wxline').hidden = wxNow === 'sunny' || !showWx;
     if (g.items.transitCert || g.items.yardIns === g.month || g.items.customsBond === g.month) $('#upcoming').innerHTML += `<span class="chip">${[g.items.transitCert ? `${M.INS_ITEMS.transitCert.icon} ${esc(M.INS_ITEMS.transitCert.name)} ${g.items.transitCert}` : '', g.items.yardIns === g.month ? `${M.INS_ITEMS.yardIns.icon} ${esc(M.INS_ITEMS.yardIns.name)}` : '', g.items.customsBond === g.month ? `${M.INS_ITEMS.customsBond.icon} ${esc(M.INS_ITEMS.customsBond.name)}` : ''].filter(Boolean).join(' · ')}</span>`;
@@ -860,8 +869,8 @@
       ${g.shows('customers') ? `<div class="d">${T('company.customers')} <b>${cu.icon} ${esc(cu.name)}</b>${p.customer !== 'anon' ? ` · ${T('cust.trustLv', { n: lv })} ${T('pd.perPiece', { n: M.CUSTOMER_BONUS[lv] })}` : ''}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}</div>` : ''}
       ${p.wet || p.outdoor ? `<div class="d">${[p.wet ? T('pd.wet') : '', p.outdoor ? T('pd.outdoor') : ''].filter(Boolean).join(' · ')}</div>` : ''}
       ${attrRows}
-      ${g.contracts.some(c => c && g.canHandle(c, p) && g.breakProb(c, p) === 0) || selfOk ? '' : `<div class="d" style="color:var(--orange);margin-top:6px">${g.contracts.filter(Boolean).length >= D.CONTRACT_SLOTS && optFor(g, p) ? T('pd.needOpt', { name: optFor(g, p) }) : famNames(p) ? T('pd.needFamily', { list: famNames(p) }) : T('pd.needNothing')}</div>`}
-      <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('pd.contracts')}</div><div class="ttrack">${rows || `<div class="d">${T('pd.noContract')}</div>`}${g.shows('self') ? `<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">${T('pd.selfRow')} ${selfOk ? T('pd.selfCost', { cost: g.selfCost(p) }) : `<span style="color:var(--dim)">${esc(selfWhy || T('pd.no'))}</span>`}</span><span class="st">${selfOk ? T('pd.ok') : '—'}</span></div>` : ''}</div>`;
+      ${g.contracts.some(c => c && g.canHandle(c, p) && g.breakProb(c, p) === 0) || (selfOk && !g.selfBreakProb(p)) ? '' : `<div class="d" style="color:var(--orange);margin-top:6px">${g.contracts.filter(Boolean).length >= D.CONTRACT_SLOTS && optFor(g, p) ? T('pd.needOpt', { name: optFor(g, p) }) : famNames(p) ? T('pd.needFamily', { list: famNames(p) }) : T('pd.needNothing')}</div>`}
+      <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('pd.contracts')}</div><div class="ttrack">${rows || `<div class="d">${T('pd.noContract')}</div>`}${g.shows('self') ? `<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">${T('pd.selfRow')} ${selfOk ? T('pd.selfCost', { cost: g.selfCost(p) }) + (g.selfBreakProb(p) ? ` <span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(g.selfBreakProb(p) * 100) })}</span>` : '') : `<span style="color:var(--dim)">${esc(selfWhy || T('pd.no'))}</span>`}</span><span class="st">${selfOk ? T('pd.ok') : '—'}</span></div>` : ''}</div>`;
     modal(`${t.name} ${T('fmt.cells', { n: p.size })}`, body, [{ label: T('btn.close'), onClick: closeModal }]);
     storyCheck({ kind: 'modal', modal: 'parcel', parcel: p });
   }
@@ -953,7 +962,7 @@
     // c === SELF: 우리 차 — 크기 한도와 차량(냉동 탑차·완충 포장차)으로 거른다
     if (c === SELF) return Object.keys(D.PARCEL_TYPES).filter(open).filter(t => {
       const T2 = D.PARCEL_TYPES[t], size = T2.sizes.find(sz => sz <= g.selfSizeMax());
-      return size != null && g.selfCan({ type: t, size, attrs: T2.attrs, customs: 0 });
+      { const pp = { type: t, size, attrs: T2.attrs, customs: 0 }; return size != null && g.selfCan(pp) && !g.selfBreakProb(pp); }
     });
     return Object.keys(D.PARCEL_TYPES).filter(open).filter(t => {
       const T2 = D.PARCEL_TYPES[t], size = T2.sizes.find(sz => sz >= D.CARRIERS[c.carrier].sizeMin && sz <= g.contractSizeMax(c));
@@ -1089,7 +1098,7 @@
     else if (p.overdue) { const ri = game ? game.returnIn(p) : null; parts.push(`<b style="color:var(--red)">${T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' })}</b>`); } else parts.push(T('ps.deadline', { n: p.deadline }));
     if (p.outdoor) parts.unshift(`<b style="color:var(--orange)">${T('hud.outdoorTag')}</b>`);
     // 어떤 계약으로도 못 싣고 직접 배송도 안 되는 택배 — 반송 말고는 길이 없으니 눈에 띄어야 한다
-    if (game && game.phase === 'play' && !(p.customs > 0) && !game.contracts.some(c => c && game.canHandle(c, p) && game.breakProb(c, p) === 0) && !game.selfCan(p)) parts.unshift(`<b style="color:var(--red)">${T('ps.noCarrier')}</b>`);
+    if (game && game.phase === 'play' && !(p.customs > 0) && !game.contracts.some(c => c && game.canHandle(c, p) && game.breakProb(c, p) === 0) && !(game.selfCan(p) && !game.selfBreakProb(p))) parts.unshift(`<b style="color:var(--red)">${T('ps.noCarrier')}</b>`);
     return parts.join(' · ');
   }
   function urgDot(p) { const u = urgencyOf(p); return `<span class="urg ${u <= 0 ? 'r' : u <= 1 ? 'r' : u <= 2 ? 'o' : u <= 3 ? 'y' : 'g'}"></span>`; }
@@ -1121,7 +1130,7 @@
     if (a.includes('cold') && !p.inCold) h.push('warm');
     if (a.includes('frozen') && !p.inFrozen) h.push('fout');
     if (a.includes('produce') && game && game.isHeatTurn() && !game.warehouse.vent && !p.inCold) h.push('heat');
-    try { if (game && game.phase === 'play' && !(p.customs > 0) && !game.contracts.some(c => c && game.canHandle(c, p) && game.breakProb(c, p) === 0) && !game.selfCan(p)) h.push('nc'); } catch (e) { /* 계산 못 하면 위험 없음으로 둔다 */ }
+    try { if (game && game.phase === 'play' && !(p.customs > 0) && !game.contracts.some(c => c && game.canHandle(c, p) && game.breakProb(c, p) === 0) && !(game.selfCan(p) && !game.selfBreakProb(p))) h.push('nc'); } catch (e) { /* 계산 못 하면 위험 없음으로 둔다 */ }
     return h.join('+');
   }
   // 기한 머리줄 — 초과 · 통관 N일 · 기한 N일 · 무기한
@@ -1229,7 +1238,7 @@
     if (lastCallCtx) storyCheck(lastCallCtx);
   }
   function callState() {
-    if (pick.i === SELF) return { sel: pick.sel, elig: new Set(game.selfEligible().map(p => p.id)), risk: new Set() };
+    if (pick.i === SELF) return { sel: pick.sel, elig: new Set(game.selfEligible().map(p => p.id)), risk: new Set(game.selfEligible().filter(p => game.selfBreakProb(p) > 0).map(p => p.id)) };
     const c = game.contracts[pick.i], elig = game.eligibleParcels(c);
     return { sel: pick.sel, elig: new Set(elig.map(p => p.id)), risk: new Set(elig.filter(p => game.breakProb(c, p) > 0).map(p => p.id)) };
   }
@@ -1283,7 +1292,7 @@
     const blocked = g.parcels.filter(p => !g.selfCan(p)).length;
     head.innerHTML = `<div class="ch-top"><b>🚐 ${T('self.card')}</b><span class="caps">${vans ? `${T('wm.vans')}: ${esc(vans)}` : T('wm.noVans')}${blocked ? ` · ${T('wm.blocked', { n: blocked })}` : ''}</span></div>
       <div class="load-visual mini"><div class="truck-stack"><div class="truck-shell van"><div class="truck-cells" style="--cols:${Math.min(6, n)}">${cells}</div></div></div><div class="load-money"><span class="money-chip">${T('call.earn')}<b>+${pl.income}c</b></span><span class="money-chip cost">${T('call.cost')}<b>−${pl.cost}c</b></span><span class="money-chip net">${T('call.net')}<b>${pl.net >= 0 ? '+' : ''}${pl.net}c</b></span></div></div>
-      `;
+      ${(() => { const rs = pl.picked.filter(p => g.selfBreakProb(p) > 0); return rs.length ? `<div class="riskline">${T('call.riskLine', { n: rs.length, pct: Math.round(g.selfBreakProb(rs[0]) * 100), loss: Math.round(rs.reduce((s, p) => s + g.selfBreakProb(p) * g.baseReward(p.type, p.baseSize), 0)) })}</div>` : ''; })()}`;
     head.hidden = false; foot.hidden = true; foot.innerHTML = '';
     // 보내기는 아래 큰 버튼(직접 배송 N개)이 맡는다 — 자동 선택·선택 해제·따로 선 호출 버튼 줄은 없앴다
     pickAction = { label: T('self.go'), sub: pl.picked.length ? `${T('call.net')} ${pl.net >= 0 ? '+' : ''}${pl.net}c · ${pl.picked.length}` : T('call.pickNone'), on: pl.picked.length ? () => doSelf(pl.picked.map(p => p.id)) : null };
@@ -1773,13 +1782,20 @@
 
   // ---------- 고객 ----------
   function custBar(c) { const lv = c.level; const bars = [1, 2, 3].map(i => `<i class="${i <= lv ? 'on' : ''}"></i>`).join(''); return `<span class="trust" title="${c.next ? T('cust.next', { have: c.next.have, need: c.next.need }) : T('trust.max')}">${bars}${c.suspended ? ` ${T('cust.suspended')}` : c.next ? ` ${c.next.have}/${c.next.need}` : ' MAX'}</span>`; }
+  // 고객 카드: 한 줄 머리(아이콘·이름·신뢰 단계·이번 달) + 맡기는 종류 색 점 + 규칙 한 줄. 단계별 혜택은 누르면 펼친다
   function customerCard(c) {
-    const cu = M.CUSTOMERS[c.id];
-    const perks = [2, 3].filter(l => cu.perks && cu.perks[l]).map(l => `<div class="ttrow ${c.level >= l ? 'on' : ''}"><span class="lv">${l}</span><span class="ef">${esc(cu.perks[l].text)}</span><span class="st">${c.level >= l ? '✓' : `${M.CUSTOMER_LEVELS[l]}xp`}</span></div>`).join('');
-    const lvRow = `<div class="ttrow ${c.level >= 1 ? 'on' : ''}"><span class="lv">1</span><span class="ef">${T('cust.lv1')}</span><span class="st">${c.level >= 1 ? '✓' : `${M.CUSTOMER_LEVELS[1]}xp`}</span></div>`;
-    const items = cu.items ? Object.keys(cu.items).map(k => { const it = M.CUSTOMER_ITEMS[k]; const t = it ? it.type : k; return `${D.PARCEL_TYPES[t].short}${it ? attrIcons(it.attrs) : ''} ${cu.items[k]}%`; }).join(' · ') : T('cust.defaultMix');
-    return `<div class="card ${c.suspended ? 'dis' : ''}" style="cursor:default"><div class="t"><span>${cu.icon} ${esc(cu.name)}${c.slots > 1 ? ` ×${c.slots}` : ''}</span><span class="price">${c.id === 'anon' ? '' : custBar(c)}</span></div>
-      <div class="d">${items} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('cust.thisMonth', { n: c.month.delivered, rev: c.month.revenue })}${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.suspended ? ` · <span style="color:var(--red)">${T('cust.suspendedLong')}</span>` : ''}${c.id === 'anon' ? '' : `<div class="ttrack">${lvRow}${perks}</div>`}</div></div>`;
+    const cu = M.CUSTOMERS[c.id], max = M.CUSTOMER_LEVELS.length - 1;
+    const pips = c.id === 'anon' ? '' : `<span class="tpips"><small>${esc(T('common.trust'))}</small> <b>Lv${c.level}</b>${Array.from({ length: max }, (_, k) => `<i class="${k < c.level ? 'on' : ''}"></i>`).join('')}${c.next ? `<small class="cc-xp">${c.next.have}/${c.next.need}</small>` : ''}</span>`;
+    const mix = cu.items ? Object.keys(cu.items).map(k => { const it = M.CUSTOMER_ITEMS[k]; const t = it ? it.type : k; return `<span class="cc-mix"><i class="hv-sw" style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>${cu.items[k]}%</span>`; }).join('') : `<span class="cc-mix dim">${T('cust.defaultMix')}</span>`;
+    const month = `<span class="cc-month">📦${c.month.delivered} · ${c.month.revenue >= 0 ? '+' : ''}${c.month.revenue}c${c.month.claims ? ` · <b class="bad">−${c.month.claims}c</b>` : ''}</span>`;
+    const claim = cu.claimMult !== 1 ? `<span class="cc-claim" title="${esc(T('mk.claimMult', { n: cu.claimMult }))}">⚖×${cu.claimMult}</span>` : '';
+    const rule = cu.rule ? `<div class="cc-rule">🎯 ${esc(cu.rule.text)}</div>` : '';
+    const lvRows = c.id === 'anon' ? '' : [[1, T('cust.lv1')], ...[2, 3].filter(l => cu.perks && cu.perks[l]).map(l => [l, cu.perks[l].text])]
+      .map(([l, txt]) => `<div class="ttrow ${c.level >= l ? 'on' : ''}"><span class="lv">${l}</span><span class="ef">${esc(txt)}</span><span class="st">${c.level >= l ? '✓' : `${M.CUSTOMER_LEVELS[l]}xp`}</span></div>`).join('');
+    const head = `<span class="cc-ic">${cu.icon}</span><b>${esc(cu.name)}${c.slots > 1 ? ` ×${c.slots}` : ''}</b>${pips}`;
+    const sub = `<span class="cc-line">${mix}${claim}${month}</span>${c.suspended ? `<span class="bad">${T('cust.suspendedLong')}</span>` : ''}`;
+    return lvRows ? `<details class="cx-tile cc ${c.suspended ? 'dis' : ''}"><summary>${head}${sub}${rule}</summary><div class="cx-more"><div class="ttrack">${lvRows}</div></div></details>`
+      : `<div class="cx-tile cc"><div class="cx-sum">${head}${sub}${rule}</div></div>`;
   }
   function showInsurance(back) {
     const g = game;
@@ -1795,11 +1811,13 @@
     const soon = Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !have.includes(k))
       .map(k => ({ k, tier: M.CUSTOMERS[k].repTier || 0 }))
       .sort((a, b) => a.tier - b.tier || a.k.localeCompare(b.k));
-    const soonRows = soon.length ? `<div class="perk-count" style="margin-top:10px">${T('cust.locked')}</div>` + soon.map(({ k, tier }) => {
+    const soonRows = soon.length ? `<div class="cx-head">🔒 ${T('cust.locked')}</div><div class="cc-soon">` + soon.map(({ k, tier }) => {
       const cu = M.CUSTOMERS[k], open = tier <= g.repTier;
-      return `<div class="d" style="opacity:${open ? 1 : 0.55}">${cu.icon} ${esc(cu.name)} — ${open ? T('cust.openNow') : T('cust.needTier', { name: T('rep.tier.' + D.REP_TIERS[tier].id) })}</div>`;
-    }).join('') : '';
-    const body = `<div class="perk-count">${T('cust.rules')}</div>` + list.map(customerCard).join('') + soonRows;
+      return `<span class="${open ? '' : 'dim'}" title="${esc(open ? T('cust.openNow') : T('cust.needTier', { name: T('rep.tier.' + D.REP_TIERS[tier].id) }))}">${cu.icon} ${esc(cu.name)} <small>${open ? '✓' : '⭐' + esc(T('rep.tier.' + D.REP_TIERS[tier].id))}</small></span>`;
+    }).join('') + '</div>' : '';
+    // 규칙 줄글은 아이콘 세 개로: 기한 내 +1 · 특수 규칙 +1 · 폐기 −3
+    const rules = `<div class="cc-rules"><span>⏱ +1xp</span><span>🎯 +1xp</span><span class="bad">🗑 −3xp</span><span class="dim">⭐ ${T('cust.upHint')}</span></div>`;
+    const body = rules + `<div class="cx-list">${list.map(customerCard).join('')}</div>` + soonRows;
     modal(T('company.customers'), body, [{ label: T('btn.close'), onClick: back }]);
   }
 
@@ -2150,21 +2168,36 @@
       storyCheck({ kind: 'turn' });
     });
   }
+  // 메뉴: 위에는 지금 런(런 · 회사 · 퍽 장착 칸), 아래는 아이콘 격자 버튼. 버튼 아홉 개를 한 줄에 늘어놓으면 글자가 세로로 쪼개졌다
   function showMenu() {
-    const g = game, R = g.rules;
-    const info = !g.shows('perks') ? `<div class="d" style="font-size:12px;margin-bottom:6px">${g.company.icon} ${esc(g.companyName())}</div>`
-      : `<div class="d" style="font-size:12px;margin-bottom:6px">${esc((M.SCENARIOS[g.cfg.scenario] || {}).name || '')} · ${g.company.icon} ${esc(g.companyName())}<br><span style="color:var(--green)">＋ ${esc(g.company.passive)}</span><br><span style="color:var(--orange)">－ ${esc(g.company.weakness)}</span>${g.perks.length ? `<br>${T('company.perks')}: ` + g.perks.map(p => esc(M.PERKS[p].name + ' — ' + M.PERKS[p].desc)).join(`<br>${T('company.perks')}: `) : ''}${(g.cfg.variants || []).length ? `<br>${T('prep.variants')}: ` + g.cfg.variants.map(v => esc(M.DAILY_VARIANTS[v].name + ' — ' + M.DAILY_VARIANTS[v].desc)).join(', ') : ''}</div>`;
-    const m = modal(T('menu.title'), `${info}<p style="font-size:12px;color:var(--dim)">${T('menu.autosave')}</p><label style="display:flex;align-items:center;gap:8px;font-size:12px">${T('menu.volume')} <input type="range" id="vol" min="0" max="1" step="0.05" value="${opts.musicVol}" style="flex:1"></label>`, [
-      { label: T('menu.continue'), cls: 'primary', onClick: closeModal },
-      ...(g.shows('customers') ? [{ label: T('company.customers'), onClick: () => showCustomers(showMenu) }] : []),
-      ...(g.shows('market') ? [{ label: T('title.records'), onClick: () => showLog(showMenu) }] : []),
-      { label: T('btn.help'), onClick: () => showHelp(showMenu) },
-      { label: T('opt.sound', { v: T(opts.sound ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); closeModal(); } },
-      { label: T('opt.music', { v: T(opts.music ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); closeModal(); } },
-      { label: T('menu.story', { v: T(g.story && !g.story.off ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { if (!g.story) g.story = { seen: [], notes: [] }; g.story.off = !g.story.off; saveGame(); closeModal(); if (!g.story.off && g.phase === 'play') storyCheck({ kind: 'turn' }); } },
-      ...(g.shows('weather') ? [{ label: T('menu.sms', { v: T(opts.sms ? 'opt.turnOff' : 'opt.turnOn') }), onClick: () => { opts.sms = !opts.sms; saveOpts(); closeModal(); } }] : []),
-      { label: T('menu.abandon'), cls: 'warn', onClick: () => askConfirm(T('menu.abandonConfirm'), () => { Store.remove(SAVE_KEY); game = null; showTitle(); }, T('menu.abandonBtn'), showMenu) },
-    ]);
+    const g = game;
+    const perks = g.shows('perks') ? `<div class="menu-perks">${perkSlotsHtml(g.perks, Math.max(g.perks.length, Profile.perkSlots()), { names: true })}</div>` : '';
+    const coLine = g.shows('perks') ? `<div class="menu-co"><span class="up">＋ ${esc(g.company.passive)}</span>${g.company.weakness && g.company.weakness !== T('common.none') ? `<span class="down">－ ${esc(g.company.weakness)}</span>` : ''}</div>` : '';
+    const head = `<div class="menu-run">${esc((M.SCENARIOS[g.cfg.scenario] || {}).icon || '')} ${esc((M.SCENARIOS[g.cfg.scenario] || {}).name || '')} · ${g.company.icon} ${esc(g.companyName())}</div>${coLine}${perks}`;
+    const onOff = v => T(v ? 'opt.on' : 'opt.off');
+    const acts = [
+      g.shows('customers') && ['cust', '👥', T('company.customers')],
+      g.shows('market') && ['log', '📜', T('title.records')],
+      ['help', '❓', T('btn.help')],
+      ['sound', opts.sound ? '🔊' : '🔇', `${T('menu.sfx')} ${onOff(opts.sound)}`],
+      ['music', opts.music ? '🎵' : '🔕', `${T('menu.bgm')} ${onOff(opts.music)}`],
+      ['story', '🧓', `${T('menu.guide')} ${onOff(g.story && !g.story.off)}`],
+      g.shows('weather') && ['sms', '💬', `${T('menu.smsShort')} ${onOff(opts.sms)}`],
+      ['quit', '🏳', T('menu.abandon'), 'warn'],
+    ].filter(Boolean);
+    const grid = `<div class="menu-grid">${acts.map(([id, ic, lb, cls]) => `<button class="btn ${cls || ''}" data-act="${id}"><span>${ic}</span><small>${esc(lb)}</small></button>`).join('')}</div>`;
+    const vol = `<label class="menu-vol">🎚 <input type="range" id="vol" min="0" max="1" step="0.05" value="${opts.musicVol}"></label><p class="menu-note">${T('menu.autosave')}</p>`;
+    const m = modal(T('menu.title'), head + grid + vol, [{ label: T('menu.continue'), cls: 'primary', onClick: closeModal }]);
+    const run = {
+      cust: () => showCustomers(showMenu), log: () => showLog(showMenu), help: () => showHelp(showMenu),
+      sound: () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); showMenu(); },
+      music: () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); showMenu(); },
+      story: () => { if (!g.story) g.story = { seen: [], notes: [] }; g.story.off = !g.story.off; saveGame(); showMenu(); },
+      sms: () => { opts.sms = !opts.sms; saveOpts(); showMenu(); },
+      quit: () => askConfirm(T('menu.abandonConfirm'), () => { Store.remove(SAVE_KEY); game = null; showTitle(); }, T('menu.abandonBtn'), showMenu),
+    };
+    m.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { SFX.click(); run[b.dataset.act](); });
+    m.querySelectorAll('.menu-perks .pslot.on').forEach(el => el.onclick = () => { const pk = M.PERKS[el.dataset.id]; toast(`${perkIcon(el.dataset.id)} ${pk.name} — ${pk.desc}`, 2600); });
     m.querySelector('#vol').oninput = e => { opts.musicVol = +e.target.value; BGM.setVolume(opts.musicVol); saveOpts(); };
   }
 

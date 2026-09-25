@@ -91,8 +91,8 @@ window.Scene3D = (function () {
       const dx = (Z.x0 - FULL.x0) / 2;
       const spanX = (Z.x1 + 1.2 - Z.x0) / 11, spanZ = (Z.yardZ0 + Z.YARD.depth * CELL + 0.3 - BACK_Z) / 6.35;
       const k = Math.max(0.96, Math.min(1, Math.max(spanX, spanZ)));   // 작아져도 너무 붙지는 않는다 — 건물이 자라는 게 보여야 하니까
-      if (a < 0.9) { const fx = 1.3 + dx; this.camX = fx + 1.15 * k; this.camY = 0.45 + 6.45 * k; this.camZ = 0.65 + 8.2 * k; this.camLook = [fx, 0.45, 0.65]; }
-      else { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a);
+      // 세로로 긴 화면도 **가로에 맞춘다** — 창고 폭이 화면 폭에 들어올 때까지 물러난다(예전엔 세로형이면 고정 거리라 폭이 잘리고 모델이 확대돼 보였다)
+      { const need = 6.4 * k / (Math.tan(fov / 2 * Math.PI / 180) * a);
         // 폰에서 3D 가 200px 안팎으로 납작해지면(a≈1.6~2.2) 가로는 다 들어와도 세로가 잘린다 — 앞뒤(마당~뒷벽)가 들어올 때까지 물러난다
         const tall = Math.max(1, 1 + (a - 1.15) * 0.62);
         const kk = Math.max(1, need / 12.1, tall); const fx = 0.1 + dx; this.camX = fx + 0.2; this.camY = 0.45 + 6.45 * kk * k; this.camZ = 0.65 + 8.2 * kk * k; this.camLook = [fx, 0.45, 0.65]; }

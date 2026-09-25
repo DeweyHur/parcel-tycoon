@@ -110,7 +110,7 @@
       icon: '✈️',
       warehouse: { cap: 26, cold: 4, xl: 2 }, cash: 380,
       contracts: [{ carrier: 'intl' }, { carrier: 'air' }, { carrier: 'bulk', calls: 3 }],
-      mods: { rewardDelta: { intl: 20, normal: -5 }, carrierStartTrust: { intl: 20 }, opCostRandom: [110, 190], marketWeight: { intl: 2 }, gradeShift: 0.3 },
+      mods: { rewardDelta: { intl: 20, normal: -5 }, carrierStartTrust: { intl: 8 }, opCostRandom: [110, 190], marketWeight: { intl: 2 }, gradeShift: 0.3 },
       unlock: 'worldwide', tier: 2 },
     glass: {
       customers: [['glass', 2], ['mart', 1], ['anon', 0]],
@@ -153,7 +153,7 @@
     compact:   { family: 'warehouse', mods: { storeBigDelta: -1 }, unlock: null },   // 크기 4 이상이 창고에서 한 칸 덜 차지한다(트럭 적재는 그대로). 전부 -1 이면 크기 2 가 1 이 되어 창고·트럭이 사실상 두 배 — 시뮬 생존 80%→100%, 현금 2.3배
     coldpro:   { family: 'warehouse', mods: { freshExtra: 1 }, unlock: 'no_spoil' },
     tempyard:  { family: 'warehouse', mods: { overflowGrace: 2 }, unlock: 'overflow_survivor' },
-    shelves:   { family: 'warehouse', mods: { capDelta: 4 }, unlock: 'expander' },
+    shelves:   { family: 'warehouse', mods: { startFacilities: ['expand1'] }, unlock: 'expander' },   // 숫자만 +4 가 아니라 진짜 선반 랙(시설 expand1)을 깔고 시작
     freezer:   { family: 'warehouse', mods: { freezer: 2 }, unlock: 'cold_buyer', needsCold: true },
     yard:      { family: 'warehouse', mods: { xlDelta: 1, xlPenalty: 2 }, unlock: 'xl_stack' },
     // 운영 계열
