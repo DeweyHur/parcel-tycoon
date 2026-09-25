@@ -619,6 +619,8 @@
     // 돌고 있는 캠페인은 버튼에 매체 아이콘 + 남은 날(물량이 아직 들어오는 날 수)로 — 📰2 📻3
     { const act = (g.campaignRuns || []).filter(r => r.m === g.month && r.end > g.turn), ib = $('#invest-btn');
       ib.classList.toggle('active', act.length > 0);
+      // 돌고 있는 캠페인이 없는데 지금 걸 수 있는 매체가 있으면 반짝 — 창고가 빌 때 쓰는 버튼이라는 걸 잊지 않게
+      ib.classList.toggle('ready', !act.length && g.phase === 'play' && g.ownedMedia().some(id => g.campaignPlan(id).ready));
       ib.innerHTML = `${esc(T('camp.button'))}${act.length ? `<small class="camp-act">${act.map(r => `<span title="${esc(T('camp.activeTip', { name: T('media.' + r.media), n: r.end - g.turn }))}">${(D.AD_MEDIA[r.media] || {}).icon || '📣'}${r.end - g.turn}${esc(T('media.fx.dayUnit'))}</span>`).join(' ')}</small>` : ''}`; }
     $('#app').classList.toggle('calling', !!pk);
     updateMusic();
