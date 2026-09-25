@@ -1545,8 +1545,8 @@
         if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); const pc = { carrier: it.carrier, grade: it.grade || 'normal', enh: { limit: 0, cap: 0, capDelta: 0, regular: false, express: false, opt: null } }; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}<span class="ospec">${miniTruck(game, pc)} ${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> <b>${T('mk.feeEach', { n: o.fee })}</b> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span></span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge} ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') { const tg = enhTargets(it.enh); desc = `${D.ENHANCEMENTS[it.enh].desc}<br>${tg.length ? `<span style="color:var(--green)">→ ${tg.map(esc).join(' · ')}</span>` : `<span style="color:var(--red)">${T('mk.enhNoTarget')}</span>`}`; }
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
-        else if (it.kind === 'media') { const mp = game.mediaPlan(it.media); desc = `${D.AD_MEDIA[it.media].icon} ${esc(T('media.trait.' + it.media))} · ${T('media.line', { n: D.AD_MEDIA[it.media].per, days: mp.days, cost: D.AD_MEDIA[it.media].cost })}`; }
-        else if (it.kind === 'mediaUp') { const mp = game.mediaPlan(it.media); desc = mp.next ? `${D.AD_MEDIA[it.media].icon} ${T('media.upLine', { n: mp.parcels, n2: mp.next.parcels, cost: mp.cost, cost2: mp.next.cost })}` : ''; }
+        else if (it.kind === 'media') { const mp = game.mediaPlan(it.media); desc = `${mediaEffect(it.media)} <span class="media-fx"><span>💸${D.AD_MEDIA[it.media].cost}c</span></span> ${callPipsHtml(1, 1)}`; }
+        else if (it.kind === 'mediaUp') { const mp = game.mediaPlan(it.media); desc = mp.next ? `${D.AD_MEDIA[it.media].icon} ${T('media.upLine', { n: mp.runs, n2: mp.next.runs })} ${callPipsHtml(mp.next.runs, mp.next.runs)}` : ''; }
         else if (it.kind === 'growth') desc = T('growth.desc.' + it.growth, { n: D.GROWTH.warehouse.cap });
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
         else if (it.kind === 'fac') { const F = it.fac && D.FACILITIES[it.fac]; let prev = ''; if (F) { if (F.cap) prev = `${T('common.warehouse')} ${game.warehouse.cap} → ${game.warehouse.cap + Math.round(F.cap * R.facilityCapMult)}`; else if (F.cold) prev = `${D.ATTRS.cold.name} ${game.warehouse.cold} → ${Math.min(R.coldCapMax == null ? 99 : R.coldCapMax, game.warehouse.cold + F.cold)}`; else if (F.xl) prev = `${T('common.xl')} ${game.warehouse.xl} → ${game.warehouse.xl + F.xl}`; else if (F.frozen) prev = `${D.ATTRS.frozen.name} ${game.warehouse.frozen || 0} → ${(game.warehouse.frozen || 0) + F.frozen}`; } desc = F ? F.desc + (prev ? `<br><span style="color:var(--green)">${T('mk.afterBuy')} ${prev}</span>` : '') : T('mk.allFacilities'); }
@@ -1994,20 +1994,29 @@
     clearTimeout(smsTimer); smsTimer = setTimeout(() => { el.hidden = true; }, 9000);
     el.onclick = () => { el.hidden = true; };
   }
-  // 📣 광고 집행: 가진 매체 중 하나를 골라 보름에 한 번. 새 매체·강화와 성장 투자는 마켓에서만 산다
+  // 매체 효과를 아이콘으로: 📦+건수 · ⏱일 · ⭐평판 · 더 부르는 종류(택배 색 점 ↑)
+  function mediaEffect(id) {
+    const A = D.AD_MEDIA[id], more = Object.keys(A.mix || {}).filter(t => A.mix[t] > 1 && D.PARCEL_TYPES[t]);
+    const dots = more.length ? `<span class="takes">${more.map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('')}</span>↑` : '';
+    // 지금 집행하면 어느 날 몇 건 — 위의 내일·모레 줄과 같은 말로 (플레이 중에만. 마켓에선 며칠에 걸치는지만)
+    const sp = game && game.phase === 'play' && game.media && game.media[id] ? game.campaignSpread(id) : null;
+    const dayName = d => d === 1 ? T('hud.tomorrow') : d === 2 ? T('hud.dayAfter') : T('media.fx.dayN', { n: d });
+    const when = sp && sp.length ? sp.map(x => `<span>${esc(dayName(x.day))} 📦+${x.n}</span>`).join('') : `<span title="${esc(T('media.fx.parcels'))}">📦+${A.per}</span><span title="${esc(T('media.fx.days'))}">⏱${A.days}${esc(T('media.fx.dayUnit'))}</span>`;
+    return `<span class="media-fx">${when}${A.rep ? `<span title="${esc(T('media.fx.rep'))}">⭐+${A.rep}</span>` : ''}${dots ? `<span>${dots}</span>` : ''}</span>`;
+  }
+  // 📣 광고 집행: 가진 매체 중 하나를 골라 집행. 파란 눈금 = 이번 보름 남은 횟수
   function showGrowth() {
     if (!game || game.phase !== 'play') return;
-    const g = game, used = g.campaignCycle === g.month;
+    const g = game;
     const owned = g.ownedMedia();
     const cp0 = g.campaignPlan();
     const cards = owned.map((id, k) => {
       const mp = g.mediaPlan(id), cp = g.campaignPlan(id), ok = cp.ready && g.cash >= cp.cost;
-      const dots = Array.from({ length: mp.max }, (_, i) => `<i class="${i < mp.level ? 'on' : ''}"></i>`).join('');
       return `<button class="growth-card" data-media="${id}" ${k === 0 ? 'id="camp-go"' : ''} ${ok ? '' : 'disabled'}>
-        <span class="growth-icon">${D.AD_MEDIA[id].icon}</span><span class="growth-copy"><b>${esc(T('media.' + id))} <em>Lv.${mp.level}</em></b><span>${used ? T('camp.used') : T('camp.effect', { n: mp.parcels, days: mp.days })}</span><small>${esc(T('media.trait.' + id))}</small></span>
-        <span class="growth-buy"><span class="growth-dots">${dots}</span><b>${mp.cost}c</b><small>${T('media.run')}</small></span></button>`;
+        <span class="growth-icon">${D.AD_MEDIA[id].icon}</span><span class="growth-copy"><b>${esc(T('media.' + id))}</b>${mediaEffect(id)}</span>
+        <span class="growth-buy"><span class="camp-runs"><small>${esc(T('camp.runs'))}</small> ${callPipsHtml(mp.left, mp.runs)}</span><b>${mp.cost}c</b><small>${T('media.run')}</small></span></button>`;
     }).join('');
-    const body = cp0.level ? `<div class="growth-tip">${T('camp.desc')}</div><div class="growth-grid">${cards}</div><div class="growth-tip" style="margin-top:8px">${T('media.more')}</div>` : `<div class="growth-tip">${T('camp.desc')}</div>`;
+    const body = `<div class="growth-grid">${cards}</div>`;
     const m = modal(T('camp.title'), body, [{ label: T('btn.close'), onClick: closeModal }]);
     storyCheck({ kind: 'modal', modal: 'growth', ready: cp0.ready && g.cash >= cp0.cost });
     m.querySelectorAll('[data-media]').forEach(el => el.onclick = () => {

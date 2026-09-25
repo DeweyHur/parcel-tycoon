@@ -115,7 +115,8 @@
       this.market = null;
       this.storage = []; this.offer = null; this.outdoorPref = []; this.weather = []; this.pendingRevenue = []; this.feesDue = 0; this.debt = 0;
       this.insurer = 'none'; this.premMult = 1; this.noClaimMonths = 0; this.coverHalf = false; this.items = { transitCert: 0, yardIns: 0, customsBond: 0 };
-      this.campaignCycle = 0;                 // 캠페인을 연 사이클 (보름에 한 번)
+      this.campaignCycle = 0;                 // 마지막으로 캠페인을 연 사이클
+      this.mediaRuns = { m: 0, used: {} };    // 이번 사이클에 매체별로 집행한 횟수 (사이클이 바뀌면 다시 찬다)
       this.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0, automation: 0, branding: 0, coldchain: 0 }, (cfg.carry && cfg.carry.growth) || {});
       this.media = Object.assign({ flyer: 1 }, (cfg.carry && cfg.carry.media) || {});   // 광고 매체 → 레벨. 전단지는 처음부터
       this.monthStats = null;
@@ -809,8 +810,9 @@
     mediaPlan(id) {
       const A = D.AD_MEDIA[id]; if (!A) return null;
       const lv = (this.media && this.media[id]) || 0, L = Math.max(1, lv);
-      return { id, level: lv, owned: lv > 0, icon: A.icon, parcels: A.per + (L - 1) * A.perUp, days: A.days, cost: A.cost + (L - 1) * A.costUp, max: A.max,
-        next: lv > 0 && lv < A.max ? { parcels: A.per + L * A.perUp, cost: A.cost + L * A.costUp } : null };
+      const runs = lv, used = this.mediaRuns && this.mediaRuns.m === this.month ? (this.mediaRuns.used[id] || 0) : 0;
+      return { id, level: lv, owned: lv > 0, icon: A.icon, parcels: A.per, days: A.days, cost: A.cost, max: A.max, runs, left: Math.max(0, runs - used),
+        next: lv > 0 && lv < A.max ? { runs: L + 1 } : null };
     }
     mediaScore() { return Math.max(0, Object.values(this.media || {}).reduce((a, b) => a + b, 0) - 1); }
     ownedMedia() { return Object.keys(D.AD_MEDIA).filter(id => (this.media || {})[id] > 0); }
@@ -818,9 +820,9 @@
     campaignPlan(id) {
       id = id || this.ownedMedia()[0] || 'flyer';
       const mp = this.mediaPlan(id) || this.mediaPlan('flyer');
-      const used = this.campaignCycle === this.month;
+      const used = mp.left <= 0;
       const open = this.shows('invest') && this.campaignOpen() && mp.owned;
-      return { id: mp.id, level: open ? mp.level : 0, parcels: mp.parcels, days: mp.days, cost: mp.cost, used, ready: open && !used };
+      return { id: mp.id, level: open ? mp.level : 0, parcels: mp.parcels, days: mp.days, cost: mp.cost, runs: mp.runs, left: mp.left, used, ready: open && !used };
     }
     // 스토리 캠페인에서는 '창고가 빈 날 이틀'을 겪고 박 반장이 소개한 뒤에 열린다. 자유 런·안내 끔이면 처음부터
     campaignOpen() { return !this.level || !this.story || this.story.off || (this.story.seen || []).includes('l3invest'); }
@@ -831,6 +833,8 @@
       if (this.cash < p.cost) return { ok: false, reason: 'cash', cost: p.cost };
       this.cash -= p.cost;
       this.campaignCycle = this.month;
+      if (!this.mediaRuns || this.mediaRuns.m !== this.month) this.mediaRuns = { m: this.month, used: {} };
+      this.mediaRuns.used[p.id] = (this.mediaRuns.used[p.id] || 0) + 1;
       const n = this._injectGrowthDemand(this.schedule, p.parcels, this.turn, this.month, this.turn + p.days, D.AD_MEDIA[p.id].mix);
       const rg = D.AD_MEDIA[p.id].rep || 0; if (rg) this.addRep(rg, MSG('why.repAd'));
       this.say('log.campaign', { n, days: p.days, cost: p.cost });
@@ -1223,17 +1227,23 @@
       this.say('log.monthStart', { m: this.monthIndex(m), y: this.yearOf(m), cal: this.calMonth(m), half: this.half(m) });
       this._startTurn();
     }
+    // 캠페인 물량이 어느 날 몇 건 들어오나 — 며칠에 고르게 나눈다(태풍 날은 건너뛴다). 미리보기와 실제 주입이 같은 표를 쓴다
+    // 반환: [{ slot(schedule 칸), day(1=내일), n }]
+    _spreadSlots(count, start, end, len) {
+      const slots = [];
+      const last = Math.min(len, end == null ? len : end);
+      for (let i = Math.max(0, start || 0); i < last; i++) if (this.weather[i] !== 'storm') slots.push(i);
+      if (!slots.length || !count) return [];
+      return slots.map((slot, k) => ({ slot, day: slot - this.turn + 1, n: Math.floor(count / slots.length) + (k < count % slots.length ? 1 : 0) })).filter(x => x.n > 0);
+    }
+    campaignSpread(id) { const p = this.campaignPlan(id); return this._spreadSlots(p.parcels, this.turn, this.turn + p.days, this.schedule.length); }
     _injectGrowthDemand(sched, count, start, m, end, mix) {
       if (!count || !sched.length) return 0;
       const ratio = { ...this._typeRatio(m) }, cw = this._customerWeightsFor(m);
       for (const t in mix || {}) if (ratio[t]) ratio[t] *= mix[t];   // 매체 성격 — 닫힌 종류(0)는 곱해도 0
-      const slots = [];
-      const last = Math.min(sched.length, end == null ? sched.length : end);
-      for (let i = Math.max(0, start || 0); i < last; i++) if (this.weather[i] !== 'storm') slots.push(i);
-      if (!slots.length) return 0;
-      const order = this.rng.shuffle(slots);
-      for (let i = 0; i < count; i++) sched[order[i % order.length]].push(this._genParcelSpec(ratio, m, cw));
-      return count;
+      const spread = this._spreadSlots(count, start, end, sched.length);
+      let n = 0; for (const s of spread) for (let i = 0; i < s.n; i++) { sched[s.slot].push(this._genParcelSpec(ratio, m, cw)); n++; }
+      return n;
     }
     _makeSchedule(m) {
       const R = this.rules, turns = this.turns(m);
@@ -2174,7 +2184,8 @@
       if (!g.weather || !g.weather.length) g.weather = Array(g.turns()).fill('sunny').map((w, i) => g.heatTurns && g.heatTurns.includes(i + 1) ? 'heat' : w);
       if (g.monthStats) for (const k of ['insClaims', 'covered', 'premium', 'storageIncome']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
       g.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0, automation: 0, branding: 0, coldchain: 0 }, g.growth || {});
-      if (!g.media) g.media = { flyer: Math.max(1, g.growth.marketing || 0) };   // 옛 저장: 홍보 레벨을 전단지 레벨로
+      if (!g.media) g.media = { flyer: Math.max(1, g.growth.marketing || 0) };
+      if (!g.mediaRuns) g.mediaRuns = { m: g.campaignCycle || 0, used: g.campaignCycle ? { flyer: 1 } : {} };   // 옛 저장: 이번 보름에 열었으면 전단지 1회로   // 옛 저장: 홍보 레벨을 전단지 레벨로
       g._assignCold();
       return g;
     }
