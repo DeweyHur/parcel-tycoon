@@ -216,6 +216,7 @@
     'self.needPadVan': 'Needs Padded Van',
     'self.customsWait': 'In customs',
     'market.hintSoon': 'Carries the forecast {short} (up to {count})',
+    'mk.callShort': '⚠ Not enough calls — about {vol} cells expected, remaining calls carry {cap}. Re-contract to refill',
     'market.hint': 'Can ship {count} {short} in the warehouse',
     'market.facSoldOut': 'Facilities sold out',
     'market.newCustomer': 'New customer: {name}',

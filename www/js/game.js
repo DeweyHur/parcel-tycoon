@@ -1097,7 +1097,7 @@
       if (R.typeShift) for (const t in R.typeShift) base[t] = Math.max(0, (base[t] || 0) + R.typeShift[t]);
       // 🛃 통관 · ❆ 냉동은 평판 등급이 열어 준다 — 아직이면 그 몫은 일반으로 (달력이 아니라 내가 키워서 여는 것).
       // 시나리오가 그 품목을 주제로 삼은 경우(typeOverride·보장 업체)는 건드리지 않는다
-      if (!R.typeOverride) for (const t of ['intl', 'frozen']) if (base[t] && !this.repUnlocked(t)) { base.normal = (base.normal || 0) + base[t]; base[t] = 0; }
+      if (!R.typeOverride) for (const t of ['intl', 'large', 'frozen']) if (base[t] && !this.repUnlocked(t)) { base.normal = (base.normal || 0) + base[t]; base[t] = 0; }
       // 캠페인: 아직 안 연 품목은 아예 오지 않는다. 화면에서 숨기는 것으로는 부족하다 —
       // ⚠🛃🌾 를 받아 줄 계약도, ❄ 를 둘 냉장 구역도 없는 장에 그게 오면 반송 말고는 길이 없다.
       // (대본이 없는 사이클을 무작위로 풀어 두려면 이 문이 규칙 쪽에도 있어야 한다)
@@ -1760,6 +1760,17 @@
     }
     // 다음 사이클 예상 중 못 받는 종류. **화면에 뜬 예상 그대로** 판정한다 —
     // 보이는 줄과 붉은 줄이 어긋나면 플레이어는 어느 쪽도 믿지 않는다
+    // 다음 사이클 예상 물량(칸) 대 남은 배차로 실을 수 있는 칸. 모자라면 마켓이 재계약(충전)을 짚는다
+    callShortfall(m) {
+      let vol = this.usedVolume ? this.usedVolume() : 0;
+      for (const f of this.customerForecast(m)) for (const t in f.range) {
+        const r = f.range[t]; if (!(r[1] > 0) || (t !== 'normal' && !(f.special > 0))) continue;
+        const sz = D.PARCEL_TYPES[t].sizes; vol += (r[0] + r[1]) / 2 * sz.reduce((a, b) => a + b, 0) / sz.length;
+      }
+      vol = Math.round(vol);
+      const cap = this.contracts.filter(Boolean).reduce((s, c) => s + Math.max(0, c.calls) * this.vehicleCap(c), 0);
+      return { vol, cap, short: Math.max(0, vol - cap) };
+    }
     forecastBlocked(m) {
       m = m || this.month + (this.phase === 'market' && !(this.market && this.market.prep) ? 1 : 0);
       const out = [];
@@ -1860,7 +1871,7 @@
         for (const t of this.forecastBlocked(fm)) if (t !== 'normal' && !blocked.some(b => b.type === t)) { const P = D.PARCEL_TYPES[t]; const rng = this.customerForecast(fm || this.month).reduce((a, f) => a + ((f.range[t] || [0, 0])[1]), 0); blocked.push({ type: t, maxSize: Math.max(...P.sizes), count: rng, soon: true }); }
         for (const bt of blocked) {
           if (forced.length >= R.marketContractSlots) break;
-          const pp = { type: bt.type, size: bt.maxSize, customs: 0 };
+          const pp = { type: bt.type, size: bt.maxSize, customs: D.PARCEL_TYPES[bt.type].attrs.includes('customs') ? 1 : 0 };   // 🛃 는 통관 대기로 판정해야 통관 못 하는 계열(대형 등)이 걸러진다
           const safe = fam => { const car = D.CARRIERS[D.centerFor(fam, 0)]; return this._carrierAccepts(car, pp) && (!D.PARCEL_TYPES[bt.type].attrs.includes('fragile') || car.caps.includes('fragile')); };
           if (forced.some(f => safe(f.family))) continue;
           const cand = {}; for (const k of Object.keys(weights)) if (safe(k)) cand[k] = weights[k];

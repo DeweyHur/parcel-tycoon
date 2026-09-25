@@ -499,8 +499,9 @@
       showPerkSelect();
     });
   }
+  // 시작하자마자 마켓을 열지 않는다(prep: false) — 무명 평판에서는 시작 계약으로 못 싣는 종류가 오지 않는다(data.js REP_TIERS)
   function startRun() {
-    const cfg = { scenario: prep.scenario, company: noCompany() ? 'local' : prep.company, perks: prep.perks.slice(), insurer: prep.insurer, prep: true, story: !!prep.story, demoMonths: demoLocked() ? demoMonths() : 0 };
+    const cfg = { scenario: prep.scenario, company: noCompany() ? 'local' : prep.company, perks: prep.perks.slice(), insurer: prep.insurer, prep: false, story: !!prep.story, demoMonths: demoLocked() ? demoMonths() : 0 };
     if (noCompany()) { const nm = (Profile.get().campaign || {}).name; if (nm) cfg.companyName = nm; }   // 회사가 없으면 내 상호를 건다
     withHowTo(() => { game = new Game(cfg); closeModal(); startPlay(); });
   }
@@ -1529,6 +1530,15 @@
     const mk = game.market, R = game.rules;
     BGM.play('market');
     const render = () => {
+      // 부족분 짚기: 예보에서 못 싣는 종류를 풀어 주는 매물(계약·특약)과, 배차가 모자라면 재계약 버튼을 반짝인다
+      const fb = game.forecastBlocked().filter(t => t !== 'normal');
+      const solves = it => {
+        if (!fb.length || it.sold) return false;
+        if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier]; return fb.some(t => D.PARCEL_TYPES[t].sizes.some(sz => game._carrierAccepts(car, { type: t, size: sz, customs: D.PARCEL_TYPES[t].attrs.includes('customs') ? 1 : 0 }))); }
+        if (it.kind === 'enh') { const e = D.ENHANCEMENTS[it.enh]; return e.kind === 'opt' && fb.some(t => D.PARCEL_TYPES[t].attrs.includes(e.attr)) && enhTargets(it.enh).length > 0; }
+        return false;
+      };
+      const sf = game.callShortfall();
       const cards = mk.items.map((it, i) => {
         if (it.kind === 'refill') return ''; // 충전은 위 '현재 계약' 칸에서
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
@@ -1538,7 +1548,7 @@
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
         else if (it.kind === 'fac') { const F = it.fac && D.FACILITIES[it.fac]; let prev = ''; if (F) { if (F.cap) prev = `${T('common.warehouse')} ${game.warehouse.cap} → ${game.warehouse.cap + Math.round(F.cap * R.facilityCapMult)}`; else if (F.cold) prev = `${D.ATTRS.cold.name} ${game.warehouse.cold} → ${Math.min(R.coldCapMax == null ? 99 : R.coldCapMax, game.warehouse.cold + F.cold)}`; else if (F.xl) prev = `${T('common.xl')} ${game.warehouse.xl} → ${game.warehouse.xl + F.xl}`; else if (F.frozen) prev = `${D.ATTRS.frozen.name} ${game.warehouse.frozen || 0} → ${(game.warehouse.frozen || 0) + F.frozen}`; } desc = F ? F.desc + (prev ? `<br><span style="color:var(--green)">${T('mk.afterBuy')} ${prev}</span>` : '') : T('mk.allFacilities'); }
         const up = it.kind === 'contract' && it.switchFrom;
-        return `<div class="card ${it.sold ? 'sold' : ''} ${up ? 'upgrade' : ''}" id="mk-card-${Story.mkKey(it)}" data-i="${i}"><div class="t"><span>${up ? `<small class="uplbl">↑ ${T('mk.upgrade')}</small> ` : ''}${it.kind === 'enh' ? enhIcon(it.enh) : ''}${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
+        return `<div class="card ${it.sold ? 'sold' : ''} ${up ? 'upgrade' : ''} ${solves(it) ? 'need' : ''}" id="mk-card-${Story.mkKey(it)}" data-i="${i}"><div class="t"><span>${up ? `<small class="uplbl">↑ ${T('mk.upgrade')}</small> ` : ''}${it.kind === 'enh' ? enhIcon(it.enh) : ''}${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
       });
       // 계약 섹션 하나: 현재 계약 카드 → 그 바로 아래 같은 계열 업그레이드 매물 → 그 뒤 새 계열 매물. 빈 슬롯은 카드 대신 머리글에 알린다
       const vis = game.contracts.slice(0, game.visibleSlots());
@@ -1546,7 +1556,7 @@
       const curCard = (c, si) => {
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
         return `<div class="card cur" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)} ${takesDots(game, c, true)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}"><small class="lbl">${esc(T('cd.calls'))}</small> ${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
-          <div class="crow"><span class="d">${miniTruck(game, c)}${game.shows('market') ? enhPips(game, c) : ''}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
+          <div class="crow"><span class="d">${miniTruck(game, c)}${game.shows('market') ? enhPips(game, c) : ''}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''} ${sf.short > 0 && c.calls < c.maxCalls ? 'need' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
       };
       const usedIdx = new Set();
       const contractRows = vis.map((c, si) => { if (!c) return ''; const ups = mk.items.map((it, i) => it.kind === 'contract' && it.switchFrom === c.id ? (usedIdx.add(i), cards[i]) : '').join(''); return curCard(c, si) + ups; }).join('');
@@ -1567,7 +1577,8 @@
       const rng = r => r[0] === r[1] ? `${r[0]}` : `${r[0]}~${r[1]}`;
       const byType = {}; for (const f of game.customerForecast()) for (const t in f.range) { if (!(f.range[t][1] > 0)) continue; if (t !== 'normal' && !(f.special > 0)) continue; byType[t] = byType[t] || [0, 0]; byType[t][0] += f.range[t][0]; byType[t][1] += f.range[t][1]; }
       const fcParts = Object.keys(D.PARCEL_TYPES).filter(t => byType[t]).map(t => { const bad = !game.canTakeType(t); return `<span class="${bad ? 'fcwarn' : ''}" title="${esc(D.PARCEL_TYPES[t].name)}${bad ? ' — ' + esc(T('mk.cantTake')) : ''}"><i style="display:inline-block;width:8px;height:8px;background:${D.PARCEL_TYPES[t].css}"></i> ${rng(byType[t])}${bad ? '✖' : ''}</span>`; });
-      const fcLine = nm <= game.monthsTotal() ? `<div class="d fcline1" id="mk-fc"><span class="lbl">${T(mk.prep ? 'mk.fcNow' : 'mk.fcNext')}</span>${fcParts.join(' ')}</div>` : '';
+      const shortLine = sf.short > 0 ? `<div class="d fcshort">${T('mk.callShort', { vol: sf.vol, cap: sf.cap })}</div>` : '';
+      const fcLine = nm <= game.monthsTotal() ? `<div class="d fcline1" id="mk-fc"><span class="lbl">${T(mk.prep ? 'mk.fcNow' : 'mk.fcNext')}</span>${fcParts.join(' ')}</div>${shortLine}` : '';
       const body = `<div class="pickinfo"><span>${T('hud.cash')} <b>${game.cash}</b>c</span>${R.marketMaxBuy ? `<span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span>` : ''}</div>${fcLine}${contracts}${newContracts}${items}${insurance}
         ${!game.shows('attrs') ? '' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
       // 마지막 사이클의 마켓을 닫으면 다음 사이클이 아니라 **장**이 끝난다

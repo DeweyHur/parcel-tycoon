@@ -190,6 +190,10 @@ body.no-game { background: #141210; } body.no-game #app { visibility: hidden; } 
 .pgrid .card { margin: 0; padding: 4px 5px; min-width: 0; } .pgrid .card .t { font-size: 12px; display: block; line-height: 1.25; } .pgrid .card .d { font-size: 11px; line-height: 1.3; word-break: keep-all; }
 .pgrid .card .fam { font-size: 10px; color: var(--dim); } .pgrid .card.ins .fam { color: var(--gold); }
 .pk-head { font-size: 12px; color: var(--gold); margin: 8px 0 4px; }
+/* 마켓 부족분: 풀어 주는 매물·재계약을 반짝인다 */
+@keyframes needGlow { 0%, 100% { box-shadow: 0 0 0 2px #ffd16655; } 50% { box-shadow: 0 0 0 3px #ffd166cc; } }
+.card.need { border-color: var(--gold); animation: needGlow 1.4s ease-in-out infinite; } .btn.need { animation: needGlow 1.4s ease-in-out infinite; border-color: var(--gold); }
+.fcshort { color: var(--orange); font-size: 12px; margin: 2px 0 4px; }
 .co-plus { font-size: 12px; margin-left: 6px; }
 .co-plus { color: var(--green); white-space: nowrap; } .co-minus { color: var(--orange); white-space: nowrap; }
 .card.co-lock { padding-top: 4px; padding-bottom: 4px; } .card.co-lock .t { font-weight: 400; font-size: 13px; }

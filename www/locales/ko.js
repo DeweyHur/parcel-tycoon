@@ -216,6 +216,7 @@
     'self.needPadVan': '완충 포장차 필요',
     'self.customsWait': '통관 대기 중',
     'market.hintSoon': '이번 보름 예보의 {short} 최대 {count}개를 실을 수 있음',
+    'mk.callShort': '⚠ 배차 부족 — 예상 약 {vol}칸, 남은 배차로 {cap}칸. 재계약으로 채우세요',
     'market.hint': '창고의 {short} {count}개 처리 가능',
     'market.facSoldOut': '시설 매진',
     'market.newCustomer': '신규 고객: {name}',
