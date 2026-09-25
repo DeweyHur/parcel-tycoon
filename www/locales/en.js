@@ -1479,7 +1479,7 @@
         "name": "Easy Does It",
         "short": "EasyDoes",
         "vehicle": "padded van",
-        "desc": "Fragile specialist. No breakage, fragile bonus · standard contract"
+        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce · standard contract"
       },
       "pack0": {
         "name": "Gentle Parcel",
@@ -1491,19 +1491,19 @@
         "name": "Glass Hands",
         "short": "GlassHands",
         "vehicle": "padded van",
-        "desc": "Fragile specialist. No breakage, fragile bonus · Premium — trucks +1 · cap +1 · fee +20%"
+        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce · Premium — trucks +1 · cap +1 · fee +20%"
       },
       "fragile2": {
         "name": "Padding Masters",
         "short": "Padding",
         "vehicle": "large padded truck",
-        "desc": "Fragile specialist. No breakage, fragile bonus · Elite — trucks +2 · cap +2 · fee +40% · up to size 7"
+        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce · Elite — trucks +2 · cap +2 · fee +40% · up to size 7"
       },
       "fragile3": {
         "name": "Porcelain Logis",
         "short": "Porcelain",
         "vehicle": "chilled padded truck",
-        "desc": "Fragile specialist. No breakage, fragile bonus · Master — trucks +3 · cap +3 · fee +60% · ❄ cold-capable added · up to size 7"
+        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce · Master — trucks +3 · cap +3 · fee +60% · ❄ cold-capable added · up to size 7"
       },
       "intl0": {
         "name": "Customs Bridge",

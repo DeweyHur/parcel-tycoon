@@ -191,13 +191,14 @@
       frozen1: { family: 'frozen', tier: 1 },
       frozen2: { family: 'frozen', tier: 2, extraCaps: ['cold'] },
       // 파손
-      fragile0: { family: 'fragile', tier: 0 },
+      // 파손 계열은 ⚠ 전문이지만 일반·🌾 농산물도 싣는다(need 없음) — 냉장·통관 설비가 없어 ❄·❆·🛃 은 못 싣는다(allowAttrs)
+      fragile0: { family: 'fragile', tier: 0, need: null, allowAttrs: ['fragile'] },
       // 캠페인 2장에서 붙는 작은 완충 밴 — ⚠ 도 안전하게, 일반도 받는다(need 없음). 차가 4칸이라
       // 일반만 실으면 배차비와 똔똔이고, ⚠ 를 실어야 남는다. 마켓·랜덤 시작에는 안 나온다(campaign).
       pack0: { family: 'fragile', tier: 0, need: null, campaign: true, rep: 'ahn', allowAttrs: ['fragile'] },   // 냉장 설비가 없다 — ❄·❆·🛃 는 못 싣는다
-      fragile1: { family: 'fragile', tier: 1 },
-      fragile2: { family: 'fragile', tier: 2, sizeMax: 7 },                    // 대형 파손까지
-      fragile3: { family: 'fragile', tier: 3, sizeMax: 7, extraCaps: ['cold'] },
+      fragile1: { family: 'fragile', tier: 1, need: null, allowAttrs: ['fragile'] },
+      fragile2: { family: 'fragile', tier: 2, sizeMax: 7, need: null, allowAttrs: ['fragile'] },                    // 대형 파손까지
+      fragile3: { family: 'fragile', tier: 3, sizeMax: 7, extraCaps: ['cold'], need: null, allowAttrs: ['fragile', 'cold'] },
       // 통관
       intl0:   { family: 'intl', tier: 0 },
       intl1:   { family: 'intl', tier: 1 },
