@@ -150,7 +150,7 @@
     spare:     { family: 'contract', mods: { spareCall: true }, unlock: 'empty_tank' },
     bundle:    { family: 'contract', mods: { bundleRefund: 4 }, unlock: 'big_haul' },
     // 창고 계열
-    compact:   { family: 'warehouse', mods: { bigSizeDelta: -1 }, unlock: null },   // 크기 4 이상만 -1. 전부 -1 이면 크기 2 가 1 이 되어 창고·트럭이 사실상 두 배 — 시뮬 생존 80%→100%, 현금 2.3배
+    compact:   { family: 'warehouse', mods: { storeBigDelta: -1 }, unlock: null },   // 크기 4 이상이 창고에서 한 칸 덜 차지한다(트럭 적재는 그대로). 전부 -1 이면 크기 2 가 1 이 되어 창고·트럭이 사실상 두 배 — 시뮬 생존 80%→100%, 현금 2.3배
     coldpro:   { family: 'warehouse', mods: { freshExtra: 1 }, unlock: 'no_spoil' },
     tempyard:  { family: 'warehouse', mods: { overflowGrace: 2 }, unlock: 'overflow_survivor' },
     shelves:   { family: 'warehouse', mods: { capDelta: 4 }, unlock: 'expander' },

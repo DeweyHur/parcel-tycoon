@@ -36,7 +36,7 @@
     months: 3, scoreMult: 1, calendar: 'kr', monthOffset: 0,
     cashDelta: 0, cashMult: 1, opCostFixed: null, opCostDelta: 0, opCostRandom: null, lateOpCost: null,
     firstCallBonus: 0, freshExtra: 0, coldTrustBonus: 0, rewardMult: {}, rewardDelta: {}, rewardAll: 0, revenueMult: 1, bonusDelta: 0,
-    banCarriers: [], marketWeight: {}, bigSizeDelta: 0, sizeDelta: 0, carrierCapDelta: {}, coldCapMax: null, callsDelta: 0, startCallsDelta: 0,
+    banCarriers: [], marketWeight: {}, bigSizeDelta: 0, sizeDelta: 0, storeBigDelta: 0, carrierCapDelta: {}, coldCapMax: null, callsDelta: 0, startCallsDelta: 0,
     facilityCapMult: 1, carrierStartTrust: {}, gradeShift: 0, deadlineDelta: {}, deadlineAll: 0, bigCallPenalty: null,
     priceMult: 1, contractPriceMult: 1, itemPriceMult: 1, facilityPriceMult: 1, waitStack: 0, skipBonus: 0,
     randomStart: false, freeRefresh: 0, marketContractSlots: 2, erosion: false, stressRelief: null, keepCalls: 0, marketMaxBuy: D.MARKET_MAX_BUY, expertFrom: 1,
@@ -53,7 +53,7 @@
     cycleOffset: 0, noRepEnd: false, gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, customerClaimMult: {}, noHolidays: false,
   };
   const MULT_KEYS = ['theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
-  const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'selfCapDelta', 'allStartTrust'];
+  const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'storeBigDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'selfCapDelta', 'allStartTrust'];
   const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust', 'premiumDelta'];
   const MAP_MULT_KEYS = ['rewardMult', 'marketWeight', 'customerWeights', 'weatherWeights', 'customerClaimMult'];
   const LIST_KEYS = ['banCarriers', 'guaranteeCarriers'];
@@ -769,7 +769,7 @@
     // 대기했을 때 다음 턴 예상: 창고 사용량, 기한 초과·부패 예정
     forecast() {
       const R = this.rules, nxt = this.schedule[this.turn] || [];
-      let incoming = 0; for (const s of nxt) { let sz = s.size + R.sizeDelta; if (s.size >= 4) sz += R.bigSizeDelta; incoming += Math.max(1, sz); }
+      let incoming = 0; for (const s of nxt) { let sz = s.size + R.sizeDelta; if (s.size >= 4) sz += R.bigSizeDelta + R.storeBigDelta; incoming += Math.max(1, sz); }
       let overdue = 0, spoil = 0, frozenOver = 0;
       const heat = this.isHeatTurn();
       { let free = (this.warehouse.frozen || 0) - this.frozenUsed(); for (const s of nxt) if (s.type === 'frozen') { if (s.size > free) frozenOver++; else free -= s.size; } }
@@ -1002,27 +1002,30 @@
       if (c.calls <= 0 && !(this.rules.spareCall && !this.monthStats.spareUsed)) return false;
       return this.eligibleParcels(c).length > 0;
     }
+    // 창고에서 차지하는 칸. 트럭에 실을 때는 p.size 그대로다 — 공간 최적화(storeBigDelta)는 창고 적재만 줄인다
+    storeSize(p) { const d = this.rules.storeBigDelta; return d && (p.baseSize || p.size) >= 4 ? Math.max(1, p.size + d) : p.size; }
     usedVolume() {
       let v = 0, xl = 0;
-      for (const p of this.parcels) { v += p.size; if (p.baseSize >= 7) xl++; }
+      for (const p of this.parcels) { v += this.storeSize(p); if (p.baseSize >= 7) xl++; }
       if (xl > this.warehouse.xl) v += (xl - this.warehouse.xl) * this.rules.xlPenalty;
       return v + this.storageVolume();
     }
-    coldUsed() { return this.parcels.filter(p => this._attrs(p).includes('cold')).reduce((s, p) => s + p.size, 0); }
+    coldUsed() { return this.parcels.filter(p => this._attrs(p).includes('cold')).reduce((s, p) => s + this.storeSize(p), 0); }
     usage() { return this.usedVolume() / this.warehouse.cap; }
     _assignCold() {
       let left = this.warehouse.cold, fl = this.warehouse.frozen || 0;
       for (const p of this.parcels) {
-        if (this._attrs(p).includes('frozen')) { if (p.size <= fl) { p.inFrozen = true; fl -= p.size; } else p.inFrozen = false; continue; }
+        const sz = this.storeSize(p);
+        if (this._attrs(p).includes('frozen')) { if (sz <= fl) { p.inFrozen = true; fl -= sz; } else p.inFrozen = false; continue; }
         if (!this._attrs(p).includes('cold')) continue;
-        if (p.size <= left) { p.inCold = true; left -= p.size; } else p.inCold = false;
+        if (sz <= left) { p.inCold = true; left -= sz; } else p.inCold = false;
       }
       // 🌾 농산물은 남는 냉장 자리에 들어가면 폭염을 피한다
-      for (const p of this.parcels) { if (!this._attrs(p).includes('produce')) continue; if (p.size <= left) { p.inCold = true; left -= p.size; } else p.inCold = false; }
+      for (const p of this.parcels) { if (!this._attrs(p).includes('produce')) continue; const sz = this.storeSize(p); if (sz <= left) { p.inCold = true; left -= sz; } else p.inCold = false; }
       this._assignOutdoor();
     }
     _attrs(p) { return p.attrs || D.PARCEL_TYPES[p.type].attrs; }
-    frozenUsed() { return this.parcels.filter(p => this._attrs(p).includes('frozen')).reduce((s, p) => s + p.size, 0); }
+    frozenUsed() { return this.parcels.filter(p => this._attrs(p).includes('frozen')).reduce((s, p) => s + this.storeSize(p), 0); }
     // 야외 적재: 플레이어 지정(outdoorPref) 먼저, 그래도 넘치면 덜 급한 것부터 밖으로. 냉장·냉동 구역 택배는 마지막
     _assignOutdoor() {
       const cap = this.warehouse.cap, pref = this.outdoorPref || [];
@@ -1030,14 +1033,14 @@
       for (const s of this.storage) s.outdoor = false;
       let inside = this.usedVolume();
       for (const s of this.storage) if (pref.includes('s' + s.id)) { s.outdoor = true; inside -= this.storageVol(s); }
-      for (const p of this.parcels) if (pref.includes(p.id)) { p.outdoor = true; p.inCold = false; p.inFrozen = false; inside -= p.size; }
+      for (const p of this.parcels) if (pref.includes(p.id)) { p.outdoor = true; p.inCold = false; p.inFrozen = false; inside -= this.storeSize(p); }
       if (inside <= cap) return;
       const zone = p => p.inCold || p.inFrozen;
       const cands = this.parcels.filter(p => !p.outdoor).sort((a, b) => (zone(a) - zone(b)) || (this._urgencyKey(b) - this._urgencyKey(a)) || (b.id - a.id));
-      for (const p of cands) { if (inside <= cap) break; p.outdoor = true; p.inCold = false; p.inFrozen = false; inside -= p.size; }
+      for (const p of cands) { if (inside <= cap) break; p.outdoor = true; p.inCold = false; p.inFrozen = false; inside -= this.storeSize(p); }
     }
     outdoorParcels() { return this.parcels.filter(p => p.outdoor); }
-    outdoorVolume() { return this.outdoorParcels().reduce((s, p) => s + p.size, 0) + this.storage.filter(s => s.outdoor).reduce((v, s) => v + this.storageVol(s), 0); }
+    outdoorVolume() { return this.outdoorParcels().reduce((s, p) => s + this.storeSize(p), 0) + this.storage.filter(s => s.outdoor).reduce((v, s) => v + this.storageVol(s), 0); }
     theftProb(weather) {
       const ov = this.outdoorVolume(); if (ov <= 0) return 0;
       const over = Math.max(1, Math.min(ov, this.usedVolume() - this.warehouse.cap));

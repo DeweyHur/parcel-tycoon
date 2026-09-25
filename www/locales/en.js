@@ -1914,8 +1914,8 @@
       },
       "compact": {
         "name": "Space Optimizer",
-        "desc": "Parcels of size 4+ take 1 less space",
-        "short": "Big parcels -1 size"
+        "desc": "Size 4+ parcels take 1 less warehouse cell (truck load unchanged)",
+        "short": "Big parcels: -1 storage"
       },
       "coldpro": {
         "name": "Cold Expert",
