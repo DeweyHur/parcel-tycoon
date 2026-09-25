@@ -1109,6 +1109,7 @@
     'kind.customer': 'Customer',
     'res.unlocked': '🔓 {name} unlocked',
     'res.best': '★ New best',
+    'res.run': 'Run',
     'res.scenarioCompany': 'Run / company',
     'res.reached': 'Reached',
     'res.revenue': 'Total revenue',

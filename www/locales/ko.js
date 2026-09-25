@@ -1110,6 +1110,7 @@
     'kind.customer': '고객',
     'res.unlocked': '🔓 {name} 해금',
     'res.best': '★ 최고 기록',
+    'res.run': '런',
     'res.scenarioCompany': '런 / 회사',
     'res.reached': '도달',
     'res.revenue': '총 배송 수익',
