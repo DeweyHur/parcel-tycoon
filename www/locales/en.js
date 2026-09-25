@@ -1509,37 +1509,37 @@
         "name": "Customs Bridge",
         "short": "Customs",
         "vehicle": "bonded truck",
-        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · standard contract"
+        "desc": "Clears and ships 🛃 cargo still waiting at customs, and carries general cargo too (no refrigeration). Customs bonus · 8 slots · standard contract"
       },
       "intl1": {
         "name": "Bonded Express",
         "short": "Bonded",
         "vehicle": "bonded truck",
-        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · Premium — trucks +1 · cap +1 · fee +20%"
+        "desc": "Clears and ships 🛃 cargo still waiting at customs, and carries general cargo too (no refrigeration). Customs bonus · Premium — trucks +2 · 8 slots · fee +20%"
       },
       "intl2": {
         "name": "WorldGate",
         "short": "WorldGate",
         "vehicle": "bonded padded truck",
-        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · Elite — trucks +2 · cap +2 · fee +40% · ⚠ break-safe added"
+        "desc": "Clears and ships 🛃 cargo still waiting at customs, and carries general cargo too (no refrigeration). Customs bonus · Elite — trucks +4 · 12 slots · fee +40% · ⚠ break-safe added"
       },
       "large0": {
         "name": "Giant Freight",
         "short": "Giant",
         "vehicle": "heavy truck",
-        "desc": "Handles size 4+ parcels (break-safe). Large bonus · standard contract"
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus · 8 slots (two 4s) · standard contract"
       },
       "large1": {
         "name": "Taesan Heavy",
         "short": "Taesan",
         "vehicle": "heavy truck",
-        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Premium — trucks +1 · cap +1 · fee +20%"
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Premium — trucks +2 · 8 slots · fee +20%"
       },
       "large2": {
         "name": "Elephant Special",
         "short": "Elephant",
         "vehicle": "reefer heavy truck",
-        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Elite — trucks +2 · cap +2 · fee +40% · ❄ cold-capable added"
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Elite — trucks +4 · 12 slots (three 4s) · fee +40% · ❄ cold-capable added"
       },
       "air0": {
         "name": "Airport Cargo Agent",

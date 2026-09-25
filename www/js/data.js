@@ -159,8 +159,8 @@
       cold:    { badge: '🚚', cap: 4,  fee: 58, trucks: 4, price: 90, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'], rep: 'kang' },
       frozen:  { badge: '🚚', cap: 4,  fee: 80, trucks: 4, price: 100, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true, rep: 'kang' },
       fragile: { badge: '🚚', cap: 4,  fee: 69, trucks: 4, price: 90, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
-      intl:    { badge: '🚚', cap: 8,  fee: 118, trucks: 3, price: 110, caps: ['customs'], need: ['customs'], sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
-      large:   { badge: '🚚', cap: 10, fee: 142, trucks: 3, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true, rep: 'noh' },
+      intl:    { badge: '🚚', cap: 8,  fee: 118, trucks: 3, price: 110, caps: ['customs'], need: null, sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
+      large:   { badge: '🚚', cap: 8,  fee: 124, trucks: 3, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true, rep: 'noh' },
       // 항공·철도·해상은 우리가 비행기·배를 부르는 게 아니다 — 창고에서 공항·화물역·항만까지 실어다 주는 **포워더**다.
       // 그래서 무역 고객(수입상·명품관처럼 🛃 통관 짐을 맡기는 화주)이 있을 때만 마켓에 온다 (needsTrade)
       air:     { badge: '✈', cap: 4,  fee: 48, trucks: 3, price: 120, caps: ['customs', 'fragile'], sizeMin: 1, sizeMax: 2, marketOnly: true, needsTrade: true },
@@ -200,13 +200,16 @@
       fragile2: { family: 'fragile', tier: 2, sizeMax: 7, need: null, allowAttrs: ['fragile'] },                    // 대형 파손까지
       fragile3: { family: 'fragile', tier: 3, sizeMax: 7, extraCaps: ['cold'], need: null, allowAttrs: ['fragile', 'cold'] },
       // 통관
-      intl0:   { family: 'intl', tier: 0 },
-      intl1:   { family: 'intl', tier: 1 },
-      intl2:   { family: 'intl', tier: 2, extraCaps: ['fragile'] },
+      // 통관 대행도 통관 짐만 싣는 게 아니다 — 통관 끝난 짐이든 일반이든 싣고, 대기 중인 🛃 를 바로 통관·발송하는 게 능력. 냉장 설비는 없다.
+      // 용량은 4칸 단위(8 → 8 → 12): 🛃 는 4칸으로 오니 11칸이면 늘 3칸이 논다. 등급은 배차·배차비로 오르고 마지막에 한 칸 더(4칸 하나)
+      intl0:   { family: 'intl', tier: 0, allowAttrs: ['customs', 'fragile'] },
+      intl1:   { family: 'intl', tier: 1, cap: 8, allowAttrs: ['customs', 'fragile'] },
+      intl2:   { family: 'intl', tier: 2, cap: 12, extraCaps: ['fragile'], allowAttrs: ['customs', 'fragile'] },
       // 대형
+      // 대형도 4칸 단위(8 → 8 → 12) — 대형 택배는 4칸(가끔 7칸)이라 10·11칸 차는 늘 2~3칸이 비었다 (유저: "8칸을 기본으로")
       large0:  { family: 'large', tier: 0 },
-      large1:  { family: 'large', tier: 1 },
-      large2:  { family: 'large', tier: 2, extraCaps: ['cold'] },              // 냉장 대형차
+      large1:  { family: 'large', tier: 1, cap: 8 },
+      large2:  { family: 'large', tier: 2, cap: 12, extraCaps: ['cold'] },              // 냉장 대형차
       // 원형(운송 수단)
       air0:    { family: 'air', tier: 0 },
       air1:    { family: 'air', tier: 1, sizeMax: 4 },
