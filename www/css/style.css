@@ -987,3 +987,8 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .cc-deal { font-size: 11px; color: var(--gold); margin-top: 2px; } .cc-deal.dim { color: var(--dim); }
 .sum-deals { margin: 6px 0; font-size: 12px; } .sum-deals div { padding: 2px 0; }
 .sum-deals .grade-S { color: var(--gold); } .sum-deals .grade-A { color: var(--green); } .sum-deals .grade-C { color: var(--red); }
+/* 사이클마다 다시 차는 횟수(광고) — 배차 막대(파랑)와 다른 모양: 둥근 주황 점 */
+.pips.runs i { width: 7px; height: 7px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1px #ffab4a88; }
+.pips.runs i.on { background: #ffab4a; box-shadow: 0 0 3px #ffab4a88; }
+.pips.runs i.gap { width: 4px; box-shadow: none; background: none; }
+.pips.runs b { color: #ffab4a; }

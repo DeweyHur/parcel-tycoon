@@ -715,7 +715,7 @@
         const on = selfOk() && !busy && g.phase === 'play', n = g.selfCount(), el = g.selfEligible();
         sc.disabled = !on; sc.className = 'btn contract self' + (on ? ' ready' : '') + (pk && pk.i === SELF ? ' picked' : '');
         const pv = sortByUrgency(el).slice(0, n);
-        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span>${takesDots(g, SELF, true) || '<span class="takes"></span>'}<span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls ${g.selfTripsLeft() ? '' : 'zero'}">${callPipsHtml(g.selfTripsLeft(), Math.max(g.selfTrips(), g.selfTripsLeft()))}</span>`;
+        sc.innerHTML = `<span class="cn">🚐 ${T('self.card')}</span>${takesDots(g, SELF, true) || '<span class="takes"></span>'}<span class="cl">${el.length ? pips(pv.flatMap(p => Array(p.size).fill(ptype(p).css)), Math.min(10, pv.reduce((s, p) => s + p.size, 0)), []) : ''}</span><span class="per">${el.length ? '' : '—'}</span><span class="calls ${g.selfTripsLeft() ? '' : 'zero'}">${callPipsHtml(g.selfTripsLeft(), Math.max(g.selfTrips(), g.selfTripsLeft()), 'runs')}</span>`;
       }
     }
     const wb = $('#wait-btn'); wb.disabled = busy || g.phase !== 'play';
@@ -1004,7 +1004,8 @@
   const PIP_MAX = 10;
   // trucks > 1 이면 차마다 한 칸 띄워 그린다 — 두 대가 '6+6' 으로 보인다
   // 배차 눈금: 열 대까지는 한 칸씩, 그보다 많으면 다섯 대를 큰 칸 하나(안에 5)로 묶는다 — 숫자 'n/m' 대신
-  function callPipsHtml(calls, max) {
+  // kind 'runs' = 사이클(보름)마다 다시 차는 횟수(광고 집행) — 배차(파란 막대)와 헷갈리지 않게 둥근 주황 점
+  function callPipsHtml(calls, max, kind) {
     let h = '';
     for (let g0 = 0; g0 < max; g0 += 5) {
       const size = Math.min(5, max - g0), have = Math.max(0, Math.min(size, calls - g0));
@@ -1012,7 +1013,7 @@
       if (max > 10 && size === 5 && (have === 5 || have === 0)) h += `<b class="${have ? 'on' : ''}">5</b>`;
       else for (let k = 0; k < size; k++) h += `<i class="${k < have ? 'on' : ''}"></i>`;
     }
-    return `<span class="pips calls">${h}</span>`;
+    return `<span class="pips ${kind === 'runs' ? 'runs' : 'calls'}">${h}</span>`;
   }
   function pips(cells, cap, over, trucks) {
     if (cap > PIP_MAX) return '';
@@ -1580,8 +1581,8 @@
         if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); const pc = { carrier: it.carrier, grade: it.grade || 'normal', enh: { limit: 0, cap: 0, capDelta: 0, regular: false, express: false, opt: null } }; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}<span class="ospec">${miniTruck(game, pc)} ${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> <b>${T('mk.feeEach', { n: o.fee })}</b> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span></span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge} ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') { const tg = enhTargets(it.enh); desc = `${D.ENHANCEMENTS[it.enh].desc}<br>${tg.length ? `<span style="color:var(--green)">→ ${tg.map(esc).join(' · ')}</span>` : `<span style="color:var(--red)">${T('mk.enhNoTarget')}</span>`}`; }
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
-        else if (it.kind === 'media') { const mp = game.mediaPlan(it.media); desc = `${mediaEffect(it.media)} <span class="media-fx"><span>💸${D.AD_MEDIA[it.media].cost}c</span></span> ${callPipsHtml(1, 1)}`; }
-        else if (it.kind === 'mediaUp') { const mp = game.mediaPlan(it.media); desc = mp.next ? `${D.AD_MEDIA[it.media].icon} ${T('media.upLine', { n: mp.runs, n2: mp.next.runs })} ${callPipsHtml(mp.next.runs, mp.next.runs)}` : ''; }
+        else if (it.kind === 'media') { const mp = game.mediaPlan(it.media); desc = `${mediaEffect(it.media)} <span class="media-fx"><span>💸${D.AD_MEDIA[it.media].cost}c</span></span> ${callPipsHtml(1, 1, 'runs')}`; }
+        else if (it.kind === 'mediaUp') { const mp = game.mediaPlan(it.media); desc = mp.next ? `${D.AD_MEDIA[it.media].icon} ${T('media.upLine', { n: mp.runs, n2: mp.next.runs })} ${callPipsHtml(mp.next.runs, mp.next.runs, 'runs')}` : ''; }
         else if (it.kind === 'growth') desc = T('growth.desc.' + it.growth, { n: D.GROWTH.warehouse.cap });
         else if (it.kind === 'deal') desc = dealOfferDesc(it);
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
@@ -1984,7 +1985,7 @@
     const weather = `<table class="hv-tbl">${wx}</table>` + row('🔮', T('hv.wx.fc'));
     // 7. 캠페인
     const ads = Object.keys(A).map(id => `<tr><td class="hv-ic">${A[id].icon}</td><td><b>${esc(T('media.' + id))}</b></td><td>📦+${A[id].per}</td><td>⏱${A[id].days}${esc(T('media.fx.dayUnit'))}</td><td>⭐+${A[id].rep || 0}</td><td>${A[id].cost}c</td></tr>`).join('');
-    const camp = `<table class="hv-tbl">${ads}</table>` + row('🔵', T('hv.camp.lv')) + row('×½', T('hv.camp.half')) + row('🚫', T('hv.camp.same'));
+    const camp = `<table class="hv-tbl">${ads}</table>` + row(callPipsHtml(1, 2, 'runs'), T('hv.camp.lv')) + row('×½', T('hv.camp.half')) + row('🚫', T('hv.camp.same'));
     // 8. 정산 · 마켓
     const DL = M.DEAL, dealHelp = row('📦', T('hv.deal.anon')) + row('📄', T('hv.deal.offer', { a: DL.cycles[0], b: DL.cycles[1], sp: Math.round(DL.spread * 100) })) + row('🛡', T('hv.deal.ins'))
       + row('🏅', T('hv.deal.grade')) + row('🎁', T('hv.deal.bonus')) + row('⭐', T('hv.deal.rel'));
@@ -2185,7 +2186,7 @@
       const mp = g.mediaPlan(id), cp = g.campaignPlan(id), ok = cp.ready;
       return `<button class="growth-card" data-media="${id}" ${k === 0 ? 'id="camp-go"' : ''} ${ok ? '' : 'disabled'}>
         <span class="growth-icon">${D.AD_MEDIA[id].icon}</span><span class="growth-copy"><b>${esc(T('media.' + id))}</b>${mediaEffect(id)}</span>
-        <span class="growth-buy"><span class="camp-runs"><small>${esc(T('camp.runs'))}</small> ${callPipsHtml(mp.left, mp.runs)}</span>${cp.active ? `<b class="camp-on">${esc(T('camp.activeNow', { n: cp.activeLeft }))}</b>` : `<b>${mp.cost}c</b><small>${T('media.run')}</small>`}</span></button>`;
+        <span class="growth-buy"><span class="camp-runs"><small>${esc(T('camp.runs'))}</small> ${callPipsHtml(mp.left, mp.runs, 'runs')}</span>${cp.active ? `<b class="camp-on">${esc(T('camp.activeNow', { n: cp.activeLeft }))}</b>` : `<b>${mp.cost}c</b><small>${T('media.run')}</small>`}</span></button>`;
     }).join('');
     const body = `<div class="growth-grid">${cards}</div>`;
     const m = modal(T('camp.title'), body, [{ label: T('btn.close'), onClick: closeModal }]);
