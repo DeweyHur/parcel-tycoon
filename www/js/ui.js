@@ -51,7 +51,10 @@
   }
 
   // ---------- modal ----------
+  // 진행 중인 판이 없으면 게임 화면을 감춘다 (index.html 도 no-game 으로 시작한다 — 첫 로딩에 빈 판이 번쩍이지 않게)
+  function syncNoGame() { document.body.classList.toggle('no-game', !game); }
   function modal(title, bodyHtml, buttons, sub) {
+    syncNoGame();
     const m = $('#modal');
     m.classList.remove('titlecard'); $('#modal-root').classList.remove('title-mode');   // 타이틀 화면만 모달 틀을 벗는다 — 다음 모달로 딸려가면 안 된다
     m.innerHTML = (title ? `<h2>${esc(title)}${sub ? `<small>${esc(sub)}</small>` : ''}</h2>` : '') + `<div class="body">${bodyHtml}</div>` +
@@ -63,7 +66,7 @@
   }
   // window.confirm은 웹뷰·아티팩트 샌드박스에서 막히므로 자체 확인 모달
   function askConfirm(msg, onYes, yesLabel = T('btn.ok'), onNo) { modal(T('btn.ok'), `<p>${esc(msg)}</p>`, [{ label: T('btn.cancel'), onClick: onNo || closeModal }, { label: yesLabel, cls: 'warn', onClick: () => { closeModal(); onYes(); } }]); }
-  function closeModal() { $('#modal-root').classList.remove('show'); $('#modal').innerHTML = ''; if (gateTarget && !document.body.contains(gateTarget)) clearGate(); }
+  function closeModal() { syncNoGame(); $('#modal-root').classList.remove('show'); $('#modal').innerHTML = ''; if (gateTarget && !document.body.contains(gateTarget)) clearGate(); }
 
   // ---------- title ----------
   // 소리 · 음악 · 언어 — 버튼 세 개가 아니라 아래쪽 텍스트 한 줄. 아이콘으로 바꾸지 않는다(도트 화면에선 세 글자가 더 짧다)
@@ -226,6 +229,7 @@
       closeModal();
       { const P3 = Profile.get(); P3.story = Object.assign({}, P3.story, { seen: true, done: true }); Profile.save(); }
       if (scene && scene.setShopName) scene.setShopName(P.campaign.name || T('lv.nameDefault'), { silent: true });   // 엔딩은 내 간판을 올려다본다
+      document.body.classList.remove('no-game');   // 엔딩은 판 없이 창고를 보여 준다
       if (window.Intro && scene) Intro.play(scene, () => showTitle(), { outro: true, params: { name: esc(P.campaign.name || T('lv.nameDefault')) } });
       else showTitle();
     };
@@ -503,6 +507,7 @@
 
   // ---------- play ----------
   function startPlay(o) {
+    syncNoGame();
     game.takeEvents();
     scene.sync(game, { animate: true });
     saveGame();

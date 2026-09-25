@@ -10,6 +10,8 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
 html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: 'Galmuri11', 'Apple SD Gothic Neo', 'Noto Sans KR', monospace; font-size: 16px; overflow: hidden; image-rendering: pixelated; }
 body { touch-action: manipulation; }
+/* 게임이 없을 때(첫 로딩·타이틀·런 준비 화면)는 뒤의 창고·패널을 감춘다 — 빈 판이 비쳐 보이면 어수선하다 */
+body.no-game { background: #141210; } body.no-game #app { visibility: hidden; } body.no-game #toast { visibility: visible; } body.no-game #modal-root { background: #141210; }
 #app { position: fixed; inset: 0; display: flex; flex-direction: column; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
 
 /* ---------- 3D scene ---------- */
