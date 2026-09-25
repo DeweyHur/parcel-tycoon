@@ -867,8 +867,8 @@
       if (!p.level || !this.shows('invest')) return { ok: false, reason: 'locked' };
       if (p.used) return { ok: false, reason: 'used' };
       if (p.active) return { ok: false, reason: 'active', left: p.activeLeft };
-      if (this.cash < p.cost) return { ok: false, reason: 'cash', cost: p.cost };
-      this.cash -= p.cost;
+      // 광고비도 배차비처럼 후불 — 정산에서 빠진다. 월중에 잔고가 바닥이어도 창고가 비면 광고를 걸 수 있어야 한다
+      this.feesDue += p.cost; this.monthStats.spent += p.cost; this.run.spent += p.cost;
       const roll = this._campaignRoll(p.id);   // 눈금을 쓰기 전에 굴린다 — 미리보기와 같은 '몇 번째' 씨앗
       this.campaignCycle = this.month;
       if (!this.mediaRuns || this.mediaRuns.m !== this.month) this.mediaRuns = { m: this.month, used: {} };

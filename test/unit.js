@@ -47,7 +47,7 @@ t('광고 집행: 전단지로 시작, 보름에 한 번, 며칠 안에 물량�
   assert.equal(plan.parcels, F.per, '한 번의 건수는 매체마다 고정');
   assert.equal(plan.cost, F.cost);
   assert.equal(plan.runs, 2, 'Lv2 = 보름에 두 번'); assert.equal(plan.left, 2);
-  const before = g.schedule.slice(g.turn).flat().length, cash0 = g.cash;
+  const before = g.schedule.slice(g.turn).flat().length, cash0 = g.cash, due0 = g.feesDue;
   const pv = g.campaignPreview('flyer'), roll = g._campaignRoll('flyer'), perSlot0 = roll.map(x => g.schedule[x.slot].length);
   assert.equal(pv.reduce((a, x) => a + x.n, 0), plan.parcels, '미리보기 합 = 건수'); assert.equal(pv[0].day, 1, '첫 칸은 내일');
   const rep0 = g.rep;
@@ -58,7 +58,7 @@ t('광고 집행: 전단지로 시작, 보름에 한 번, 며칠 안에 물량�
     assert.equal(g.schedule[x.slot].length, perSlot0[k] + x.specs.length, '미리보기대로 그 날에 들어온다 — ' + x.day);
     const cells = g.schedule[x.slot].reduce((a, s) => a + g._specCells(s), 0); assert.equal(cells, pv[k].after, '미리 보인 칸 수 그대로 — ' + pv[k].before + '→' + pv[k].after);
   });
-  assert.equal(g.cash, cash0 - plan.cost);
+  assert.equal(g.cash, cash0, '광고비는 후불 — 잔고는 그대로'); assert.equal(g.feesDue, due0 + plan.cost, '정산 때 빠진다');
   const win = g.schedule.slice(g.turn, g.turn + plan.days).flat().length;
   assert.ok(win >= plan.parcels, '며칠 안에 몰려 들어온다 — ' + win);
   assert.equal(g.campaignPlan('flyer').left, 1, '한 번 쓰면 눈금 하나가 빈다');
