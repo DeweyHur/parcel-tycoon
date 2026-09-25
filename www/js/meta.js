@@ -76,6 +76,25 @@
   // 복합 품목: 종류 + 추가 속성
   const CUSTOMER_ITEMS = { intlfragile: { type: 'intl', attrs: ['customs', 'fragile'], sizes: [1, 2] } };
   const CUSTOMER_SLOTS = 4; // 익명 제외 고객 최대 수
+  // ----- 기업 계약 (자유 런) — docs/CUSTOMER_DESIGN.md 8장 -----
+  // 개인 고객(익명)은 평판을 따라 늘어나는 바탕 물량. 기업 고객은 정산 마켓의 **제안서**로 온다:
+  // 기간(사이클) 동안 예상 물량(칸, ±변동)을 보내고, 만기에 성적(정시·⚡긴급·사고)으로 평가받는다.
+  // 관계(0~5)는 평가가 쌓인 것 — 개당 보너스(CUSTOMER_BONUS)와 다음 제안서의 물량·단가만 바꾼다(차·창고 혜택 없음).
+  // 보험이 없으면 서명할 수 없고, 그 기업의 제휴 보험사(INSURERS.fans)에 들어 있으면 조건이 좋아진다.
+  const DEAL = {
+    cells: [10, 14, 18, 24],        // 사이클당 예상 물량(칸) — 고객 평판 등급(repTier) 0~3
+    anonShare: 0.6,                 // 개인 고객 바탕 물량 배율 — 나머지는 기업 계약이 채운다(총량이 예전과 비슷하게)
+    spread: 0.25,                   // 실제 물량 = 예상 × (1 ± spread)
+    cycles: [2, 4],                 // 계약 기간(사이클)
+    relVolume: 0.12, relRate: 0.04, // 관계 1당 물량 +12% · 단가 +4%
+    fanVolume: 0.15, fanRate: 0.08, // 제휴 보험사 가입 중: 물량 +15% · 단가 +8%
+    bonusBase: 30, bonusPerCycle: 20, bonusPerRel: 15,   // 무사고 완료 보너스(c)
+    grades: [['S', 0.95, 2, 2], ['A', 0.85, 1, 1], ['B', 0.65, 0, 0], ['C', 0, -1, -2]],   // [등급, 정시율 하한, 관계, 평판]
+    rushWeight: 0.02,               // ⚡ 긴급 당일 처리 1건당 정시율 +2%p (평가용)
+    claimPenalty: 0.08,             // 사고(폐기) 1건당 −8%p, 사고가 있으면 S 불가
+    cooldown: 2,                    // C 등급이면 이 사이클 동안 제안이 오지 않는다
+    maxOffers: 3,
+  };
   // repTier: 이 평판 등급부터 마켓에 찾아온다 (0 무명 · 1 동네 소문 · 2 구내 유명 · 3 시내 최고)
   const COMPANIES = {
     local: {
@@ -302,6 +321,6 @@
     all_scenarios:{ kind: 'meta', rewardType: 'none', check: (s, p) => Object.keys(SCENARIOS).every(k => p.clearsByScenario[k]), prog: p => [Object.keys(SCENARIOS).filter(k => p.clearsByScenario[k]).length, Object.keys(SCENARIOS).length] },
   };
 
-  const META = { CALENDARS, CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, SPANS, DEFAULT_SCENARIO, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: [DEFAULT_SCENARIO], perkSlots: 1 } };
+  const META = { CALENDARS, CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, DEAL, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, SPANS, DEFAULT_SCENARIO, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: [DEFAULT_SCENARIO], perkSlots: 1 } };
   if (typeof module !== 'undefined') module.exports = META; else root.META = META;
 })(typeof window !== 'undefined' ? window : globalThis);

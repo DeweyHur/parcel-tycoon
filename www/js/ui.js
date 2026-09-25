@@ -783,7 +783,8 @@
     let h = '';
     for (let i = 1; i <= max; i++) h += `<i class="${i <= to ? (i > from ? 'new' : 'on') : i <= from ? 'lost' : ''}"></i>`;
     // 「신뢰 Lv2 ▮▮▯▯▯」 — 🤝 아이콘만으로는 강화 칸인지 신뢰인지 안 읽혔다
-    return `<span class="tpips" title="${esc(T('common.trust'))} ${to}/${max}"><small>${esc(T('common.trust'))}</small> <b>Lv${to}</b>${h}</span>`;
+    const lbl = game && game.bizMode && game.bizMode() ? T('deal.relLbl') : T('common.trust');   // 기업 계약 모드에선 '관계'
+    return `<span class="tpips" title="${esc(lbl)} ${to}/${max}"><small>${esc(lbl)}</small> <b>Lv${to}</b>${h}</span>`;
   }
   function showRepInfo() {
     const g = game, floor = g.repFloor(), cap = g.repCap(), top = g.repTier >= D.REP_TIERS.length - 1;
@@ -1532,7 +1533,9 @@
       <span>${T('sum.usage')}</span><span class="v">${T('sum.usageVal', { pct: s.usage, n: s.left })}</span>
       ${s.overdueVol ? `<span>${T('sum.overdueVol')}</span><span class="v bad">${T('fmt.cells', { n: s.overdueVol })}</span>` : ''}</div>`;
     const custs = s.customers && game.shows('customers') ? `${sec('Cust')}` + s.customers.map(c => `<div style="font-size:12px">${M.CUSTOMERS[c.id].icon} ${esc(M.CUSTOMERS[c.id].name)} — ${T('fmt.count', { n: c.month.delivered })} · +${c.month.revenue}c${c.month.claims ? ` · <span style="color:var(--red)">${T('sum.custClaim', { n: c.month.claims })}</span>` : ''}${c.id !== 'anon' ? ` · ${trustPips(c.month.lvStart, c.level)}${c.suspended ? ` (${T('cust.suspended')})` : ''}` : ''}</div>`).join('') : '';
-    const body = head + income + cost + incident + state + custs;
+    // 기업 계약 만기 — 평가 · 무사고 보너스 · 관계. 이게 다음 제안서의 크기를 정한다
+    const deals = (s.deals || []).length ? `${sec('Deal')}<div class="sum-deals">${s.deals.map(r => { const cu = M.CUSTOMERS[r.customer]; return `<div class="grade-${r.grade}">${T('deal.result', { icon: cu.icon, name: esc(cu.name), grade: r.grade, score: r.score, bonus: r.bonus ? T('deal.resultBonus', { n: r.bonus }) : '', rel: T('deal.resultRel', { n: r.rel }) })}</div>`; }).join('')}</div>` : '';
+    const body = head + income + cost + incident + deals + state + custs;
     const last = game.month >= R.months;
     modal(T('sum.title', { n: game.cycleLabel(s.month) }), body, [{ label: last ? T('sum.final') : game.shows('market') ? T('sum.toMarket') : T('sum.toNext', { n: game.cycleLabel(s.month + 1) }), cls: 'primary', onClick: () => {
       closeModal(); game.closeSummary(); game.takeEvents(); saveGame();
@@ -1545,6 +1548,19 @@
   }
 
   // ---------- market ----------
+  // 기업 계약 제안서: 기간 · 예상 물량 · 단가 · 무사고 보너스 · 품목 · 배상, 그리고 보험(필수 · 제휴면 조건↑)
+  function dealOfferDesc(it) {
+    const g = game, cu = M.CUSTOMERS[it.customer], t = g._dealTerms(it.customer, it.cycles, { renew: it.renew }), sp = Math.round(M.DEAL.spread * 100);
+    const mix = Object.keys(cu.items || {}).map(k => { const ci = M.CUSTOMER_ITEMS[k], ty = D.PARCEL_TYPES[ci ? ci.type : k]; return `<i class="dot" style="background:${ty.css}"></i>${cu.items[k]}%`; }).join(' ');
+    const fans = Object.keys(M.INSURERS).filter(k => g.isFanInsurer(it.customer, k));
+    const block = g.dealBlock(it.customer);
+    const ins = t.fan ? `<span class="good">🤝 ${esc(T('deal.fan', { name: M.INSURERS[g.insurer].icon + M.INSURERS[g.insurer].name }))}</span>`
+      : `<span style="color:var(--dim)">🤝 ${esc(T('deal.fanList', { list: fans.map(k => M.INSURERS[k].icon + M.INSURERS[k].name).join(', ') }))}</span>`;
+    return `<div class="deal-grid"><span>📄 ${T('deal.cycles', { n: t.cycles })}</span><span>📦 ${T('deal.cells', { n: t.cells, sp })}</span><span>💰 ×${t.rate.toFixed(2)}</span><span>🎁 +${t.bonus}c</span></div>
+      <div class="deal-mix">${cu.icon} ${mix} · ⚖×${cu.claimMult}${t.rel ? ` · ${T('deal.rel', { n: t.rel })}` : ''}</div>
+      ${cu.rule ? `<div style="color:var(--gold)">🎯 ${esc(cu.rule.text)}</div>` : ''}<div>${ins}</div>
+      ${block ? `<div style="color:var(--red)">${T('err.deal.' + block, { n: M.CUSTOMER_SLOTS })}</div>` : ''}`;
+  }
   function showMarket() {
     const mk = game.market, R = game.rules;
     BGM.play('market');
@@ -1567,12 +1583,13 @@
         else if (it.kind === 'media') { const mp = game.mediaPlan(it.media); desc = `${mediaEffect(it.media)} <span class="media-fx"><span>💸${D.AD_MEDIA[it.media].cost}c</span></span> ${callPipsHtml(1, 1)}`; }
         else if (it.kind === 'mediaUp') { const mp = game.mediaPlan(it.media); desc = mp.next ? `${D.AD_MEDIA[it.media].icon} ${T('media.upLine', { n: mp.runs, n2: mp.next.runs })} ${callPipsHtml(mp.next.runs, mp.next.runs)}` : ''; }
         else if (it.kind === 'growth') desc = T('growth.desc.' + it.growth, { n: D.GROWTH.warehouse.cap });
+        else if (it.kind === 'deal') desc = dealOfferDesc(it);
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
         else if (it.kind === 'fac') { const F = it.fac && D.FACILITIES[it.fac]; let prev = ''; if (F) { if (F.cap) prev = `${T('common.warehouse')} ${game.warehouse.cap} → ${game.warehouse.cap + Math.round(F.cap * R.facilityCapMult)}`; else if (F.cold) prev = `${D.ATTRS.cold.name} ${game.warehouse.cold} → ${Math.min(R.coldCapMax == null ? 99 : R.coldCapMax, game.warehouse.cold + F.cold)}`; else if (F.xl) prev = `${T('common.xl')} ${game.warehouse.xl} → ${game.warehouse.xl + F.xl}`; else if (F.frozen) prev = `${D.ATTRS.frozen.name} ${game.warehouse.frozen || 0} → ${(game.warehouse.frozen || 0) + F.frozen}`; } desc = F ? F.desc + (prev ? `<br><span style="color:var(--green)">${T('mk.afterBuy')} ${prev}</span>` : '') : T('mk.allFacilities'); }
         const up = it.kind === 'contract' && it.switchFrom;
         // 돈이 모자라거나(poor) 붙일 계약이 없는 강화(noTarget)는 회색 — 눌러 보기 전에 안 된다는 걸 보인다
-        const poor = !it.sold && game.cash < price, noTarget = !it.sold && it.kind === 'enh' && !enhTargets(it.enh).length;
-        return `<div class="card ${it.sold ? 'sold' : ''} ${up ? 'upgrade' : ''} ${solves(it) ? 'need' : ''} ${poor ? 'poor' : ''} ${noTarget ? 'na' : ''}" id="mk-card-${Story.mkKey(it)}" data-i="${i}"><div class="t"><span>${up ? `<small class="uplbl">↑ ${T('mk.upgrade')}</small> ` : ''}${it.kind === 'enh' ? enhIcon(it.enh) : ''}${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T('mk.sold') : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
+        const poor = !it.sold && game.cash < price, noTarget = !it.sold && ((it.kind === 'enh' && !enhTargets(it.enh).length) || (it.kind === 'deal' && !!game.dealBlock(it.customer)));
+        return `<div class="card ${it.sold ? 'sold' : ''} ${up ? 'upgrade' : ''} ${solves(it) ? 'need' : ''} ${poor ? 'poor' : ''} ${noTarget ? 'na' : ''}" id="mk-card-${Story.mkKey(it)}" data-i="${i}"><div class="t"><span>${up ? `<small class="uplbl">↑ ${T('mk.upgrade')}</small> ` : ''}${it.kind === 'enh' ? enhIcon(it.enh) : ''}${esc(it.name)}${gradeBadge(it.grade)}</span><span class="price">${it.sold ? T(it.kind === 'deal' ? 'mk.signed' : 'mk.sold') : it.kind === 'deal' ? `<small>${T('mk.sign')}</small>` : price + 'c'}</span></div><div class="d">${desc}</div>${it.kind === 'contract' && !it.sold ? `<div class="ob"><button class="btn small" data-offer="${i}">${T('mk.detail')}</button></div>` : ''}</div>`;
       });
       // 계약 섹션 하나: 현재 계약 카드 → 그 바로 아래 같은 계열 업그레이드 매물 → 그 뒤 새 계열 매물. 빈 슬롯은 카드 대신 머리글에 알린다
       const vis = game.contracts.slice(0, game.visibleSlots());
@@ -1593,7 +1610,7 @@
       const contractHead = `<div class="mkhead">${T('kind.contract')}${R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : ''}</div>`;
       const contracts = `<div id="mk-contracts">${contractHead}${contractRows}</div>`;
       // 섹션: 강화 · 시설 · 광고(새 매체·매체 강화) · 성장 투자 · 고객
-      const ORDER = [['enh', ['enh'], 'kind.enh'], ['fac', ['fac'], 'kind.fac'], ['media', ['media', 'mediaUp'], 'media.newHead'], ['growth', ['growth'], 'growth.head'], ['customer', ['customer'], 'kind.customer']];
+      const ORDER = [['enh', ['enh'], 'kind.enh'], ['fac', ['fac'], 'kind.fac'], ['media', ['media', 'mediaUp'], 'media.newHead'], ['growth', ['growth'], 'growth.head'], ['customer', ['customer', 'deal'], 'kind.customer']];
       const items = ORDER.map(([, ks, head]) => { const rows = mk.items.map((it, i) => ks.includes(it.kind) ? cards[i] : '').filter(Boolean); return rows.length ? `<div class="mkhead">${T(head)}</div>` + rows.join('') : ''; }).join('');
       // 보험 섹션: 지금 든 보험 한 줄 + 바꾸기, 그 아래 1회성 보험 매물
       const insRows = mk.items.map((it, i) => it.kind === 'item' ? cards[i] : '').filter(Boolean).join('');
@@ -1627,7 +1644,7 @@
         if (R.marketMaxBuy && mk.bought >= R.marketMaxBuy) return toast(T('err.marketMax', { n: R.marketMaxBuy }));
         const price = it.kind === 'contract' ? game.contractPrice(it) : it.price;
         if (game.cash < price) return toast(T('err.noCash'));
-        if (['fac', 'item', 'customer', 'media', 'mediaUp', 'growth'].includes(it.kind)) { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); game.takeEvents(); scene.sync(game, { animate: true }); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
+        if (['fac', 'item', 'customer', 'deal', 'media', 'mediaUp', 'growth'].includes(it.kind)) { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); game.takeEvents(); scene.sync(game, { animate: true }); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
         // 같은 계열 상위 센터로 갈아타기: 그 슬롯을 바로 대상으로, 확인만
         if (it.kind === 'contract' && it.switchFrom) {
           const si = game.contracts.findIndex(c => c && c.id === it.switchFrom), c = game.contracts[si];
@@ -1792,15 +1809,17 @@
   // 고객 카드: 한 줄 머리(아이콘·이름·신뢰 단계·이번 달) + 맡기는 종류 색 점 + 규칙 한 줄. 단계별 혜택은 누르면 펼친다
   function customerCard(c) {
     const cu = M.CUSTOMERS[c.id], max = M.CUSTOMER_LEVELS.length - 1;
-    const pips = c.id === 'anon' ? '' : `<span class="tpips"><small>${esc(T('common.trust'))}</small> <b>Lv${c.level}</b>${Array.from({ length: max }, (_, k) => `<i class="${k < c.level ? 'on' : ''}"></i>`).join('')}${c.next ? `<small class="cc-xp">${c.next.have}/${c.next.need}</small>` : ''}</span>`;
+    const biz = game && game.bizMode(), d = biz && c.id !== 'anon' ? game.dealFor(c.id) : null;
+    const pips = c.id === 'anon' ? '' : `<span class="tpips"><small>${esc(biz ? T('deal.relLbl') : T('common.trust'))}</small> <b>Lv${c.level}</b>${Array.from({ length: max }, (_, k) => `<i class="${k < c.level ? 'on' : ''}"></i>`).join('')}${c.next ? `<small class="cc-xp">${c.next.have}/${c.next.need}</small>` : ''}</span>`;
     const mix = cu.items ? Object.keys(cu.items).map(k => { const it = M.CUSTOMER_ITEMS[k]; const t = it ? it.type : k; return `<span class="cc-mix"><i class="hv-sw" style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>${cu.items[k]}%</span>`; }).join('') : `<span class="cc-mix dim">${T('cust.defaultMix')}</span>`;
     const month = `<span class="cc-month">📦${c.month.delivered} · ${c.month.revenue >= 0 ? '+' : ''}${c.month.revenue}c${c.month.claims ? ` · <b class="bad">−${c.month.claims}c</b>` : ''}</span>`;
     const claim = cu.claimMult !== 1 ? `<span class="cc-claim" title="${esc(T('mk.claimMult', { n: cu.claimMult }))}">⚖×${cu.claimMult}</span>` : '';
     const rule = cu.rule ? `<div class="cc-rule">🎯 ${esc(cu.rule.text)}</div>` : '';
-    const lvRows = c.id === 'anon' ? '' : [[1, T('cust.lv1')], ...[2, 3].filter(l => cu.perks && cu.perks[l]).map(l => [l, cu.perks[l].text])]
+    const lvRows = c.id === 'anon' || biz ? '' : [[1, T('cust.lv1')], ...[2, 3].filter(l => cu.perks && cu.perks[l]).map(l => [l, cu.perks[l].text])]
       .map(([l, txt]) => `<div class="ttrow ${c.level >= l ? 'on' : ''}"><span class="lv">${l}</span><span class="ef">${esc(txt)}</span><span class="st">${c.level >= l ? '✓' : `${M.CUSTOMER_LEVELS[l]}xp`}</span></div>`).join('');
     const head = `<span class="cc-ic">${cu.icon}</span><b>${esc(cu.name)}${c.slots > 1 ? ` ×${c.slots}` : ''}</b>${pips}`;
-    const sub = `<span class="cc-line">${mix}${claim}${month}</span>${c.suspended ? `<span class="bad">${T('cust.suspendedLong')}</span>` : ''}`;
+    const dealLine = !biz || c.id === 'anon' ? '' : d ? `<div class="cc-deal">${T('deal.line', { left: d.left, cycles: d.cycles, got: d.cyc.cells, target: d.cyc.target || '—', pct: d.st.delivered ? Math.round(d.st.onTime / d.st.delivered * 100) : 100, rush: d.st.rush, claims: d.st.claims })}</div>` : `<div class="cc-deal dim">${T('deal.none')}</div>`;
+    const sub = `<span class="cc-line">${mix}${claim}${month}</span>${dealLine}${c.suspended ? `<span class="bad">${T('cust.suspendedLong')}</span>` : ''}`;
     return lvRows ? `<details class="cx-tile cc ${c.suspended ? 'dis' : ''}"><summary>${head}${sub}${rule}</summary><div class="cx-more"><div class="ttrack">${lvRows}</div></div></details>`
       : `<div class="cx-tile cc"><div class="cx-sum">${head}${sub}${rule}</div></div>`;
   }
@@ -1823,8 +1842,10 @@
       return `<span class="${open ? '' : 'dim'}" title="${esc(open ? T('cust.openNow') : T('cust.needTier', { name: T('rep.tier.' + D.REP_TIERS[tier].id) }))}">${cu.icon} ${esc(cu.name)} <small>${open ? '✓' : '⭐' + esc(T('rep.tier.' + D.REP_TIERS[tier].id))}</small></span>`;
     }).join('') + '</div>' : '';
     // 규칙 줄글은 아이콘 세 개로: 기한 내 +1 · 특수 규칙 +1 · 폐기 −3
-    const rules = `<div class="cc-rules"><span>⏱ +1xp</span><span>🎯 +1xp</span><span class="bad">🗑 −3xp</span><span class="dim">⭐ ${T('cust.upHint')}</span></div>`;
-    const body = rules + `<div class="cx-list">${list.map(customerCard).join('')}</div>` + soonRows;
+    const rules = g.bizMode() ? `<div class="cc-rules dim">${T('deal.rules')}</div>` : `<div class="cc-rules"><span>⏱ +1xp</span><span>🎯 +1xp</span><span class="bad">🗑 −3xp</span><span class="dim">⭐ ${T('cust.upHint')}</span></div>`;
+    // 기업 계약 모드: 진행 중 계약이 먼저, 그 다음 지난 거래처, 개인 고객은 맨 아래
+    const ord = c => c.id === 'anon' ? 2 : g.bizMode() && !g.dealFor(c.id) ? 1 : 0;
+    const body = rules + `<div class="cx-list">${list.slice().sort((a, b) => ord(a) - ord(b)).map(customerCard).join('')}</div>` + soonRows;
     modal(T('company.customers'), body, [{ label: T('btn.close'), onClick: back }]);
   }
 
@@ -1965,12 +1986,14 @@
     const ads = Object.keys(A).map(id => `<tr><td class="hv-ic">${A[id].icon}</td><td><b>${esc(T('media.' + id))}</b></td><td>📦+${A[id].per}</td><td>⏱${A[id].days}${esc(T('media.fx.dayUnit'))}</td><td>⭐+${A[id].rep || 0}</td><td>${A[id].cost}c</td></tr>`).join('');
     const camp = `<table class="hv-tbl">${ads}</table>` + row('🔵', T('hv.camp.lv')) + row('×½', T('hv.camp.half')) + row('🚫', T('hv.camp.same'));
     // 8. 정산 · 마켓
+    const DL = M.DEAL, dealHelp = row('📦', T('hv.deal.anon')) + row('📄', T('hv.deal.offer', { a: DL.cycles[0], b: DL.cycles[1], sp: Math.round(DL.spread * 100) })) + row('🛡', T('hv.deal.ins'))
+      + row('🏅', T('hv.deal.grade')) + row('🎁', T('hv.deal.bonus')) + row('⭐', T('hv.deal.rel'));
     const money = row('🚚', T('hv.pay.fee')) + row('🏠', T('hv.pay.op', { n: D.OPERATING_COST })) + row('📄', T('hv.pay.note'))
       + row('💸', T('hv.pay.loan', { pct: Math.round(D.LOAN.interest * 100), limit: D.LOAN.limit })) + row('🛒', T('hv.pay.market'));
     // 9. 런
     const run = `<div class="hv-flow"><span>🌸<small>${T('hv.run.q')}</small></span><b>→</b><span>☔🎑❄<small>${T('hv.run.q2')}</small></span><b>→</b><span>🌱🍂<small>${T('hv.run.half')}</small></span><b>→</b><span>📅<small>${T('hv.run.year')}</small></span></div>`
       + row('🎑', T('hv.run.holiday'));
-    return `<div class="hv">${sec('day', '🔁', true, day)}${sec('call', '🚚', true, call)}${sec('kind', '🎨', false, kind)}${sec('early', '🤝', false, early)}${sec('wh', '🏠', false, store)}${sec('wx', '🌦', false, weather)}${sec('camp', '📣', false, camp)}${sec('pay', '💰', false, money)}${sec('run', '📅', false, run)}</div>`;
+    return `<div class="hv">${sec('day', '🔁', true, day)}${sec('call', '🚚', true, call)}${sec('kind', '🎨', false, kind)}${sec('early', '🤝', false, early)}${sec('wh', '🏠', false, store)}${sec('wx', '🌦', false, weather)}${sec('camp', '📣', false, camp)}${game && game.bizMode && game.bizMode() || !game ? sec('deal', '📄', false, dealHelp) : ''}${sec('pay', '💰', false, money)}${sec('run', '📅', false, run)}</div>`;
   }
   function showHelp(back) {
     // 아직 마켓도 안 열린 런(레벨 1)에 전체 설명서를 보여 주면 숨긴 보람이 없다 — 그 레벨에 있는 것만

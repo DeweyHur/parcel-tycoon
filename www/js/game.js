@@ -256,7 +256,14 @@
         c.slots++; c.xp = Math.max(c.xp, M.CUSTOMER_LEVELS[lv] || 0);
       }
       for (const id in this.customers) this._applyCustomerPerks(id);
-      // 대형 계약: 고객 1명이 물량 60%
+      // 자유 런: 회사 명단의 기업 고객은 '이미 맺어 둔 계약'으로 시작한다 — 두 사이클, 명단의 단계가 곧 관계
+      this.deals = this.deals || []; this.relations = this.relations || {};
+      // 바탕(개인 고객) 물량을 DEAL.anonShare 로 줄인 만큼 기업 계약이 채운다 — 첫 보름의 총량은 예전과 비슷하다
+      if (this.bizMode() && !this.deals.length) for (const [id, lv] of list) {
+        if (id === 'anon' || !M.CUSTOMERS[id] || M.CUSTOMERS[id].storage || this.dealFor(id)) continue;
+        this.relations[id] = Math.max(this.relations[id] || 0, lv || 0);
+        this._pushDeal(this._dealTerms(id, 2), 1);
+      }
     }
     // 마켓 신규 고객 계약
     addCustomer(id) {
@@ -266,19 +273,88 @@
       return true;
     }
     customerCount() { return Object.keys(this.customers).filter(id => id !== 'anon').length; }
+    // ----- 기업 계약 (자유 런, docs/CUSTOMER_DESIGN.md 8장) -----
+    // 스토리 장은 예전 고객 신뢰(Lv)를 그대로 쓴다 — 장마다 대사가 그 규칙을 가르친다
+    bizMode() { return this.shows('bizDeals') && !(this.cfg && this.cfg.legacyCustomers); }
+    relation(id) { return (this.relations && this.relations[id]) || 0; }
+    activeDeals() { return (this.deals || []).filter(d => d.left > 0); }
+    dealFor(id) { return (this.deals || []).find(d => d.customer === id && d.left > 0) || null; }
+    isFanInsurer(id, ins) { ins = ins || this.insurer; return ins !== 'none' && ((M.INSURERS[ins] || {}).fans || []).includes(id); }
+    _dealTerms(id, cycles, opts) {
+      const DL = M.DEAL, cust = M.CUSTOMERS[id] || {}, rel = this.relation(id), fan = this.isFanInsurer(id), renew = !!(opts && opts.renew);
+      const base = DL.cells[Math.min(DL.cells.length - 1, cust.repTier || 0)];
+      const cells = Math.round(base * (1 + rel * DL.relVolume + (fan ? DL.fanVolume : 0)) * (renew ? 1.1 : 1));
+      const rate = Math.round((1 + rel * DL.relRate + (fan ? DL.fanRate : 0)) * 100) / 100;
+      const bonus = DL.bonusBase + DL.bonusPerCycle * cycles + DL.bonusPerRel * rel;
+      return { customer: id, cycles, cells, rate, bonus, fan, rel, renew };
+    }
+    _pushDeal(terms, start) {
+      if (!this.customers[terms.customer]) this.customers[terms.customer] = { id: terms.customer, xp: 0, slots: 1, suspended: false, streak: 0, perkApplied: {}, month: this._emptyCustMonth(), total: { delivered: 0, revenue: 0, claims: 0, discarded: 0 } };
+      const d = { ...terms, left: terms.cycles, start, st: { delivered: 0, onTime: 0, rush: 0, claims: 0 }, cyc: { target: 0, cells: 0 } };
+      this.deals.push(d); return d;
+    }
+    dealBlock(id) {
+      if (this.insurer === 'none') return 'insurance';
+      if (this.dealFor(id)) return 'dup';
+      if (this.activeDeals().length >= M.CUSTOMER_SLOTS) return 'slots';
+      return null;
+    }
+    signDeal(id, cycles, renew) {
+      const why = this.dealBlock(id); if (why) return { ok: false, reason: why };
+      const t = this._dealTerms(id, cycles, { renew });
+      const d = this._pushDeal(t, this.market && this.market.prep ? this.month : this.month + 1);
+      this.stats.customersAdded++;
+      this.say('log.dealSign', { name: M.CUSTOMERS[id].name, cycles, cells: t.cells });
+      return { ok: true, deal: d };
+    }
+    // 평가 점수: 정시율 + ⚡긴급 당일 처리 가산 − 사고 감산. 사고가 하나라도 있으면 S 는 없다
+    dealScore(d) { const DL = M.DEAL, s = d.st; const rate = s.delivered ? s.onTime / s.delivered : 1; return Math.max(0, rate + s.rush * DL.rushWeight - s.claims * DL.claimPenalty); }
+    dealGrade(d) { const sc = this.dealScore(d); for (const g of M.DEAL.grades) { if (g[0] === 'S' && d.st.claims) continue; if (sc >= g[1]) return g; } return M.DEAL.grades[M.DEAL.grades.length - 1]; }
+    _settleDeals() {
+      const DL = M.DEAL, out = [];
+      for (const d of this.activeDeals()) {
+        if (d.start > this.month) continue;          // 이번 마켓에 맺은 것 — 다음 사이클부터
+        d.left--;
+        if (d.left > 0) continue;
+        const g = this.dealGrade(d), id = d.customer, cust = M.CUSTOMERS[id], rel0 = this.relation(id);
+        const rel = Math.max(0, Math.min(M.CUSTOMER_LEVELS.length - 1, rel0 + g[2])); this.relations[id] = rel;
+        if (rel >= 3 && rel0 < 3) this.stats.customerL3++;
+        let rep = 0; if (g[3]) rep = this.addRep(g[3], MSG('why.repDeal', { name: cust.name, grade: g[0] })) || g[3];
+        let bonus = 0; if (!d.st.claims) { bonus = d.bonus; this.cash += bonus; this.monthStats.revenue += bonus; this.run.revenue += bonus; }
+        if (g[0] === 'C') (this.dealCooldown || (this.dealCooldown = {}))[id] = this.month + DL.cooldown;
+        const r = { customer: id, grade: g[0], rel, relDelta: rel - rel0, rep: g[3], bonus, score: Math.round(this.dealScore(d) * 100), st: { ...d.st }, cycles: d.cycles };
+        out.push(r);
+        this.say('log.dealDone', { name: cust.name, grade: g[0], bonus: bonus ? MSG('log.dealBonus', { n: bonus }) : '' });
+        this.emit('dealDone', r);
+      }
+      this.dealResults = out;
+      return out;
+    }
+    // 정산 마켓의 제안서: 만기가 좋게 끝난 기업의 재계약이 먼저, 그 다음 평판 등급이 연 새 기업
+    _dealOfferItems() {
+      const DL = M.DEAL, items = [], active = new Set(this.activeDeals().map(d => d.customer));
+      const cyc = () => DL.cycles[0] + this.rng.int(DL.cycles[1] - DL.cycles[0] + 1);
+      for (const r of this.dealResults || []) if (r.grade !== 'C' && !active.has(r.customer) && items.length < DL.maxOffers) items.push({ kind: 'deal', customer: r.customer, cycles: cyc(), renew: true, price: 0, name: T('market.dealRenew', { name: M.CUSTOMERS[r.customer].name }), sold: false });
+      const taken = new Set([...active, ...items.map(x => x.customer)]);
+      const cands = this.rng.shuffle(Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !M.CUSTOMERS[k].storage && M.CUSTOMERS[k].items && (M.CUSTOMERS[k].repTier || 0) <= this.repTier && !taken.has(k) && !((this.dealCooldown || {})[k] > this.month)));
+      const n = 1 + (this.rng.next() < 0.25 + this.repTier * 0.12 ? 1 : 0);
+      for (const k of cands.slice(0, n)) if (items.length < DL.maxOffers) items.push({ kind: 'deal', customer: k, cycles: cyc(), renew: false, price: 0, name: T('market.dealOffer', { name: M.CUSTOMERS[k].name }), sold: false });
+      return items;
+    }
     _emptyCustMonth() { return { delivered: 0, revenue: 0, claims: 0, discarded: 0, lvStart: 0 }; }
-    customerLevel(id) { const c = this.customers && this.customers[id]; if (!c || c.suspended) return 0; let lv = 0; for (let i = 1; i < M.CUSTOMER_LEVELS.length; i++) if (c.xp >= M.CUSTOMER_LEVELS[i]) lv = i; return lv; }
-    customerNext(id) { const lv = this.customerLevel(id); const c = this.customers[id]; return lv >= M.CUSTOMER_LEVELS.length - 1 ? null : { need: M.CUSTOMER_LEVELS[lv + 1], have: Math.max(0, c.xp) }; }
-    customerPerk(id, key) { const cust = M.CUSTOMERS[id]; if (!cust || !cust.perks) return null; const lv = this.customerLevel(id); let v = null; for (const l of [2, 3]) if (lv >= l && cust.perks[l] && cust.perks[l][key] != null) v = cust.perks[l][key]; return v; }
+    customerLevel(id) { if (this.bizMode()) return id === 'anon' ? 0 : this.relation(id); const c = this.customers && this.customers[id]; if (!c || c.suspended) return 0; let lv = 0; for (let i = 1; i < M.CUSTOMER_LEVELS.length; i++) if (c.xp >= M.CUSTOMER_LEVELS[i]) lv = i; return lv; }
+    customerNext(id) { if (this.bizMode()) return null; const lv = this.customerLevel(id); const c = this.customers[id]; return lv >= M.CUSTOMER_LEVELS.length - 1 ? null : { need: M.CUSTOMER_LEVELS[lv + 1], have: Math.max(0, c.xp) }; }
+    customerPerk(id, key) { if (this.bizMode()) return null; const cust = M.CUSTOMERS[id]; if (!cust || !cust.perks) return null; const lv = this.customerLevel(id); let v = null; for (const l of [2, 3]) if (lv >= l && cust.perks[l] && cust.perks[l][key] != null) v = cust.perks[l][key]; return v; }
     // 창고에 직접 적용되는 혜택(냉장·초대형)은 단계 도달 시 더하고, 거래 중단 시 뺀다
     _applyCustomerPerks(id) {
+      if (this.bizMode()) return;   // 기업 관계는 보너스·물량만 — 차·창고를 건드리지 않는다
       const cust = M.CUSTOMERS[id], c = this.customers[id]; if (!cust || !cust.perks) return;
       for (const l of [2, 3]) { const pk = cust.perks[l]; if (!pk) continue; const should = this.customerLevel(id) >= l; const has = !!c.perkApplied[l];
         if (should && !has) { if (pk.cold) this.warehouse.cold += pk.cold; if (pk.xl) this.warehouse.xl += pk.xl; c.perkApplied[l] = true; }
         else if (!should && has) { if (pk.cold) this.warehouse.cold = Math.max(0, this.warehouse.cold - pk.cold); if (pk.xl) this.warehouse.xl = Math.max(0, this.warehouse.xl - pk.xl); c.perkApplied[l] = false; } }
     }
     _custXp(id, delta, why) {
-      const c = this.customers && this.customers[id]; if (!c || id === 'anon') return;
+      const c = this.customers && this.customers[id]; if (!c || id === 'anon' || this.bizMode()) return;
       const before = this.customerLevel(id);
       c.xp += delta;
       if (c.xp < 0) { c.xp = 0; if (!c.suspended) { c.suspended = true; this.say('log.custSuspend', { name: M.CUSTOMERS[id].name, why }); this.emit('custSuspend', { customer: id }); } }
@@ -296,6 +372,7 @@
       if (c) { c.month.claims += amount; c.month.discarded++; c.total.claims += amount; c.total.discarded++; }
       this.say('log.claim', { amount, name: cust.name, why, covered: covered ? MSG('log.claimCovered', { covered }) : '' });
       this.emit('claim', { parcel: p, amount, covered, customer: id, why });
+      { const d = this.bizMode() && this.dealFor(id); if (d) d.st.claims++; }
       this._custXp(id, -3, why);
     }
     // 처리 시 고객 보너스·xp. delivered: 이 호출로 처리한 같은 고객 택배들
@@ -317,12 +394,14 @@
       }
       if (ruleHit) xp += 1;
       if (c) { c.month.delivered++; c.total.delivered++; }
+      { const d = this.bizMode() && this.dealFor(id); if (d) { d.st.delivered++; if (onTime) d.st.onTime++; if (p.rush && onTime) d.st.rush++; d.cyc.cells += p.size; } }
       if (xp) this._custXp(id, xp, MSG('why.delivered'));
       return bonus;
     }
     _custRevenue(p, amount) { const c = this.customers && this.customers[p.customer || 'anon']; if (c) { c.month.revenue += amount; c.total.revenue += amount; } }
     _customerWeightsFor(m) {
       const R = this.rules, w = {};
+      if (this.bizMode()) return { anon: 1 };   // 바탕 물량은 개인 고객 — 기업 물량은 계약으로 따로 얹는다(_makeSchedule)
       for (const id in this.customers) { const c = this.customers[id]; if (c.suspended) continue; const vol = id === 'anon' ? 1 : M.CUSTOMER_VOLUME[this.customerLevel(id)]; w[id] = c.slots * vol * (R.customerWeights[id] || 1); if (this.insurer === 'none' && M.CUSTOMERS[id].claimMult >= 2) w[id] *= 0.5; if (M.CUSTOMERS[id].storage) delete w[id]; }
       if (!Object.keys(w).length) w.anon = 1;
       return w;
@@ -348,7 +427,7 @@
       const sf = this._scriptForecast(m); if (sf) return sf;
       const R = this.rules;
       const organic = Math.min(this.turns(m), D.GROWTH.organicArrivals);
-      const extra = Math.round(this._extraArrivals(Math.min(m, 6)) * D.ARRIVALS_SCALE * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
+      const extra = Math.round(this._extraArrivals(Math.min(m, 6)) * D.ARRIVALS_SCALE * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult * (this.bizMode() ? M.DEAL.anonShare : 1));
       const total = organic + extra;
       const w = this._customerWeightsFor(m); const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
       const ratio = this._typeRatio(m);
@@ -365,7 +444,20 @@
         for (const t of types) { pct[t] = special * tw[t] / tsum; const e = n * pct[t]; range[t] = [Math.max(0, Math.floor(e - 1)), Math.ceil(e + 1)]; }
         const normalE = n * (1 - special); range.normal = [Math.max(0, Math.floor(normalE - 1)), Math.ceil(normalE + 1)];
         return { id, level: lv, min: Math.max(0, Math.floor(n - 1)), max: Math.ceil(n + 1), special, types, pct, range };
-      }).sort((a, b) => b.max - a.max);
+      }).concat(this.bizMode() ? this._dealForecast(m) : []).sort((a, b) => b.max - a.max);
+    }
+    // 기업 계약의 다음 사이클 예상: 예상 칸수 ± 변동을 그 기업의 평균 크기로 나눠 개수로
+    _dealForecast(m) {
+      const SZ = { small: 1.3, mid: 2, big: 4.5 }, sp = M.DEAL.spread;
+      return this.activeDeals().filter(d => d.start <= m && d.left - (d.start <= this.month && this.phase === 'market' ? 1 : 0) > 0).map(d => {
+        const cust = M.CUSTOMERS[d.customer], avg = SZ[cust.sizeBias] || 1.8, tw = {};
+        for (const k of Object.keys(cust.items || {})) { const t = M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k; tw[t] = (tw[t] || 0) + cust.items[k]; }
+        const tsum = Object.values(tw).reduce((a, b) => a + b, 0) || 1, lo = d.cells * (1 - sp) / avg, hi = d.cells * (1 + sp) / avg, pct = {}, range = {};
+        for (const t in tw) { pct[t] = tw[t] / tsum; range[t] = [Math.floor(lo * pct[t]), Math.ceil(hi * pct[t])]; }
+        if (!range.normal) range.normal = [0, 0];
+        const types = Object.keys(tw).filter(t => t !== 'normal');
+        return { id: d.customer, level: this.relation(d.customer), min: Math.floor(lo), max: Math.ceil(hi), special: 1 - (pct.normal || 0), types, pct, range, deal: true };
+      });
     }
     customerSummary() { return Object.keys(this.customers || {}).map(id => ({ id, ...M.CUSTOMERS[id], level: this.customerLevel(id), xp: this.customers[id].xp, suspended: this.customers[id].suspended, month: this.customers[id].month, total: this.customers[id].total, next: this.customerNext(id), slots: this.customers[id].slots })); }
 
@@ -1170,7 +1262,7 @@
 
     // ----- 월별 테이블 (무한 모드 확장 포함) -----
     // 고객 신뢰 단계에 따른 추가 입고: 단계가 오를수록 물량이 배 이상으로 는다
-    _customerExtra() { let n = 0; for (const id in this.customers) { const c = this.customers[id]; if (id === 'anon' || c.suspended) continue; n += (M.CUSTOMER_EXTRA[this.customerLevel(id)] || 0) * (c.slots || 1); } return n; }
+    _customerExtra() { if (this.bizMode()) return 0; let n = 0; for (const id in this.customers) { const c = this.customers[id]; if (id === 'anon' || c.suspended) continue; n += (M.CUSTOMER_EXTRA[this.customerLevel(id)] || 0) * (c.slots || 1); } return n; }
     // 달력 컷 시나리오(성수기·폭염·데일리)는 monthOffset 만큼 뒤 개월차의 표(입고·품목·등급·가격)를 쓴다 — 11월 컷이 1개월차 물량으로 시작하면 싱겁다
     tableMonth(c) { return this.monthIndex(c) + (this.rules.monthOffset || 0); }
     // 튜토리얼 대본(1~3개월차). 「인수인계」로 시작한 런에서만 (docs/STORY_TUTORIAL_DESIGN.md 부록 I)
@@ -1314,9 +1406,17 @@
       const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
       for (const t of organicTurns) sched[t].push(gen());
       // 홍보 물량은 여기 없다 — 캠페인(runCampaign)으로 플레이어가 직접 끌어온다
-      let extra = Math.round(this._extraArrivals(m) * D.ARRIVALS_SCALE * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult);
+      let extra = Math.round(this._extraArrivals(m) * D.ARRIVALS_SCALE * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult * (this.bizMode() ? M.DEAL.anonShare : 1));
       const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
       for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
+      // 기업 계약 물량: 예상 칸수 ×(1±변동) 만큼 그 기업 품목으로 채워 영업일에 흩는다
+      if (this.bizMode()) for (const d of this.activeDeals()) {
+        if (d.start > m) continue;
+        const target = Math.max(2, Math.round(d.cells * (1 + (this.rng.next() * 2 - 1) * M.DEAL.spread)));
+        const cw1 = { [d.customer]: 1 }; let cells = 0, guard = 0;
+        while (cells < target && guard++ < 120) { const sp = this._genParcelSpec(ratio, m, cw1); sched[1 + this.rng.int(Math.max(1, turns - 1))].push(sp); cells += this._specCells(sp); }
+        d.cyc = { target: cells, cells: 0, m };
+      }
       // 태풍 턴: 입고 없음, 다음 턴에 몰림
       for (let t = 0; t < turns - 1; t++) if (this.weather[t] === 'storm' && sched[t].length) { sched[t + 1].push(...sched[t]); sched[t] = []; }
       // 달력 이벤트: 폭주(그 턴 입고 배수·기한 단축·품목 이동), 휴무(입고 없음 → 휴무 뒤 첫 턴에 몰림), 보상 보정
@@ -1341,7 +1441,7 @@
       const cust = M.CUSTOMERS[customer] || M.CUSTOMERS.anon;
       let type, attrs, sizes, premium = false;
       // 고객 특수 품목은 신뢰 단계로 열린다 (3장): 0단계 일반 85%, 1단계 55%, 2단계 고객 정의, 3단계 + 프리미엄 품목
-      const clv = cust.items ? this.customerLevel(customer) : 0;
+      const clv = cust.items ? (this.bizMode() ? Math.max(2, this.relation(customer)) : this.customerLevel(customer)) : 0;
       // 0단계 고객은 일반만, 1단계 30%, 2단계부터 고객 품목 그대로
       const normalShare = clv === 0 ? 1 : clv === 1 ? 0.7 : 0;
       if (!cust.items || this.rng.next() < normalShare) type = this.rng.weighted(cust.items ? { normal: 1 } : ratio);
@@ -1379,6 +1479,7 @@
       let reward = this.baseReward(spec.type, spec.size); if (spec.premium) reward = Math.round(reward * 1.5);
       reward = Math.round(reward * (1 + ((this.growth && this.growth.branding) || 0) * D.GROWTH.branding.reward));
       if (spec.rewardDelta && spec.rewardDelta[spec.type]) reward += spec.rewardDelta[spec.type];
+      { const dl = this.bizMode() && customer !== 'anon' && this.dealFor(customer); if (dl) reward = Math.round(reward * dl.rate); }   // 계약 단가
       const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, rush: !!spec.rush, attrs, customer,
         deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1,
         // 첫 사이클에는 기한을 붙이지 않는다 — '차를 꽉 채워 보낸다'를 먼저 익히고, 기한은 그 다음에 배운다 (levels.js noDeadlineCycles)
@@ -1763,6 +1864,7 @@
       let closing = 0;
       if (R.closingBonus && this.usage() <= R.closingBonus.usage) { closing = R.closingBonus.amount; this.cash += closing; }
             if (R.erosion) { const cands = this.contracts.filter(c => c && this.startContractIds.includes(c.id) && c.maxCalls > 1); if (cands.length) { const c = this.rng.pick(cands); c.maxCalls--; c.calls = Math.min(c.calls, c.maxCalls); this.say('log.erosion', { name: this.contractName(c) }); } }
+      const deals = this.bizMode() ? this._settleDeals() : [];
       // 평판: 사고 없이 넘긴 정산은 소문이 좋아지고, 상한까지 채운 채로 넘기면 등급이 오른다
       let repClean = 0, repTierUp = null, repPerks = null;
       if (ms.penalty === 0) repClean = this.addRep(D.REP_GAIN.cleanMonth, MSG('why.repClean'));
@@ -1786,7 +1888,7 @@
       this.summary = { month: this.month, revenue: ms.revenue, opCost, opCostDetail: this._lastOpCost, calls: ms.calls, waits: ms.waits,
         delivered: ms.delivered, penalty: ms.penalty, unprocPenalty: unproc, overdueVol, discarded: ms.discarded, returned: ms.returned, stolen: ms.stolen, broken: ms.broken, claims: ms.claims, covered: ms.covered, selfCost: ms.selfCost || 0, fees: ms.fees || 0, premium, insClaims: ms.insClaims, nextPremium: this.premium(), noClaimBonus: !!ms.noClaimBonus, storageIncome: ms.storageIncome, closing, notesPaid, notesCount, notesLeft: (this.pendingRevenue || []).reduce((a, x) => a + x.amount, 0), customers: this.customerSummary(),
         cash: this.cash, cashStart: ms.cashStart != null ? ms.cashStart : this.cash, net: this.cash - (ms.cashStart != null ? ms.cashStart : this.cash),
-        rep: this.rep, repCap: this.repCap(), repTier: this.repTierId(), repClean, repTierUp, repPerks, repDelta: this.rep - (ms.repStart != null ? ms.repStart : this.rep), usage: Math.round(this.usage() * 100), left: this.parcels.length };
+        rep: this.rep, repCap: this.repCap(), repTier: this.repTierId(), repClean, repTierUp, repPerks, repDelta: this.rep - (ms.repStart != null ? ms.repStart : this.rep), usage: Math.round(this.usage() * 100), left: this.parcels.length, deals };
       // 단기 금융: 지난달 차입 상환(원금+이자) → 그래도 음수면 새로 차입해 0으로 맞춤
       const loan = { interest: 0, repaid: 0, borrowed: 0, debt: 0 };
       if (this.debt > 0) { loan.interest = Math.ceil(this.debt * D.LOAN.interest); loan.repaid = this.debt; this.cash -= this.debt + loan.interest; this.run.spent += loan.interest; this.stats.interestPaid += loan.interest; this.debt = 0; }
@@ -2056,7 +2158,8 @@
         items.push({ kind: 'fac', fac: f, price: facPrice(f), name: D.FACILITIES[f].name, sold: false });
       } else if (!nextExpand) items.push({ kind: 'fac', fac: null, price: 0, name: T('market.facSoldOut'), sold: true });
       if (Object.keys(vehW).length && this.rng.next() < 0.5) { const f = this.rng.weighted(vehW); items.push({ kind: 'fac', fac: f, price: Math.round(D.FACILITIES[f].price * mult * R.facilityPriceMult), name: D.FACILITIES[f].name, sold: false }); }
-      if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3 + this.repTier * 0.12) { const cands = this.openCustomers(); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: T('market.newCustomer', { name: M.CUSTOMERS[k].name }), sold: false }); } }
+      if (this.bizMode()) items.push(...this._dealOfferItems());
+      else if (this.customerCount() < M.CUSTOMER_SLOTS && this.rng.next() < 0.3 + this.repTier * 0.12) { const cands = this.openCustomers(); if (cands.length) { const k = this.rng.pick(cands); items.push({ kind: 'customer', customer: k, price: Math.round(150 * mult), name: T('market.newCustomer', { name: M.CUSTOMERS[k].name }), sold: false }); } }
       if (this.rng.next() < 0.6) { const k = this.rng.pick(Object.keys(M.INS_ITEMS)); items.push({ kind: 'item', item: k, price: Math.round(M.INS_ITEMS[k].price * mult), name: M.INS_ITEMS[k].name, sold: false }); }
       return items.filter(it => this._marketAllowed(it));
     }
@@ -2125,6 +2228,7 @@
       if (this.phase !== 'market') return { ok: false, msg: T('err.notMarket') };
       const R = this.rules, it = this.market.items[itemIdx];
       if (!it || it.sold) return { ok: false, msg: T('err.sold') };
+      if (it.kind === 'deal') { const r = this.signDeal(it.customer, it.cycles, it.renew); if (!r.ok) return { ok: false, msg: T('err.deal.' + r.reason, { n: M.CUSTOMER_SLOTS }) }; it.sold = true; return { ok: true, deal: true }; }   // 서명은 공짜, 구매 한도와 무관
       if (R.marketMaxBuy && it.kind !== 'refill' && this.market.bought >= R.marketMaxBuy) return { ok: false, msg: T('err.marketMax', { n: R.marketMaxBuy }) };
       let price = it.price;
       if (it.kind === 'contract') {
@@ -2242,6 +2346,7 @@
       if (g.monthStats) for (const k of ['returned', 'stolen', 'broken']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
       if (g.monthStats) { if (g.monthStats.missionEarned == null) g.monthStats.missionEarned = g.monthStats.revenue || 0; if (g.monthStats.missionRank == null) g.monthStats.missionRank = 0; if (g.monthStats.missionBonus == null) g.monthStats.missionBonus = 0; if (!g.monthStats.missionTarget) g.monthStats.missionTarget = g._missionTarget(g.schedule); }
       if (!g.pendingRevenue) g.pendingRevenue = []; if (g.feesDue == null) g.feesDue = 0; if (g.debt == null) g.debt = 0; if (g.totalTurn == null) g.totalTurn = (g.month - 1) * D.TURNS_PER_MONTH + g.turn;
+      if (!g.deals) g.deals = []; if (!g.relations) g.relations = {};
       if (!g.customers) { g._initCustomers(); for (const p of g.parcels) if (!p.customer) p.customer = 'anon'; }
       for (const id in g.customers) { const c = g.customers[id]; if (!c.total) c.total = { delivered: 0, revenue: 0, claims: 0, discarded: 0 }; if (!c.month) c.month = g._emptyCustMonth(); }
       if (g.monthStats && g.monthStats.claims == null) g.monthStats.claims = 0;

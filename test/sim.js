@@ -88,6 +88,7 @@ function marketBot(g) {
   const perTurn = parcels / (g.turns() || D.TURNS_PER_MONTH) * 1.7;
   while (g.warehouse.cap < perTurn * 5) { const i = idx(it => it.kind === 'fac' && it.fac && /^expand/.test(it.fac) && can(it.price)); if (i < 0 || !g.buy(i, null).ok) break; }
   // 4) 새 고객: 자리가 남고 자금이 넉넉하면 데려온다 (평판 등급이 열어 준 고객)
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'deal') g.buy(i, null); });   // 기업 계약 제안서: 서명은 공짜 — 받을 수 있으면 받는다
   items.forEach((it, i) => { if (!it.sold && it.kind === 'customer' && g.cash - it.price > reserve + 300 && (!g.rules.marketMaxBuy || (g.market.bought || 0) < g.rules.marketMaxBuy)) g.buy(i, null); });
   // 5) 여유 자금: 시설 → 업그레이드 → 강화
   items.forEach((it, i) => { if (!it.sold && it.kind === 'fac' && it.fac && g.cash - it.price > reserve + 200 && (!g.rules.marketMaxBuy || (g.market.bought || 0) < g.rules.marketMaxBuy)) g.buy(i, null); });
