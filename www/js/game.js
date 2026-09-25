@@ -832,10 +832,11 @@
       if (p.used) return { ok: false, reason: 'used' };
       if (this.cash < p.cost) return { ok: false, reason: 'cash', cost: p.cost };
       this.cash -= p.cost;
+      const roll = this._campaignRoll(p.id);   // 눈금을 쓰기 전에 굴린다 — 미리보기와 같은 '몇 번째' 씨앗
       this.campaignCycle = this.month;
       if (!this.mediaRuns || this.mediaRuns.m !== this.month) this.mediaRuns = { m: this.month, used: {} };
       this.mediaRuns.used[p.id] = (this.mediaRuns.used[p.id] || 0) + 1;
-      const n = this._injectGrowthDemand(this.schedule, p.parcels, this.turn, this.month, this.turn + p.days, D.AD_MEDIA[p.id].mix);
+      let n = 0; for (const x of roll) for (const sp of x.specs) { this.schedule[x.slot].push(sp); n++; }
       const rg = D.AD_MEDIA[p.id].rep || 0; if (rg) this.addRep(rg, MSG('why.repAd'));
       this.say('log.campaign', { n, days: p.days, cost: p.cost });
       this.emit('campaign', { n, days: p.days, cost: p.cost, media: p.id });
@@ -1236,14 +1237,24 @@
       if (!slots.length || !count) return [];
       return slots.map((slot, k) => ({ slot, day: slot - this.turn + 1, n: Math.floor(count / slots.length) + (k < count % slots.length ? 1 : 0) })).filter(x => x.n > 0);
     }
-    campaignSpread(id) { const p = this.campaignPlan(id); return this._spreadSlots(p.parcels, this.turn, this.turn + p.days, this.schedule.length); }
-    _injectGrowthDemand(sched, count, start, m, end, mix) {
-      if (!count || !sched.length) return 0;
-      const ratio = { ...this._typeRatio(m) }, cw = this._customerWeightsFor(m);
-      for (const t in mix || {}) if (ratio[t]) ratio[t] *= mix[t];   // 매체 성격 — 닫힌 종류(0)는 곱해도 0
-      const spread = this._spreadSlots(count, start, end, sched.length);
-      let n = 0; for (const s of spread) for (let i = 0; i < s.n; i++) { sched[s.slot].push(this._genParcelSpec(ratio, m, cw)); n++; }
-      return n;
+    // 이번 집행으로 들어올 택배를 **미리 정해** 둔다 — 캠페인마다 자기 씨앗(판 씨앗·사이클·매체·몇 번째)을 쓰므로
+    // 미리보기와 실제 집행이 같은 짐을 만들고, 본 난수 흐름은 건드리지 않는다. 반환: [{ slot, day(1=내일), specs }]
+    _campaignRoll(id) {
+      const p = this.campaignPlan(id), run = p.runs - p.left;
+      const spread = this._spreadSlots(p.parcels, this.turn, this.turn + p.days, this.schedule.length);
+      let h = 0; for (const ch of String(id)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+      const seed = (this.seed ^ Math.imul(this.month + 1, 2654435761) ^ Math.imul(run + 1, 40503) ^ h) >>> 0;
+      const saved = this.rng; this.rng = new Rng(seed);
+      try {
+        const ratio = { ...this._typeRatio(this.month) }, cw = this._customerWeightsFor(this.month), mix = D.AD_MEDIA[p.id].mix || {};
+        for (const t in mix) if (ratio[t]) ratio[t] *= mix[t];   // 매체 성격 — 닫힌 종류(0)는 곱해도 0
+        return spread.map(x => ({ slot: x.slot, day: x.day, specs: Array.from({ length: x.n }, () => this._genParcelSpec(ratio, this.month, cw)) }));
+      } finally { this.rng = saved; }
+    }
+    _specCells(s) { const R = this.rules; let sz = s.size + R.sizeDelta; if (s.size >= 4) sz += R.bigSizeDelta + R.storeBigDelta; return Math.max(1, sz); }
+    // 지금 집행하면 그날 입고가 몇 칸에서 몇 칸이 되나 — 예보 줄과 같은 날짜로
+    campaignPreview(id) {
+      return this._campaignRoll(id).map(x => { const before = (this.schedule[x.slot] || []).reduce((a, s) => a + this._specCells(s), 0); return { day: x.day, n: x.specs.length, before, after: before + x.specs.reduce((a, s) => a + this._specCells(s), 0) }; });
     }
     _makeSchedule(m) {
       const R = this.rules, turns = this.turns(m);

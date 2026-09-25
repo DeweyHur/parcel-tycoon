@@ -1999,9 +1999,10 @@
     const A = D.AD_MEDIA[id], more = Object.keys(A.mix || {}).filter(t => A.mix[t] > 1 && D.PARCEL_TYPES[t]);
     const dots = more.length ? `<span class="takes">${more.map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('')}</span>↑` : '';
     // 지금 집행하면 어느 날 몇 건 — 위의 내일·모레 줄과 같은 말로 (플레이 중에만. 마켓에선 며칠에 걸치는지만)
-    const sp = game && game.phase === 'play' && game.media && game.media[id] ? game.campaignSpread(id) : null;
+    const sp = game && game.phase === 'play' && game.media && game.media[id] ? game.campaignPreview(id) : null;
     const dayName = d => d === 1 ? T('hud.tomorrow') : d === 2 ? T('hud.dayAfter') : T('media.fx.dayN', { n: d });
-    const when = sp && sp.length ? sp.map(x => `<span>${esc(dayName(x.day))} 📦+${x.n}</span>`).join('') : `<span title="${esc(T('media.fx.parcels'))}">📦+${A.per}</span><span title="${esc(T('media.fx.days'))}">⏱${A.days}${esc(T('media.fx.dayUnit'))}</span>`;
+    // 그날 입고 칸이 얼마에서 얼마로 — 지금 예보를 기준으로
+    const when = sp && sp.length ? sp.map(x => `<span class="fx-day"><b>${esc(dayName(x.day))}</b> ${x.before}→<em>${x.after}</em>${esc(T('media.fx.cells'))}</span>`).join('') : `<span title="${esc(T('media.fx.parcels'))}">📦+${A.per}</span><span title="${esc(T('media.fx.days'))}">⏱${A.days}${esc(T('media.fx.dayUnit'))}</span>`;
     return `<span class="media-fx">${when}${A.rep ? `<span title="${esc(T('media.fx.rep'))}">⭐+${A.rep}</span>` : ''}${dots ? `<span>${dots}</span>` : ''}</span>`;
   }
   // 📣 광고 집행: 가진 매체 중 하나를 골라 집행. 파란 눈금 = 이번 보름 남은 횟수

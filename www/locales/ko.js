@@ -57,6 +57,7 @@
     'media.fx.dayUnit': "일",
     'media.fx.rep': "평판",
     'media.fx.dayN': "{n}일 뒤",
+    'media.fx.cells': "칸",
     'camp.title': '캠페인',
     'camp.button': '📣캠페인',
     'camp.desc': "창고가 빌 때 물량을 끌어온다. 파란 눈금만큼 보름마다 다시 찬다.",

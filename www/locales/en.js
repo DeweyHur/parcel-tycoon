@@ -57,6 +57,7 @@
     'media.fx.dayUnit': "d",
     'media.fx.rep': "Reputation",
     'media.fx.dayN': "in {n}d",
+    'media.fx.cells': " cells",
     'camp.title': "Marketing campaign",
     'camp.button': '📣 Campaign',
     'camp.desc': "Pull in parcels when the warehouse is empty. Blue pips refill every half-month.",
