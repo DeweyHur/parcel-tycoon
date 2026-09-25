@@ -56,12 +56,29 @@ t('광고 집행: 전단지로 시작, 보름에 한 번, 며칠 안에 물량�
   assert.equal(h.campaignPlan().used, true, '세이브를 건너도 이번 보름에 쓴 것이 남는다');
   assert.equal(h.media.flyer, 2, '매체 레벨도 저장된다');
 });
+t('창고 구역: 랙·복층은 따로 떨어진 칸 — 한 택배는 한 구역에 통째로 들어간다', () => {
+  const g = NG(75); g.parcels = []; g.storage = [];
+  g.warehouse.cap = 3 + 8; g.warehouse.rackCap = 8; g.warehouse.mezzCap = 0; g.warehouse.cold = 0; g.warehouse.frozen = 0;   // 바닥 3칸 + 랙 8칸
+  const mk = (id, size, type) => ({ id, type: type || 'normal', size, baseSize: size, attrs: [], deadline: 3, reward: 30, customer: 'anon' });
+  g.parcels = [mk(1, 4, 'large')]; g._assignCold();
+  assert.equal(g.parcels[0].outdoor, true, '남은 칸이 11이어도 4칸짜리는 바닥 3칸에 안 들어가니 밖으로 — 바닥 반·랙 반으로 쪼개지 않는다');
+  g.parcels = [mk(2, 2), mk(3, 2), mk(4, 2), mk(5, 2), mk(6, 1)]; g._assignCold();
+  assert.ok(g.parcels.every(p => !p.outdoor), '작은 짐은 랙에 올라간다');
+  assert.equal(g.parcels.filter(p => p.area === 'rack').length, 4, '크기 2 네 개가 랙 8칸을 채운다');
+  assert.equal(g.parcels.find(p => p.id === 6).area, 'floor');
+  g.warehouse.cap = 2 + 12; g.warehouse.rackCap = 0; g.warehouse.mezzCap = 12;
+  g.parcels = [mk(7, 4, 'large'), mk(8, 7, 'large')]; g._assignCold();
+  assert.equal(g.parcels.find(p => p.id === 7).area, 'mezz', '크기 4 는 복층에');
+  assert.equal(g.parcels.find(p => p.id === 8).outdoor, true, '크기 7 은 복층에 못 올린다');
+});
 t('마켓: 새 광고 매체·매체 강화·성장 투자를 판다', () => {
   const g = NG(74); g.cash = 5000;
   g.phase = 'market'; g.market = { items: g._adAndGrowthItems(1), bought: 0, refreshes: 0, month: g.month };
   const kinds = g.market.items.map(it => it.kind);
   assert.ok(kinds.includes('media') && kinds.includes('mediaUp'), '새 매체와 강화가 있다 — ' + kinds);
-  assert.equal(kinds.filter(k => k === 'growth').length, D.GROWTH_OFFERS, '성장 투자 ' + D.GROWTH_OFFERS + '개');
+  const gs = g.market.items.filter(it => it.kind === 'growth');
+  assert.ok(gs.length >= 1 && gs.length <= D.GROWTH_OFFERS, '성장 투자 1~' + D.GROWTH_OFFERS + '개 — ' + gs.length);
+  assert.ok(gs.every(it => !['warehouse', 'coldchain', 'marketing'].includes(it.growth)), '창고·저온은 시설로 — 성장 투자에 없다');
   const mi = kinds.indexOf('media'), id = g.market.items[mi].media;
   assert.ok(g.buy(mi, null).ok); assert.equal(g.media[id], 1, '산 매체는 Lv1');
   assert.ok(g.buy(kinds.indexOf('mediaUp'), null).ok); assert.equal(g.media.flyer, 2, '강화하면 레벨이 오른다');

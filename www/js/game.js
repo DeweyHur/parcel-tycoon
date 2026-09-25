@@ -225,7 +225,8 @@
     carryState() {
       return {
         cash: this.cash,
-        warehouse: { cap: this.warehouse.cap, cold: this.warehouse.cold, frozen: this.warehouse.frozen, xl: this.warehouse.xl || 0 },
+        warehouse: Object.assign({ cap: this.warehouse.cap, cold: this.warehouse.cold, frozen: this.warehouse.frozen, xl: this.warehouse.xl || 0, rackCap: this.warehouse.rackCap || 0, mezzCap: this.warehouse.mezzCap || 0 },
+          Object.fromEntries(Object.keys(D.FACILITIES).filter(f => this.warehouse[f]).map(f => [f, true]))),   // 산 시설도 넘긴다 — 다음 장에서 랙을 또 팔면 안 된다
         contracts: this.contracts.filter(Boolean).map(c => ({ carrier: c.carrier, grade: c.grade, calls: c.calls, enh: { ...c.enh } })),
         customers: Object.keys(this.customers).map(id => [id, this.customerLevel(id)]),
         trust: { ...this.trust },
@@ -1041,17 +1042,43 @@
     _attrs(p) { return p.attrs || D.PARCEL_TYPES[p.type].attrs; }
     frozenUsed() { return this.parcels.filter(p => this._attrs(p).includes('frozen')).reduce((s, p) => s + this.storeSize(p), 0); }
     // 야외 적재: 플레이어 지정(outdoorPref) 먼저, 그래도 넘치면 덜 급한 것부터 밖으로. 냉장·냉동 구역 택배는 마지막
+    // 창고 구역별 남은 칸: 바닥(= 전체 - 랙 - 복층) · 랙 · 복층
+    areaCaps() { const W = this.warehouse, rack = W.rackCap || 0, mezz = W.mezzCap || 0; return { floor: W.cap - rack - mezz, rack, mezz }; }
+    // 이 묶음이 구역에 다 들어가는가 — 들어가면 { id → 구역 }. 큰 것부터, 받아 주는 구역 중 가장 좁은 곳(랙 → 복층 → 바닥)에 통째로 넣는다
+    _packAreas(list, floorUsed) {
+      const room = this.areaCaps(); room.floor -= floorUsed;
+      const A = D.AREAS, out = new Map();
+      const sorted = list.slice().sort((a, b) => this.storeSize(b) - this.storeSize(a));
+      for (const p of sorted) {
+        const sz = this.storeSize(p), zone = p.inCold || p.inFrozen;   // 냉장·냉동 구역은 바닥에 있다
+        const cand = zone ? ['floor'] : ['rack', 'mezz', 'floor'];
+        const a = cand.find(k => (k === 'floor' || sz <= A[k].maxSize) && room[k] >= sz);
+        if (!a) return null;
+        room[a] -= sz; out.set(p.id, a);
+      }
+      return out;
+    }
+    // 야외 적재: 플레이어 지정(outdoorPref) 먼저, 나머지는 급한 것부터 창고 구역에 통째로 넣어 보고 안 들어가는 것만 밖으로.
+    // 냉장·냉동 구역 택배는 마지막까지 안에 둔다
     _assignOutdoor() {
-      const cap = this.warehouse.cap, pref = this.outdoorPref || [];
-      for (const p of this.parcels) p.outdoor = false;
+      const pref = this.outdoorPref || [];
+      for (const p of this.parcels) { p.outdoor = false; p.area = null; }
       for (const s of this.storage) s.outdoor = false;
-      let inside = this.usedVolume();
-      for (const s of this.storage) if (pref.includes('s' + s.id)) { s.outdoor = true; inside -= this.storageVol(s); }
-      for (const p of this.parcels) if (pref.includes(p.id)) { p.outdoor = true; p.inCold = false; p.inFrozen = false; inside -= this.storeSize(p); }
-      if (inside <= cap) return;
+      let floorUsed = 0;
+      for (const s of this.storage) { if (pref.includes('s' + s.id)) s.outdoor = true; else floorUsed += this.storageVol(s); }
+      const xl = this.parcels.filter(p => p.baseSize >= 7).length;
+      if (xl > this.warehouse.xl) floorUsed += (xl - this.warehouse.xl) * this.rules.xlPenalty;
+      for (const p of this.parcels) if (pref.includes(p.id)) { p.outdoor = true; p.inCold = false; p.inFrozen = false; }
       const zone = p => p.inCold || p.inFrozen;
-      const cands = this.parcels.filter(p => !p.outdoor).sort((a, b) => (zone(a) - zone(b)) || (this._urgencyKey(b) - this._urgencyKey(a)) || (b.id - a.id));
-      for (const p of cands) { if (inside <= cap) break; p.outdoor = true; p.inCold = false; p.inFrozen = false; inside -= this.storeSize(p); }
+      // 안에 둘 순서: 냉장·냉동 구역 먼저, 그다음 급한 것 (예전 '밖으로 뺄 순서'의 거꾸로)
+      const order = this.parcels.filter(p => !p.outdoor).sort((a, b) => (zone(b) - zone(a)) || (this._urgencyKey(a) - this._urgencyKey(b)) || (a.id - b.id));
+      let kept = [], placed = this._packAreas([], floorUsed) || new Map();
+      for (const p of order) {
+        const tryPack = this._packAreas(kept.concat(p), floorUsed);
+        if (tryPack) { kept.push(p); placed = tryPack; }
+        else { p.outdoor = true; p.inCold = false; p.inFrozen = false; }
+      }
+      for (const p of kept) p.area = placed.get(p.id) || 'floor';
     }
     outdoorParcels() { return this.parcels.filter(p => p.outdoor); }
     outdoorVolume() { return this.outdoorParcels().reduce((s, p) => s + this.storeSize(p), 0) + this.storage.filter(s => s.outdoor).reduce((v, s) => v + this.storageVol(s), 0); }
@@ -1875,7 +1902,7 @@
       if (fresh.length) { const id = this.rng.pick(fresh); out.push({ kind: 'media', media: id, price: Math.round(D.AD_MEDIA[id].price * mult), name: T('media.' + id), sold: false }); }
       const up = this.ownedMedia().filter(id => this.media[id] < D.AD_MEDIA[id].max).sort((a, b) => this.media[a] - this.media[b]);
       if (up.length) { const id = up[0], lv = this.media[id]; out.push({ kind: 'mediaUp', media: id, price: Math.round(D.AD_MEDIA[id].upPrice * lv * mult), name: T('media.upName', { name: T('media.' + id), lv: lv + 1 }), sold: false }); }
-      const kinds = ['fleet', 'warehouse', 'automation', 'branding'].concat(this.shows('cold') ? ['coldchain'] : []).filter(k => { const pl = this.growthPlan(k); return pl && pl.cost != null && !pl.locked; });
+      const kinds = ['fleet', 'automation', 'branding'].filter(k => { const pl = this.growthPlan(k); return pl && pl.cost != null && !pl.locked; });
       for (const k of this.rng.shuffle(kinds).slice(0, D.GROWTH_OFFERS)) { const pl = this.growthPlan(k); out.push({ kind: 'growth', growth: k, price: pl.cost, name: T('growth.' + k) + ' Lv.' + (pl.level + 1), sold: false }); }
       return out;
     }
@@ -2083,7 +2110,7 @@
         if (!it.fac) return { ok: false, msg: T('err.soldOut') };
         if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         const f = D.FACILITIES[it.fac];
-        if (f.cap) { this.warehouse.cap += Math.round(f.cap * R.facilityCapMult); this.stats.expansions++; }
+        if (f.cap) { const add = Math.round(f.cap * R.facilityCapMult); this.warehouse.cap += add; if (f.area) this.warehouse[f.area + 'Cap'] = (this.warehouse[f.area + 'Cap'] || 0) + add; this.stats.expansions++; }
         if (f.cold) { this.warehouse.cold += f.cold; if (R.coldCapMax != null) this.warehouse.cold = Math.min(this.warehouse.cold, R.coldCapMax); this.stats.coldUpgrades++; }
         if (f.xl) this.warehouse.xl += f.xl;
         if (f.frozen) { this.warehouse.frozen = (this.warehouse.frozen || 0) + f.frozen; if (R.frozenCapMax != null) this.warehouse.frozen = Math.min(this.warehouse.frozen, R.frozenCapMax); }

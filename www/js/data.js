@@ -69,7 +69,9 @@
       radio: { icon: '📻', price: 160, per: 8,  perUp: 4, cost: 90,  costUp: 25, days: 3, max: 4, upPrice: 130, mix: {} },
       bus:   { icon: '🚌', price: 240, per: 12, perUp: 5, cost: 140, costUp: 35, days: 4, max: 4, upPrice: 180, mix: { large: 3, fragile: 1.5 } },
     },
-    // 성장 투자(차량·창고·자동화·브랜드·저온)는 마켓에서만 판다 — 한 마켓에 이만큼
+    // 창고 구역: 바닥은 아무 크기나, 랙·복층은 올릴 수 있는 크기에 한도가 있다
+    AREAS: { rack: { maxSize: 2 }, mezz: { maxSize: 4 } },
+    // 성장 투자(차량·자동화·브랜드)는 마켓에서만 판다 — 한 마켓에 이만큼. 창고·저온은 시설(확장·냉장 증설)로 일원화
     GROWTH_OFFERS: 2,
 
     // 창고를 채운 뒤 여러 대를 한 번에 빼는 폭발형 출고 보너스.
@@ -269,9 +271,11 @@
       optFrozen:  { price: 220, kind: 'opt', attr: 'frozen', capDelta: -1, maxSizeMax: 4, icon: '❆', tint: 'frozen' },
     },
     FACILITIES: {
-      expand1: { price: 160, upkeep: 15, cap: 8 },
-      expand2: { price: 320, upkeep: 35, cap: 10, requires: 'expand1' },
-      expand3: { price: 640, upkeep: 70, cap: 12, requires: 'expand2' },
+      // 창고 확장 — 땅은 그대로다. 같은 건물 안에 선반 랙을 세우고, 복층을 올리고, 마지막에 옆 칸을 빌려 벽을 튼다.
+      // 랙·복층은 **따로 떨어진 칸**이다: 한 택배는 한 칸에 통째로 들어간다(4칸짜리를 바닥 반·랙 반으로 나눠 두지 않는다). area → D.AREAS
+      expand1: { price: 160, upkeep: 15, cap: 8,  area: 'rack' },                          // 선반 랙 — 작은 짐(크기 2 이하)만
+      expand2: { price: 320, upkeep: 35, cap: 12, area: 'mezz', requires: 'expand1' },     // 복층 — 크기 4 이하
+      expand3: { price: 640, upkeep: 70, cap: 16, requires: 'expand2' },                    // 옆 칸 임대 — 바닥이 넓어진다
       cold1:   { price: 140, upkeep: 15, cold: 4 },
       cold2:   { price: 300, upkeep: 35, cold: 6, requires: 'cold1' },
       yard:    { price: 180, upkeep: 10, xl: 1 },

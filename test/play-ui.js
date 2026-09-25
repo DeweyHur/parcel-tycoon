@@ -54,7 +54,7 @@ const say = m => { console.log(m); log.push(m); };
   check(btns.includes('t-level'), '「시작하기」만 있다 — ' + btns.join(','));
   check(!btns.includes('t-new') && !btns.includes('t-codex'), '자유 런·도감·기록은 없다');
   const sig0 = await page.evaluate(() => PT.scene.buildSig);
-  check(sig0 === '16/0/0/0', '첫 화면 모델에 냉장·냉동이 없다 — ' + sig0);
+  check(sig0 === '16/0/0/0/0/0', '첫 화면 모델에 냉장·냉동이 없다 — ' + sig0);
   await scene('00s-title-scene');
 
   // 컷신이 스스로 치운 자리인지 보려면 '컷신 전'을 알아야 한다 — 탑차 위치·화각·패널 접힘은 튜닝으로 바뀐다
@@ -164,7 +164,7 @@ const say = m => { console.log(m); log.push(m); };
   check(!(await page.$('#parcels .ptile i span')), '서장 상자에는 아이콘이 없다 (속성·고객이 아직 없다)');
   const s0 = await state();
   check(s0.cap === 16, '창고 16칸 — ' + s0.cap);
-  check(s0.sig === '16/0/0/0', '3D 건물이 16칸·냉장0 으로 지어졌다 — ' + s0.sig);
+  check(s0.sig === '16/0/0/0/0/0', '3D 건물이 16칸·냉장0 으로 지어졌다 — ' + s0.sig);
   const waitLabel = await page.$eval('#wait-btn', el => el.textContent.trim().split('\n')[0]);
   check(!/직접/.test(waitLabel), '대기 버튼에 직접 배송이 없다 — "' + waitLabel.slice(0, 20) + '"');
 
@@ -306,7 +306,7 @@ const say = m => { console.log(m); log.push(m); };
   check(ok2, '인수인계(자유 런)가 시작됐다');
   if (!ok2) { console.log('\n에러:', errors.length ? errors.slice(0, 5) : '없음'); await browser.close(); process.exit(1); }
   const st2 = await page.evaluate(() => ({ sig: PT.scene.buildSig, cap: PT.game.warehouse.cap, cold: PT.game.warehouse.cold, rep: !document.getElementById('stress-wrap').hidden, wx: !!document.querySelector('#upcoming .chip.wx') }));
-  check(st2.sig === '24/6/4/0', '3D 건물이 24칸·냉장6·냉동4 로 다시 지어졌다 — ' + st2.sig);
+  check(st2.sig === '24/6/4/0/0/0', '3D 건물이 24칸·냉장6·냉동4 로 다시 지어졌다 — ' + st2.sig);
   check(st2.rep && st2.wx, '자유 런에는 평판·날씨가 다시 보인다');
   await scene('50-freerun-scene');
   await shot('51-freerun');

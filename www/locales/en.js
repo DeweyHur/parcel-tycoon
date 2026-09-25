@@ -1589,16 +1589,16 @@
     },
     "FACILITIES": {
       "expand1": {
-        "name": "Warehouse Expansion I",
-        "desc": "Total capacity +8"
+        "name": "Shelving racks",
+        "desc": "8 rack cells — size 2 or smaller only"
       },
       "expand2": {
-        "name": "Warehouse Expansion II",
-        "desc": "Total capacity +10"
+        "name": "Mezzanine",
+        "desc": "12 mezzanine cells — size 4 or smaller only"
       },
       "expand3": {
-        "name": "Warehouse Expansion III",
-        "desc": "Total capacity +12"
+        "name": "Lease next unit",
+        "desc": "Knock through: +16 floor cells, any size"
       },
       "cold1": {
         "name": "Cold Room Extension",

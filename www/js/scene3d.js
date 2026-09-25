@@ -126,16 +126,21 @@ window.Scene3D = (function () {
       return m;
     }
     // 창고 상태 → 실제 구역·발자국. "칸 수가 늘면 건물이 자란다"를 여기 한 곳에서 정한다
+    // 랙은 바닥 뒤 오른쪽 2×2 칸 위에 선 2단 선반(8칸), 복층은 뒤 왼쪽 6×2 칸 위 데크(12칸). 바닥은 '전체 - 랙 - 복층' 이고 랙이 선 자리는 못 쓴다
     _zonesFor(wh) {
-      const cap = Math.max(1, wh.cap || 1), coldCells = (wh.cold || 0) + (wh.frozen || 0);
-      const mainDepth = Math.max(2, Math.min(MAIN.maxDepth, Math.ceil(cap / MAIN.cells)));
+      const rackCap = wh.rackCap || 0, mezzCap = wh.mezzCap || 0;
+      const cap = Math.max(1, (wh.cap || 1) - rackCap - mezzCap), coldCells = (wh.cold || 0) + (wh.frozen || 0);
+      const reserve = rackCap ? { col: MAIN.cells - 2, rows: 2 } : null;   // 랙 발밑
+      const mainDepth = Math.max(2, Math.min(MAIN.maxDepth, Math.ceil((cap + (reserve ? 4 : 0)) / MAIN.cells)));
       const coldDepth = coldCells > 0 ? Math.max(1, Math.min(COLD.maxDepth, Math.ceil(coldCells / COLD.cells))) : 0;
       const frontZ = ROW_Z + mainDepth * CELL + 0.45;     // 앞벽(셔터) 자리 = 실내의 끝
       const yardZ0 = frontZ + 0.35;                        // 야외 적재는 앞벽 '바깥' 이다 — 지붕도 바닥도 건물 것이 아니다
       const x0 = coldDepth ? COLD.x0 - 0.6 : MAIN.x0 - 0.5;
       const yardX0 = Math.max(-2.4, x0 + 0.3);
       return {
-        MAIN: { x0: MAIN.x0, cells: MAIN.cells, depth: mainDepth, z0: ROW_Z },
+        MAIN: { x0: MAIN.x0, cells: MAIN.cells, depth: mainDepth, z0: ROW_Z, reserve, floorCap: cap },
+        RACK: rackCap ? { x0: MAIN.x0 + (MAIN.cells - 2) * CELL, cells: 2, depth: 2, z0: ROW_Z, tiers: [0.95, 1.85], cap: rackCap } : null,
+        MEZZ: mezzCap ? { x0: MAIN.x0, cells: 6, depth: 2, z0: ROW_Z, y: 1.95, cap: mezzCap } : null,
         COLD: { x0: COLD.x0, cells: COLD.cells, depth: coldDepth, z0: ROW_Z },
         YARD: { x0: yardX0, cells: Math.max(4, Math.floor((DOCK_X - 0.2 - yardX0) / CELL)), depth: YARD.depth, z0: yardZ0 },
         x0, x1: DOCK_X, frontZ, yardZ0,
@@ -144,7 +149,7 @@ window.Scene3D = (function () {
     }
     // 착탈: 창고가 바뀌면 바뀐 모듈만 다시 짓는다. 처음 짓는 게 아니면 위에서 내려앉는다
     _syncBuilding(wh, opts) {
-      const sig = [wh.cap, wh.cold || 0, wh.frozen || 0, ['coldvan', 'padvan', 'bigvan'].filter(k => wh[k]).length].join('/');
+      const sig = [wh.cap, wh.cold || 0, wh.frozen || 0, wh.rackCap || 0, wh.mezzCap || 0, ['coldvan', 'padvan', 'bigvan'].filter(k => wh[k]).length].join('/');
       if (sig === this.buildSig) return false;
       // 런을 처음 그릴 때는 조용히 짓고, 게임 중에 바뀐 것(확장·냉장실·차량)만 내려앉는다
       const first = !this.buildSig || !!(opts && opts.silent);
@@ -160,6 +165,8 @@ window.Scene3D = (function () {
       put('front', this._makeFront(Z), 0.7);
       put('cold', Z.COLD.depth ? this._makeColdRoom(Z) : null, 1.8);
       put('yard', this._makeYardPad(Z), 0.5);
+      put('rack', Z.RACK ? this._makeRack(Z) : null, 1.2);
+      put('mezz', Z.MEZZ ? this._makeMezz(Z) : null, 1.6);
       const vans = ['coldvan', 'padvan', 'bigvan'].filter(k => wh[k]);
       put('van', vans.length ? this._makeVan(Z, vans[0]) : null, 1.4);
       this._syncShopSigns(!first);
@@ -244,6 +251,26 @@ window.Scene3D = (function () {
       return g;
     }
     // 차량 시설을 사면 마당에 그 차가 선다 (냉장 밴 · 완충 밴 · 대형 밴)
+    // 선반 랙: 기둥 넷 + 선반 두 장 (앞이 트여 있어 짐이 보인다)
+    _makeRack(Z) {
+      const g = new THREE.Group(), R = Z.RACK;
+      g.userData.inspect = { kind: 'warehouse' };
+      const w = R.cells * CELL, d = R.depth * CELL, x0 = R.x0, z0 = R.z0;
+      for (const [x, z] of [[x0 + 0.03, z0 + 0.03], [x0 + w - 0.03, z0 + 0.03], [x0 + 0.03, z0 + d - 0.03], [x0 + w - 0.03, z0 + d - 0.03]]) { const p = noShadow(this._box(0.06, 2.75, 0.06, 0x3f6fb0)); p.position.set(x, 1.375, z); g.add(p); }
+      for (const y of R.tiers) { const sh = noShadow(this._box(w, 0.05, d, 0xd0843a)); sh.position.set(x0 + w / 2, y - 0.025, z0 + d / 2); g.add(sh); }
+      return g;
+    }
+    // 복층: 기둥 위 데크 + 앞 난간 + 오른쪽 계단
+    _makeMezz(Z) {
+      const g = new THREE.Group(), M2 = Z.MEZZ;
+      g.userData.inspect = { kind: 'warehouse' };
+      const w = M2.cells * CELL, d = M2.depth * CELL, x0 = M2.x0, z0 = M2.z0, y = M2.y;
+      const deck = noShadow(this._box(w, 0.08, d, 0x8a7a66)); deck.position.set(x0 + w / 2, y - 0.04, z0 + d / 2); g.add(deck);
+      for (const x of [x0 + 0.05, x0 + w / 2, x0 + w - 0.05]) { const p = noShadow(this._box(0.08, y, 0.08, 0x5b5f6b)); p.position.set(x, y / 2, z0 + d - 0.05); g.add(p); }
+      const rail = noShadow(this._box(w, 0.05, 0.04, 0xffd166)); rail.position.set(x0 + w / 2, y + 0.45, z0 + d); g.add(rail);
+      for (let i = 0; i < 5; i++) { const st = noShadow(this._box(0.34, 0.05, 0.16, 0x9a9aa8)); st.position.set(x0 + w + 0.2, (i + 1) * y / 6, z0 + d + 0.35 - i * 0.16); g.add(st); }
+      return g;
+    }
     // ---------- 상호 간판 ----------
     // 서장·1장(인수인계)에는 한 사장의 「한성창고」가 걸려 있고, 가계약서에 도장을 찍으면 내가 지은 이름으로 갈아 단다.
     // 두 군데에 건다: 뒤쪽 지붕 위 입간판(플레이 화면 — 앞면이 벗겨져 있어도 보인다)과
@@ -438,7 +465,11 @@ window.Scene3D = (function () {
       const g = new THREE.Group(); this.tiles = g; this.tileCaps = [cap, cold, frozen, use];
       const n = (k, tot) => use ? `${use[k]}/${tot}` : String(tot);
       const tile = (zone, i, color) => { const x = i % zone.cells, z = Math.floor(i / zone.cells); const m = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 0.08, CELL - 0.08), new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.55 })); m.rotation.x = -Math.PI / 2; m.position.set(zone.x0 + (x + 0.5) * CELL, zone === COLD ? 0.145 : 0.075, zone.z0 + (z + 0.5) * CELL); m.receiveShadow = true; g.add(m); };
-      for (let i = 0; i < Math.min(cap, MAIN.cells * MAIN.depth); i++) tile(MAIN, i, 0xb9b9c6);
+      // 바닥 타일은 '전체 - 랙 - 복층' 만큼, 랙 발밑은 건너뛴다. 랙 선반·복층 데크 위에는 그 구역 칸만큼
+      { let k = 0; for (let i = 0; i < MAIN.cells * MAIN.depth && k < MAIN.floorCap; i++) { const x = i % MAIN.cells, z = Math.floor(i / MAIN.cells); if (MAIN.reserve && z < MAIN.reserve.rows && x >= MAIN.reserve.col) continue; tile(MAIN, i, 0xb9b9c6); k++; } }
+      const upTile = (zone, i, y, color) => { const x = i % zone.cells, z = Math.floor(i / zone.cells) % zone.depth; const m = new THREE.Mesh(new THREE.PlaneGeometry(CELL - 0.1, CELL - 0.1), new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.6 })); m.rotation.x = -Math.PI / 2; m.position.set(zone.x0 + (x + 0.5) * CELL, y + 0.01, zone.z0 + (z + 0.5) * CELL); g.add(m); };
+      if (Z.RACK) for (let i = 0; i < Z.RACK.cap; i++) upTile(Z.RACK, i, Z.RACK.tiers[Math.min(Z.RACK.tiers.length - 1, Math.floor(i / (Z.RACK.cells * Z.RACK.depth)))], 0xf0c890);
+      if (Z.MEZZ) for (let i = 0; i < Math.min(Z.MEZZ.cap, Z.MEZZ.cells * Z.MEZZ.depth); i++) upTile(Z.MEZZ, i, Z.MEZZ.y, 0xc9c0b0);
       for (let i = 0; i < Math.min(cold, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x8fd0dc);
       for (let i = cold; i < Math.min(cold + frozen, COLD.cells * COLD.depth); i++) tile(COLD, i, 0x6c8cff);
       // 냉장/냉동 경계선
@@ -577,15 +608,29 @@ window.Scene3D = (function () {
     }
 
     // ---------- 택배 배치 ----------
-    _pack(parcels, zone) {
-      // 행 단위 패킹, 넘치면 구역 밖으로 계속 쌓임 (창고 초과 시각화)
+    _pack(parcels, zone, y) {
+      // 행 단위 패킹, 넘치면 구역 밖으로 계속 쌓임 (창고 초과 시각화). zone.reserve: 그 줄들의 오른쪽 칸은 랙 발밑이라 건너뛴다
       const out = new Map(); let x = 0, z = 0, rowD = 0;
+      const width = zz => zone.reserve && zz < zone.reserve.rows ? zone.reserve.col : zone.cells;
       for (const p of parcels) {
         const [w, d] = FOOT[p.baseSizeVis];
-        if (x + w > zone.cells) { x = 0; z += rowD; rowD = 0; }
-        out.set(p.id, { cx: zone.x0 + (x + w / 2) * CELL, cz: zone.z0 + (z + d / 2) * CELL, over: z + d > zone.depth });
+        if (x + w > width(z)) { x = 0; z += rowD || 1; rowD = 0; }
+        out.set(p.id, { cx: zone.x0 + (x + w / 2) * CELL, cz: zone.z0 + (z + d / 2) * CELL, y: y || 0, over: z + d > zone.depth });
         x += w; rowD = Math.max(rowD, d);
       }
+      return out;
+    }
+    // 랙: 아래 선반부터 채우고 넘치면 위 선반
+    _packRack(parcels, R) {
+      const out = new Map(); let tier = 0, rest = parcels.slice();
+      while (rest.length && tier < R.tiers.length) {
+        const m = this._pack(rest, R, R.tiers[tier]);
+        const fit = rest.filter(p => !m.get(p.id).over);
+        for (const p of fit) out.set(p.id, m.get(p.id));
+        rest = rest.filter(p => m.get(p.id).over); tier++;
+        if (!fit.length) break;
+      }
+      if (rest.length) { const m = this._pack(rest, R, R.tiers[R.tiers.length - 1]); for (const p of rest) out.set(p.id, m.get(p.id)); }
       return out;
     }
     _visSize(p) { return p.size >= 7 ? 7 : p.size >= 4 ? 4 : p.size >= 2 ? 2 : 1; }
@@ -613,8 +658,10 @@ window.Scene3D = (function () {
       const items = [];
       for (const s of game.storage || []) items.push({ id: 's' + s.id, type: 'storage', size: s.vol, baseSize: s.vol, baseSizeVis: s.vol >= 7 ? 7 : s.vol >= 4 ? 4 : 2, outdoor: s.outdoor, storage: true });
       for (const p of game.parcels) items.push(p);
-      for (const p of items) { if (!p.storage) p.baseSizeVis = this._visSize(p); (p.outdoor ? yard : ((p.inCold || p.inFrozen) ? cold : main)).push(p); }
-      const pos = new Map([...this._pack(cold, this.Z.COLD), ...this._pack(main, this.Z.MAIN), ...this._pack(yard, this.Z.YARD)]);
+      const rack = [], mezz = [];
+      for (const p of items) { if (!p.storage) p.baseSizeVis = this._visSize(p); (p.outdoor ? yard : ((p.inCold || p.inFrozen) ? cold : p.area === 'rack' && this.Z.RACK ? rack : p.area === 'mezz' && this.Z.MEZZ ? mezz : main)).push(p); }
+      const pos = new Map([...this._pack(cold, this.Z.COLD), ...this._pack(main, this.Z.MAIN), ...this._pack(yard, this.Z.YARD),
+        ...(this.Z.RACK ? this._packRack(rack, this.Z.RACK) : []), ...(this.Z.MEZZ ? this._pack(mezz, this.Z.MEZZ, this.Z.MEZZ.y) : [])]);
       // 지금 비가 오거나 예보에 비·눈이 있으면 마당에 나가 있는 것들은 젖는다
       let wetRisk = false;
       try { const w = game.weatherNow && game.weatherNow(); wetRisk = ['rain', 'snow', 'storm'].includes(w) || (game.upcoming && game.upcoming().some(u => ['rain', 'snow', 'storm'].includes(u.weather))); } catch (e) { }
@@ -643,11 +690,11 @@ window.Scene3D = (function () {
           if (!p.storage) { const cu = (window.META && window.META.CUSTOMERS[p.customer || 'anon']); if (cu) b.add(this._iconMark(cu.icon, w, h, d)); }
           this.scene.add(b); this.boxes.set(p.id, b);
           const t = pos.get(p.id);
-          if (opts.animate && t) { b.position.set(t.cx, h / 2 + 4, t.cz); this._tween(b.position, { y: h / 2 }, 0.55, bounce, 0.05 * (this.tweens.length % 6)); }
-          else b.position.set(t.cx, h / 2, t.cz);
+          if (opts.animate && t) { b.position.set(t.cx, t.y + h / 2 + 4, t.cz); this._tween(b.position, { y: t.y + h / 2 }, 0.55, bounce, 0.05 * (this.tweens.length % 6)); }
+          else b.position.set(t.cx, t.y + h / 2, t.cz);
         } else {
           const t = pos.get(p.id);
-          if (t && !b.userData.locked && (Math.abs(b.position.x - t.cx) > 0.01 || Math.abs(b.position.z - t.cz) > 0.01)) this._tween(b.position, { x: t.cx, z: t.cz, y: h / 2 }, 0.35, ease);
+          if (t && !b.userData.locked && (Math.abs(b.position.x - t.cx) > 0.01 || Math.abs(b.position.z - t.cz) > 0.01 || Math.abs(b.position.y - (t.y + h / 2)) > 0.01)) this._tween(b.position, { x: t.cx, z: t.cz, y: t.y + h / 2 }, 0.35, ease);
         }
         // 상태 색상
         const m = b.material;
