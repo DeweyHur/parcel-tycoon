@@ -478,13 +478,18 @@ window.Scene3D = (function () {
       const sign = (iconKey, label, accent, x, z, y) => {
         const t = this._signTexture(iconKey, label, accent);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t.tex, transparent: true, depthTest: false }));
-        sp.scale.set(t.vw * SIGN.unit, t.vh * SIGN.unit, 1); sp.position.set(x, y || 0.9, z); g.add(sp);
+        sp.scale.set(t.vw * SIGN.unit, t.vh * SIGN.unit, 1); sp.position.set(x, y || 0.9, z); g.add(sp); return sp;
       };
       const A = window.DATA.ATTRS, OUT = window.I18n ? window.I18n.t('hud.outdoorLabel') : '';
       // 창고·냉장 간판은 앞자락에 낮게 — 뒤쪽 높은 자리는 HUD 상자가 덮는다(폰에서 3D 가 200px 안팎일 때)
       sign('box', `${window.I18n ? window.I18n.t('common.warehouse') : ''} ${n('main', cap)}`.trim(), '#e8c46a', MAIN.x0 + MAIN.cells * CELL * 0.5, MAIN.z0 + MAIN.depth * CELL - 0.2, 0.62);
-      if (cold > 0) sign('cold', `${A.cold.name} ${n('cold', cold)}`, '#5ee0d8', COLD.x0 + 0.9, COLD.z0 + COLD.depth * CELL - 0.2, 0.62);
-      if (frozen > 0) { const i = Math.min(cold, COLD.cells * COLD.depth - 1); sign('frozen', `${A.frozen.name} ${n('frozen', frozen)}`, '#9ad7ff', COLD.x0 + (i % COLD.cells + 0.5) * CELL + 0.4, COLD.z0 + (Math.floor(i / COLD.cells) + 0.5) * CELL); }
+      // 냉동 간판은 냉장 간판 바로 위에 한 칸 띄워 쌓는다 — 냉동 칸 자리에 따로 세우면 화면 비율에 따라 둘이 겹쳤다
+      const coldSp = cold > 0 ? sign('cold', `${A.cold.name} ${n('cold', cold)}`, '#5ee0d8', COLD.x0 + 0.9, COLD.z0 + COLD.depth * CELL - 0.2, 0.62) : null;
+      if (frozen > 0) {
+        const fx = COLD.x0 + 0.9, fz = COLD.z0 + COLD.depth * CELL - 0.2;
+        const fs = sign('frozen', `${A.frozen.name} ${n('frozen', frozen)}`, '#9ad7ff', fx, fz, 0.62);
+        if (coldSp) { fs.position.y = 0.62 + (coldSp.scale.y + fs.scale.y) / 2 + 0.08; fs.position.x = fx + 0.35; }
+      }
       sign('rain', use && use.yard ? `${OUT} ${use.yard}` : OUT, '#c9a06c', YARD.x0 + 0.9, YARD.z0 + YARD.depth * CELL - 0.15, 0.62);   // 마당 앞자락, 낮게 — 건물 벽에 걸쳐 뜨면 안이 뚫려 보인다
       g.visible = !this.closed;   // 완성 건물(오프닝)일 때는 바닥 표시가 벽을 뚫고 보이면 안 된다
       this.scene.add(g);

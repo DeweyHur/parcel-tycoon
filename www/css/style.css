@@ -168,6 +168,7 @@ body.no-game { background: #141210; } body.no-game #app { visibility: hidden; } 
 .modal { background: var(--panel); border: 4px solid var(--line); box-shadow: 6px 6px 0 var(--shadow); width: 100%; max-width: 440px; max-height: 100%; display: flex; flex-direction: column; }
 .modal h2 { margin: 0; padding: 8px 12px; font-size: 16px; background: var(--line); color: var(--gold); display: flex; justify-content: space-between; align-items: center; }
 .modal h2 small { color: var(--dim); font-size: 11px; font-weight: 400; }
+.modal h2 small .mk-cash { color: var(--gold); font-size: 18px; }
 .modal .body { padding: 10px 12px; overflow-y: auto; font-size: 13px; line-height: 1.45; -webkit-overflow-scrolling: touch; }
 .modal .foot { padding: 8px 12px; border-top: 3px solid var(--line); display: flex; gap: 6px; }
 .modal .foot .btn { flex: 1; text-align: center; }
@@ -561,7 +562,10 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 
 #panel { border-top-width: 3px; }
 .bars { padding: 5px 8px 1px; }
-#upcoming { flex-wrap: nowrap; overflow-x: auto; min-height: 29px; scrollbar-width: none; }
+#upcoming { flex-wrap: wrap; overflow-x: hidden; min-height: 29px; scrollbar-width: none; }
+/* 야외 적재·보험 칩은 다음 줄로 — 한 줄에 끼면 내일·모레 칩이 짜부라져 상자가 세로로 쏟아졌다 */
+#upcoming > .chip:not(.up):not(.wx):not(.none) { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#upcoming .chip.up .boxes { max-height: 22px; overflow: hidden; }
 #upcoming::-webkit-scrollbar, #contract-strip::-webkit-scrollbar { display: none; }
 #parcels { padding-top: 4px; }
 .parcel { min-height: 31px; }
