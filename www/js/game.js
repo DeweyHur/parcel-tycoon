@@ -36,7 +36,7 @@
     months: 3, scoreMult: 1, calendar: 'kr', monthOffset: 0,
     cashDelta: 0, cashMult: 1, opCostFixed: null, opCostDelta: 0, opCostRandom: null, lateOpCost: null,
     firstCallBonus: 0, freshExtra: 0, coldTrustBonus: 0, rewardMult: {}, rewardDelta: {}, rewardAll: 0, revenueMult: 1, bonusDelta: 0,
-    banCarriers: [], marketWeight: {}, bigSizeDelta: 0, sizeDelta: 0, storeBigDelta: 0, carrierCapDelta: {}, coldCapMax: null, callsDelta: 0, startCallsDelta: 0,
+    banCarriers: [], marketWeight: {}, bigSizeDelta: 0, sizeDelta: 0, storeBigDelta: 0, carrierCapDelta: {}, coldCapMax: null, callsDelta: 0, startCallsDelta: 0, callsMult: D.CALLS_SCALE || 1,
     facilityCapMult: 1, carrierStartTrust: {}, gradeShift: 0, deadlineDelta: {}, deadlineAll: 0, bigCallPenalty: null,
     priceMult: 1, contractPriceMult: 1, itemPriceMult: 1, facilityPriceMult: 1, waitStack: 0, skipBonus: 0,
     randomStart: false, freeRefresh: 0, marketContractSlots: 2, erosion: false, stressRelief: null, keepCalls: 0, marketMaxBuy: D.MARKET_MAX_BUY, expertFrom: 1,
@@ -693,7 +693,7 @@
     _makeContract(carrier, grade, calls, isStart) {
       carrier = this.resolveCenter(carrier, grade);
       const c = D.CARRIERS[carrier], R = this.rules; grade = c.grade;
-      const maxCalls = Math.max(1, c.trucks + R.callsDelta + (isStart ? R.startCallsDelta : 0) + (this.trustPerk(carrier, 'trucks') || 0) + ((this.growth && this.growth.fleet) || 0) * D.GROWTH.fleet.calls);
+      const maxCalls = Math.max(1, Math.round(c.trucks * (R.callsMult || 1)) + R.callsDelta + (isStart ? R.startCallsDelta : 0) + (this.trustPerk(carrier, 'trucks') || 0) + ((this.growth && this.growth.fleet) || 0) * D.GROWTH.fleet.calls);
       return { id: this.nextId++, carrier, grade, maxCalls, calls: calls == null ? maxCalls : calls,
         enh: { limit: 0, cap: 0, regular: false, express: false, opt: null, capDelta: 0 }, successCalls: 0, totalCalls: 0, delivered: 0 };
     }

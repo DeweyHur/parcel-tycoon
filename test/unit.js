@@ -14,7 +14,7 @@ const slot = (g, fam) => g.contracts.findIndex(c => c && D.familyOf(c.carrier) =
 const withAll = fn => () => { const keep = D.DISABLED_FEATURES; D.DISABLED_FEATURES = []; try { fn(); } finally { D.DISABLED_FEATURES = keep; } };
 t('시작 상태: 자금 450, 계약 3개(대량·냉장·프래자일), 준비 없이 play', () => { const g = NG(1); assert.equal(g.cash, 450); assert.equal(g.contracts.filter(Boolean).length, 3); assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk0', 'cold0', 'fragile0']); assert.equal(g.phase, 'play'); assert.equal(g.month, 1); });
 t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.storeBigDelta, -1); assert.equal(g.rules.bigSizeDelta, 0); assert.equal(g.rules.sizeDelta, 0); });
-t('초기 입고: 첫 보름 18~28개(ARRIVALS_SCALE 1.0), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.ok(sp.length >= 18 && sp.length <= 28, `initial arrivals ${sp.length}`); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
+t('초기 입고: 첫 보름 28~40개(ARRIVALS_SCALE 2.0), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.ok(sp.length >= 28 && sp.length <= 40, `initial arrivals ${sp.length}`); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
 t('실시간 성장 투자: 홍보는 캠페인 크기, 트럭은 배차, 창고는 공간을 즉시 늘린다', () => {
   const g = NG(71); g.cash = 3000;
   const future0 = g.schedule.slice(g.turn).flat().length;
@@ -194,7 +194,7 @@ t('신뢰도: 기한보다 일찍 보낼수록 오른다 — 들어오자마자 
 });
 t('센터: 상위 tier 센터 = 다른 센터와 신규 계약 (배차 +2·용량 +1·배차비 -10%, 신뢰도는 센터별 새로 시작), 복합 능력', () => {
   const g = EMPTY(3); const c = g._makeContract('bulk', 'trusted'); g.contracts[3] = c;
-  assert.equal(c.carrier, 'bulk1'); assert.equal(c.grade, 'trusted'); assert.equal(g.trustLevel('bulk1'), 0); assert.equal(c.maxCalls, 7 + 2); assert.equal(g.vehicleCap(c), 6 + 1 + 1); assert.equal(g.truckFee(c), Math.round(D.FAMILIES.bulk.fee * 0.9));
+  assert.equal(c.carrier, 'bulk1'); assert.equal(c.grade, 'trusted'); assert.equal(g.trustLevel('bulk1'), 0); assert.equal(c.maxCalls, Math.round((7 + 2) * D.CALLS_SCALE)); assert.equal(g.vehicleCap(c), 6 + 1 + 1); assert.equal(g.truckFee(c), Math.round(D.FAMILIES.bulk.fee * 0.9));
   assert.equal(D.CARRIERS.bulk1.name, '빠른손 익스프레스'); assert.equal(D.GRADES.trusted.name, '프리미엄');
   const e = g._makeContract('bulk2'); assert.ok(g.contractCaps(e).includes('fragile')); assert.ok(!('express' in D.ENHANCEMENTS), '동시 배차 강화 없음');
   assert.ok(g.contractCaps(g._makeContract('cold2')).includes('frozen')); assert.equal(D.CARRIERS.rail1.delay, 0);

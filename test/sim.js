@@ -58,9 +58,9 @@ function marketBot(g) {
   // 창고가 턴당 입고를 못 받으면 확장. 남는 돈은 시설·강화. 예비금 100c.
   const items = g.market.items, reserve = 100;
   const fc = g.customerForecast(); const parcels = fc.reduce((s, f) => s + (f.min + f.max) / 2, 0);
-  const needVol = parcels * 1.7 * 1.15;
+  const needVol = parcels * 1.7 * 1.3;
   const capVol = () => g.contracts.filter(Boolean).reduce((s, c) => s + c.maxCalls * g.vehicleCap(c), 0);
-  const can = price => g.cash - price >= reserve && g.market.bought < g.rules.marketMaxBuy;
+  const can = price => g.cash - price >= reserve && (!g.rules.marketMaxBuy || (g.market.bought || 0) < g.rules.marketMaxBuy);
   const canR = price => g.cash - price >= reserve;
   const bySlotDelivered = () => { let slot = -1, max = -1; g.contracts.forEach((c, s) => { if (c && c.delivered > max) { max = c.delivered; slot = s; } }); return slot; };
   const idx = pred => items.findIndex(it => !it.sold && pred(it));
@@ -86,13 +86,13 @@ function marketBot(g) {
   }
   // 3) 창고: 턴당 입고(2턴치)를 못 받으면 확장
   const perTurn = parcels / (g.turns() || D.TURNS_PER_MONTH) * 1.7;
-  while (g.warehouse.cap < perTurn * 3) { const i = idx(it => it.kind === 'fac' && it.fac && /^expand/.test(it.fac) && can(it.price)); if (i < 0 || !g.buy(i, null).ok) break; }
+  while (g.warehouse.cap < perTurn * 5) { const i = idx(it => it.kind === 'fac' && it.fac && /^expand/.test(it.fac) && can(it.price)); if (i < 0 || !g.buy(i, null).ok) break; }
   // 4) 새 고객: 자리가 남고 자금이 넉넉하면 데려온다 (평판 등급이 열어 준 고객)
-  items.forEach((it, i) => { if (!it.sold && it.kind === 'customer' && g.cash - it.price > reserve + 300 && g.market.bought < g.rules.marketMaxBuy) g.buy(i, null); });
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'customer' && g.cash - it.price > reserve + 300 && (!g.rules.marketMaxBuy || (g.market.bought || 0) < g.rules.marketMaxBuy)) g.buy(i, null); });
   // 5) 여유 자금: 시설 → 업그레이드 → 강화
-  items.forEach((it, i) => { if (!it.sold && it.kind === 'fac' && it.fac && g.cash - it.price > reserve + 200 && g.market.bought < g.rules.marketMaxBuy) g.buy(i, null); });
-  items.forEach((it, i) => { if (!it.sold && it.kind === 'contract' && it.switchFrom && g.cash - g.contractPrice(it) > reserve + 250 && g.market.bought < g.rules.marketMaxBuy) { const s = g.contracts.findIndex(c => c && c.id === it.switchFrom); if (s >= 0) g.buy(i, s); } });
-  items.forEach((it, i) => { if (!it.sold && it.kind === 'enh' && g.cash - it.price > reserve + 300 && g.market.bought < g.rules.marketMaxBuy) { const s = bySlotDelivered(); if (s >= 0) g.buy(i, s); } });
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'fac' && it.fac && g.cash - it.price > reserve + 200 && (!g.rules.marketMaxBuy || (g.market.bought || 0) < g.rules.marketMaxBuy)) g.buy(i, null); });
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'contract' && it.switchFrom && g.cash - g.contractPrice(it) > reserve + 250 && (!g.rules.marketMaxBuy || (g.market.bought || 0) < g.rules.marketMaxBuy)) { const s = g.contracts.findIndex(c => c && c.id === it.switchFrom); if (s >= 0) g.buy(i, s); } });
+  items.forEach((it, i) => { if (!it.sold && it.kind === 'enh' && g.cash - it.price > reserve + 300 && (!g.rules.marketMaxBuy || (g.market.bought || 0) < g.rules.marketMaxBuy)) { const s = bySlotDelivered(); if (s >= 0) g.buy(i, s); } });
   // 돈이 넉넉하면 남은 계약도 충전해 둔다
   items.forEach((it, i) => { if (!it.sold && it.kind === 'refill' && g.cash - it.price > reserve + 400) g.buy(i, null); });
 }

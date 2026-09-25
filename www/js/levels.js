@@ -41,7 +41,7 @@
 
   // 장 공통 보정 — 예전 '수습' 난이도가 하던 일이다. 난이도 선택은 없어졌고(인수인계가 곧 수습이다), 캠페인에만 이 한 겹이 깔린다.
   // 자유 런에는 안 붙는다. noHolidays: 대본은 턴 번호로 짜여 있어 실제 공휴일(3·1절·어린이날…)이 끼면 어긋난다 — 캠페인은 명절 없이 돈다.
-  const BASE_MODS = { arrivalsMult: 0.85, opCostDelta: -20, feeMult: 0.8, itemPriceMult: 0.9, contractPriceMult: 0.9, facilityPriceMult: 0.9, theftMult: 0.5, breakMult: 0.5, claimMult: 0.5, upcomingTurns: 3, gameoverStress: 24, scoreMult: 0.7, noDualAttrs: true, noHolidays: true };
+  const BASE_MODS = { callsMult: 1, arrivalsMult: 0.85, opCostDelta: -20, feeMult: 0.8, itemPriceMult: 0.9, contractPriceMult: 0.9, facilityPriceMult: 0.9, theftMult: 0.5, breakMult: 0.5, claimMult: 0.5, upcomingTurns: 3, gameoverStress: 24, scoreMult: 0.7, noDualAttrs: true, noHolidays: true };
 
   const LEVELS = [
     // ===== 캠페인은 여섯 장 · 장마다 한 사이클(반달) · 전부 합쳐 봄 석 달 =====

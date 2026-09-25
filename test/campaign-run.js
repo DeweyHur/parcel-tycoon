@@ -9,7 +9,7 @@ const LV = require('../www/js/levels.js');
 const fail = [], check = (ok, msg) => { console.log((ok ? '  ok ' : '  FAIL ') + msg); if (!ok) fail.push(msg); };
 
 // 장마다 그 시점에 켜져 있어야 하는 것 = levels.js 의 grants 누적 (표를 두 벌 두지 않는다)
-const expectAt = n => LV.FLAGS.filter(f => LV.showsAt(n).has(f));
+const expectAt = n => LV.FLAGS.filter(f => LV.showsAt(n).has(f) && !(D.DISABLED_FEATURES || []).includes(f));   // 꺼 둔 기능(일요일 선택지 등)은 장이 열어도 안 보인다
 
 function bestCall(g) {
   let best = null;
