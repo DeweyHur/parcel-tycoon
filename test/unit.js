@@ -62,7 +62,12 @@ t('광고 집행: 전단지로 시작, 보름에 한 번, 며칠 안에 물량�
   const win = g.schedule.slice(g.turn, g.turn + plan.days).flat().length;
   assert.ok(win >= plan.parcels, '며칠 안에 몰려 들어온다 — ' + win);
   assert.equal(g.campaignPlan('flyer').left, 1, '한 번 쓰면 눈금 하나가 빈다');
+  // 겹침 반감: 첫 캠페인 물량이 아직 들어오는 동안 또 하면 건수·평판이 반
+  const p2 = g.campaignPlan('flyer'); assert.equal(p2.stack, 1); assert.equal(p2.parcels, Math.round(F.per / 2), '겹치면 건수 반감'); assert.equal(p2.rep, Math.floor(D.AD_MEDIA.flyer.rep / 2), '평판도 반감');
+  const before2 = g.schedule.slice(g.turn).flat().length;
   assert.ok(g.runCampaign('flyer').ok, 'Lv2 는 같은 보름에 한 번 더');
+  assert.equal(g.schedule.slice(g.turn).flat().length, before2 + p2.parcels, '반감된 만큼만 붙는다');
+  { const k = g.turn; g.turn += D.AD_MEDIA.flyer.days + 1; assert.equal(g.campaignStack(), 0, '끝난 캠페인은 겹침으로 안 센다'); g.turn = k; }
   assert.equal(g.runCampaign('flyer').ok, false, '눈금을 다 쓰면 그 보름엔 끝');
   const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
   assert.equal(h.campaignPlan().used, true, '세이브를 건너도 이번 보름에 쓴 것이 남는다');

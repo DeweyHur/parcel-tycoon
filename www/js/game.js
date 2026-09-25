@@ -836,12 +836,18 @@
     mediaScore() { return Math.max(0, Object.values(this.media || {}).reduce((a, b) => a + b, 0) - 1); }
     ownedMedia() { return Object.keys(D.AD_MEDIA).filter(id => (this.media || {})[id] > 0); }
     // 캠페인(광고 집행) 계획. id 를 안 주면 가진 매체 중 첫째(전단지) — 스토리·옛 호출과 맞춘다
+    // 겹친 캠페인은 효과가 반감된다 — 아직 끝나지 않은(물량이 들어오는 중인) 캠페인 수만큼 ½ 씩. 끝난 뒤에 다시 하면 온전하다.
+    // 같은 날들에 광고를 몰아 부어 창고를 억지로 채우는 것을 막는다 (비용은 그대로)
+    campaignStack() { return (this.campaignRuns || []).filter(r => r.m === this.month && r.end > this.turn).length; }
+    campaignMult() { return Math.pow(0.5, this.campaignStack()); }
     campaignPlan(id) {
       id = id || this.ownedMedia()[0] || 'flyer';
       const mp = this.mediaPlan(id) || this.mediaPlan('flyer');
       const used = mp.left <= 0;
       const open = this.shows('invest') && this.campaignOpen() && mp.owned;
-      return { id: mp.id, level: open ? mp.level : 0, parcels: mp.parcels, days: mp.days, cost: mp.cost, runs: mp.runs, left: mp.left, used, ready: open && !used };
+      const mult = this.campaignMult(), A = D.AD_MEDIA[mp.id] || {};
+      return { id: mp.id, level: open ? mp.level : 0, parcels: Math.max(1, Math.round(mp.parcels * mult)), rep: Math.floor((A.rep || 0) * mult), mult, stack: this.campaignStack(),
+        days: mp.days, cost: mp.cost, runs: mp.runs, left: mp.left, used, ready: open && !used };
     }
     // 스토리 캠페인에서는 '창고가 빈 날 이틀'을 겪고 박 반장이 소개한 뒤에 열린다. 자유 런·안내 끔이면 처음부터
     campaignOpen() { return !this.level || !this.story || this.story.off || (this.story.seen || []).includes('l3invest'); }
@@ -856,7 +862,9 @@
       if (!this.mediaRuns || this.mediaRuns.m !== this.month) this.mediaRuns = { m: this.month, used: {} };
       this.mediaRuns.used[p.id] = (this.mediaRuns.used[p.id] || 0) + 1;
       let n = 0; for (const x of roll) for (const sp of x.specs) { this.schedule[x.slot].push(sp); n++; }
-      const rg = D.AD_MEDIA[p.id].rep || 0; if (rg) this.addRep(rg, MSG('why.repAd'));
+      this.campaignRuns = (this.campaignRuns || []).filter(r => r.m === this.month && r.end > this.turn);
+      this.campaignRuns.push({ m: this.month, end: this.turn + p.days, media: p.id });
+      const rg = p.rep; if (rg) this.addRep(rg, MSG('why.repAd'));
       this.say('log.campaign', { n, days: p.days, cost: p.cost });
       this.emit('campaign', { n, days: p.days, cost: p.cost, media: p.id });
       return { ok: true, n, days: p.days, cost: p.cost, media: p.id };

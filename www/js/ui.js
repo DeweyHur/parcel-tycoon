@@ -605,6 +605,10 @@
     // 재고는 늘 펼쳐져 있다 — 상자 격자가 곧 창고이고, 차를 부르면 그대로 고르는 판이 된다
     const pk = ensurePick();
     $('#invest-btn').hidden = !(g.shows('invest') && g.campaignOpen());   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다
+    // 돌고 있는 캠페인은 버튼에 매체 아이콘 + 남은 날(물량이 아직 들어오는 날 수)로 — 📰2 📻3
+    { const act = (g.campaignRuns || []).filter(r => r.m === g.month && r.end > g.turn), ib = $('#invest-btn');
+      ib.classList.toggle('active', act.length > 0);
+      ib.innerHTML = `${esc(T('camp.button'))}${act.length ? `<small class="camp-act">${act.map(r => `<span title="${esc(T('camp.activeTip', { name: T('media.' + r.media), n: r.end - g.turn }))}">${(D.AD_MEDIA[r.media] || {}).icon || '📣'}${r.end - g.turn}${esc(T('media.fx.dayUnit'))}</span>`).join(' ')}</small>` : ''}`; }
     $('#app').classList.toggle('calling', !!pk);
     updateMusic();
     $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { y: g.yearOf(), cal: g.calMonth(), n: g.month })}`;
@@ -2030,8 +2034,12 @@
         const r = roll.find(x => x.day === d);
         const u = { turn: slot + 1, specs: g.schedule[slot] || [], weather: g.weatherAt ? g.weatherAt(slot + 1) : null, heat: g.weatherAt && g.weatherAt(slot + 1) === 'heat', off: g.isOffTurn && g.isOffTurn(slot + 1) };
         return dayChip(g, u, dayName(d), r ? r.specs : []); }).join('')}</span>`; })() : '';
-    const when = chips ? '' : `<span title="${esc(T('media.fx.parcels'))}">📦+${A.per}</span><span title="${esc(T('media.fx.days'))}">⏱${A.days}${esc(T('media.fx.dayUnit'))}</span>`;
-    return `${chips}<span class="media-fx">${when}${A.rep ? `<span title="${esc(T('media.fx.rep'))}">⭐+${A.rep}</span>` : ''}${dots ? `<span>${dots}</span>` : ''}</span>`;
+    // 이미 돌고 있는 캠페인과 겹치면 효과 반감 — 📦·⭐ 에 반영하고 「겹침 ½」 딱지
+    const cp = g && g.phase === 'play' ? g.campaignPlan(id) : null, half = cp && cp.stack > 0;
+    const per = cp ? cp.parcels : A.per, rep = cp ? cp.rep : (A.rep || 0);
+    const when = chips ? '' : `<span title="${esc(T('media.fx.parcels'))}">📦+${per}</span><span title="${esc(T('media.fx.days'))}">⏱${A.days}${esc(T('media.fx.dayUnit'))}</span>`;
+    const stackTag = half ? `<span class="camp-half" title="${esc(T('camp.halfTip'))}">${esc(T('camp.half', { n: cp.stack }))} ×${cp.mult < 0.3 ? '¼' : '½'}</span>` : '';
+    return `${chips}<span class="media-fx">${when}${A.rep ? `<span title="${esc(T('media.fx.rep'))}">⭐+${rep}</span>` : ''}${dots ? `<span>${dots}</span>` : ''}${stackTag}</span>`;
   }
   // 📣 광고 집행: 가진 매체 중 하나를 골라 집행. 파란 눈금 = 이번 보름 남은 횟수
   function showGrowth() {

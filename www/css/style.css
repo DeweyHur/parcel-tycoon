@@ -864,3 +864,8 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .kv .v small { white-space: normal; }
 .card .t .takes { display: inline-flex; gap: 2px; vertical-align: middle; margin-left: 4px; }
 .card .t .takes i { width: 8px; height: 8px; border: 1px solid #0008; }
+
+/* 겹친 캠페인 — 효과 반감 딱지 */
+.camp-half { color: var(--orange); font-size: 10px; border: 1px solid var(--orange); padding: 0 3px; margin-left: 4px; }
+#invest-btn .camp-act { display: block; font-size: 10px; color: var(--ink); line-height: 1.2; }
+#invest-btn.active { border-color: var(--gold); }
