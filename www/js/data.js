@@ -158,7 +158,7 @@
       bulk:    { badge: '🚚', cap: 6,  fee: 64, trucks: 7, price: 60,  caps: [], onlyPlain: true, sizeMin: 1, sizeMax: 2, rep: 'yeo' },
       cold:    { badge: '🚚', cap: 4,  fee: 58, trucks: 4, price: 90, caps: ['cold'], need: ['cold', 'produce'], sizeMin: 1, sizeMax: 4, specialist: ['fresh', 'produce'], rep: 'kang' },
       frozen:  { badge: '🚚', cap: 4,  fee: 80, trucks: 4, price: 100, caps: ['frozen'], need: ['frozen'], sizeMin: 1, sizeMax: 4, specialist: 'frozen', marketOnly: true, rep: 'kang' },
-      fragile: { badge: '🚚', cap: 4,  fee: 69, trucks: 4, price: 90, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile' },
+      fragile: { badge: '🚚', cap: 4,  fee: 69, trucks: 4, price: 90, caps: ['fragile'], need: ['fragile'], sizeMin: 1, sizeMax: 4, specialist: 'fragile', rep: 'ahn' },   // 담당: 안 대리(뽁뽁이 롤) — 살살 택배에서 옮겨 다닌다
       intl:    { badge: '🚚', cap: 8,  fee: 118, trucks: 3, price: 110, caps: ['customs'], need: null, sizeMin: 1, sizeMax: 7, specialist: 'intl', marketOnly: true },
       large:   { badge: '🚚', cap: 8,  fee: 124, trucks: 3, price: 100, caps: ['fragile'], sizeMin: 4, sizeMax: 7, specialist: 'large', marketOnly: true, rep: 'noh' },
       // 항공·철도·해상은 우리가 비행기·배를 부르는 게 아니다 — 창고에서 공항·화물역·항만까지 실어다 주는 **포워더**다.
