@@ -372,6 +372,10 @@
   function unlockText(achId) { const a = M.ACHIEVEMENTS[achId]; if (!a) return '🔒'; let pr = ''; try { if (a.prog) { const P = Profile.get(); const [h, n] = a.prog(P.stats, P); pr = ` (${Math.min(h, n)}/${n})`; } } catch (e) { } return `🔒 ${a.name}: ${a.desc}${pr}`; }
   const TIER_NAMES = () => [T('tier.0'), T('tier.1'), T('tier.2'), T('tier.3')];
   const prep = { scenario: M.DEFAULT_SCENARIO, company: 'local', perks: [], insurer: 'sturdy' };
+  // 한국 달력 런에는 회사를 고르지 않는다 — 한 번에 여는 것이 너무 많다. 기본 판(local)으로 시작하고, 간판은 내 상호다
+  const COMPANY_FREE = { kr: true };
+  const noCompany = () => !!COMPANY_FREE[(M.SCENARIOS[prep.scenario] || {}).country];
+  const prepStep = n => noCompany() ? T('prep.stepOf', { n: n === 3 ? 2 : n, m: 2 }) : T('prep.step' + n);
   // 런 = 나라 달력 × 시작 달 × 길이. 나라별로 묶고, 그 안에서 분기 → 반기 → 한 해 순으로 놓는다.
   function showScenarioSelect() {
     const P = Profile.get(), lock = demoLocked();
@@ -398,7 +402,7 @@
       const head = `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${cal.icon || ''} ${esc(cal.name || T('cal.' + cc + '.name'))}</div>`;
       return head + Object.keys(M.SPANS).map(sp => { const ids = Object.keys(M.SCENARIOS).filter(id => avail(id) && M.SCENARIOS[id].country === cc && M.SCENARIOS[id].span === sp); return ids.length ? `<div class="d" style="font-size:11px;color:var(--dim);margin:6px 0 2px">${esc(T('prep.span.' + sp))}</div>` + ids.map(card).join('') : ''; }).join('');
     }).join('');
-    const m = modal(T('prep.scenarioTitle'), `<div class="perk-count">${T('prep.step1')}</div>${cards}`, [{ label: T('btn.title'), onClick: showTitle }, { label: lock ? T('demo.cta') : T('prep.nextCompany'), cls: lock ? 'gold' : 'primary', onClick: () => { if (lock) return showDemoGate(showScenarioSelect); showCompanySelect(); } }]);
+    const m = modal(T('prep.scenarioTitle'), `<div class="perk-count">${prepStep(1)}</div>${cards}`, [{ label: T('btn.title'), onClick: showTitle }, { label: lock ? T('demo.cta') : T(noCompany() ? 'prep.nextPerk' : 'prep.nextCompany'), cls: lock ? 'gold' : 'primary', onClick: () => { if (lock) return showDemoGate(showScenarioSelect); if (noCompany()) return showPerkSelect(); showCompanySelect(); } }]);
     m.querySelectorAll('.card').forEach(el => el.onclick = () => { const id = el.dataset.id; if (lock) { SFX.click(); showDemoGate(showScenarioSelect); return; } if (!P.unlocked.scenarios.includes(id)) { toast(unlockText(M.SCENARIOS[id].unlock), 2500); return; } SFX.select(); prep.scenario = id; showScenarioSelect(); });
   }
   // 회사 시작 계약은 계열 이름(bulk…)으로 적혀 있다 → Game.resolveCenter 와 같은 규칙으로 센터 id 를 찾는다
@@ -452,29 +456,43 @@
   function showPerkSelect() {
     const P = Profile.get(), slots = Profile.perkSlots();
     prep.perks = prep.perks.filter(p => P.unlocked.perks.includes(p) && !perkConflict(p)).slice(0, slots);
+    if (noCompany()) prep.company = 'local';
     const co = M.COMPANIES[prep.company];
-    const groups = Object.keys(M.PERK_FAMILIES).filter(f => Object.keys(M.PERKS).some(id => M.PERKS[id].family === f && P.unlocked.perks.includes(id))).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${T('prep.family', { family: M.PERK_FAMILIES[f] })}</div>` + Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f && P.unlocked.perks.includes(id)).map(id => {
-      const pk = M.PERKS[id], un = P.unlocked.perks.includes(id), sel = prep.perks.includes(id), conflict = un && !sel ? perkConflict(id) : null;
-      return `<div class="card ${!un || conflict ? 'dis' : ''} ${sel ? 'sel' : ''}" data-id="${id}"><div class="t">${esc(pk.name)}</div><div class="d">${un ? esc(pk.desc) + (conflict ? ` <span style="color:var(--orange)">(${esc(conflict)})</span>` : '') : esc(unlockText(pk.unlock))}</div></div>`;
-    }).join('')).join('');
-    const head = `<div class="perk-count">${T('prep.step3')} — ${esc(M.SCENARIOS[prep.scenario].name)} · ${co.icon} ${esc(co.name)}<br>${T('prep.perkCount', { n: prep.perks.length, slots })}</div>`;
+    // 한 화면에: 맨 위에 장착 칸, 아래로 퍽 · 보험을 세로 3단 격자로. 설명은 카드에 들어가는 짧은 한 줄(short)
+    const fams = Object.keys(M.PERK_FAMILIES);
+    const ids = Object.keys(M.PERKS).filter(id => P.unlocked.perks.includes(id)).sort((a, b) => fams.indexOf(M.PERKS[a].family) - fams.indexOf(M.PERKS[b].family));
+    const perkCard = id => {
+      const pk = M.PERKS[id], sel = prep.perks.includes(id), swap = prep.perks.some(o => M.PERKS[o].family === pk.family), conflict = !sel && !swap ? perkConflict(id) : null;   // 같은 계열은 누르면 갈아 끼우니 흐리게 하지 않는다
+      return `<div class="card pk ${conflict ? 'dis' : ''} ${sel ? 'sel' : ''}" data-id="${id}" title="${esc(pk.desc)}"><div class="fam">${esc(M.PERK_FAMILIES[pk.family])}</div><div class="t">${esc(pk.name)}</div><div class="d">${esc(pk.short || pk.desc)}</div></div>`;
+    };
+    const worn = Array.from({ length: slots }, (_, k) => { const id = prep.perks[k]; return id ? `<span class="slot on" data-id="${id}">${esc(M.PERKS[id].name)} ✕</span>` : `<span class="slot">${esc(T('prep.slotEmpty'))}</span>`; }).join('');
+    const head = `<div class="perk-count">${prepStep(3)} — ${esc(M.SCENARIOS[prep.scenario].name)}${noCompany() ? '' : ` · ${co.icon} ${esc(co.name)}`}</div><div class="worn"><b>${T('prep.perkCount', { n: prep.perks.length, slots })}</b>${worn}</div>`;
+    const groups = `<div class="pgrid">${ids.map(perkCard).join('')}</div>`;
     if (prep.story == null) prep.story = !(storySeen(P)); // 첫 런은 안내가 기본으로 켜진다
-    const storyCard = `<div style="font-size:12px;color:var(--gold);margin:10px 0 4px">${T('prep.story')}</div><div class="card toggle ${prep.story ? 'sel' : ''}" id="prep-story"><div class="t"><span>${prep.story ? '☑' : '☐'} ${T('prep.story')}</span></div><div class="d">${T('prep.storyDesc')}</div></div>`;
+    const storyCard = `<div class="card toggle ${prep.story ? 'sel' : ''}" id="prep-story" title="${esc(T('prep.storyDesc'))}"><div class="t"><span>${prep.story ? '☑' : '☐'} ${T('prep.story')}</span></div></div>`;
     const noIns = !!(co.mods && co.mods.noInsurance);
-    const insCards = storyCard + `<div style="font-size:12px;color:var(--gold);margin:10px 0 4px">${T('prep.insuranceHead')}</div>` + (noIns ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('prep.startupNoIns')}</div>` : Object.keys(M.INSURERS).map(id => { const I = M.INSURERS[id]; const fee = Math.max(0, Math.round((I.fee + ((co.mods && co.mods.premiumDelta || {})[id] || 0)) * ((co.mods && co.mods.premiumMult) || 1) * ((M.SCENARIOS[prep.scenario].mods || {}).premiumMult || 1))); return `<div class="card ins ${prep.insurer === id ? 'sel' : ''}" data-ins="${id}"><div class="t"><span>${I.icon} ${esc(I.name)}</span><span class="price">${fee ? T('fmt.perMonth', { n: fee }) : '0c'}</span></div><div class="d">${esc(I.desc)}${I.fans.length ? `<br><span style="color:var(--green)">${T('prep.fans', { list: I.fans.map(f => M.CUSTOMERS[f].icon + M.CUSTOMERS[f].name).join(' ') })}</span>` : ''}</div></div>`; }).join(''));
-    const m = modal(T('prep.perkTitle'), head + groups + insCards, [{ label: T('btn.back'), onClick: showCompanySelect }, { label: T('prep.start'), cls: 'primary', onClick: () => startRun() }]);
+    const insCards = storyCard + `<div class="pk-head">${T('prep.insuranceShort')}</div>` + (noIns ? `<div class="d" style="font-size:12px;color:var(--dim)">${T('prep.startupNoIns')}</div>` : `<div class="pgrid">` + Object.keys(M.INSURERS).map(id => { const I = M.INSURERS[id]; const fee = Math.max(0, Math.round((I.fee + ((co.mods && co.mods.premiumDelta || {})[id] || 0)) * ((co.mods && co.mods.premiumMult) || 1) * ((M.SCENARIOS[prep.scenario].mods || {}).premiumMult || 1))); return `<div class="card pk ins ${prep.insurer === id ? 'sel' : ''}" data-ins="${id}" title="${esc(I.desc)}"><div class="fam">${fee ? T('fmt.perMonth', { n: fee }) : '0c'}</div><div class="t">${I.icon} ${esc(I.name)}</div><div class="d">${esc(I.short || I.desc)}${I.fans.length ? ` ${I.fans.map(f => M.CUSTOMERS[f].icon).join('')}` : ''}</div></div>`; }).join('') + `</div>`);
+    const m = modal(T('prep.perkTitle'), head + groups + insCards, [{ label: T('btn.back'), onClick: () => noCompany() ? showScenarioSelect() : showCompanySelect() }, { label: T('prep.start'), cls: 'primary', onClick: () => startRun() }]);
     m.querySelectorAll('.card.ins').forEach(el => el.onclick = () => { SFX.select(); prep.insurer = el.dataset.ins; showPerkSelect(); });
+    m.querySelectorAll('.worn .slot.on').forEach(el => el.onclick = () => { SFX.cancel(); prep.perks = prep.perks.filter(p => p !== el.dataset.id); showPerkSelect(); });
     m.querySelector('#prep-story').onclick = () => { SFX.select(); prep.story = !prep.story; showPerkSelect(); };
-    m.querySelectorAll('.card:not(.ins):not(.toggle)').forEach(el => el.onclick = () => {
+    m.querySelectorAll('.card.pk:not(.ins)').forEach(el => el.onclick = () => {
       const id = el.dataset.id;
-      if (!P.unlocked.perks.includes(id)) { toast(unlockText(M.PERKS[id].unlock), 2500); return; }
       if (prep.perks.includes(id)) { prep.perks = prep.perks.filter(p => p !== id); SFX.cancel(); }
-      else { const c = perkConflict(id); if (c) { toast(c); return; } if (prep.perks.length >= slots) { toast(T('prep.slotFull', { n: slots })); return; } prep.perks.push(id); SFX.select(); }
+      else {
+        // 같은 계열이 끼어 있으면 그걸 갈아 끼우고, 칸이 다 찼으면 가장 먼저 낀 것을 뺀다 — 토스트로 막지 않는다
+        const same = prep.perks.find(o => M.PERKS[o].family === M.PERKS[id].family);
+        if (same) prep.perks = prep.perks.filter(p => p !== same);
+        const c = perkConflict(id); if (c) { toast(c); return; }
+        if (prep.perks.length >= slots) prep.perks.shift();
+        prep.perks.push(id); SFX.select();
+      }
       showPerkSelect();
     });
   }
   function startRun() {
-    const cfg = { scenario: prep.scenario, company: prep.company, perks: prep.perks.slice(), insurer: prep.insurer, prep: true, story: !!prep.story, demoMonths: demoLocked() ? demoMonths() : 0 };
+    const cfg = { scenario: prep.scenario, company: noCompany() ? 'local' : prep.company, perks: prep.perks.slice(), insurer: prep.insurer, prep: true, story: !!prep.story, demoMonths: demoLocked() ? demoMonths() : 0 };
+    if (noCompany()) { const nm = (Profile.get().campaign || {}).name; if (nm) cfg.companyName = nm; }   // 회사가 없으면 내 상호를 건다
     withHowTo(() => { game = new Game(cfg); closeModal(); startPlay(); });
   }
 
@@ -605,7 +623,7 @@
     // 아직 안 연 것은 화면에도 없다 (levels.js) — 평판 게이지·회사 줄은 레벨이 열어 준다
     $('#hud-right').hidden = !g.shows('rep') && !g.shows('perks');
     $('#stress-wrap').hidden = !g.shows('rep');
-    $('#hud-perks').innerHTML = !g.shows('perks') ? `<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName ? g.companyName() : g.company.name)}</a>` : [`<a class="hl" data-pop="company">${g.company.icon} ${esc(g.company.name)}</a>`, ...g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}">${esc(M.PERKS[p].name)}</a>`), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ');
+    $('#hud-perks').innerHTML = !g.shows('perks') ? `<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName ? g.companyName() : g.company.name)}</a>` : [`<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName())}</a>`, ...g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}">${esc(M.PERKS[p].name)}</a>`), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ');
     $('#hud-perks').querySelectorAll('[data-pop]').forEach(el => el.onclick = () => { SFX.click(); if (el.dataset.pop === 'company') showCompanyInfo(); else if (el.dataset.pop === 'insurer') showInsurance(closeModal); else { const pk = M.PERKS[el.dataset.id]; modal(pk.name, `<p>${esc(pk.desc)}</p><p style="color:var(--dim);font-size:12px">${esc(T('hud.familyPerk', { family: M.PERK_FAMILIES[pk.family] }))}</p>`, [{ label: T('btn.close'), onClick: closeModal }]); } });
     // 창고·냉장 막대는 패널에서 뺐다 — 3D 간판이 '창고 12/24 · 냉장 2/6' 을 읽는다 (scene3d _buildTiles)
     const up = g.upcoming();
@@ -2064,7 +2082,7 @@
   function showMenu() {
     const g = game, R = g.rules;
     const info = !g.shows('perks') ? `<div class="d" style="font-size:12px;margin-bottom:6px">${g.company.icon} ${esc(g.companyName())}</div>`
-      : `<div class="d" style="font-size:12px;margin-bottom:6px">${esc((M.SCENARIOS[g.cfg.scenario] || {}).name || '')} · ${g.company.icon} ${esc(g.company.name)}<br><span style="color:var(--green)">＋ ${esc(g.company.passive)}</span><br><span style="color:var(--orange)">－ ${esc(g.company.weakness)}</span>${g.perks.length ? `<br>${T('company.perks')}: ` + g.perks.map(p => esc(M.PERKS[p].name + ' — ' + M.PERKS[p].desc)).join(`<br>${T('company.perks')}: `) : ''}${(g.cfg.variants || []).length ? `<br>${T('prep.variants')}: ` + g.cfg.variants.map(v => esc(M.DAILY_VARIANTS[v].name + ' — ' + M.DAILY_VARIANTS[v].desc)).join(', ') : ''}</div>`;
+      : `<div class="d" style="font-size:12px;margin-bottom:6px">${esc((M.SCENARIOS[g.cfg.scenario] || {}).name || '')} · ${g.company.icon} ${esc(g.companyName())}<br><span style="color:var(--green)">＋ ${esc(g.company.passive)}</span><br><span style="color:var(--orange)">－ ${esc(g.company.weakness)}</span>${g.perks.length ? `<br>${T('company.perks')}: ` + g.perks.map(p => esc(M.PERKS[p].name + ' — ' + M.PERKS[p].desc)).join(`<br>${T('company.perks')}: `) : ''}${(g.cfg.variants || []).length ? `<br>${T('prep.variants')}: ` + g.cfg.variants.map(v => esc(M.DAILY_VARIANTS[v].name + ' — ' + M.DAILY_VARIANTS[v].desc)).join(', ') : ''}</div>`;
     const m = modal(T('menu.title'), `${info}<p style="font-size:12px;color:var(--dim)">${T('menu.autosave')}</p><label style="display:flex;align-items:center;gap:8px;font-size:12px">${T('menu.volume')} <input type="range" id="vol" min="0" max="1" step="0.05" value="${opts.musicVol}" style="flex:1"></label>`, [
       { label: T('menu.continue'), cls: 'primary', onClick: closeModal },
       ...(g.shows('customers') ? [{ label: T('company.customers'), onClick: () => showCustomers(showMenu) }] : []),

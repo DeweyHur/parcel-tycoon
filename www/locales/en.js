@@ -255,6 +255,9 @@
     'opt.off': 'Off',
     'cal.kr.name': 'Korea',
     'prep.scenarioTitle': "Choose a run",
+    'prep.stepOf': 'Step {n}/{m}',
+    'prep.slotEmpty': 'empty',
+    'prep.insuranceShort': 'Insurance (billed month-end)',
     'prep.step1': 'Step 1/3',
     'btn.title': 'Title',
     'prep.runWhenSame': '{y1}',
@@ -275,7 +278,7 @@
     'prep.noColdCompany': 'Company has no cold zone',
     'prep.sameFamily': 'A {family} perk is already equipped',
     'prep.step3': 'Step 3/3',
-    'prep.perkCount': 'Perks {n}/{slots} (one per family)',
+    'prep.perkCount': 'Perks {n}/{slots} · 1 per family',
     'prep.insuranceHead': 'Insurance (monthly premium deducted at settlement; -20% next month with no claims)',
     'prep.startupNoIns': 'Startup begins uninsured. Available from the month 2 market',
     'prep.fans': 'Preferred by: {list} (+1 xp at month start while insured)',
@@ -807,7 +810,7 @@
     'title.story': 'Handover',
     'title.storySub': 'story tutorial · first three months',
     'prep.story': 'Manager guide',
-    'prep.storyDesc': 'Park explains the rules during the first 3 months (any company or run)',
+    'prep.storyDesc': 'Park explains the rules during the first 3 months (any run)',
     'menu.story': 'Manager guide: {v}',
     'menu.sms': 'Season texts: {v}',
     'help.notes': 'Manager\'s notes',
@@ -1759,23 +1762,28 @@
     "INSURERS": {
       "none": {
         "name": "Uninsured",
-        "desc": "No coverage. Customers with damages ×2 send half the volume"
+        "desc": "No coverage. Customers with damages ×2 send half the volume",
+        "short": "No cover"
       },
       "sturdy": {
         "name": "Sturdy Fire",
-        "desc": "50% of all discard damages"
+        "desc": "50% of all discard damages",
+        "short": "All discards 50%"
       },
       "coldguard": {
         "name": "ColdGuard",
-        "desc": "❄❆ spoilage damages 80%, others 20%"
+        "desc": "❄❆ spoilage damages 80%, others 20%",
+        "short": "❄❆ 80% · others 20%"
       },
       "safebox": {
         "name": "SafeBox",
-        "desc": "⚠ breakage & theft damages 80%, others 20%"
+        "desc": "⚠ breakage & theft damages 80%, others 20%",
+        "short": "⚠ break/theft 80%"
       },
       "premier": {
         "name": "Premier",
-        "desc": "90% of all damages + no return stress"
+        "desc": "90% of all damages + no return stress",
+        "short": "All 90% + no return penalty"
       }
     },
     "INS_ITEMS": {
@@ -1873,103 +1881,128 @@
     "PERKS": {
       "longdeal": {
         "name": "Long-term Deal",
-        "desc": "All contract prices -10%"
+        "desc": "All contract prices -10%",
+        "short": "Contracts -10%"
       },
       "prepay": {
         "name": "Prepay Discount",
-        "desc": "First contract purchase each month -40"
+        "desc": "First contract purchase each month -40",
+        "short": "1st contract/mo -40c"
       },
       "protect": {
         "name": "Renewal Protection",
-        "desc": "Replacing a contract keeps 1 remaining call"
+        "desc": "Replacing a contract keeps 1 remaining call",
+        "short": "Swap keeps 1 call"
       },
       "regularco": {
         "name": "Regular Carriers",
-        "desc": "All carriers start with 3 trust xp (lv 1)"
+        "desc": "All carriers start with 3 trust xp (lv 1)",
+        "short": "Carriers start trust lv1"
       },
       "spare": {
         "name": "Spare Driver",
-        "desc": "Once a month, call a contract with 0 calls left"
+        "desc": "Once a month, call a contract with 0 calls left",
+        "short": "1 extra call/mo"
       },
       "bundle": {
         "name": "Bundle Discount",
-        "desc": "A call shipping 4+ parcels doesn't consume a call (once a month)"
+        "desc": "A call shipping 4+ parcels doesn't consume a call (once a month)",
+        "short": "4+ parcels: free call (1/mo)"
       },
       "compact": {
         "name": "Space Optimizer",
-        "desc": "All parcel sizes -1 (min 1)"
+        "desc": "All parcel sizes -1 (min 1)",
+        "short": "Parcel size -1"
       },
       "coldpro": {
         "name": "Cold Expert",
-        "desc": "Fresh food shelf life +1 turn"
+        "desc": "Fresh food shelf life +1 turn",
+        "short": "Fresh +1 day"
       },
       "tempyard": {
         "name": "Temp Yard",
-        "desc": "No penalty for overflow of 1–2"
+        "desc": "No penalty for overflow of 1–2",
+        "short": "Overflow ≤2 no penalty"
       },
       "shelves": {
         "name": "Extra Shelves",
-        "desc": "Starting capacity +4"
+        "desc": "Starting capacity +4",
+        "short": "Start capacity +4"
       },
       "freezer": {
         "name": "Freezer",
-        "desc": "Fresh food in the cold zone doesn't age for its first 2 turns"
+        "desc": "Fresh food in the cold zone doesn't age for its first 2 turns",
+        "short": "Cold fresh: 2 days no decay"
       },
       "yard": {
         "name": "Open Yard",
-        "desc": "XL storage +1, XL temp space 3→2"
+        "desc": "XL storage +1, XL temp space 3→2",
+        "short": "XL storage +1"
       },
       "skip": {
         "name": "Close-Day Bonus",
-        "desc": "Capacity +1 on the next call after ending a day"
+        "desc": "Capacity +1 on the next call after ending a day",
+        "short": "After closing: next truck +1"
       },
       "insure": {
         "name": "Discard Insurance",
-        "desc": "No penalty for the first discarded parcel of the run"
+        "desc": "No penalty for the first discarded parcel of the run",
+        "short": "1st discard: no penalty"
       },
       "tent": {
         "name": "Tent",
-        "desc": "Parcels outside don't get wet in rain or typhoons"
+        "desc": "Parcels outside don't get wet in rain or typhoons",
+        "short": "Yard stays dry"
       },
       "breath": {
         "name": "Deep Breath",
-        "desc": "Stress -1 at month start"
+        "desc": "Stress -1 at month start",
+        "short": "Rep +1 each settle"
       },
       "overtime": {
         "name": "Overtime",
-        "desc": "Overdue reward cut 25% → 10%"
+        "desc": "Overdue reward cut 25% → 10%",
+        "short": "Late cut 25→10%"
       },
       "foresight": {
         "name": "Foresight",
-        "desc": "Show arrivals 4 turns ahead"
+        "desc": "Show arrivals 4 turns ahead",
+        "short": "Forecast 4 days"
       },
       "emergency": {
         "name": "Dispatch Deal",
-        "desc": "All dispatch fees -15%"
+        "desc": "All dispatch fees -15%",
+        "short": "Dispatch fees -15%"
       },
       "regulars": {
         "name": "Regular Customers",
-        "desc": "Standard parcel reward +5"
+        "desc": "Standard parcel reward +5",
+        "short": "Standard reward +5"
       },
       "premium": {
         "name": "Premium Service",
-        "desc": "Special shipping bonus +5"
+        "desc": "Special shipping bonus +5",
+        "short": "Special reward +5"
       },
       "closing": {
         "name": "Closing Bonus",
-        "desc": "+60 if month-end warehouse usage ≤ 60%"
+        "desc": "+60 if month-end warehouse usage ≤ 60%",
+        "short": "Month-end ≤60% full: +60c"
       },
       "consult": {
         "name": "Logistics Consulting",
-        "desc": "Trust xp gain +1"
+        "desc": "Trust xp gain +1",
+        "short": "Trust xp +1"
       },
       "taxsave": {
         "name": "Tax Savings",
-        "desc": "Month-end op cost -20"
+        "desc": "Month-end op cost -20",
+        "short": "Op cost -20"
       },
       "investor": {
         "name": "Investor",
-        "desc": "Starting cash +150, month-end op cost +20"
+        "desc": "Starting cash +150, month-end op cost +20",
+        "short": "Cash +150, op cost +20"
       }
     },
     "PERK_FAMILIES": {

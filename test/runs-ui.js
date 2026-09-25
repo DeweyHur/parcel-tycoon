@@ -38,11 +38,9 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   t = await modalText();
   ok('겨울은 해를 넘겨 표시', /겨울 \(12~2월\)/.test(t) && new RegExp(`${new Date().getFullYear()}→${new Date().getFullYear() + 1}`).test(t));
   ok('선택은 봄 그대로', (await page.evaluate(() => PT.prep.scenario)) === 'kr_spring');
-  // 회사 → 퍽 → 시작
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.modal .btn')].find(x => /다음: 회사/.test(x.textContent)); b.click(); }); await page.waitForTimeout(300);
-  t = await modalText(); ok('회사 화면 머리에 런 이름', /봄 \(3~5월\)/.test(t));
+  // 한국 런은 회사를 고르지 않는다: 런 → 퍽 → 시작
   await page.evaluate(() => { const b = [...document.querySelectorAll('.modal .btn')].find(x => /다음: 퍽/.test(x.textContent)); b.click(); }); await page.waitForTimeout(300);
-  t = await modalText(); ok('퍽 화면', /퍽/.test(t) && !/변형/.test(t));
+  t = await modalText(); ok('퍽 화면 (회사 단계 없이 2/2, 머리에 런 이름)', /퍽/.test(t) && !/변형/.test(t) && /2\/2 단계/.test(t) && /봄 \(3~5월\)/.test(t) && !/동네 택배/.test(t));
   await page.evaluate(() => { PT.prep.story = false; PT.startRun(); }); await page.waitForTimeout(500);
   for (let i = 0; i < 8; i++) { if (await page.evaluate(() => !!PT.game)) break; const b = await page.$('.foot .btn.primary'); if (!b) break; await b.click({ force: true }); await page.waitForTimeout(300); }
   ok('런 시작', !!(await page.evaluate(() => !!PT.game)));
