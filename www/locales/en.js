@@ -1914,8 +1914,8 @@
       },
       "compact": {
         "name": "Space Optimizer",
-        "desc": "All parcel sizes -1 (min 1)",
-        "short": "Parcel size -1"
+        "desc": "Parcels of size 4+ take 1 less space",
+        "short": "Big parcels -1 size"
       },
       "coldpro": {
         "name": "Cold Expert",

@@ -13,7 +13,7 @@ const slot = (g, fam) => g.contracts.findIndex(c => c && D.familyOf(c.carrier) =
 // 꺼 둔 시스템(D.DISABLED_FEATURES — 일괄 출고·연속 만차·보름 목표)의 규칙 자체는 살아 있으니 켠 채로 검사한다
 const withAll = fn => () => { const keep = D.DISABLED_FEATURES; D.DISABLED_FEATURES = []; try { fn(); } finally { D.DISABLED_FEATURES = keep; } };
 t('시작 상태: 자금 450, 계약 3개(대량·냉장·프래자일), 준비 없이 play', () => { const g = NG(1); assert.equal(g.cash, 450); assert.equal(g.contracts.filter(Boolean).length, 3); assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk0', 'cold0', 'fragile0']); assert.equal(g.phase, 'play'); assert.equal(g.month, 1); });
-t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.sizeDelta, -1); });
+t('퍽 규칙 병합', () => { const g = NG(1, { perks: ['longdeal', 'compact'] }); assert.equal(g.rules.contractPriceMult, 0.9); assert.equal(g.rules.bigSizeDelta, -1); assert.equal(g.rules.sizeDelta, 0); });
 t('초기 입고: 첫 보름 18~28개(ARRIVALS_SCALE 1.0), 소형 위주', () => { let small = 0, all = 0; for (let s = 1; s < 20; s++) { const g = NG(s); const sp = g.schedule.flat(); assert.ok(sp.length >= 18 && sp.length <= 28, `initial arrivals ${sp.length}`); for (const x of sp) { all++; if (x.size <= 2) small++; } } assert.ok(small / all > 0.8, `small ${small}/${all}`); });
 t('실시간 성장 투자: 홍보는 캠페인 크기, 트럭은 배차, 창고는 공간을 즉시 늘린다', () => {
   const g = NG(71); g.cash = 3000;
@@ -181,7 +181,7 @@ t('계약 교체(갈아타기): 같은 계열 상위 센터로 바꾸면 잔여 
   g.market.items.push({ kind: 'contract', carrier: 'bulk1', grade: 'trusted', price: 100, name: 'x', sold: false });
   const b = slot(g, 'bulk'); assert.ok(g.buy(g.market.items.length - 1, b).ok); assert.equal(g.contracts[b].carrier, 'bulk1'); assert.equal(g.trust.bulk0, 5); assert.equal(g.trustLevel('bulk1'), 0);
 });
-t('공간 최적화: 크기 -1 (최소 1)', () => { const g = NG(2, { perks: ['compact', 'insure'] }); for (const p of g.parcels) assert.equal(p.size, Math.max(1, p.baseSize - 1)); });
+t('공간 최적화: 크기 4 이상만 -1', () => { const g = NG(2, { perks: ['compact', 'insure'] }); for (const p of g.parcels) assert.equal(p.size, p.baseSize >= 4 ? p.baseSize - 1 : p.baseSize); });
 t('창고 초과 페널티', () => { const g = NG(11); g.warehouse.cap = 0; for (let i = 0; i < 4; i++) g.parcels.push(P(700 + i, 'normal', 2)); const s0 = g.rep; adv(g); assert.ok(g.rep < s0); });
 t('신선: 냉장 안이면 기한만 진행, 밖이면 1턴 뒤 폐기(+2)', () => {
   const g = EMPTY(4, { perks: ['skip', 'longdeal'] }); g.warehouse.cold = 2;
