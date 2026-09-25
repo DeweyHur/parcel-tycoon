@@ -933,3 +933,6 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .cx-stat b { font-size: 15px; color: var(--gold); } .cx-stat small { font-size: 9px; color: var(--dim); text-align: center; }
 .cx-types { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; margin: 6px 0; } .cx-types span { display: inline-flex; align-items: center; gap: 3px; }
 .cx-tabs { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
+/* 마켓: 돈이 모자라거나 붙일 데가 없는 매물은 회색 */
+.card.poor, .card.na { opacity: .45; }
+.card.poor .price { color: var(--red); }
