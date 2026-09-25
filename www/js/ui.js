@@ -1815,21 +1815,55 @@
   }
 
   // ---------- 도감 ----------
+  // 도감: 줄글 카드 대신 아이콘 타일. 한 줄 요약만 보이고, 누르면(▸) 설명·해금 조건·신뢰 단계가 펼쳐진다
+  const CX_ICONS = { companies: '🏢', carriers: '🚚', perks: '✨', scenarios: '📅', achievements: '🏆', stats: '📊' };
+  function cxTile(head, sub, detail, cls) {
+    return detail ? `<details class="cx-tile ${cls || ''}"><summary>${head}${sub ? `<span class="cx-sub">${sub}</span>` : ''}</summary><div class="cx-more">${detail}</div></details>`
+      : `<div class="cx-tile ${cls || ''}"><div class="cx-sum">${head}${sub ? `<span class="cx-sub">${sub}</span>` : ''}</div></div>`;
+  }
+  const cxHead = txt => `<div class="cx-head">${txt}</div>`;
+  // 이 업체가 실을 수 있는 종류(색 점) — 크기 범위·능력·전용 조건으로 가른다
+  function carrierTakes(car) {
+    return Object.keys(D.PARCEL_TYPES).filter(t => {
+      const T2 = D.PARCEL_TYPES[t], at = (T2.attrs || []).filter(a => D.GATING_ATTRS.includes(a));
+      if (!T2.sizes.some(z => z >= car.sizeMin && z <= car.sizeMax)) return false;
+      if (car.onlyPlain && at.length) return false;
+      if (car.need && car.need.length && !(T2.attrs || []).some(a => car.need.includes(a))) return false;
+      return at.every(a => (car.caps || []).includes(a) || a === 'fragile');   // ⚠ 는 아무 차나 싣되 깨질 수 있다
+    });
+  }
   function showCodex(tab, back) {
     const P = Profile.get();
     if (tab === 'companies' && companiesHidden()) tab = 'carriers';
-    const tabs = ['companies', 'carriers', 'perks', 'scenarios', 'achievements', 'stats'].filter(id => id !== 'companies' || !companiesHidden()).map(id => [id, T('codex.tab.' + id)]);
-    let body = `<div class="tabs">${tabs.map(([id, nm]) => `<button class="btn small ${tab === id ? 'gold' : ''}" data-tab="${id}">${nm}</button>`).join('')}</div>`;
-    if (tab === 'companies') body += [0, 1, 2, 3].map(t => `<div class="perk-count">${TIER_NAMES()[t]}</div>` + Object.keys(M.COMPANIES).filter(id => (M.COMPANIES[id].tier || 0) === t).map(id => { const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id); const clears = P.stats.clearsByCompany[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? co.icon : '🔒'} ${esc(co.name)} <small style="color:var(--dim)">${esc(co.tag)}</small></span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div>${un ? companyInfo(co, id, true) : `<div class="d">${esc(unlockText(co.unlock))}</div>`}</div>`; }).join('')).join('');
-    else if (tab === 'carriers') { const live = game && game.phase !== 'over' && game.phase !== 'win'; body += `<div class="perk-count">${T('codex.carriersHead')}${live ? ` ${T('codex.liveRun')}` : ''}</div>` + Object.keys(D.FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${esc(D.FAMILIES[f].name)}</div>` + D.centersOf(f).map(k => { const car = D.CARRIERS[k]; return `<div class="card" style="cursor:default"><div class="t"><span>${car.badge || ''} ${esc(car.name)}${gradeBadge(car.grade)}</span><span class="price">${T('codex.carrierPrice', { vehicle: esc(car.vehicle || ''), cap: car.cap, fee: car.fee, trucks: car.trucks, price: car.price })}</span></div><div class="d">${esc(car.desc)}<br>${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.need ? ` · ${T('codex.need', { icons: car.need.map(a => D.ATTRS[a].icon).join('') })}` : ''}${car.onlyPlain ? ` · ${T('pd.plainOnly')}` : ''}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}${trustTrack(k, live ? game.trustXp(k) : null)}</div></div>`; }).join('')).join(''); }
-    else if (tab === 'perks') body += `<div class="perk-count">${T('codex.perkSlots', { n: Profile.perkSlots() })}</div>` + Object.keys(M.PERK_FAMILIES).map(f => `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${T('prep.family', { family: M.PERK_FAMILIES[f] })}</div>` + Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f).map(id => { const pk = M.PERKS[id], un = P.unlocked.perks.includes(id); return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t">${un ? '' : '🔒 '}${esc(pk.name)}</div><div class="d">${esc(pk.desc)}${un ? '' : `<br>${esc(unlockText(pk.unlock))}`}</div></div>`; }).join('')).join('');
-    else if (tab === 'scenarios') body += Object.keys(M.SCENARIOS).map(id => { const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id); const clears = P.stats.clearsByScenario[id] || 0; return `<div class="card ${un ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${un ? s.icon : '🔒'} ${esc(s.name)}</span><span class="price">${clears ? T('fmt.wins', { n: clears }) : ''}</span></div><div class="d">${esc(s.desc)}${un ? '' : `<br>${esc(unlockText(s.unlock))}`}</div></div>`; }).join('');
+    const tabs = ['companies', 'carriers', 'perks', 'scenarios', 'achievements', 'stats'].filter(id => id !== 'companies' || !companiesHidden());
+    let body = `<div class="cx-tabs">${tabs.map(id => `<button class="btn small ${tab === id ? 'gold' : ''}" data-tab="${id}"><span>${CX_ICONS[id]}</span><small>${esc(T('codex.tab.' + id))}</small></button>`).join('')}</div>`;
+    const lock = '🔒';
+    if (tab === 'companies') body += [0, 1, 2, 3].map(t => { const ids = Object.keys(M.COMPANIES).filter(id => (M.COMPANIES[id].tier || 0) === t); if (!ids.length) return ''; return cxHead(TIER_NAMES()[t]) + `<div class="cx-grid">${ids.map(id => { const co = M.COMPANIES[id], un = P.unlocked.companies.includes(id), clears = P.stats.clearsByCompany[id] || 0;
+      return cxTile(`<span class="cx-ic">${un ? co.icon : lock}</span><b>${esc(co.name)}</b>${clears ? `<span class="cx-win">🏆${clears}</span>` : ''}`, esc(co.tag || ''), un ? companyInfo(co, id, true) : `<span class="cx-lock">${esc(unlockText(co.unlock))}</span>`, un ? '' : 'dis'); }).join('')}</div>`; }).join('');
+    else if (tab === 'carriers') { const live = game && game.phase !== 'over' && game.phase !== 'win';
+      body += `<div class="cx-note">🤝 ${T('codex.carriersHead')}${live ? ` ${T('codex.liveRun')}` : ''}</div>` + Object.keys(D.FAMILIES).map(f => cxHead(esc(D.FAMILIES[f].name)) + `<div class="cx-list">${D.centersOf(f).map(k => { const car = D.CARRIERS[k];
+        const dots = carrierTakes(car).map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('');
+        const stats = `<span class="cx-stats"><span class="mktruck" title="${esc(T('fmt.cells', { n: car.cap }))}">${'<i></i>'.repeat(Math.min(car.cap, 16))}<b></b></span>${callPipsHtml(car.trucks, car.trucks)}<span title="${esc(T('mk.feeEach', { n: car.fee }))}">💰${car.fee}</span>${car.delay ? `<span>📄</span>` : ''}</span>`;
+        const head = `<span class="cx-ic">${car.badge && car.badge !== '🚚' ? car.badge : '🚚'}</span><b>${esc(car.short || car.name)}</b>${gradeBadge(car.grade)}<span class="takes">${dots}</span><span class="cx-price">${car.price}c</span>`;
+        const more = `<b>${esc(car.name)}</b> · ${esc(car.vehicle || '')}<br>${esc(car.desc)}<br>${T('call.caps')} ${car.caps.length ? attrIcons(car.caps) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: car.sizeMax })}${car.need ? ` · ${T('codex.need', { icons: car.need.map(a => D.ATTRS[a].icon).join('') })}` : ''}${car.delay ? ` · ${T('call.payLater', { n: car.delay })}` : ''}${trustTrack(k, live ? game.trustXp(k) : null)}`;
+        return cxTile(head, stats, more, 'wide'); }).join('')}</div>`).join(''); }
+    else if (tab === 'perks') body += `<div class="cx-note">✨ ${T('codex.perkSlots', { n: Profile.perkSlots() })}</div>` + Object.keys(M.PERK_FAMILIES).map(f => cxHead(esc(M.PERK_FAMILIES[f])) + `<div class="cx-grid">${Object.keys(M.PERKS).filter(id => M.PERKS[id].family === f).map(id => { const pk = M.PERKS[id], un = P.unlocked.perks.includes(id);
+      return cxTile(`<span class="cx-ic">${un ? (pk.icon || ({ contract: '📝', warehouse: '🏠', ops: '⚙', income: '💰' })[f] || '✨') : lock}</span><b>${esc(pk.name)}</b>`, '', `${esc(pk.desc)}${un ? '' : `<br><span class="cx-lock">${esc(unlockText(pk.unlock))}</span>`}`, un ? '' : 'dis'); }).join('')}</div>`).join('');
+    else if (tab === 'scenarios') body += `<div class="cx-grid">${Object.keys(M.SCENARIOS).map(id => { const s = M.SCENARIOS[id], un = P.unlocked.scenarios.includes(id), clears = P.stats.clearsByScenario[id] || 0;
+      return cxTile(`<span class="cx-ic">${un ? s.icon : lock}</span><b>${esc(s.name)}</b>${clears ? `<span class="cx-win">🏆${clears}</span>` : ''}`, '', `${esc(s.desc || '')}${un ? '' : `<br><span class="cx-lock">${esc(unlockText(s.unlock))}</span>`}`, un ? '' : 'dis'); }).join('')}</div>`;
     else if (tab === 'achievements') {
-      const groups = ['company', 'scenario', 'slot', 'multi', 'perk', 'none'].map(g => [g, T('codex.ach.' + g)]);
-      body += groups.map(([g, nm]) => { const ids = Object.keys(M.ACHIEVEMENTS).filter(id => M.ACHIEVEMENTS[id].rewardType === g && achShown(id)); if (!ids.length) return ''; return `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${nm}</div>` + ids.map(id => { const a = M.ACHIEVEMENTS[id], done = !!P.achievements[id]; const reward = a.rewardType === 'company' ? M.COMPANIES[a.reward].name : a.rewardType === 'perk' ? M.PERKS[a.reward].name : a.rewardType === 'scenario' ? M.SCENARIOS[a.reward].name : a.rewardType === 'slot' ? T('codex.slotReward', { n: a.reward }) : a.rewardType === 'multi' ? T('codex.multiReward') : ''; return `<div class="card ${done ? '' : 'dis'}" style="cursor:default"><div class="t"><span>${done ? '🏆' : '⬜'} ${esc(a.name)}</span>${reward ? `<span class="price">${esc(reward)}</span>` : ''}</div><div class="d">${esc(a.desc)}</div></div>`; }).join(''); }).join('');
+      const all = Object.keys(M.ACHIEVEMENTS).filter(achShown), done = all.filter(id => P.achievements[id]).length;
+      body += `<div class="cx-note">🏆 ${done} / ${all.length}</div>`;
+      const groups = ['company', 'scenario', 'slot', 'multi', 'perk', 'none'];
+      const rIcon = { company: '🏢', perk: '✨', scenario: '📅', slot: '🎒', multi: '🎁' };
+      body += groups.map(g => { const ids = all.filter(id => M.ACHIEVEMENTS[id].rewardType === g); if (!ids.length) return ''; return cxHead(T('codex.ach.' + g)) + `<div class="cx-grid">${ids.map(id => { const a = M.ACHIEVEMENTS[id], ok = !!P.achievements[id];
+        const reward = a.rewardType === 'company' ? M.COMPANIES[a.reward].name : a.rewardType === 'perk' ? M.PERKS[a.reward].name : a.rewardType === 'scenario' ? M.SCENARIOS[a.reward].name : a.rewardType === 'slot' ? T('codex.slotReward', { n: a.reward }) : a.rewardType === 'multi' ? T('codex.multiReward') : '';
+        return cxTile(`<span class="cx-ic">${ok ? '🏆' : '⬜'}</span><b>${esc(a.name)}</b>`, reward ? `${rIcon[g] || ''} ${esc(reward)}` : '', esc(a.desc), ok ? 'done' : 'dis'); }).join('')}</div>`; }).join('');
     } else {
-      const s = P.stats, dt = s.deliveredByType;
-      body += `<div class="kv stats"><span>${T('stat.runsClears')}</span><span class="v">${s.runs} / ${s.clears}</span><span>${T('stat.best')}</span><span class="v">${s.bestScore}</span><span>${T('stat.delivered')}</span><span class="v">${T('fmt.count', { n: dt.normal + dt.fresh + dt.fragile + dt.intl + dt.large })}</span><span class="sub">　${D.PARCEL_TYPES.normal.short} / ${D.PARCEL_TYPES.fresh.short}</span><span class="v sub">${dt.normal} / ${dt.fresh}</span><span class="sub">　${D.PARCEL_TYPES.fragile.short} / ${D.PARCEL_TYPES.intl.short} / ${D.PARCEL_TYPES.large.short}</span><span class="v sub">${dt.fragile} / ${dt.intl} / ${dt.large}</span><span>${T('res.callsWaits')}</span><span class="v">${s.calls} / ${s.waits}</span><span>${T('stat.contracts')}</span><span class="v">${s.contractsBought}</span><span>${T('sum.discarded')}</span><span class="v">${s.discarded}</span><span>${T('stat.tidy')}</span><span class="v">${s.tidyMonths}</span></div>
+      const s = P.stats, dt = s.deliveredByType, tot = Object.values(dt).reduce((a, b) => a + (b || 0), 0);
+      const tile = (ic, v, lb) => `<div class="cx-stat"><span class="cx-ic">${ic}</span><b>${v}</b><small>${esc(lb)}</small></div>`;
+      const byType = Object.keys(D.PARCEL_TYPES).filter(t => dt[t]).map(t => `<span><i class="hv-sw" style="background:${D.PARCEL_TYPES[t].css}"></i>${dt[t]}</span>`).join('');
+      body += `<div class="cx-stats-grid">${tile('🎮', `${s.runs} / ${s.clears}`, T('stat.runsClears'))}${tile('⭐', s.bestScore, T('stat.best'))}${tile('📦', tot, T('stat.delivered'))}${tile('🚚', `${s.calls} / ${s.waits}`, T('res.callsWaits'))}${tile('📝', s.contractsBought, T('stat.contracts'))}${tile('🗑', s.discarded, T('sum.discarded'))}${tile('✨', s.tidyMonths, T('stat.tidy'))}</div>${byType ? `<div class="cx-types">${byType}</div>` : ''}
         <hr><p style="font-size:12px;color:var(--dim)">${T('stat.profileNote')}</p>
         <div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn small" id="cx-export" style="flex:1">${T('stat.export')}</button><button class="btn small" id="cx-import" style="flex:1">${T('stat.import')}</button></div>
         <p style="font-size:11px;color:var(--dim)">${T('stat.transferNote')}</p><button class="btn small warn" id="cx-reset">${T('stat.reset')}</button>`;
@@ -1861,12 +1895,60 @@
   function showLog(back) {
     modal(T('log.title'), `<div class="log-list">${game.log.map(l => `<div>${esc(I18n.text(l))}</div>`).join('')}</div>`, [{ label: T('btn.close'), onClick: back }]);
   }
+
+  // ---------- 게임 방법 (그림판) ----------
+  // 줄글 설명서 대신 섹션마다 아이콘 줄 + 실제 화면 조각(차 그림·돈 칩·신뢰 게이지·예보 칩)을 그대로 그린다.
+  // 숫자는 전부 data.js 에서 읽는다 — 밸런스를 바꿔도 설명이 따라간다.
+  function helpVisual() {
+    const P = D.PARCEL_TYPES, A = D.AD_MEDIA, W = M.WEATHER;
+    const row = (ic, txt) => `<div class="hv-row"><span class="hv-ic">${ic}</span><span>${txt}</span></div>`;
+    const sec = (id, ic, open, inner) => `<details class="hv-sec"${open ? ' open' : ''}><summary><span class="hv-ic">${ic}</span>${esc(T('hv.' + id))}</summary><div class="hv-body">${inner}</div></details>`;
+    const sw = t => `<i class="hv-sw" style="background:${P[t].css}"></i>`;
+    const cells = (list, cap) => Array.from({ length: cap }, (_, i) => list[i] ? `<i class="truck-cell filled" style="background:${list[i]}"></i>` : '<i class="truck-cell"></i>').join('');
+    // 1. 하루
+    const day = `<div class="hv-flow"><span>📦<small>${T('hv.flow.in')}</small></span><b>→</b><span>🚚<small>${T('hv.flow.call')}</small></span><b>/</b><span>🛌<small>${T('hv.flow.wait')}</small></span><b>→</b><span>⏳<small>${T('hv.flow.tick')}</small></span></div>`
+      + row('📅', T('hv.day.week')) + row('💰', T('hv.day.cycle'));
+    // 2. 호출 — 차 그림 + 돈 칩 스냅샷
+    const n = P.normal.css, f = P.fragile.css;
+    const snap = `<div class="hv-snap"><div class="load-visual mini"><div class="truck-stack"><div class="truck-shell"><div class="truck-cells" style="--cols:7">${cells([n, n, n, n, f, f], 7)}</div></div></div><div class="load-money"><span class="money-chip">${T('call.earn')}<b>+120c</b></span><span class="money-chip cost">${T('call.cost')}<b>−64c</b></span><span class="money-chip net">${T('call.net')}<b>+56c</b></span></div></div></div>`;
+    const call = snap + row('👆', T('hv.call.tap')) + row('📦', T('hv.call.box')) + row('<i class="hv-btn">🚚</i>', T('hv.call.btn'))
+      + row('½', T('hv.call.half', { pct: Math.round(D.FILL_BREAKEVEN * 100) })) + row('🚚🚚', T('hv.call.two', { n: D.MAX_TRUCKS || 2 })) + row(callPipsHtml(3, 5), T('hv.call.pips'));
+    // 3. 택배 종류
+    const kinds = ['normal', 'fresh', 'frozen', 'fragile', 'produce', 'intl', 'large'].filter(t => P[t]).map(t => {
+      const at = (P[t].attrs || []).map(a => (D.ATTRS[a] || {}).icon || '').join('');
+      return `<tr><td>${sw(t)}</td><td><b>${esc(P[t].short || P[t].name)}</b> ${at}</td><td class="hv-sz">${P[t].sizes.join('·')}</td><td>${T('hv.kind.' + t)}</td></tr>`;
+    }).join('');
+    const kind = `<table class="hv-tbl"><tr><th></th><th></th><th>${T('hv.kind.size')}</th><th></th></tr>${kinds}</table>`;
+    // 4. 기한 · 신뢰 · 평판
+    const L = D.TRUST_LEVELS, G = D.REP_GAIN;
+    const tbar = pct => `<span class="trust"><small>${esc(T('common.trust'))}</small><b class="tlv">Lv1</b><span class="tbar"><i style="width:${pct}%"></i><i class="gain" style="width:20%"></i></span><small class="tnum">8<b class="arrow">→</b>10</small></span>`;
+    const early = `<div class="hv-snap">${tbar(20)}</div><table class="hv-tbl hv-score"><tr><td>🚀</td><td>${T('hv.early.fast')}</td><td class="good">+2</td></tr><tr><td>🙂</td><td>${T('hv.early.ok')}</td><td class="good">+1</td></tr><tr><td>😐</td><td>${T('hv.early.due')}</td><td>0</td></tr><tr><td>😡</td><td>${T('hv.early.late')}</td><td class="bad">−2</td></tr></table>`
+      + row('🤝', T('hv.trust.lv', { a: L[1], b: L[2], c: L[3] })) + row('⭐', T('hv.rep.rule', { div: G.earlyDiv, max: G.earlyMax, clean: G.cleanMonth }))
+      + row('⏳', T('hv.due.late', { pct: Math.round((1 - 0.75) * 100), n: D.RETURN_GRACE }));
+    // 5. 창고
+    const th = D.THEFT_PROB.map(x => Math.round(x[1] * 100) + '%').join(' / ');
+    const store = `<div class="hv-chips"><span class="chip">🏠 ${T('hv.wh.main')} 6/24</span><span class="chip">❄ ${T('hv.wh.cold')} 2/6</span><span class="chip">❆ ${T('hv.wh.frozen')} 0/4</span><span class="chip heat">🌧 ${T('hv.wh.yard')} 3</span></div>`
+      + row('📤', T('hv.wh.over', { th })) + row('❄', T('hv.wh.coldRule')) + row('🌙', T('hv.wh.wait'));
+    // 6. 날씨
+    const wx = Object.keys(W).map(k => `<tr><td class="hv-ic">${W[k].icon}</td><td><b>${esc(W[k].name)}</b></td><td>${esc(W[k].desc || T('weather.noEffect'))}</td></tr>`).join('');
+    const weather = `<table class="hv-tbl">${wx}</table>` + row('🔮', T('hv.wx.fc'));
+    // 7. 캠페인
+    const ads = Object.keys(A).map(id => `<tr><td class="hv-ic">${A[id].icon}</td><td><b>${esc(T('media.' + id))}</b></td><td>📦+${A[id].per}</td><td>⏱${A[id].days}${esc(T('media.fx.dayUnit'))}</td><td>⭐+${A[id].rep || 0}</td><td>${A[id].cost}c</td></tr>`).join('');
+    const camp = `<table class="hv-tbl">${ads}</table>` + row('🔵', T('hv.camp.lv')) + row('×½', T('hv.camp.half')) + row('🚫', T('hv.camp.same'));
+    // 8. 정산 · 마켓
+    const money = row('🚚', T('hv.pay.fee')) + row('🏠', T('hv.pay.op', { n: D.OPERATING_COST })) + row('📄', T('hv.pay.note'))
+      + row('💸', T('hv.pay.loan', { pct: Math.round(D.LOAN.interest * 100), limit: D.LOAN.limit })) + row('🛒', T('hv.pay.market'));
+    // 9. 런
+    const run = `<div class="hv-flow"><span>🌸<small>${T('hv.run.q')}</small></span><b>→</b><span>☔🎑❄<small>${T('hv.run.q2')}</small></span><b>→</b><span>🌱🍂<small>${T('hv.run.half')}</small></span><b>→</b><span>📅<small>${T('hv.run.year')}</small></span></div>`
+      + row('🎑', T('hv.run.holiday'));
+    return `<div class="hv">${sec('day', '🔁', true, day)}${sec('call', '🚚', true, call)}${sec('kind', '🎨', false, kind)}${sec('early', '🤝', false, early)}${sec('wh', '🏠', false, store)}${sec('wx', '🌦', false, weather)}${sec('camp', '📣', false, camp)}${sec('pay', '💰', false, money)}${sec('run', '📅', false, run)}</div>`;
+  }
   function showHelp(back) {
     // 아직 마켓도 안 열린 런(레벨 1)에 전체 설명서를 보여 주면 숨긴 보람이 없다 — 그 레벨에 있는 것만
     const short = !!(game && !game.shows('market'));
-    const body = short ? T('help.l1') : T('help.body', { stress: D.GAMEOVER_STRESS });
-    const btns = short ? [] : [{ label: T('how.title'), onClick: () => showHowTo(null, () => showHelp(back)) }];
-    modal(T('title.help'), body, [...btns, { label: T('help.notes'), onClick: () => showNotes(() => showHelp(back)) }, { label: T('btn.close'), onClick: back }]);
+    const body = short ? T('help.l1') : helpVisual();
+    // 아래 버튼은 닫기 하나 — 옛 설명 카드·창고장 노트 버튼은 그림판이 대신한다
+    modal(T('title.help'), body, [{ label: T('btn.close'), onClick: back }]);
   }
   // 창고장 노트: 이 런에서 들은 비트 전문
   function showNotes(back) {

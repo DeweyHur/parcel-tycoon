@@ -870,3 +870,66 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 #invest-btn .camp-act { display: block; font-size: 10px; color: var(--ink); line-height: 1.2; }
 #invest-btn.active { border-color: var(--gold); }
 .growth-buy .camp-on { color: var(--gold); font-size: 11px; }
+
+/* ---------- 게임 방법 그림판 ---------- */
+.hv { display: flex; flex-direction: column; gap: 6px; }
+.hv-sec { background: var(--panel2); border: 2px solid var(--line); }
+.hv-sec > summary { cursor: pointer; padding: 6px 8px; font-weight: 700; color: var(--gold); list-style: none; display: flex; align-items: center; gap: 6px; }
+.hv-sec > summary::-webkit-details-marker { display: none; }
+.hv-sec > summary::after { content: '▾'; margin-left: auto; color: var(--dim); }
+.hv-sec:not([open]) > summary::after { content: '▸'; }
+.hv-body { padding: 2px 8px 8px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.hv-row { display: flex; align-items: center; gap: 8px; line-height: 1.35; }
+.hv-ic { flex: 0 0 auto; min-width: 22px; text-align: center; font-size: 14px; }
+.hv-row .hv-ic .pips { font-size: 10px; }
+.hv-btn { font-style: normal; display: inline-block; padding: 0 4px; background: #b98a1e; border: 1px solid var(--gold); }
+.hv-flow { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 4px 0 6px; flex-wrap: wrap; }
+.hv-flow > span { display: flex; flex-direction: column; align-items: center; font-size: 18px; }
+.hv-flow > span small { font-size: 10px; color: var(--dim); }
+.hv-flow > b { color: var(--dim); }
+.hv-snap { border: 1px dashed var(--line); padding: 4px 6px; margin: 2px 0 4px; background: var(--bg, #1b1a2e); }
+.hv-snap .load-visual { margin: 0; }
+.hv-snap .truck-shell { min-height: 0; padding: 4px 22px 4px 4px; }
+.hv-snap .truck-shell::before { top: 4px; bottom: 2px; height: auto; width: 18px; }
+.hv-snap .truck-cells { min-height: 0; gap: 2px; }
+.hv-snap .truck-cell { min-height: 16px; min-width: 10px; }
+.hv-snap .money-chip { padding: 2px 4px; } .hv-snap .money-chip b { font-size: 13px; } .hv-snap .money-chip.net b { font-size: 15px; }
+.hv-tbl { border-collapse: collapse; width: 100%; font-size: 12px; }
+.hv-tbl td, .hv-tbl th { padding: 2px 4px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.hv-tbl th { color: var(--dim); font-size: 10px; font-weight: 400; }
+.hv-tbl .hv-sz { color: var(--dim); white-space: nowrap; }
+.hv-sw { display: inline-block; width: 12px; height: 12px; border: 1px solid #0008; vertical-align: middle; }
+.hv-score td.good { color: var(--green); font-weight: 700; } .hv-score td.bad { color: var(--red); font-weight: 700; }
+.hv-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.hv-snap .load-visual { grid-template-columns: 1fr; gap: 4px; }
+.hv-snap .load-money { grid-template-rows: none; grid-template-columns: repeat(3, 1fr); min-width: 0; }
+.hv-score td:first-child { width: 24px; }
+
+/* ---------- 도감 타일 ---------- */
+.cx-tabs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-bottom: 6px; }
+.cx-tabs .btn { display: flex; flex-direction: column; align-items: center; padding: 3px 0; line-height: 1.1; }
+.cx-tabs .btn span { font-size: 16px; } .cx-tabs .btn small { font-size: 9px; }
+.cx-head { font-size: 11px; color: var(--gold); margin: 8px 0 3px; }
+.cx-note { font-size: 11px; color: var(--dim); margin: 2px 0 4px; }
+.cx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.cx-list { display: flex; flex-direction: column; gap: 3px; }
+.cx-tile { background: var(--panel2); border: 2px solid var(--line); font-size: 12px; min-width: 0; }
+.cx-tile > summary, .cx-tile > .cx-sum { list-style: none; cursor: pointer; padding: 4px 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; }
+.cx-tile > summary::-webkit-details-marker { display: none; }
+.cx-tile b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.cx-tile.dis { opacity: .5; } .cx-tile.done { border-color: #7c642a; }
+.cx-tile[open] { grid-column: 1 / -1; border-color: var(--gold); opacity: 1; }
+.cx-ic { font-size: 14px; }
+.cx-sub { flex-basis: 100%; font-size: 10px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+.cx-tile.wide .cx-sub { flex-basis: auto; margin-left: auto; }
+.cx-tile .takes { display: inline-flex; gap: 2px; } .cx-tile .takes i { width: 7px; height: 7px; border: 1px solid #0006; }
+.cx-price { margin-left: auto; color: var(--gold); font-size: 11px; }
+.cx-win { margin-left: auto; font-size: 10px; color: var(--gold); }
+.cx-stats { display: inline-flex; align-items: center; gap: 6px; }
+.cx-more { padding: 2px 8px 8px; font-size: 11px; color: var(--dim); line-height: 1.45; }
+.cx-lock { color: var(--orange); }
+.cx-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.cx-stat { background: var(--panel2); border: 2px solid var(--line); display: flex; flex-direction: column; align-items: center; padding: 4px 2px; }
+.cx-stat b { font-size: 15px; color: var(--gold); } .cx-stat small { font-size: 9px; color: var(--dim); text-align: center; }
+.cx-types { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; margin: 6px 0; } .cx-types span { display: inline-flex; align-items: center; gap: 3px; }
+.cx-tabs { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
