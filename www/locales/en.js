@@ -153,7 +153,7 @@
     'mission.toast': "Fortnight target hit {grade} · growth bonus +{bonus}c",
     'mk.vehicleLine': "{vehicle} <b>{cap}</b> slots · <b>{fee}</b>c per vehicle · <b>{trucks}</b>/month",
     'mk.gradeVs': "vs Standard: capacity {cap0}→{cap1} · {t0}→{t1}/month · fee {f0}→{f1}c · trust lv {lv} immediately",
-    'grade.merit': "Premium contracts bring bigger vehicles, more dispatches, cheaper fees and instant trust perks",
+    'grade.merit': "Premium contracts bring bigger vehicles and more dispatches, at a higher fee per truck",
     'mk.capLine': "{vehicle} <b>{cap}</b> cells × <b>{trucks}</b>/mo = <b>{total}</b> cells · {fee}c per truck (<b>{per}</b>c per cell)",
     'mk.monthTotal': "up to {total} cells/mo · {per}c per cell",
     'mk.forecastSum': "Next cycle ({m}) forecast: {min}-{max} parcels",
@@ -930,7 +930,7 @@
     'cal.event.hangul': "Hangul Day — carriers closed",
     'cal.event.christmas': "Christmas — carriers closed",
     'cal.event.gift': 'Gift week — ⚠ fragile pay +10',
-    'cal.event.sale': 'Shopping festival — plain parcels ×1.5, bulk fee −10%',
+    'cal.event.sale': 'Shopping festival — plain parcels ×1.5, bulk fee +20%',
     'cal.kr.1.label': 'New Year lull',
     'cal.kr.1.note': 'Off-season — volume −15%, frequent snow, no cost inflation this month',
     'cal.kr.1.sms': 'First month of the year is quiet. Catch your breath and get ready for the February holiday.',
@@ -962,7 +962,7 @@
     'cal.kr.10.note': 'Autumn moving · harvest — produce ↑, more storage offers, storage fee +20%',
     'cal.kr.10.sms': 'Autumn moving season. The movers will come asking for space. Take it if you have room.',
     'cal.kr.11.label': 'Kimjang · sale',
-    'cal.kr.11.note': 'Kimjang season · shopping festival — volume +30%, produce ↑, festival turns 7–10 (plain rush, bulk fee −10%)',
+    'cal.kr.11.note': 'Kimjang season · shopping festival — volume +30%, produce ↑, festival turns 7–10 (plain rush, bulk fee +20%)',
     'cal.kr.11.sms': 'Kimjang brings produce, and the month-end sale floods plain boxes. Stock up on bulk trucks.',
     'cal.kr.12.label': 'Year-end',
     'cal.kr.12.note': 'Year-end — volume +40%, fragile·frozen·large ↑, snow (free cold), return grace −1',
@@ -1377,19 +1377,19 @@
         "name": "QuickHands Express",
         "short": "QuickHands",
         "vehicle": "box truck",
-        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Premium — trucks +1 · cap +1 · fee −10%"
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Premium — trucks +1 · cap +1 · fee +20%"
       },
       "bulk2": {
         "name": "Blueway Logis",
         "short": "Blueway",
         "vehicle": "padded box truck",
-        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Elite — trucks +2 · cap +2 · fee −20% · ⚠ break-safe added"
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Elite — trucks +2 · cap +2 · fee +40% · ⚠ break-safe added"
       },
       "bulk3": {
         "name": "MegaHub Logistics",
         "short": "MegaHub",
         "vehicle": "padded box truck",
-        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Master — trucks +3 · cap +3 · fee −30% · ⚠ break-safe added"
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Master — trucks +3 · cap +3 · fee +60% · ⚠ break-safe added"
       },
       "cold0": {
         "name": "Dawn Chill",
@@ -1401,19 +1401,19 @@
         "name": "Ice Road",
         "short": "Ice Road",
         "vehicle": "reefer truck",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus · Premium — trucks +1 · cap +1 · fee −10%"
+        "desc": "Fresh & produce specialist. Fresh/produce bonus · Premium — trucks +1 · cap +1 · fee +20%"
       },
       "cold2": {
         "name": "ColdChain Center",
         "short": "ColdChain",
         "vehicle": "reefer/freezer truck",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus · Elite — trucks +2 · cap +2 · fee −20% · ❆ frozen-capable added"
+        "desc": "Fresh & produce specialist. Fresh/produce bonus · Elite — trucks +2 · cap +2 · fee +40% · ❆ frozen-capable added"
       },
       "cold3": {
         "name": "Polar Logis",
         "short": "Polar",
         "vehicle": "large reefer",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus · Master — trucks +3 · cap +3 · fee −30% · ❆ frozen-capable added · up to size 7"
+        "desc": "Fresh & produce specialist. Fresh/produce bonus · Master — trucks +3 · cap +3 · fee +60% · ❆ frozen-capable added · up to size 7"
       },
       "frozen0": {
         "name": "Glacier Frozen",
@@ -1425,13 +1425,13 @@
         "name": "Snowfield Frozen",
         "short": "Snowfield",
         "vehicle": "freezer truck",
-        "desc": "Frozen only. Frozen bonus · Premium — trucks +1 · cap +1 · fee −10%"
+        "desc": "Frozen only. Frozen bonus · Premium — trucks +1 · cap +1 · fee +20%"
       },
       "frozen2": {
         "name": "Minus 30",
         "short": "Minus30",
         "vehicle": "freezer/reefer truck",
-        "desc": "Frozen only. Frozen bonus · Elite — trucks +2 · cap +2 · fee −20% · ❄ cold-capable added"
+        "desc": "Frozen only. Frozen bonus · Elite — trucks +2 · cap +2 · fee +40% · ❄ cold-capable added"
       },
       "fragile0": {
         "name": "Easy Does It",
@@ -1449,19 +1449,19 @@
         "name": "Glass Hands",
         "short": "GlassHands",
         "vehicle": "padded van",
-        "desc": "Fragile specialist. No breakage, fragile bonus · Premium — trucks +1 · cap +1 · fee −10%"
+        "desc": "Fragile specialist. No breakage, fragile bonus · Premium — trucks +1 · cap +1 · fee +20%"
       },
       "fragile2": {
         "name": "Padding Masters",
         "short": "Padding",
         "vehicle": "large padded truck",
-        "desc": "Fragile specialist. No breakage, fragile bonus · Elite — trucks +2 · cap +2 · fee −20% · up to size 7"
+        "desc": "Fragile specialist. No breakage, fragile bonus · Elite — trucks +2 · cap +2 · fee +40% · up to size 7"
       },
       "fragile3": {
         "name": "Porcelain Logis",
         "short": "Porcelain",
         "vehicle": "chilled padded truck",
-        "desc": "Fragile specialist. No breakage, fragile bonus · Master — trucks +3 · cap +3 · fee −30% · ❄ cold-capable added · up to size 7"
+        "desc": "Fragile specialist. No breakage, fragile bonus · Master — trucks +3 · cap +3 · fee +60% · ❄ cold-capable added · up to size 7"
       },
       "intl0": {
         "name": "Customs Bridge",
@@ -1473,13 +1473,13 @@
         "name": "Bonded Express",
         "short": "Bonded",
         "vehicle": "bonded truck",
-        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · Premium — trucks +1 · cap +1 · fee −10%"
+        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · Premium — trucks +1 · cap +1 · fee +20%"
       },
       "intl2": {
         "name": "WorldGate",
         "short": "WorldGate",
         "vehicle": "bonded padded truck",
-        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · Elite — trucks +2 · cap +2 · fee −20% · ⚠ break-safe added"
+        "desc": "Clears and ships cargo still waiting at customs. Customs bonus · Elite — trucks +2 · cap +2 · fee +40% · ⚠ break-safe added"
       },
       "large0": {
         "name": "Giant Freight",
@@ -1491,13 +1491,13 @@
         "name": "Taesan Heavy",
         "short": "Taesan",
         "vehicle": "heavy truck",
-        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Premium — trucks +1 · cap +1 · fee −10%"
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Premium — trucks +1 · cap +1 · fee +20%"
       },
       "large2": {
         "name": "Elephant Special",
         "short": "Elephant",
         "vehicle": "reefer heavy truck",
-        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Elite — trucks +2 · cap +2 · fee −20% · ❄ cold-capable added"
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Elite — trucks +2 · cap +2 · fee +40% · ❄ cold-capable added"
       },
       "air0": {
         "name": "Airport Cargo Agent",
@@ -1509,7 +1509,7 @@
         "name": "Jet Forwarding",
         "short": "Jet",
         "vehicle": "airport shuttle truck",
-        "desc": "Airport cargo forwarder. Handles customs & fragile safely. Pricey but fast · Premium — trucks +1 · cap +1 · fee −10% · up to size 4"
+        "desc": "Airport cargo forwarder. Handles customs & fragile safely. Pricey but fast · Premium — trucks +1 · cap +1 · fee +20% · up to size 4"
       },
       "rail0": {
         "name": "Rail Terminal Shuttle",
@@ -1521,7 +1521,7 @@
         "name": "Bullet Forwarding",
         "short": "Bullet",
         "vehicle": "terminal trailer",
-        "desc": "Freight-terminal forwarder with an express connection. Break-safe · Premium — trucks +1 · cap +1 · fee −10% · paid immediately, no note"
+        "desc": "Freight-terminal forwarder with an express connection. Break-safe · Premium — trucks +1 · cap +1 · fee +20% · paid immediately, no note"
       },
       "sea0": {
         "name": "Wave Forwarding",
@@ -1533,7 +1533,7 @@
         "name": "Ocean Forwarding",
         "short": "Ocean",
         "vehicle": "port trailer",
-        "desc": "Port forwarder. Size 2+, customs & fragile safe · Premium — trucks +1 · cap +1 · fee −10% · 📄 half-month note"
+        "desc": "Port forwarder. Size 2+, customs & fragile safe · Premium — trucks +1 · cap +1 · fee +20% · 📄 half-month note"
       }
     },
     "FAMILIES": {

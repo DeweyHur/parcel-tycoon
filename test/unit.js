@@ -192,9 +192,9 @@ t('신뢰도: 기한보다 일찍 보낼수록 오른다 — 들어오자마자 
   const cold0 = g.warehouse.cold; g._addTrust('cold0', 24); assert.equal(g.trustLevel('cold0'), 3); assert.equal(g.warehouse.cold, cold0 + 2);
   assert.equal(D.trustEffectText('cold', 1), '용량 +2칸'); assert.equal(D.trustEffectText('rail', 2), '배차 한도 +1대');
 });
-t('센터: 상위 tier 센터 = 다른 센터와 신규 계약 (배차 +2·용량 +1·배차비 -10%, 신뢰도는 센터별 새로 시작), 복합 능력', () => {
+t('센터: 상위 tier 센터 = 다른 센터와 신규 계약 (배차 +2·용량 +1·배차비 +20%, 신뢰도는 센터별 새로 시작), 복합 능력', () => {
   const g = EMPTY(3); const c = g._makeContract('bulk', 'trusted'); g.contracts[3] = c;
-  assert.equal(c.carrier, 'bulk1'); assert.equal(c.grade, 'trusted'); assert.equal(g.trustLevel('bulk1'), 0); assert.equal(c.maxCalls, Math.round((7 + 2) * D.CALLS_SCALE)); assert.equal(g.vehicleCap(c), 6 + 1 + 1); assert.equal(g.truckFee(c), Math.round(D.FAMILIES.bulk.fee * 0.9));
+  assert.equal(c.carrier, 'bulk1'); assert.equal(c.grade, 'trusted'); assert.equal(g.trustLevel('bulk1'), 0); assert.equal(c.maxCalls, Math.round((7 + 2) * D.CALLS_SCALE)); assert.equal(g.vehicleCap(c), 6 + 1 + 1); assert.equal(g.truckFee(c), Math.round(D.FAMILIES.bulk.fee * 1.2)); assert.ok(g.truckFee(c) > D.FAMILIES.bulk.fee, '상위 센터는 배차비가 오른다');
   assert.equal(D.CARRIERS.bulk1.name, '빠른손 익스프레스'); assert.equal(D.GRADES.trusted.name, '프리미엄');
   const e = g._makeContract('bulk2'); assert.ok(g.contractCaps(e).includes('fragile')); assert.ok(!('express' in D.ENHANCEMENTS), '동시 배차 강화 없음');
   assert.ok(g.contractCaps(g._makeContract('cold2')).includes('frozen')); assert.equal(D.CARRIERS.rail1.delay, 0);

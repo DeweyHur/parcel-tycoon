@@ -164,12 +164,12 @@
       rail:    { badge: '🚆', cap: 16, fee: 194, trucks: 2, price: 80, caps: ['fragile'], sizeMin: 1, sizeMax: 7, delay: 1, marketOnly: true, rep: 'noh', needsTrade: true },
       sea:     { badge: '🚢', cap: 14, fee: 165, trucks: 2, price: 90, caps: ['customs', 'fragile'], sizeMin: 2, sizeMax: 7, delay: 2, marketOnly: true, needsTrade: true },
     },
-    // tier 공통 보정: 배차 +, 용량 +, 배차비 배율, 계약가 배율. 센터가 개별 값을 주면 그것이 우선
+    // tier 공통 보정: 배차 +, 용량 +, 배차비 배율, 계약가 배율. 상위 센터는 차가 크고 많은 대신 배차비가 확실히 비싸다(유저: "업그레이드에서 배차비는 항상 올라야 해, 유의미하게"). 센터가 개별 값을 주면 그것이 우선
     TIERS: [
       { grade: 'normal',  trucks: 0, cap: 0, fee: 1.0,  price: 1.0 },
-      { grade: 'trusted', trucks: 2, cap: 1, fee: 0.9,  price: 2.2 },
-      { grade: 'expert',  trucks: 4, cap: 2, fee: 0.8,  price: 4.0 },
-      { grade: 'master',  trucks: 6, cap: 3, fee: 0.7,  price: 7.0 },
+      { grade: 'trusted', trucks: 2, cap: 1, fee: 1.2,  price: 2.2 },
+      { grade: 'expert',  trucks: 4, cap: 2, fee: 1.4,  price: 4.0 },
+      { grade: 'master',  trucks: 6, cap: 3, fee: 1.6,  price: 7.0 },
     ],
     // 센터 목록. 이름·설명은 locales data.CARRIERS[id]. extraCaps = 복합 능력(그 센터 차는 이 속성도 안전하게), sizeMax/delay 개별 보정
     CENTERS: {
