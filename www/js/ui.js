@@ -1138,7 +1138,8 @@
     const dotOf = n => n <= 1 ? 'r' : n <= 2 ? 'o' : n <= 3 ? 'y' : 'g';
     if (p.customs > 0) return { key: `cu${p.customs}|${p.deadline}`, urg: p.customs + p.deadline, cls: 'cu', dot: dotOf(p.customs + p.deadline), label: `${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })} · ⏳ ${T('fmt.turns', { n: p.deadline })}` };
     if (p.overdue) { const ri = game ? game.returnIn(p) : null; return { key: 'od', urg: -1, cls: 'od', dot: 'r', label: T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' }) }; }
-    if (p.rush) return game && game.rushToday(p) ? { key: 'rush', urg: -5, cls: 'rush', dot: 'r', label: T('ps.rushToday', { x: D.RUSH_CARGO.sameDay }) } : { key: 'rushL', urg: 80, cls: 'nd', dot: 'g', label: T('ps.rushLate', { x: '½' }) };
+    // ⚡ 오늘 들어온 긴급은 맨 윗줄. 놓친 것은 초과 줄로 (반송까지 남은 날이 보인다)
+    if (p.rush && game && game.rushToday(p)) return { key: 'rush', urg: -5, cls: 'rush', dot: 'r', label: T('ps.rushToday', { x: D.RUSH_CARGO.sameDay }) };
     if (p.noDeadline) return { key: 'nd', urg: 90, cls: 'nd', dot: 'g', label: T('ps.noDue') };
     return { key: `d${p.deadline}`, urg: p.deadline, cls: dotOf(p.deadline), dot: dotOf(p.deadline), label: T('ps.deadline', { n: p.deadline }) };
   }

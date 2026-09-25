@@ -743,7 +743,7 @@
     // 택배마다: 들어오자마자(기한의 3/4 이상 남음) +2 · 여유 있게(2/5 이상) +1 · 기한 맞춰서 0 · 늦으면 −2. (반 점 대신 눈금을 두 배로 — TRUST_LEVELS 6/16/30)
     // 기한이 없는 첫 사이클(캠페인)은 나이로: 그날 0일 +2 · 하루 +1.
     trustScorePer(p) {
-      if (p.overdue) return -2;
+      if (p.overdue) return p.rush ? 0 : -2;   // ⚡ 긴급을 놓친 것은 벌점이 아니다 — 덜 받을 뿐
       if (p.noDeadline) return p.age <= 0 ? 2 : p.age === 1 ? 1 : 0;
       const total = Math.max(1, p.deadline0 || (p.deadline + (p.age || 0))), ratio = p.deadline / total;
       return ratio >= 0.75 ? 2 : ratio >= 0.4 ? 1 : 0;
@@ -991,8 +991,8 @@
       return Math.round(r * (R.rewardMult[p.type] || 1) * this.rushMult(p));
     }
     // ⚡ 긴급 화물 보상 배수 — 들어온 날(age 0) ×2, 그 뒤 ×½
-    rushMult(p) { return p && p.rush ? (p.age <= 0 ? D.RUSH_CARGO.sameDay : D.RUSH_CARGO.later) : 1; }
-    rushToday(p) { return !!(p && p.rush && p.age <= 0); }
+    rushMult(p) { return p && p.rush ? (p.overdue ? D.RUSH_CARGO.later : D.RUSH_CARGO.sameDay) : 1; }
+    rushToday(p) { return !!(p && p.rush && !p.overdue); }
     isSpecialist(car, type) { return Array.isArray(car.specialist) ? car.specialist.includes(type) : car.specialist === type; }
     canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)); }
     // 이 택배를 (파손 없이) 받아 주는 계열들 — 지금 계약이 없을 때 "뭘 사면 되는지" 말해 주려고
@@ -1382,7 +1382,9 @@
       const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, rush: !!spec.rush, attrs, customer,
         deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1,
         // 첫 사이클에는 기한을 붙이지 않는다 — '차를 꽉 채워 보낸다'를 먼저 익히고, 기한은 그 다음에 배운다 (levels.js noDeadlineCycles)
-        noDeadline: this.month <= (R.noDeadlineCycles || 0) || !!spec.rush };   // ⚡ 긴급은 기한·반송 대신 '오늘 ×2 / 뒤엔 ×½'
+        noDeadline: this.month <= (R.noDeadlineCycles || 0) && !spec.rush };
+      // ⚡ 긴급(새벽배송): 기한은 들어온 날 하루뿐 — 그날 내보내면 ×2, 놓치면 벌점 없이 ×½, 반송 유예가 끝나면 여느 택배처럼 반송(벌점·배상)
+      if (spec.rush) p.deadline = D.RUSH_CARGO.deadline;
       p.deadline0 = p.deadline;   // 처음 기한 — 얼마나 일찍 보냈는지(신뢰)를 잰다
       if (attrs.includes('customs')) { p.customs = R.customsWait + (this.trustPerkAny('customsDelta') || 0); if (this.rng.next() < R.customsDelayProb && this.items.customsBond !== this.month && !this.trustPerkAny('noCustomsDelay')) { p.customs += 1; p.customsDelayed = true; } if (cust.rule && cust.rule.kind === 'customsFast') p.customs += cust.rule.delta; const cd = this.customerPerk(customer, 'customsDelta'); if (cd) p.customs += cd; p.customs = Math.max(0, p.customs); p.coldDuringCustoms = true; }
       return p;
@@ -1483,7 +1485,7 @@
         r = Math.round(r * (R.rewardMult[p.type] || 1) * this.rushMult(p));
         if (p.wet) { r = Math.round(r * 0.8); this.stats.wetDelivered++; }
         if (snow && this._attrs(p).includes('cold')) { r += 10; this.stats.snowDelivered++; }
-        if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else { onTime++; this.stats.onTimeByType[p.type]++; if (p.baseSize >= 7) this.stats.xlOnTime++; if (p.baseSize >= 4) this.stats.bigDelivered++; }
+        if (p.overdue) { if (!p.rush) r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else { onTime++; this.stats.onTimeByType[p.type]++; if (p.baseSize >= 7) this.stats.xlOnTime++; if (p.baseSize >= 4) this.stats.bigDelivered++; }
         r += this._custDeliver(p, r, !p.overdue, chosen.filter(q => q.customer === p.customer));
         r = Math.max(0, r); this._custRevenue(p, r);
         revenue += r;
@@ -1582,7 +1584,7 @@
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
         r = Math.round(r * (R.rewardMult[p.type] || 1) * this.rushMult(p));
         if (p.wet) r = Math.round(r * 0.8);
-        if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else this.stats.onTimeByType[p.type]++;
+        if (p.overdue) { if (!p.rush) r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else this.stats.onTimeByType[p.type]++;
         r += this._custDeliver(p, r, !p.overdue, chosen.filter(q => q.customer === p.customer));
         r = Math.max(0, r); this._custRevenue(p, r);
         revenue += r;
@@ -1671,8 +1673,8 @@
         const grace = this.returnGraceFor(p);
         // 무기한(첫 사이클)은 기한도 안 줄고 초과도 반송도 없다 — else 로 새면 바로 반송 처리로 빠진다
         if (p.noDeadline) continue;
-        if (!p.overdue) { if (!freeze) p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; pen += R.overdueStress; if (R.overdueStress) reasons.push(MSG('r.overdue', { short: D.PARCEL_TYPES[p.type].short })); this.monthStats.overdue++; } }
-        else { p.overdueTurns = (p.overdueTurns || 0) + 1; if (p.overdueTurns >= grace) returned.push(p); else if (R.overdueTurnStress) { pen += R.overdueTurnStress; reasons.push(MSG('r.overdueCont', { short: D.PARCEL_TYPES[p.type].short })); } }
+        if (!p.overdue) { if (!freeze) p.deadline--; if (p.deadline <= 0) { p.overdue = true; p.overdueTurns = 0; if (!p.rush) pen += R.overdueStress; if (R.overdueStress && !p.rush) reasons.push(MSG('r.overdue', { short: D.PARCEL_TYPES[p.type].short })); this.monthStats.overdue++; } }
+        else { p.overdueTurns = (p.overdueTurns || 0) + 1; if (p.overdueTurns >= grace) returned.push(p); else if (R.overdueTurnStress && !p.rush) { pen += R.overdueTurnStress; reasons.push(MSG('r.overdueCont', { short: D.PARCEL_TYPES[p.type].short })); } }
       }
       for (const [p, why] of discard) { this._discardParcel(p, why, 2, 'discard'); reasons.push(MSG('r.discard', { why, short: D.PARCEL_TYPES[p.type].short })); }
       for (const p of returned) {

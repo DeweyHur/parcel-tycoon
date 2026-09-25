@@ -122,9 +122,9 @@
       large:   { attrs: [],          sizes: [4, 7],  deadline: 6, bonus: 30, reward: { 1: 45, 2: 65, 4: 100, 7: 140 }, color: 0xb08bd8, css: '#b08bd8' },
       frozen:  { attrs: ['frozen'],  sizes: [1, 2, 4],  deadline: 5, bonus: 25, reward: { 1: 22, 2: 70, 4: 105, 7: 145 }, sizeWeight: { 1: 30 }, color: 0x9ad7ff, css: '#9ad7ff' },
     },
-    // ⚡ 긴급 화물: 일반 택배에 붙는 표시. 기한·반송이 없다 — 대신 **들어온 날 내보내면 보상 ×2, 하루라도 묵히면 ×½**.
-    // 자유 런에서만(스토리 장은 설명이 없어서). chance 는 일반 택배 중 비율
-    RUSH_CARGO: { chance: 0.12, sameDay: 2, later: 0.5 },
+    // ⚡ 긴급 화물(새벽배송): 일반 택배에 붙는 표시. 기한은 들어온 날 하루(deadline 1) — 그날 내보내면 보상 ×2,
+    // 놓치면 벌점 없이 ×½, 반송 유예가 끝나면 여느 택배처럼 반송(벌점·배상). 자유 런에서만. chance 는 일반 택배 중 비율
+    RUSH_CARGO: { chance: 0.12, deadline: 1, sameDay: 2, later: 0.5 },
     FRESH_TURNS: 3,
     // 신선: 냉장 구역 밖에서 WARM_LIMIT턴 지나면 폐기 (폭염 경보 턴은 즉시). 냉동: 냉동 구역 밖이면 즉시
     WARM_LIMIT: 1,
