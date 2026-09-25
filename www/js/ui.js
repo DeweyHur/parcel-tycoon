@@ -986,7 +986,7 @@
   function enhBlock(key, c) {
     const e = D.ENHANCEMENTS[key]; if (!e || !c) return 'none';
     if (e.kind === 'trust') return null;   // 신뢰 xp 아이템은 칸을 안 쓴다
-    if (game.enhUsed(c) >= game.enhSlots(c)) return 'full';
+    // 칸이 다 찬 계약도 막지 않는다 — 끼운 것 하나를 골라 교체한다(chooseSlot → chooseReplace)
     if (e.kind === 'holiday') return c.enh.holiday ? 'has' : null;
     if (e.kind !== 'opt') return null;
     const car = D.CARRIERS[c.carrier];
@@ -1749,6 +1749,13 @@
       ${trustTrack(c.carrier, g.trustXp(c.carrier))}${enh.length ? `<div class="d">${T('kind.enh')}: ${enh.join(', ')}</div>` : ''}`;
     modal(g.contractName(c), body, [{ label: T('btn.close'), onClick: back || closeModal }]);
   }
+  // 강화 칸이 다 찬 계약: 무엇을 빼고 새 강화를 끼울지 고른다 (뺀 것은 환불 없음)
+  function chooseReplace(it, c, onPick, back) {
+    const list = game.enhList(c);
+    const body = `<p style="font-size:12px;color:var(--dim)">${T('slot.pickSwap', { name: esc(it.name) })}</p><div class="swap-list">` + list.map((id, k) => `<div class="card" data-k="${k}"><div class="t"><span>${enhIcon(id)} ${esc(D.ENHANCEMENTS[id].name)}</span><span class="price" style="color:var(--red)">→ ${enhIcon(it.enh)}</span></div><div class="d">${esc(D.ENHANCEMENTS[id].desc)}</div></div>`).join('') + '</div>';
+    const m = modal(game.contractName(c), body, [{ label: T('btn.cancel'), onClick: back }]);
+    m.querySelectorAll('.card[data-k]').forEach(el => el.onclick = () => onPick(list[+el.dataset.k]));
+  }
   function chooseSlot(it, idx, back) {
     const isContract = it.kind === 'contract';
     const body = `<p style="font-size:12px;color:var(--dim)">${isContract ? T('slot.pickReplace') : T('slot.pickApply')}</p>` + game.contracts.slice(0, game.visibleSlots()).map((c, s) => {
@@ -1757,11 +1764,14 @@
       // 못 붙이는 계약은 회색으로, 이유 한 줄과 함께 (칸이 참 · 일반 전용 · 이미 처리 · 크기 초과)
       const block = isContract ? null : enhBlock(it.enh, c);
       const names = enhNames(game, c);
-      const info = isContract ? `${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}` : `${enhPips(game, c)}${names.length ? ` ${names.join(' · ')}` : ''}${block ? `<br><span class="why">${T('slot.block.' + block)}</span>` : ''}`;
+      const full = !isContract && !block && D.ENHANCEMENTS[it.enh].kind !== 'trust' && game.enhUsed(c) >= game.enhSlots(c);
+      const info = isContract ? `${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}` : `${enhPips(game, c)}${names.length ? ` ${names.join(' · ')}` : ''}${block ? `<br><span class="why">${T('slot.block.' + block)}</span>` : full ? `<br><span class="swap">${T('slot.replaceHint')}</span>` : ''}`;
       return `<div class="card ${block ? 'dis' : ''}" data-s="${s}"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span></div><div class="d">${info}</div></div>`;
     }).join('');
     const m = modal(it.name, body, [{ label: T('btn.cancel'), onClick: back }]);
-    const doBuy = (s) => { if (isContract) return buyContractInto(it, idx, s, back); const r = game.buy(idx, s); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back(); } else toast(r.msg); };
+    const doBuy = (s, mode) => { if (isContract) return buyContractInto(it, idx, s, back); const c = game.contracts[s];
+      if (!mode && D.ENHANCEMENTS[it.enh].kind !== 'trust' && game.enhUsed(c) >= game.enhSlots(c)) return chooseReplace(it, c, rid => doBuy(s, { replace: rid }), () => chooseSlot(it, idx, back));
+      const r = game.buy(idx, s, mode); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back(); } else toast(r.msg); };
     m.querySelectorAll('.card:not(.dis)').forEach(el => el.onclick = () => doBuy(+el.dataset.s));
   }
 

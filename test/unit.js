@@ -210,6 +210,17 @@ t('기업 계약: 계약 단가가 보상에 붙고, 처리·사고가 평가에
   g.parcels = [p]; g.callCarrier(i, [p.id]); assert.equal(d.st.delivered, 1); assert.equal(d.st.onTime, 1);
   const q = g._spawnParcel({ type: 'normal', size: 1, customer: 'farm' }); g._claim(q, 'test', 'stolen'); assert.equal(d.st.claims, 1);
 });
+t('강화 교체: 칸이 다 차면 하나를 빼고 새 걸 끼운다 — 뺀 효과는 되돌아간다', () => {
+  const g = EMPTY(22); g.phase = 'market'; g.market = { items: [], bought: 0, refreshes: 0, freeRefresh: 0 }; const i = slot(g, 'bulk'), c = g.contracts[i];
+  const buy = (enh, mode) => { g.market.items.push({ kind: 'enh', enh, price: 10, name: enh, sold: false }); return g.buy(g.market.items.length - 1, i, mode); };
+  const n = g.enhSlots(c), max0 = c.maxCalls;
+  for (let k = 0; k < n; k++) assert.ok(buy('limit1').ok);
+  assert.equal(c.maxCalls, max0 + n);
+  assert.ok(!buy('holiday').ok, '칸이 차면 그냥은 못 산다');
+  const r = buy('holiday', { replace: 'limit1' }); assert.ok(r.ok, '교체로 산다');
+  assert.ok(c.enh.holiday); assert.equal(c.enh.limit, n - 1); assert.equal(c.maxCalls, max0 + n - 1, '뺀 배차 한도는 되돌아간다');
+  assert.ok(!buy('cap1', { replace: 'nope' }).ok, '끼운 적 없는 강화는 뺄 수 없다');
+});
 t('휴무 특약: 쉬는 날에도 그 계약만 부를 수 있고, 그날 배차비 ×1.8 · 강화 칸 하나', () => {
   const g = EMPTY(21); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.parcels = [P(1, 'normal', 2)]; const fee0 = g.truckFee(c);

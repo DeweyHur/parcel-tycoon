@@ -1046,13 +1046,24 @@
     enhList(c) { const out = [], lim = (c.enh.limitIds || []).slice(0, c.enh.limit || 0); while (lim.length < (c.enh.limit || 0)) lim.push('limit1');
       const rep = (id, n) => { for (let k = 0; k < n; k++) out.push(id); };
       out.push(...lim); rep('cap1', c.enh.cap || 0); rep('regular', +c.enh.regular || 0); if (c.enh.holiday) out.push('holiday'); out.push(...this.contractOpts(c)); return out; }
+    // 강화 하나 빼기(교체용) — 산 효과를 그대로 되돌린다
+    removeEnh(c, id) {
+      const e = D.ENHANCEMENTS[id]; if (!e) return false;
+      if (e.kind === 'limit') { c.enh.limit = Math.max(0, (c.enh.limit || 0) - 1); const ids = c.enh.limitIds || []; const i = ids.lastIndexOf(id); if (i >= 0) ids.splice(i, 1); c.maxCalls = Math.max(1, c.maxCalls - e.value); c.calls = Math.max(0, Math.min(c.calls, c.maxCalls)); }
+      else if (e.kind === 'cap') c.enh.cap = Math.max(0, (c.enh.cap || 0) - 1);
+      else if (e.kind === 'regular') c.enh.regular = Math.max(0, (+c.enh.regular || 0) - 1);
+      else if (e.kind === 'holiday') c.enh.holiday = false;
+      else if (e.kind === 'opt') { const opts = this.contractOpts(c); const i = opts.indexOf(id); if (i < 0) return false; opts.splice(i, 1); c.enh.opts = opts; c.enh.opt = null; if (e.capDelta) c.enh.capDelta -= e.capDelta; if (e.callsDelta) { c.maxCalls = Math.max(1, c.maxCalls - e.callsDelta); c.calls = Math.max(0, Math.min(c.calls, c.maxCalls)); } }
+      else return false;
+      return true;
+    }
     regularFreeLeft(c) { return Math.max(0, (+c.enh.regular || 0) - (c.freeUsed || 0)); }
     // 특약을 붙인 계약은 그 속성도 '받는 것'에 들어간다. caps 만 넓히고 need 를 그대로 두면
     // 전문 계열(냉장·파손·냉동·통관)은 특약을 붙여도 그 물건을 거절한다 — 특약이 아무 쓸모가 없어진다.
     // 이 특약을 붙일 수 있는 계약이 하나라도 있는가
     _canFitOpt(key) {
       const e = D.ENHANCEMENTS[key]; if (!e || e.kind !== 'opt') return false;
-      return this.contracts.some(c => { if (!c || this.enhUsed(c) >= this.enhSlots(c)) return false;
+      return this.contracts.some(c => { if (!c) return false;   // 칸이 차 있어도 교체로 끼울 수 있다
         const car = D.CARRIERS[c.carrier];
         if (car.onlyPlain || car.caps.includes(e.attr)) return false;
         if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return false;
@@ -2255,7 +2266,18 @@
         const c = this.contracts[target];
         if (!c) return { ok: false, msg: T('err.pickContract') };
         const e = D.ENHANCEMENTS[it.enh];
-        if (e.kind !== 'trust' && this.enhUsed(c) >= this.enhSlots(c)) return { ok: false, msg: T('err.enhFull', { n: this.enhSlots(c) }) };
+        // 칸이 다 찼으면 끼운 것 하나를 빼고 새 걸 끼운다(mode.replace = 뺄 강화 id). 빼는 강화는 환불 없음
+        let replaced = null;
+        if (e.kind !== 'trust' && this.enhUsed(c) >= this.enhSlots(c)) {
+          const rid = mode && mode.replace;
+          if (!rid || !this.enhList(c).includes(rid)) return { ok: false, msg: T('err.enhFull', { n: this.enhSlots(c) }) };
+          const back = JSON.parse(JSON.stringify({ enh: c.enh, maxCalls: c.maxCalls, calls: c.calls }));
+          this.removeEnh(c, rid); replaced = rid;
+          // 새 강화가 이 계약에 안 맞으면(아래 검사) 되돌린다
+          const undo = () => { c.enh = back.enh; c.maxCalls = back.maxCalls; c.calls = back.calls; };
+          if (e.kind === 'opt' && (this.contractCaps(c).includes(e.attr) || (e.maxSizeMax && D.CARRIERS[c.carrier].sizeMax > e.maxSizeMax) || D.CARRIERS[c.carrier].onlyPlain)) { undo(); return { ok: false, msg: T('err.optHasAttr') }; }
+          if (e.kind === 'holiday' && c.enh.holiday) { undo(); return { ok: false, msg: T('err.enhHas') }; }
+        }
         if (e.kind === 'limit') { c.enh.limit++; (c.enh.limitIds = c.enh.limitIds || []).push(it.enh); c.maxCalls += e.value; c.calls += e.value; }
         else if (e.kind === 'cap') { c.enh.cap++; }
         else if (e.kind === 'regular') { c.enh.regular = (+c.enh.regular || 0) + 1; }
@@ -2270,6 +2292,7 @@
         }
         this._updateTrustStats();
         this.say('log.enhance', { name: e.name, contract: this.contractName(c), price });
+        if (replaced) this.say('log.enhReplace', { old: D.ENHANCEMENTS[replaced].name, name: e.name, contract: this.contractName(c) });
       } else if (it.kind === 'customer') {
         if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         if (this.customerCount() >= M.CUSTOMER_SLOTS) return { ok: false, msg: T('err.customerMax', { n: M.CUSTOMER_SLOTS }) };

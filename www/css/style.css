@@ -997,3 +997,4 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 #invest-btn.ready { background: var(--gold) !important; border-color: #fff3c4 !important; color: #2a1e00 !important; font-weight: 700; animation: campReady 1.4s ease-in-out infinite; }
 #bottom-bar #invest-btn:not(.ready):not(.active) { filter: saturate(.55) brightness(.85); }   /* 걸 게 없으면 한 톤 죽인다 — 켜진 것과 구분되게 */
 @keyframes campReady { 0%, 100% { box-shadow: 0 0 0 0 #ffcf5a00, 3px 3px 0 #0008; } 50% { box-shadow: 0 0 10px 2px #ffcf5a99, 3px 3px 0 #0008; } }
+.card .swap { color: var(--gold); font-size: 11px; }
