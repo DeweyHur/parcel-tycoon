@@ -195,6 +195,10 @@ body.no-game { background: #141210; } body.no-game #app { visibility: hidden; } 
 .card.need { border-color: var(--gold); animation: needGlow 1.4s ease-in-out infinite; } .btn.need { animation: needGlow 1.4s ease-in-out infinite; border-color: var(--gold); }
 .media-fx { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: 12px; color: var(--ink); } .media-fx .takes { display: inline-flex; gap: 2px; vertical-align: middle; margin-right: 1px; } .media-fx .takes i { width: 8px; height: 8px; border: 1px solid #0008; }
 .media-fx .fx-day b { color: var(--dim); font-weight: 400; margin-right: 2px; } .media-fx .fx-day em { color: var(--gold); font-style: normal; }
+/* 캠페인 미리보기: 대시보드 예보 칩 + 새로 붙을 짐 깜빡임 */
+.camp-up { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; } .camp-up .chip.up { font-size: 11px; } .camp-up .ahead { white-space: nowrap; }
+@keyframes newBox { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.box.new i { animation: newBox .9s steps(2, jump-none) infinite; box-shadow: 0 0 0 1px #ffd166; }
 .camp-runs { display: inline-flex; align-items: center; gap: 4px; } .camp-runs small { color: var(--dim); font-size: 10px; }
 .fcshort { color: var(--orange); font-size: 12px; margin: 2px 0 4px; }
 .co-plus { font-size: 12px; margin-left: 6px; }

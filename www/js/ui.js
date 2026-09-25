@@ -642,18 +642,7 @@
     // 한 줄에 칩 둘 — 내일(▸)·모레(▸▸). 각 칩이 그날의 날씨와 입고를 같이 들고 있다.
     // 날짜도, '입고 예정'이라는 말도, 따로 서 있던 예보 줄도 뺐다 — 전부 중복이었다.
     $('#upcoming').innerHTML = up.slice(0, 2).map((u, i) => {
-      const mark = `<b class="ahead">${T(i ? 'hud.dayAfter' : 'hud.tomorrow')}</b>`;
-      const wx = u.weather && g.shows('weather') ? `${M.WEATHER[u.weather].icon} ` : '';
-      // 이름표는 한 줄, 상자 묶음은 두 줄까지 접힌다 — 폰 폭에서 '내일'이 세로로 쪼개지던 것
-      if (u.specs) return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}">${mark} ${wx}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}<span class="boxes">${(() => {
-        let drawn = 0; const out = [];
-        for (const sp of u.specs) {
-          if (drawn >= 16) { out.push('<b class="more">⋯</b>'); break; }
-          const t = D.PARCEL_TYPES[sp.type], n = Math.min(sp.size, 16 - drawn); drawn += n;
-          out.push(`<span class="box" title="${esc(t.name)}" aria-label="${esc(t.name)} ${sp.size}">${`<i style="background:${t.css}"></i>`.repeat(n)}</span>`);
-        }
-        return out.join('');
-      })()}</span></span>`;
+      if (u.specs) return dayChip(g, u, T(i ? 'hud.dayAfter' : 'hud.tomorrow'));
       // 월말 정산은 '호출 없음' 버튼 아래에 이미 적혀 있다 — 칩으로 또 띄우면 같은 말이 두 번
       if (u.turn > g.turns()) return '';
       return `<span class="chip none">-</span>`;
@@ -1994,16 +1983,43 @@
     clearTimeout(smsTimer); smsTimer = setTimeout(() => { el.hidden = true; }, 9000);
     el.onclick = () => { el.hidden = true; };
   }
+  // 예보 칩 하나 (대시보드 내일·모레 줄과 캠페인 미리보기가 같이 쓴다). added: 새로 붙을 짐 — 깜빡인다
+  // 이름표는 한 줄, 상자 묶음은 두 줄까지 접힌다 — 폰 폭에서 '내일'이 세로로 쪼개지던 것
+  function dayChip(g, u, label, added) {
+    const wx = u.weather && g.shows('weather') ? `${M.WEATHER[u.weather].icon} ` : '';
+    const LIM = added && added.length ? 24 : 16;
+    let drawn = 0; const out = [];
+    const box = (sp, isNew) => {
+      if (drawn >= LIM) return false;
+      const t = D.PARCEL_TYPES[sp.type], n = Math.min(sp.size, LIM - drawn); drawn += n;
+      out.push(`<span class="box ${isNew ? 'new' : ''}" title="${esc(t.name)}" aria-label="${esc(t.name)} ${sp.size}">${`<i style="background:${t.css}"></i>`.repeat(n)}</span>`);
+      return true;
+    };
+    const base = u.specs || [], add = added || [];
+    // 새 짐이 잘리지 않게: 자리가 모자라면 기존 짐을 먼저 줄인다
+    const addCells = add.reduce((a, s) => a + s.size, 0);
+    let room = Math.max(0, LIM - addCells), cut = false;
+    for (const sp of base) { if (sp.size > room) { cut = true; break; } room -= sp.size; box(sp, false); }
+    if (cut) out.push('<b class="more">⋯</b>');
+    for (const sp of add) if (!box(sp, true)) { out.push('<b class="more">⋯</b>'); break; }
+    return `<span class="chip up ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}"><b class="ahead">${esc(label)}</b> ${wx}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}<span class="boxes">${out.join('')}</span></span>`;
+  }
   // 매체 효과를 아이콘으로: 📦+건수 · ⏱일 · ⭐평판 · 더 부르는 종류(택배 색 점 ↑)
   function mediaEffect(id) {
     const A = D.AD_MEDIA[id], more = Object.keys(A.mix || {}).filter(t => A.mix[t] > 1 && D.PARCEL_TYPES[t]);
     const dots = more.length ? `<span class="takes">${more.map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('')}</span>↑` : '';
     // 지금 집행하면 어느 날 몇 건 — 위의 내일·모레 줄과 같은 말로 (플레이 중에만. 마켓에선 며칠에 걸치는지만)
-    const sp = game && game.phase === 'play' && game.media && game.media[id] ? game.campaignPreview(id) : null;
+    // 플레이 중이면 대시보드 예보 칩을 그대로 가져와 이 캠페인이 더할 짐을 깜빡인다. 마켓에선 건수·일수만
+    const g = game, roll = g && g.phase === 'play' && g.media && g.media[id] ? g._campaignRoll(id) : null;
     const dayName = d => d === 1 ? T('hud.tomorrow') : d === 2 ? T('hud.dayAfter') : T('media.fx.dayN', { n: d });
-    // 그날 입고 칸이 얼마에서 얼마로 — 지금 예보를 기준으로
-    const when = sp && sp.length ? sp.map(x => `<span class="fx-day"><b>${esc(dayName(x.day))}</b> ${x.before}→<em>${x.after}</em>${esc(T('media.fx.cells'))}</span>`).join('') : `<span title="${esc(T('media.fx.parcels'))}">📦+${A.per}</span><span title="${esc(T('media.fx.days'))}">⏱${A.days}${esc(T('media.fx.dayUnit'))}</span>`;
-    return `<span class="media-fx">${when}${A.rep ? `<span title="${esc(T('media.fx.rep'))}">⭐+${A.rep}</span>` : ''}${dots ? `<span>${dots}</span>` : ''}</span>`;
+    const chips = roll && roll.length ? (() => {
+      const last = Math.max(2, ...roll.map(x => x.day));
+      return `<span class="camp-up">${Array.from({ length: last }, (_, k) => { const d = k + 1, slot = g.turn + d - 1; if (slot >= g.turns()) return '';
+        const r = roll.find(x => x.day === d);
+        const u = { turn: slot + 1, specs: g.schedule[slot] || [], weather: g.weatherAt ? g.weatherAt(slot + 1) : null, heat: g.weatherAt && g.weatherAt(slot + 1) === 'heat', off: g.isOffTurn && g.isOffTurn(slot + 1) };
+        return dayChip(g, u, dayName(d), r ? r.specs : []); }).join('')}</span>`; })() : '';
+    const when = chips ? '' : `<span title="${esc(T('media.fx.parcels'))}">📦+${A.per}</span><span title="${esc(T('media.fx.days'))}">⏱${A.days}${esc(T('media.fx.dayUnit'))}</span>`;
+    return `${chips}<span class="media-fx">${when}${A.rep ? `<span title="${esc(T('media.fx.rep'))}">⭐+${A.rep}</span>` : ''}${dots ? `<span>${dots}</span>` : ''}</span>`;
   }
   // 📣 광고 집행: 가진 매체 중 하나를 골라 집행. 파란 눈금 = 이번 보름 남은 횟수
   function showGrowth() {
