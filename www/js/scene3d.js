@@ -603,7 +603,8 @@ window.Scene3D = (function () {
       // 창고가 바뀌었으면 건물부터 다시 짓는다 (착탈식 모듈) — 그 다음 바닥 타일
       if (game.companyName) this.setShopName(game.companyName(), { silent: !this._synced });   // 저장한 판을 처음 열 때는 조용히, 장이 넘어가며 이름이 바뀌면 내려앉는다
       if (game.warehouse) { this._syncBuilding(game.warehouse, { silent: !this._synced }); this._synced = true; }
-      this._syncGrowthVisuals(game.growth);
+      // 광고판은 가진 매체 레벨 합으로 자란다 (전단지 Lv1 만이면 아직 없음)
+      this._syncGrowthVisuals(Object.assign({}, game.growth, game.mediaScore ? { marketing: game.mediaScore() } : {}));
       { const wh = game.warehouse, use = { main: game.usedVolume ? game.usedVolume() : 0, cold: game.coldUsed ? game.coldUsed() : 0, frozen: game.frozenUsed ? game.frozenUsed() : 0, yard: game.outdoorVolume ? game.outdoorVolume() : 0 };
         const sig = [wh.cap, wh.cold, wh.frozen || 0, use.main, use.cold, use.frozen, use.yard].join('/');
         if (!this.tiles || this.tileSig !== sig) { this.tileSig = sig; this._buildTiles(wh.cap, wh.cold, wh.frozen || 0, use); } }

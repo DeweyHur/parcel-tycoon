@@ -1545,6 +1545,9 @@
         if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); const pc = { carrier: it.carrier, grade: it.grade || 'normal', enh: { limit: 0, cap: 0, capDelta: 0, regular: false, express: false, opt: null } }; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}<span class="ospec">${miniTruck(game, pc)} ${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> <b>${T('mk.feeEach', { n: o.fee })}</b> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span></span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge} ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') { const tg = enhTargets(it.enh); desc = `${D.ENHANCEMENTS[it.enh].desc}<br>${tg.length ? `<span style="color:var(--green)">→ ${tg.map(esc).join(' · ')}</span>` : `<span style="color:var(--red)">${T('mk.enhNoTarget')}</span>`}`; }
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
+        else if (it.kind === 'media') { const mp = game.mediaPlan(it.media); desc = `${D.AD_MEDIA[it.media].icon} ${esc(T('media.trait.' + it.media))} · ${T('media.line', { n: D.AD_MEDIA[it.media].per, days: mp.days, cost: D.AD_MEDIA[it.media].cost })}`; }
+        else if (it.kind === 'mediaUp') { const mp = game.mediaPlan(it.media); desc = mp.next ? `${D.AD_MEDIA[it.media].icon} ${T('media.upLine', { n: mp.parcels, n2: mp.next.parcels, cost: mp.cost, cost2: mp.next.cost })}` : ''; }
+        else if (it.kind === 'growth') desc = T('growth.desc.' + it.growth, { n: D.GROWTH.warehouse.cap });
         else if (it.kind === 'customer') { const cu = M.CUSTOMERS[it.customer]; desc = `${cu.icon} ${cu.items ? Object.keys(cu.items).map(k => { const ci = M.CUSTOMER_ITEMS[k]; return D.PARCEL_TYPES[ci ? ci.type : k].short + ' ' + cu.items[k] + '%'; }).join(' · ') : esc(cu.desc || '')} · ${T('mk.claimMult', { n: cu.claimMult })}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}<br>${T('mk.custStart', { n: game.customerCount(), max: M.CUSTOMER_SLOTS })}`; }
         else if (it.kind === 'fac') { const F = it.fac && D.FACILITIES[it.fac]; let prev = ''; if (F) { if (F.cap) prev = `${T('common.warehouse')} ${game.warehouse.cap} → ${game.warehouse.cap + Math.round(F.cap * R.facilityCapMult)}`; else if (F.cold) prev = `${D.ATTRS.cold.name} ${game.warehouse.cold} → ${Math.min(R.coldCapMax == null ? 99 : R.coldCapMax, game.warehouse.cold + F.cold)}`; else if (F.xl) prev = `${T('common.xl')} ${game.warehouse.xl} → ${game.warehouse.xl + F.xl}`; else if (F.frozen) prev = `${D.ATTRS.frozen.name} ${game.warehouse.frozen || 0} → ${(game.warehouse.frozen || 0) + F.frozen}`; } desc = F ? F.desc + (prev ? `<br><span style="color:var(--green)">${T('mk.afterBuy')} ${prev}</span>` : '') : T('mk.allFacilities'); }
         const up = it.kind === 'contract' && it.switchFrom;
@@ -1565,8 +1568,9 @@
       const newContracts = newRows ? `<div class="mkhead">${T('mk.newContracts')}${emptyN ? ` <span class="slotnote">· ${T('mk.emptySlots', { n: emptyN })}</span>` : ` <span class="slotnote" style="color:var(--dim)">· ${T('mk.noEmptySlot')}</span>`}</div>${newRows}` : '';
       const contractHead = `<div class="mkhead">${T('kind.contract')}${R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : ''}</div>`;
       const contracts = `<div id="mk-contracts">${contractHead}${contractRows}</div>`;
-      const ORDER = ['enh', 'fac', 'customer'];
-      const items = ORDER.map(k => { const rows = mk.items.map((it, i) => it.kind === k ? cards[i] : '').filter(Boolean); return rows.length ? `<div class="mkhead">${T('kind.' + k)}</div>` + rows.join('') : ''; }).join('');
+      // 섹션: 강화 · 시설 · 광고(새 매체·매체 강화) · 성장 투자 · 고객
+      const ORDER = [['enh', ['enh'], 'kind.enh'], ['fac', ['fac'], 'kind.fac'], ['media', ['media', 'mediaUp'], 'media.newHead'], ['growth', ['growth'], 'growth.head'], ['customer', ['customer'], 'kind.customer']];
+      const items = ORDER.map(([, ks, head]) => { const rows = mk.items.map((it, i) => ks.includes(it.kind) ? cards[i] : '').filter(Boolean); return rows.length ? `<div class="mkhead">${T(head)}</div>` + rows.join('') : ''; }).join('');
       // 보험 섹션: 지금 든 보험 한 줄 + 바꾸기, 그 아래 1회성 보험 매물
       const insRows = mk.items.map((it, i) => it.kind === 'item' ? cards[i] : '').filter(Boolean).join('');
       const I = M.INSURERS[game.insurer];
@@ -1599,7 +1603,7 @@
         if (R.marketMaxBuy && mk.bought >= R.marketMaxBuy) return toast(T('err.marketMax', { n: R.marketMaxBuy }));
         const price = it.kind === 'contract' ? game.contractPrice(it) : it.price;
         if (game.cash < price) return toast(T('err.noCash'));
-        if (it.kind === 'fac' || it.kind === 'item' || it.kind === 'customer') { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
+        if (['fac', 'item', 'customer', 'media', 'mediaUp', 'growth'].includes(it.kind)) { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); game.takeEvents(); scene.sync(game, { animate: true }); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
         // 같은 계열 상위 센터로 갈아타기: 그 슬롯을 바로 대상으로, 확인만
         if (it.kind === 'contract' && it.switchFrom) {
           const si = game.contracts.findIndex(c => c && c.id === it.switchFrom), c = game.contracts[si];
@@ -1990,115 +1994,28 @@
     clearTimeout(smsTimer); smsTimer = setTimeout(() => { el.hidden = true; }, 9000);
     el.onclick = () => { el.hidden = true; };
   }
-  function showGrowthLegacy() {
-    if (!game || game.phase !== 'play') return;
-    const g = game, ko = I18n.lang === 'ko';
-    const names = ko
-      ? { marketing: ['📣', '홍보', '더 많은 택배를 유치'], fleet: ['🚚', '트럭', '모든 계약의 배차 추가'], warehouse: ['🏭', '창고', '보관 공간 확장'] }
-      : { marketing: ['📣', 'Marketing', 'Attract more parcels'], fleet: ['🚚', 'Fleet', 'Add dispatches to every contract'], warehouse: ['🏭', 'Warehouse', 'Expand storage capacity'] };
-    const effect = (kind, p) => {
-      if (kind === 'marketing') return ko ? `다음 영업일부터 +${p.def.parcels}건` : `+${p.def.parcels} from next workday`;
-      if (kind === 'fleet') return ko ? `계약마다 배차 +${p.def.calls}회` : `+${p.def.calls} call per contract`;
-      return ko ? `창고 +${p.def.cap}칸` : `+${p.def.cap} warehouse cells`;
-    };
-    const current = kind => kind === 'marketing'
-      ? (ko ? `기본 ${D.GROWTH.organicArrivals}건 + 홍보 ${g.growth.marketing * D.GROWTH.marketing.parcels}건` : `${D.GROWTH.organicArrivals} organic + ${g.growth.marketing * D.GROWTH.marketing.parcels} promoted`)
-      : kind === 'fleet'
-        ? (ko ? `계약당 추가 배차 +${g.growth.fleet}` : `+${g.growth.fleet} calls per contract`)
-        : (ko ? `현재 ${g.usedVolume()}/${g.warehouse.cap}칸` : `${g.usedVolume()}/${g.warehouse.cap} cells used`);
-    const cards = ['marketing', 'fleet', 'warehouse'].map(kind => {
-      const p = g.growthPlan(kind), n = names[kind], max = p.cost == null;
-      const dots = Array.from({ length: p.max }, (_, i) => `<i class="${i < p.level ? 'on' : ''}"></i>`).join('');
-      return `<button class="growth-card ${max ? 'max' : ''}" data-growth="${kind}" ${max ? 'disabled' : ''}>
-        <span class="growth-icon">${n[0]}</span><span class="growth-copy"><b>${n[1]} <em>Lv.${p.level}</em></b><small>${n[2]}</small><span>${current(kind)}</span></span>
-        <span class="growth-buy"><span class="growth-dots">${dots}</span><b>${max ? (ko ? '최고 레벨' : 'MAX') : p.cost + 'c'}</b><small>${max ? '' : effect(kind, p)}</small></span>
-      </button>`;
-    }).join('');
-    const body = `<div class="growth-head"><span>${ko ? '현재 자금' : 'Cash'} <b>${g.cash}c</b></span><small>${ko ? '수익을 세 축에 재투자하세요. 구매 효과는 즉시 적용됩니다.' : 'Reinvest earnings. Every upgrade applies immediately.'}</small></div><div class="growth-grid">${cards}</div>`;
-    const m = modal(ko ? '실시간 성장 투자' : 'Live investment', body, [{ label: T('btn.close'), onClick: closeModal }]);
-    m.querySelectorAll('[data-growth]').forEach(el => el.onclick = () => {
-      const kind = el.dataset.growth, r = g.investGrowth(kind);
-      if (!r.ok) { toast(r.reason === 'cash' ? (ko ? `자금이 ${r.cost}c 필요합니다` : `Need ${r.cost}c`) : (ko ? '지금은 투자할 수 없습니다' : 'Cannot invest now')); return; }
-      SFX.buy(); g.takeEvents(); scene.sync(g, { animate: true }); saveGame(); renderAll(); showGrowth();
-    });
-  }
+  // 📣 광고 집행: 가진 매체 중 하나를 골라 보름에 한 번. 새 매체·강화와 성장 투자는 마켓에서만 산다
   function showGrowth() {
     if (!game || game.phase !== 'play') return;
-    const g = game, ko = I18n.lang === 'ko';
-    const info = {
-      marketing: ['📣', ko ? '홍보' : 'Marketing', ko ? `캠페인 +${D.GROWTH.marketing.campaign.per}건` : `Campaign +${D.GROWTH.marketing.campaign.per}`],
-      fleet: ['🚚', ko ? '차량' : 'Fleet', ko ? '계약마다 배차 +1' : '+1 call / contract'],
-      warehouse: ['🏭', ko ? '창고' : 'Warehouse', ko ? '보관 공간 +6' : '+6 storage'],
-      automation: ['⚙', ko ? '자동화' : 'Automation', ko ? '배차비 -4% · 인건비 -8%' : 'Fees -4% · labor -8%'],
-      branding: ['✦', ko ? '브랜드' : 'Brand', ko ? '화물값 +3% · 특급 확률 +4%' : 'Value +3% · premium +4%'],
-      coldchain: ['❄', ko ? '저온 물류' : 'Cold chain', ko ? '냉장 +2 · 냉동 +1' : 'Cold +2 · frozen +1'],
-    };
-    const kinds = ['marketing', 'fleet', 'warehouse', 'automation', 'branding'].concat(g.shows('cold') ? ['coldchain'] : []);
-    const nameOf = k => info[k][1];
-    const current = k => {
-      const lv = g.growth[k] || 0, d = D.GROWTH[k];
-      if (k === 'marketing') return lv ? (ko ? `캠페인 한 번에 ${lv * d.campaign.per}건` : `${lv * d.campaign.per} parcels per campaign`) : (ko ? '아직 캠페인을 못 연다' : 'No campaign yet');
-      if (k === 'fleet') return ko ? `추가 배차 ${lv}대` : `${lv} extra calls`;
-      if (k === 'warehouse') return ko ? `현재 ${g.warehouse.cap}칸` : `${g.warehouse.cap} cells now`;
-      if (k === 'automation') return ko ? `비용 절감 ${lv * d.feeCut * 100}%` : `${lv * d.feeCut * 100}% fee cut`;
-      if (k === 'branding') return ko ? `화물값 +${lv * d.reward * 100}%` : `Cargo value +${lv * d.reward * 100}%`;
-      return ko ? `냉장 ${g.warehouse.cold} · 냉동 ${g.warehouse.frozen || 0}` : `Cold ${g.warehouse.cold} · frozen ${g.warehouse.frozen || 0}`;
-    };
-    const cards = kinds.map(kind => {
-      const p = g.growthPlan(kind), n = info[kind], max = p.cost == null;
-      const lock = p.locked ? p.missing.map(([k, lv]) => `${nameOf(k)} Lv.${lv}`).join(' + ') : '';
-      const dots = Array.from({ length: p.max }, (_, i) => `<i class="${i < p.level ? 'on' : ''}"></i>`).join('');
-      return `<button class="growth-card ${max ? 'max' : ''} ${p.locked ? 'locked' : ''}" data-growth="${kind}" ${max || p.locked ? 'disabled' : ''}>
-        <span class="growth-icon">${n[0]}</span><span class="growth-copy"><b>${n[1]} <em>Lv.${p.level}</em></b><span>${current(kind)}</span></span>
-        <span class="growth-buy"><span class="growth-dots">${dots}</span><b>${p.locked ? '🔒' : max ? 'MAX' : p.cost + 'c'}</b><small>${p.locked ? lock : max ? (ko ? '완성' : 'Complete') : n[2]}</small></span>
-      </button>`;
+    const g = game, used = g.campaignCycle === g.month;
+    const owned = g.ownedMedia();
+    const cp0 = g.campaignPlan();
+    const cards = owned.map((id, k) => {
+      const mp = g.mediaPlan(id), cp = g.campaignPlan(id), ok = cp.ready && g.cash >= cp.cost;
+      const dots = Array.from({ length: mp.max }, (_, i) => `<i class="${i < mp.level ? 'on' : ''}"></i>`).join('');
+      return `<button class="growth-card" data-media="${id}" ${k === 0 ? 'id="camp-go"' : ''} ${ok ? '' : 'disabled'}>
+        <span class="growth-icon">${D.AD_MEDIA[id].icon}</span><span class="growth-copy"><b>${esc(T('media.' + id))} <em>Lv.${mp.level}</em></b><span>${used ? T('camp.used') : T('camp.effect', { n: mp.parcels, days: mp.days })}</span><small>${esc(T('media.trait.' + id))}</small></span>
+        <span class="growth-buy"><span class="growth-dots">${dots}</span><b>${mp.cost}c</b><small>${T('media.run')}</small></span></button>`;
     }).join('');
-    const total = kinds.reduce((s, k) => s + (g.growth[k] || 0), 0);
-    const rc = g.realtimeContracts();
-    const hireCards = rc.map(it => { const car = D.CARRIERS[it.carrier]; return `<button class="growth-card" data-hire="${it.carrier}">
-        <span class="growth-icon">${car.badge || '🚚'}</span><span class="growth-copy"><b>${esc(car.name)}</b><span>${T('call.size', { min: car.sizeMin, max: car.sizeMax })} · ${T('fmt.cells', { n: car.cap })}</span></span>
-        <span class="growth-buy"><b>${it.price}c</b><small>${it.upgrade ? T('hire.upgrade', { name: it.ownedName }) : T('hire.btn')}</small></span>
-      </button>`; }).join('');
-    const hireSection = rc.length ? `<div class="growth-head" style="margin-top:14px"><span>${T('hire.title')}</span></div><div class="growth-tip">${T('hire.desc')}</div><div class="growth-grid">${hireCards}</div>` : '';
-    // 홍보 캠페인 — 창고가 비었을 때 직접 물량을 끌어오는 자리. 투자 화면 맨 위에 둔다
-    const cp = g.campaignPlan();
-    const campSection = cp.level ? `${g.level ? '' : `<div class="growth-head" style="margin-top:4px"><span>${T('camp.title')}</span></div>`}
-      <div class="growth-tip">${T('camp.desc')}</div>
-      <div class="growth-grid"><button class="growth-card" id="camp-go" ${cp.ready && g.cash >= cp.cost ? '' : 'disabled'}>
-        <span class="growth-icon">📣</span><span class="growth-copy"><b>${T('camp.btn')}</b><span>${cp.used ? T('camp.used') : T('camp.effect', { n: cp.parcels, days: cp.days })}</span></span>
-        <span class="growth-buy"><b>${cp.cost}c</b></span></button></div>` : '';
-    const body = `<div class="growth-head"><span>${ko ? '성장 단계' : 'Growth'} <b>Lv.${total}</b></span><span class="growth-cash">${g.cash}c</span></div><div class="growth-tip">${ko ? '투자할수록 창고와 트럭이 실제로 바뀝니다.' : 'Every upgrade visibly changes your depot and trucks.'}</div>${campSection}<div class="growth-grid">${cards}</div>${hireSection}`;
-    const m = modal(g.level ? T('camp.button') : (ko ? '캠페인 · 사업 확장' : 'Campaign · Growth'), g.level ? campSection : body, [{ label: T('btn.close'), onClick: closeModal }]);
-    storyCheck({ kind: 'modal', modal: 'growth', ready: cp.ready && g.cash >= cp.cost });
-    m.querySelectorAll('[data-growth]').forEach(el => el.onclick = () => {
-      const kind = el.dataset.growth, r = g.investGrowth(kind);
-      if (!r.ok) { toast(r.reason === 'cash' ? (ko ? `${r.cost}c가 필요합니다` : `Need ${r.cost}c`) : (ko ? '아직 잠겨 있습니다' : 'Still locked')); return; }
-      SFX.buy(); rewardBurst(ko ? `${info[kind][1]} Lv.${r.level}` : `${info[kind][1]} Lv.${r.level}`, Math.min(3, Math.ceil(r.level / 2)));
-      g.takeEvents(); scene.sync(g, { animate: true }); saveGame(); renderAll(); showGrowth();
-    });
-    m.querySelectorAll('[data-hire]').forEach(el => el.onclick = () => { SFX.click(); hireContractFlow(el.dataset.hire, showGrowth); });
-    const cg = m.querySelector('#camp-go');
-    if (cg) cg.onclick = () => {
-      const r = g.runCampaign();
+    const body = cp0.level ? `<div class="growth-tip">${T('camp.desc')}</div><div class="growth-grid">${cards}</div><div class="growth-tip" style="margin-top:8px">${T('media.more')}</div>` : `<div class="growth-tip">${T('camp.desc')}</div>`;
+    const m = modal(T('camp.title'), body, [{ label: T('btn.close'), onClick: closeModal }]);
+    storyCheck({ kind: 'modal', modal: 'growth', ready: cp0.ready && g.cash >= cp0.cost });
+    m.querySelectorAll('[data-media]').forEach(el => el.onclick = () => {
+      const r = g.runCampaign(el.dataset.media);
       if (!r.ok) { toast(r.reason === 'cash' ? T('camp.needCash', { n: r.cost }) : T('camp.used')); return; }
       SFX.buy(); toast(T('camp.toast', { n: r.n, days: r.days }), 2600);
       g.takeEvents(); saveGame(); closeModal(); renderAll();
       storyCheck({ kind: 'turn' });
-    };
-  }
-  // 실시간 계약: 슬롯을 골라 즉시 고용한다 (마켓의 chooseSlot과 같은 카드 목록, 단 game.hireContract 로 처리)
-  function hireContractFlow(carrier, back) {
-    const car = D.CARRIERS[carrier], price = game.hireContractPrice(carrier);
-    const body = `<p style="font-size:12px;color:var(--dim)">${T('slot.pickReplace')}</p>` + game.contracts.slice(0, game.visibleSlots()).map((c, s) => {
-      if (!c) return `<div class="card" data-s="${s}"><div class="t">${T('err.emptySlot')}</div><div class="d">${T('slot.emptyHint')}</div></div>`;
-      const tb = trustBar(game, c.carrier);
-      return `<div class="card" data-s="${s}"><div class="t">${esc(game.contractName(c))}</div><div class="d">${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}</div></div>`;
-    }).join('');
-    const m = modal(`${car.badge || ''} ${esc(car.name)}`, body, [{ label: T('btn.cancel'), onClick: back }], T('hire.confirmSub', { price }));
-    m.querySelectorAll('.card').forEach(el => el.onclick = () => {
-      const s = +el.dataset.s, r = game.hireContract(carrier, s);
-      if (!r.ok) { toast(r.msg); return; }
-      SFX.buy(); saveGame(); scene.sync(game, { animate: true }); renderAll(); back();
     });
   }
   function showMenu() {

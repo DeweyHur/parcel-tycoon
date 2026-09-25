@@ -117,6 +117,7 @@
       this.insurer = 'none'; this.premMult = 1; this.noClaimMonths = 0; this.coverHalf = false; this.items = { transitCert: 0, yardIns: 0, customsBond: 0 };
       this.campaignCycle = 0;                 // 캠페인을 연 사이클 (보름에 한 번)
       this.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0, automation: 0, branding: 0, coldchain: 0 }, (cfg.carry && cfg.carry.growth) || {});
+      this.media = Object.assign({ flyer: 1 }, (cfg.carry && cfg.carry.media) || {});   // 광고 매체 → 레벨. 전단지는 처음부터
       this.monthStats = null;
       this.run = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, discarded: 0 };
       this.loadChain = 0;
@@ -229,6 +230,7 @@
         customers: Object.keys(this.customers).map(id => [id, this.customerLevel(id)]),
         trust: { ...this.trust },
         growth: { ...this.growth },
+        media: { ...this.media },
         seen: this.story ? this.story.seen.slice() : [],
         notes: this.story ? this.story.notes.slice() : [],
       };
@@ -364,7 +366,9 @@
     growthPlan(kind) {
       const def = D.GROWTH[kind], level = (this.growth && this.growth[kind]) || 0;
       if (!def) return null;
-      const missing = Object.entries(def.unlock || {}).filter(([k, n]) => (this.growth[k] || 0) < n);
+      // 홍보(marketing) 조건은 광고 매체로 센다 — 매체 레벨 합 - 1 (전단지 Lv1 만이면 0). 홍보 투자는 매체 계약·강화로 바뀌었다
+      const have = k => k === 'marketing' ? this.mediaScore() : (this.growth[k] || 0);
+      const missing = Object.entries(def.unlock || {}).filter(([k, n]) => have(k) < n);
       return { kind, level, max: def.costs.length, cost: def.costs[level] == null ? null : def.costs[level], def, locked: missing.length > 0, missing };
     }
     missionState() {
@@ -396,7 +400,7 @@
       return { grade: state.grade, bonus };
     }
     investGrowth(kind) {
-      if (this.phase !== 'play') return { ok: false, reason: 'phase' };
+      if (this.phase !== 'play' && this.phase !== 'market') return { ok: false, reason: 'phase' };
       const plan = this.growthPlan(kind);
       if (!plan || plan.cost == null) return { ok: false, reason: 'max' };
       if (plan.locked) return { ok: false, reason: 'locked', missing: plan.missing };
@@ -799,26 +803,36 @@
     // 홍보 캠페인 — 투자로 키운 홍보를 '발동'해서 며칠 안에 물량을 끌어온다.
     // 상시 +N건이던 것을 발동형으로 바꾼 이유: 창고가 남아도는 보름을 플레이어가 직접 메울 수 있어야 하고,
     // 그렇게 채운 창고가 곧 일괄 출고의 밑천이 된다. 보름에 한 번.
-    campaignPlan() {
-      // 홍보 투자 없이도 1단계 캠페인은 열 수 있다. 캠페인(스토리)에서는 박 반장이 소개한 뒤부터
-      const lv = Math.max(1, (this.growth && this.growth.marketing) || 0), C = D.GROWTH.marketing.campaign;
+    // ----- 광고 매체 -----
+    mediaPlan(id) {
+      const A = D.AD_MEDIA[id]; if (!A) return null;
+      const lv = (this.media && this.media[id]) || 0, L = Math.max(1, lv);
+      return { id, level: lv, owned: lv > 0, icon: A.icon, parcels: A.per + (L - 1) * A.perUp, days: A.days, cost: A.cost + (L - 1) * A.costUp, max: A.max,
+        next: lv > 0 && lv < A.max ? { parcels: A.per + L * A.perUp, cost: A.cost + L * A.costUp } : null };
+    }
+    mediaScore() { return Math.max(0, Object.values(this.media || {}).reduce((a, b) => a + b, 0) - 1); }
+    ownedMedia() { return Object.keys(D.AD_MEDIA).filter(id => (this.media || {})[id] > 0); }
+    // 캠페인(광고 집행) 계획. id 를 안 주면 가진 매체 중 첫째(전단지) — 스토리·옛 호출과 맞춘다
+    campaignPlan(id) {
+      id = id || this.ownedMedia()[0] || 'flyer';
+      const mp = this.mediaPlan(id) || this.mediaPlan('flyer');
       const used = this.campaignCycle === this.month;
-      const open = this.shows('invest') && this.campaignOpen();
-      return { level: open ? lv : 0, parcels: lv * C.per, days: C.days, cost: lv * C.cost, used, ready: open && !used };
+      const open = this.shows('invest') && this.campaignOpen() && mp.owned;
+      return { id: mp.id, level: open ? mp.level : 0, parcels: mp.parcels, days: mp.days, cost: mp.cost, used, ready: open && !used };
     }
     // 스토리 캠페인에서는 '창고가 빈 날 이틀'을 겪고 박 반장이 소개한 뒤에 열린다. 자유 런·안내 끔이면 처음부터
     campaignOpen() { return !this.level || !this.story || this.story.off || (this.story.seen || []).includes('l3invest'); }
-    runCampaign() {
-      const p = this.campaignPlan();
+    runCampaign(id) {
+      const p = this.campaignPlan(id);
       if (!p.level || !this.shows('invest')) return { ok: false, reason: 'locked' };
       if (p.used) return { ok: false, reason: 'used' };
       if (this.cash < p.cost) return { ok: false, reason: 'cash', cost: p.cost };
       this.cash -= p.cost;
       this.campaignCycle = this.month;
-      const n = this._injectGrowthDemand(this.schedule, p.parcels, this.turn, this.month, this.turn + p.days);
+      const n = this._injectGrowthDemand(this.schedule, p.parcels, this.turn, this.month, this.turn + p.days, D.AD_MEDIA[p.id].mix);
       this.say('log.campaign', { n, days: p.days, cost: p.cost });
-      this.emit('campaign', { n, days: p.days, cost: p.cost });
-      return { ok: true, n, days: p.days, cost: p.cost };
+      this.emit('campaign', { n, days: p.days, cost: p.cost, media: p.id });
+      return { ok: true, n, days: p.days, cost: p.cost, media: p.id };
     }
     rushState() {
       const R = D.RUSH, ratio = this.warehouse.cap ? this.usedVolume() / this.warehouse.cap : 0;
@@ -1180,9 +1194,10 @@
       this.say('log.monthStart', { m: this.monthIndex(m), y: this.yearOf(m), cal: this.calMonth(m), half: this.half(m) });
       this._startTurn();
     }
-    _injectGrowthDemand(sched, count, start, m, end) {
+    _injectGrowthDemand(sched, count, start, m, end, mix) {
       if (!count || !sched.length) return 0;
-      const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
+      const ratio = { ...this._typeRatio(m) }, cw = this._customerWeightsFor(m);
+      for (const t in mix || {}) if (ratio[t]) ratio[t] *= mix[t];   // 매체 성격 — 닫힌 종류(0)는 곱해도 0
       const slots = [];
       const last = Math.min(sched.length, end == null ? sched.length : end);
       for (let i = Math.max(0, start || 0); i < last; i++) if (this.weather[i] !== 'storm') slots.push(i);
@@ -1813,6 +1828,7 @@
           hint: need ? T('market.hint', { short: D.PARCEL_TYPES[need.type].short, count: need.count }) : own ? T('market.switchHint', { name: D.CARRIERS[own.carrier].name }) : null, switchFrom: own ? own.id : null });
       }
       items.push(...this._refillItems());
+      items.push(...this._adAndGrowthItems(mult));   // 캠페인 장에서도 투자가 열렸으면 광고·성장은 마켓에서 산다
       for (const e of spec.enh || []) if (D.ENHANCEMENTS[e]) items.push({ kind: 'enh', enh: e, price: Math.round(D.ENHANCEMENTS[e].price * mult), name: D.ENHANCEMENTS[e].name, sold: false });
       for (const f of spec.fac || []) {
         const F = D.FACILITIES[f]; if (!F || this.warehouse[f]) continue;
@@ -1852,6 +1868,17 @@
       return true;
     }
     // fm: 이 마켓 뒤에 올 사이클 (예보를 읽을 달). 새로고침은 비워 두면 forecastBlocked 가 market 상태로 고른다
+    // 광고 매체(새 계약 1 · 강화 1)와 성장 투자(D.GROWTH_OFFERS 개). 투자가 열린 판에서만
+    _adAndGrowthItems(mult) {
+      const out = []; if (!this.shows('invest') || !this.campaignOpen()) return out;
+      const fresh = Object.keys(D.AD_MEDIA).filter(id => !((this.media || {})[id] > 0));
+      if (fresh.length) { const id = this.rng.pick(fresh); out.push({ kind: 'media', media: id, price: Math.round(D.AD_MEDIA[id].price * mult), name: T('media.' + id), sold: false }); }
+      const up = this.ownedMedia().filter(id => this.media[id] < D.AD_MEDIA[id].max).sort((a, b) => this.media[a] - this.media[b]);
+      if (up.length) { const id = up[0], lv = this.media[id]; out.push({ kind: 'mediaUp', media: id, price: Math.round(D.AD_MEDIA[id].upPrice * lv * mult), name: T('media.upName', { name: T('media.' + id), lv: lv + 1 }), sold: false }); }
+      const kinds = ['fleet', 'warehouse', 'automation', 'branding'].concat(this.shows('cold') ? ['coldchain'] : []).filter(k => { const pl = this.growthPlan(k); return pl && pl.cost != null && !pl.locked; });
+      for (const k of this.rng.shuffle(kinds).slice(0, D.GROWTH_OFFERS)) { const pl = this.growthPlan(k); out.push({ kind: 'growth', growth: k, price: pl.cost, name: T('growth.' + k) + ' Lv.' + (pl.level + 1), sold: false }); }
+      return out;
+    }
     _genMarketItems(fm) {
       const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(m))] * R.itemPriceMult * R.priceMult;
       const sc = this.script(m);
@@ -1898,6 +1925,7 @@
       }
       // 상시 배차 충전: 배차가 빈 계약마다 '가득 충전' 카드. 정액이라 다 쓰지 않고 충전하면 그만큼 손해
       items.push(...this._refillItems());
+      items.push(...this._adAndGrowthItems(mult));
       const enhW = {}; for (const k of Object.keys(D.ENHANCEMENTS)) enhW[k] = R.marketWeight[k] || 1;
       const picked = [];
       // 슬롯이 다 찼는데 못 싣는 품목이 있으면, 계약 말고 **특약**이 답이다 — 그건 반드시 내놓는다.
@@ -2035,6 +2063,18 @@
         if (this.customerCount() >= M.CUSTOMER_SLOTS) return { ok: false, msg: T('err.customerMax', { n: M.CUSTOMER_SLOTS }) };
         if (!this.addCustomer(it.customer)) return { ok: false, msg: T('err.customerDup') };
         this.say('log.buyCustomer', { name: M.CUSTOMERS[it.customer].name, price });
+      } else if (it.kind === 'media' || it.kind === 'mediaUp') {
+        if (this.cash < price) return { ok: false, msg: T('err.noCash') };
+        const lv = (this.media[it.media] || 0);
+        if (it.kind === 'media' && lv > 0) return { ok: false, msg: T('err.sold') };
+        if (it.kind === 'mediaUp' && (lv <= 0 || lv >= D.AD_MEDIA[it.media].max)) return { ok: false, msg: T('err.sold') };
+        this.media[it.media] = lv + 1;
+        this.say('log.buyItem', { name: it.name, price });
+      } else if (it.kind === 'growth') {
+        if (this.cash < price) return { ok: false, msg: T('err.noCash') };
+        const r = this.investGrowth(it.growth); if (!r.ok) return { ok: false, msg: r.reason === 'cash' ? T('err.noCash') : T('err.sold') };
+        this.cash += price; this.run.spent -= price;   // investGrowth 가 이미 냈다 — 아래 공통 차감과 겹치지 않게
+        this.say('log.buyItem', { name: it.name, price });
       } else if (it.kind === 'item') {
         if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         if (it.item === 'transitCert') this.items.transitCert++; else this.items[it.item] = this.month + 1;
@@ -2105,6 +2145,7 @@
       if (!g.weather || !g.weather.length) g.weather = Array(g.turns()).fill('sunny').map((w, i) => g.heatTurns && g.heatTurns.includes(i + 1) ? 'heat' : w);
       if (g.monthStats) for (const k of ['insClaims', 'covered', 'premium', 'storageIncome']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
       g.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0, automation: 0, branding: 0, coldchain: 0 }, g.growth || {});
+      if (!g.media) g.media = { flyer: Math.max(1, g.growth.marketing || 0) };   // 옛 저장: 홍보 레벨을 전단지 레벨로
       g._assignCold();
       return g;
     }

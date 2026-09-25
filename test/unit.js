@@ -27,11 +27,13 @@ t('실시간 성장 투자: 홍보는 캠페인 크기, 트럭은 배차, 창고
   const fresh = g._makeContract('bulk1'); assert.ok(fresh.maxCalls >= D.CARRIERS.bulk1.trucks + 1, '새 계약에도 차량 투자가 적용된다');
   const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.deepEqual(h.growth, { marketing: 1, fleet: 1, warehouse: 1, automation: 0, branding: 0, coldchain: 0 });
 });
-t('홍보 캠페인: 보름에 한 번, 며칠 안에 물량을 끌어온다', () => {
+t('광고 집행: 전단지로 시작, 보름에 한 번, 며칠 안에 물량을 끌어온다', () => {
   const g = NG(73); g.cash = 3000;
-  const C = D.GROWTH.marketing.campaign;
-  assert.equal(g.campaignPlan().level, 1, '홍보 투자가 없어도 1단계 캠페인은 연다');
-  assert.equal(g.campaignPlan().parcels, C.per);
+  const F = D.AD_MEDIA.flyer;
+  assert.deepEqual(g.ownedMedia(), ['flyer'], '처음엔 전단지만 가진다');
+  assert.equal(g.campaignPlan().level, 1, '전단지 Lv1 로 바로 집행할 수 있다');
+  assert.equal(g.campaignPlan().parcels, F.per);
+  assert.equal(g.campaignPlan('radio').level, 0, '없는 매체는 집행 못 한다'); assert.equal(g.runCampaign('radio').ok, false);
   // 스토리 3장: 창고가 빈 날 이틀을 겪고 박 반장이 소개(l3invest)하기 전엔 닫혀 있다
   const s3 = new Game({ scenario: 'kr_spring', company: 'local', perks: [], insurer: 'none', story: true, level: 4, prep: false });
   s3.cash = 3000; if (s3.phase === 'market') s3.closeMarket();
@@ -39,19 +41,32 @@ t('홍보 캠페인: 보름에 한 번, 며칠 안에 물량을 끌어온다', (
   s3.parcels = []; s3.wait(); s3.takeEvents(); s3.parcels = []; s3.wait(); s3.takeEvents();
   assert.ok((s3.emptyDays || 0) >= 2, '빈 날을 센다 — ' + s3.emptyDays);
   s3.story.seen.push('l3invest'); assert.ok(s3.campaignPlan().ready, '소개 뒤에 열린다');
-  g.investGrowth('marketing'); g.investGrowth('marketing');       // Lv.2
-  const plan = g.campaignPlan();
-  assert.equal(plan.parcels, 2 * C.per);
-  assert.equal(plan.cost, 2 * C.cost);
+  g.media.flyer = 2;
+  const plan = g.campaignPlan('flyer');
+  assert.equal(plan.parcels, F.per + F.perUp);
+  assert.equal(plan.cost, F.cost + F.costUp);
   const before = g.schedule.slice(g.turn).flat().length, cash0 = g.cash;
-  const r = g.runCampaign(); assert.ok(r.ok, '캠페인이 열린다');
+  const r = g.runCampaign('flyer'); assert.ok(r.ok, '캠페인이 열린다');
   assert.equal(g.schedule.slice(g.turn).flat().length, before + plan.parcels, '그만큼 물량이 붙는다');
   assert.equal(g.cash, cash0 - plan.cost);
-  const win = g.schedule.slice(g.turn, g.turn + C.days).flat().length;
+  const win = g.schedule.slice(g.turn, g.turn + plan.days).flat().length;
   assert.ok(win >= plan.parcels, '며칠 안에 몰려 들어온다 — ' + win);
-  assert.equal(g.runCampaign().ok, false, '같은 보름에 두 번은 안 된다');
+  assert.equal(g.runCampaign('flyer').ok, false, '같은 보름에 두 번은 안 된다');
   const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
   assert.equal(h.campaignPlan().used, true, '세이브를 건너도 이번 보름에 쓴 것이 남는다');
+  assert.equal(h.media.flyer, 2, '매체 레벨도 저장된다');
+});
+t('마켓: 새 광고 매체·매체 강화·성장 투자를 판다', () => {
+  const g = NG(74); g.cash = 5000;
+  g.phase = 'market'; g.market = { items: g._adAndGrowthItems(1), bought: 0, refreshes: 0, month: g.month };
+  const kinds = g.market.items.map(it => it.kind);
+  assert.ok(kinds.includes('media') && kinds.includes('mediaUp'), '새 매체와 강화가 있다 — ' + kinds);
+  assert.equal(kinds.filter(k => k === 'growth').length, D.GROWTH_OFFERS, '성장 투자 ' + D.GROWTH_OFFERS + '개');
+  const mi = kinds.indexOf('media'), id = g.market.items[mi].media;
+  assert.ok(g.buy(mi, null).ok); assert.equal(g.media[id], 1, '산 매체는 Lv1');
+  assert.ok(g.buy(kinds.indexOf('mediaUp'), null).ok); assert.equal(g.media.flyer, 2, '강화하면 레벨이 오른다');
+  const gi = kinds.indexOf('growth'), gk = g.market.items[gi].growth, lv0 = g.growth[gk], cash0 = g.cash, price = g.market.items[gi].price;
+  assert.ok(g.buy(gi, null).ok); assert.equal(g.growth[gk], lv0 + 1); assert.equal(g.cash, cash0 - price, '값은 한 번만 낸다');
 });
 
 t('성장 트리: 차량→자동화→브랜드와 창고→저온 물류가 단계적으로 해금된다', () => {
@@ -60,7 +75,7 @@ t('성장 트리: 차량→자동화→브랜드와 창고→저온 물류가 �
   g.investGrowth('fleet'); g.investGrowth('fleet');
   const c = g.contracts.find(Boolean), fee0 = g.callFee(c, 1);
   assert.ok(g.investGrowth('automation').ok); assert.ok(g.callFee(c, 1) < fee0);
-  g.investGrowth('marketing'); g.investGrowth('marketing'); assert.ok(!g.growthPlan('branding').locked);
+  assert.ok(g.growthPlan('branding').locked, '광고가 전단지뿐이면 브랜드는 잠겨 있다'); g.media.flyer = 3; assert.ok(!g.growthPlan('branding').locked, '매체를 키우면 열린다');
   assert.ok(g.investGrowth('branding').ok); const base = g.baseReward('normal', 2); assert.equal(g._spawnParcel({ type: 'normal', size: 2 }).reward, Math.round(base * 1.03));
   g.investGrowth('warehouse'); g.investGrowth('warehouse'); const cold0 = g.warehouse.cold, frozen0 = g.warehouse.frozen;
   assert.ok(g.investGrowth('coldchain').ok); assert.equal(g.warehouse.cold, cold0 + 2); assert.equal(g.warehouse.frozen, frozen0 + 1);

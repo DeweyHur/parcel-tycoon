@@ -60,6 +60,18 @@
       coldchain: { costs: [180, 320, 520, 760], cold: 2, frozen: 1, unlock: { warehouse: 2 } },
     },
 
+    // 광고 매체 — 마켓에서 계약·강화하고, 플레이 중 📣 로 가진 매체 하나를 골라 집행한다(보름에 한 번).
+    // 레벨이 오르면 건수·집행비가 같이 오른다. mix: 그 매체가 끌어오는 종류 가중(월별 비율에 곱한다 — 평판 문은 그대로)
+    // 전단지는 처음부터 가진다. 버스·옥외는 대형을 더 부르지만 대형은 평판(동네 소문)이 열어야 온다
+    AD_MEDIA: {
+      flyer: { icon: '📰', price: 0,   per: 4,  perUp: 2, cost: 40,  costUp: 15, days: 2, max: 4, upPrice: 70,  mix: { normal: 2 } },
+      sns:   { icon: '📱', price: 120, per: 6,  perUp: 3, cost: 70,  costUp: 20, days: 2, max: 4, upPrice: 100, mix: { fresh: 2.5, produce: 2 } },
+      radio: { icon: '📻', price: 160, per: 8,  perUp: 4, cost: 90,  costUp: 25, days: 3, max: 4, upPrice: 130, mix: {} },
+      bus:   { icon: '🚌', price: 240, per: 12, perUp: 5, cost: 140, costUp: 35, days: 4, max: 4, upPrice: 180, mix: { large: 3, fragile: 1.5 } },
+    },
+    // 성장 투자(차량·창고·자동화·브랜드·저온)는 마켓에서만 판다 — 한 마켓에 이만큼
+    GROWTH_OFFERS: 2,
+
     // 창고를 채운 뒤 여러 대를 한 번에 빼는 폭발형 출고 보너스.
     RUSH: { chargeAt: 0.45, readyAt: 0.72, criticalAt: 0.95, bonus: 1.35, extraTrucks: 2, clearShare: 0.55, minFill: 0.72, minTrucks: 2, rep: 2 },
     LOAD_CHAIN: { minFill: 0.8, step: 0.08, max: 4, repAt: 3, rep: 1 },
