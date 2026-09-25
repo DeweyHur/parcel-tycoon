@@ -1138,7 +1138,7 @@
   // 기한 머리줄 — 초과 · 통관 N일 · 기한 N일 · 무기한
   function bucketOf(p) {
     const dotOf = n => n <= 1 ? 'r' : n <= 2 ? 'o' : n <= 3 ? 'y' : 'g';
-    if (p.customs > 0) return { key: `cu${p.customs}|${p.deadline}`, urg: p.customs + p.deadline, cls: 'cu', dot: dotOf(p.customs + p.deadline), label: `${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })} · ⏳ ${T('fmt.turns', { n: p.deadline })}` };
+    if (p.customs > 0) return { key: `cu${p.customs}|${p.deadline}`, urg: p.customs + p.deadline, cls: 'cu', dot: dotOf(p.customs + p.deadline), label: `${T('ps.customsShort', { n: p.customs, delayed: p.customsDelayed ? '+' : '' })}<br>${T('ps.deadline', { n: p.deadline })}` };   // 두 줄로 — 한 줄이면 좁은 머리칸에서 글자가 세로로 쪼개졌다
     if (p.overdue) { const ri = game ? game.returnIn(p) : null; return { key: 'od', urg: -1, cls: 'od', dot: 'r', label: T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' }) }; }
     // ⚡ 오늘 들어온 긴급은 맨 윗줄. 놓친 것은 초과 줄로 (반송까지 남은 날이 보인다)
     if (p.rush && game && game.rushToday(p)) return { key: 'rush', urg: -5, cls: 'rush', dot: 'r', label: T('ps.rushToday', { x: D.RUSH_CARGO.sameDay }) };

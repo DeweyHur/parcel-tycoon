@@ -1086,6 +1086,7 @@
     'ps.frozenOut': '🔥 Outside freezer',
     'ps.frozen': '❆ Frozen',
     'ps.heat': '🔥 Heat damage',
+    'ps.customsShort': '🛃 <b>{n#d}</b>d{delayed}',
     'ps.customs': '🛃 Customs {n#d}d{delayed}',
     'ps.delayed': '(delayed)',
     'ps.overdue': '⏳ Late{ret}',

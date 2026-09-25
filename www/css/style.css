@@ -992,3 +992,4 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .pips.runs i.on { background: #ffab4a; box-shadow: 0 0 3px #ffab4a88; }
 .pips.runs i.gap { width: 4px; box-shadow: none; background: none; }
 .pips.runs b { color: #ffab4a; }
+.prow.cu .pl span { white-space: nowrap; }

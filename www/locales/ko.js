@@ -1087,6 +1087,7 @@
     'ps.frozenOut': '🔥 냉동 구역 밖',
     'ps.frozen': '❆ 냉동',
     'ps.heat': '🔥 폭염에 상함',
+    'ps.customsShort': '🛃 <b>{n#d}</b>일{delayed}',
     'ps.customs': '🛃 통관 {n#d}일{delayed}',
     'ps.delayed': '(지연)',
     'ps.overdue': '⏳ 초과{ret}',
