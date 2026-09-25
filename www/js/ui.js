@@ -487,7 +487,9 @@
     };
     const worn = perkSlotsHtml(prep.perks, slots, { names: true, remove: true });
     const head = `<div class="perk-count">${prepStep(3)} — ${esc(M.SCENARIOS[prep.scenario].name)}${noCompany() ? '' : ` · ${co.icon} ${esc(co.name)}`}</div><div class="worn"><b>${T('prep.perkCount', { n: prep.perks.length, slots })}</b>${worn}</div>`;
-    const groups = `<div class="pgrid">${ids.map(perkCard).join('')}</div>`;
+    // 같은 계열은 하나만 낄 수 있다 — 그러니 계열마다 섹션을 나눈다 (머리글에 '1개'와 지금 낀 것 표시)
+    const groups = fams.map(f => { const list = ids.filter(id => M.PERKS[id].family === f); if (!list.length) return ''; const on = prep.perks.find(p => M.PERKS[p].family === f);
+      return `<div class="pk-fam"><div class="pk-head">${esc(M.PERK_FAMILIES[f] || f)} <small>${T('prep.famOne')}${on ? ` · ${perkIcon(on)}` : ''}</small></div><div class="pgrid">${list.map(perkCard).join('')}</div></div>`; }).join('');
     if (prep.story == null) prep.story = !(storySeen(P)); // 첫 런은 안내가 기본으로 켜진다
     const storyCard = `<div class="card toggle ${prep.story ? 'sel' : ''}" id="prep-story" title="${esc(T('prep.storyDesc'))}"><div class="t"><span>${prep.story ? '☑' : '☐'} ${T('prep.story')}</span></div></div>`;
     const noIns = !!(co.mods && co.mods.noInsurance);

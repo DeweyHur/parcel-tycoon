@@ -417,6 +417,7 @@
     'prep.insuranceHead': 'Insurance (monthly premium deducted at settlement; -20% next month with no claims)',
     'prep.startupNoIns': 'Startup begins uninsured. Available from the month 2 market',
     'prep.fans': 'Preferred by: {list} (+1 xp at month start while insured)',
+    'prep.famOne': 'pick one',
     'prep.perkTitle': 'Equip Perks',
     'prep.start': 'Start Run',
     'tier.0': 'Start',

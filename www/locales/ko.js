@@ -418,6 +418,7 @@
     'prep.insuranceHead': '보험 (월 보험료는 월말 정산에서 차감, 무사고면 다음 달 -20%)',
     'prep.startupNoIns': '스타트업은 무보험으로 시작합니다. 2개월차 마켓부터 가입 가능',
     'prep.fans': '선호 고객: {list} (가입 중 월초 xp +1)',
+    'prep.famOne': '하나만',
     'prep.perkTitle': '퍽 장착',
     'prep.start': '런 시작',
     'tier.0': '시작',

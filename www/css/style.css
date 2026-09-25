@@ -998,3 +998,4 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 #bottom-bar #invest-btn:not(.ready):not(.active) { filter: saturate(.55) brightness(.85); }   /* 걸 게 없으면 한 톤 죽인다 — 켜진 것과 구분되게 */
 @keyframes campReady { 0%, 100% { box-shadow: 0 0 0 0 #ffcf5a00, 3px 3px 0 #0008; } 50% { box-shadow: 0 0 10px 2px #ffcf5a99, 3px 3px 0 #0008; } }
 .card .swap { color: var(--gold); font-size: 11px; }
+.pk-head small { color: var(--dim); font-size: 10px; margin-left: 4px; } .pk-fam .pgrid { margin-bottom: 2px; }
