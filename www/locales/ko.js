@@ -291,6 +291,7 @@
     'err.hasExpress': '이미 고속 배차가 적용된 계약',
     'err.enhFull': '강화 칸이 다 찼습니다 ({n}칸)',
     'err.optOne': '특약은 계약당 1개',
+    'err.enhHas': '이미 붙어 있는 강화',
     'err.optHasAttr': '이미 그 속성을 다루는 업체',
     'err.optUrgent': '이 계약에는 특약을 붙일 수 없음',
     'err.optSize': '크기 최대 {max} 이하 계약만',
@@ -1674,6 +1675,10 @@
       "cap1": {
         "name": "적재 보강",
         "desc": "차량 용량 +1칸"
+      },
+      "holiday": {
+        "name": "휴무 특약",
+        "desc": "공휴일·명절 연휴에도 이 계약은 부를 수 있다 — 그날 배차비 ×1.8"
       },
       "regular": {
         "name": "월 첫 배차 무료",

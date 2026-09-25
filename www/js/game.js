@@ -1004,6 +1004,7 @@
       const R = this.rules, car = D.CARRIERS[c.carrier];
       let fee = R.feeFixed != null ? R.feeFixed : car.fee;
       let evMult = 1; for (const ev of this.eventsAt()) { const m = famVal(ev.feeMult, c.carrier); if (m) evMult *= m; }
+      if (c.enh && c.enh.holiday && this.isOffTurn()) evMult *= D.ENHANCEMENTS.holiday.feeMult;   // 휴무 특약: 쉬는 날 부르면 할증
       fee = fee * (this.trustPerk(c.carrier, 'feeMult') || 1) * R.feeMult * evMult * this.inflation() + R.feeDelta;
       return Math.max(0, Math.round(fee));
     }
@@ -1040,11 +1041,11 @@
     // 강화 칸 — 등급만큼. 어떤 강화든 한 칸 (신뢰 강화는 업체에 쌓이므로 칸을 안 먹는다)
     contractOpts(c) { const o = (c.enh.opts || []).slice(); if (c.enh.opt && !o.includes(c.enh.opt)) o.unshift(c.enh.opt); return o; }
     enhSlots(c) { return (D.ENH_SLOTS || {})[c.grade] || 2; }
-    enhUsed(c) { return (c.enh.limit || 0) + (c.enh.cap || 0) + (+c.enh.regular || 0) + this.contractOpts(c).length; }
+    enhUsed(c) { return (c.enh.limit || 0) + (c.enh.cap || 0) + (+c.enh.regular || 0) + (c.enh.holiday ? 1 : 0) + this.contractOpts(c).length; }
     // 장착된 강화 id 목록 (칸 표시용) — 한도 강화는 +1/+2 를 구분해 기억한다
     enhList(c) { const out = [], lim = (c.enh.limitIds || []).slice(0, c.enh.limit || 0); while (lim.length < (c.enh.limit || 0)) lim.push('limit1');
       const rep = (id, n) => { for (let k = 0; k < n; k++) out.push(id); };
-      out.push(...lim); rep('cap1', c.enh.cap || 0); rep('regular', +c.enh.regular || 0); out.push(...this.contractOpts(c)); return out; }
+      out.push(...lim); rep('cap1', c.enh.cap || 0); rep('regular', +c.enh.regular || 0); if (c.enh.holiday) out.push('holiday'); out.push(...this.contractOpts(c)); return out; }
     regularFreeLeft(c) { return Math.max(0, (+c.enh.regular || 0) - (c.freeUsed || 0)); }
     // 특약을 붙인 계약은 그 속성도 '받는 것'에 들어간다. caps 만 넓히고 need 를 그대로 두면
     // 전문 계열(냉장·파손·냉동·통관)은 특약을 붙여도 그 물건을 거절한다 — 특약이 아무 쓸모가 없어진다.
@@ -1153,8 +1154,10 @@
       }
       return { ids: r.take.map(p => p.id), vol: r.v, trucks: Math.max(1, this.packTrucks(c, r.take).length), trimmed };
     }
+    // 휴무일이라도 휴무 특약이 붙은 계약은 부를 수 있다
+    offFor(c) { return this.isOffTurn() && !(c && c.enh && c.enh.holiday); }
     canCall(c) {
-      if (!c || this.isOffTurn()) return false;
+      if (!c || this.offFor(c)) return false;
       if (!this.shows('calls')) return this.eligibleParcels(c).length > 0;   // 배차가 소모품이 되기 전(레벨 1)엔 잔량이 없다
       if (c.calls <= 0 && !(this.rules.spareCall && !this.monthStats.spareUsed)) return false;
       return this.eligibleParcels(c).length > 0;
@@ -1544,7 +1547,7 @@
       if (this.phase !== 'play') return { ok: false, msg: T('err.cannotCallNow') };
       const c = this.contracts[slotIdx], R = this.rules;
       if (!c) return { ok: false, msg: T('err.emptySlot') };
-      if (this.isOffTurn()) return { ok: false, msg: T('err.holidayOff') };
+      if (this.offFor(c)) return { ok: false, msg: T('err.holidayOff') };
       const useSpare = c.calls <= 0;
       if (useSpare && !(R.spareCall && !this.monthStats.spareUsed)) return { ok: false, msg: T('err.noCalls') };
       const car = D.CARRIERS[c.carrier], usedBefore = this.usedVolume(), rushReady = this.rushState().ready;
@@ -2256,6 +2259,7 @@
         if (e.kind === 'limit') { c.enh.limit++; (c.enh.limitIds = c.enh.limitIds || []).push(it.enh); c.maxCalls += e.value; c.calls += e.value; }
         else if (e.kind === 'cap') { c.enh.cap++; }
         else if (e.kind === 'regular') { c.enh.regular = (+c.enh.regular || 0) + 1; }
+        else if (e.kind === 'holiday') { if (c.enh.holiday) return { ok: false, msg: T('err.enhHas') }; c.enh.holiday = true; }
         else if (e.kind === 'trust') this._addTrust(c.carrier, e.value);
         else if (e.kind === 'opt') {
           const car = D.CARRIERS[c.carrier];

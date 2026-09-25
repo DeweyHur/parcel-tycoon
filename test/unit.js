@@ -210,6 +210,16 @@ t('기업 계약: 계약 단가가 보상에 붙고, 처리·사고가 평가에
   g.parcels = [p]; g.callCarrier(i, [p.id]); assert.equal(d.st.delivered, 1); assert.equal(d.st.onTime, 1);
   const q = g._spawnParcel({ type: 'normal', size: 1, customer: 'farm' }); g._claim(q, 'test', 'stolen'); assert.equal(d.st.claims, 1);
 });
+t('휴무 특약: 쉬는 날에도 그 계약만 부를 수 있고, 그날 배차비 ×1.8 · 강화 칸 하나', () => {
+  const g = EMPTY(21); const i = slot(g, 'bulk'), c = g.contracts[i];
+  g.parcels = [P(1, 'normal', 2)]; const fee0 = g.truckFee(c);
+  g.isOffTurn = () => true;
+  assert.ok(!g.canCall(c), '특약 없으면 휴무'); assert.ok(!g.callCarrier(i, [1]).ok);
+  const used = g.enhUsed(c); c.enh.holiday = true; assert.equal(g.enhUsed(c), used + 1); assert.ok(g.enhList(c).includes('holiday'));
+  assert.ok(g.canCall(c), '특약이 있으면 부를 수 있다'); assert.equal(g.truckFee(c), Math.round(fee0 * D.ENHANCEMENTS.holiday.feeMult));
+  const r = g.callCarrier(i, [1]); assert.ok(r.ok, '휴무일 호출');
+  g.isOffTurn = () => false; assert.equal(g.truckFee(c), fee0, '평일엔 할증 없음');
+});
 t('⚡ 긴급 화물(새벽배송): 기한은 들어온 날 — 그날 ×2, 놓치면 벌점 없이 ×½, 유예가 끝나면 반송', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
   const sp = g._spawnParcel({ type: 'normal', size: 1, rush: true }); assert.ok(sp.rush && !sp.noDeadline && sp.deadline === 1, '기한 하루');

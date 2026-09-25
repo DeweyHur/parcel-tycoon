@@ -274,6 +274,8 @@
       limit2:  { price: 160, kind: 'limit', value: 2, icon: '🚛' },
       cap1:    { price: 140, kind: 'cap', value: 1, icon: '📦' },
       regular: { price: 180, kind: 'regular', icon: '🎫' },
+      // 휴무 특약: 공휴일·명절 연휴(업체 휴무)에도 이 계약은 부를 수 있다 — 대신 그날 배차비 ×feeMult (계약당 1개)
+      holiday: { price: 150, kind: 'holiday', feeMult: 1.8, icon: '🎌' },
       seal:    { price: 90, kind: 'trust', value: 2, icon: '🔖' },
       record:  { price: 170, kind: 'trust', value: 4, icon: '📜' },
       // 속성 특약: 계약 하나에 속성 하나 추가 (계약당 1개, 교체 시 소멸, 특약 처리는 보너스 없음)

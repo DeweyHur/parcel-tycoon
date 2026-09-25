@@ -291,6 +291,7 @@
     'err.hasExpress': 'Express dispatch already applied',
     'err.enhFull': 'No enhancement slots left ({n})',
     'err.optOne': 'One rider per contract',
+    'err.enhHas': 'Already installed on this contract',
     'err.optHasAttr': 'Carrier already handles that attribute',
     'err.optUrgent': 'Riders cannot be added to this contract',
     'err.optSize': 'Only contracts with max size {max} or less',
@@ -1673,6 +1674,10 @@
       "cap1": {
         "name": "Load Reinforcement",
         "desc": "Vehicle capacity +1"
+      },
+      "holiday": {
+        "name": "Holiday Rider",
+        "desc": "This contract can still be called on public holidays — at ×1.8 dispatch fees that day"
       },
       "regular": {
         "name": "Free First Dispatch",
