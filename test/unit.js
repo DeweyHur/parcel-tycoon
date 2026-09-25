@@ -181,6 +181,20 @@ t('단기 금융: 정산 후 음수면 차입해 0, 다음 정산에 원금+이�
   assert.equal(g.debt, 0); assert.equal(g.summary.loan.repaid, debt); assert.equal(g.summary.loan.interest, Math.ceil(debt * 0.15));
   g.closeSummary(); g.closeMarket(); g.cash = 0; g.feesDue = 900; g.turn = D.TURNS_PER_MONTH; g._endMonth(); assert.equal(g.phase, 'over');
 });
+t('⚡ 긴급 화물: 들어온 날 내보내면 ×2, 하루라도 묵히면 ×½, 기한·반송은 없다', () => {
+  const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
+  const sp = g._spawnParcel({ type: 'normal', size: 1, rush: true }); assert.ok(sp.rush && sp.noDeadline, '긴급은 기한 없음');
+  const base = D.PARCEL_TYPES.normal.reward[1];
+  g.parcels = [P(1, 'normal', 1, { rush: true, noDeadline: true, age: 0 })];
+  assert.equal(g.previewReward(c, g.parcels[0]), base * 2, '미리보기도 ×2');
+  let r = g.callCarrier(i, [1]); assert.equal(r.revenue, Math.round(base * 2 * g.rules.revenueMult), '당일 ×2');
+  g.parcels = [P(2, 'normal', 1, { rush: true, noDeadline: true, age: 1 })];
+  r = g.callCarrier(i, [2]); assert.equal(r.revenue, Math.round(Math.round(base * 0.5) * g.rules.revenueMult), '하루 뒤 ×½');
+  const old = P(3, 'normal', 1, { rush: true, noDeadline: true, age: 3, deadline: 1 }); g.parcels = [old]; g.wait && g.wait();
+  assert.ok(!old.overdue && g.parcels.includes(old), '며칠 묵어도 반송되지 않는다');
+  const ng = NG(5); let n = 0; for (let k = 0; k < 400; k++) if (ng._genParcelSpec({ normal: 1 }, 1, null).rush) n++;
+  assert.ok(n > 20 && n < 90, '자유 런 일반 택배의 약 12% — ' + n);
+});
 t('신뢰도: 차 한 대에 실은 택배 점수 평균(−2~+2) — 들어오자마자 +2 · 여유 있게 +1 · 기한 맞춰 0 · 늦으면 −2 (꽉 채우기와 무관), 특성은 업체마다 다름', () => {
   const g = EMPTY(2); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.parcels = [P(1, 'normal', 1, { deadline0: 4, deadline: 4 })]; g.callCarrier(i, [1]); assert.equal(g.trust.bulk0, 2, '들어온 날 한 개 → +2 (반 차여도)');

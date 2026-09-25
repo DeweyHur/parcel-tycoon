@@ -859,7 +859,7 @@
     const g = game, p = g.parcels.find(x => x.id === id); if (!p) return;
     const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], lv = g.customerLevel(p.customer || 'anon');
     const claim = Math.round(((p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))) * cu.claimMult * g.rules.claimMult * (g.rules.customerClaimMult[p.customer] || 1));
-    const attrRows = a.map(k => `<div class="d">${D.ATTRS[k].icon} <b>${D.ATTRS[k].name}</b> — ${T('attr.' + k)}</div>`).join('');
+    const attrRows = a.map(k => `<div class="d">${D.ATTRS[k].icon} <b>${D.ATTRS[k].name}</b> — ${T('attr.' + k)}</div>`).join('') + (p.rush ? `<div class="d" style="color:var(--gold)">${T('pd.rush', { a: D.RUSH_CARGO.sameDay, b: '½' })}</div>` : '');
     // 못 싣는 계약 줄은 읽을 이유가 없다 — 실을 수 있는 것만 보여 주고,
     // 하나도 없을 때만 전부 펼쳐 "왜 안 실리는지"를 답한다
     const anyOk = g.contracts.some(c => c && g.canHandle(c, p));
@@ -1138,6 +1138,7 @@
     const dotOf = n => n <= 1 ? 'r' : n <= 2 ? 'o' : n <= 3 ? 'y' : 'g';
     if (p.customs > 0) return { key: `cu${p.customs}|${p.deadline}`, urg: p.customs + p.deadline, cls: 'cu', dot: dotOf(p.customs + p.deadline), label: `${T('ps.customs', { n: p.customs, delayed: p.customsDelayed ? ` ${T('ps.delayed')}` : '' })} · ⏳ ${T('fmt.turns', { n: p.deadline })}` };
     if (p.overdue) { const ri = game ? game.returnIn(p) : null; return { key: 'od', urg: -1, cls: 'od', dot: 'r', label: T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' }) }; }
+    if (p.rush) return game && game.rushToday(p) ? { key: 'rush', urg: -5, cls: 'rush', dot: 'r', label: T('ps.rushToday', { x: D.RUSH_CARGO.sameDay }) } : { key: 'rushL', urg: 80, cls: 'nd', dot: 'g', label: T('ps.rushLate', { x: '½' }) };
     if (p.noDeadline) return { key: 'nd', urg: 90, cls: 'nd', dot: 'g', label: T('ps.noDue') };
     return { key: `d${p.deadline}`, urg: p.deadline, cls: dotOf(p.deadline), dot: dotOf(p.deadline), label: T('ps.deadline', { n: p.deadline }) };
   }
@@ -1154,13 +1155,13 @@
   function parcelTile(p, s) {
     const t = ptype(p), a = attrsOf(p), hz = hazardKey(p);
     const rot = (a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen);
-    const cls = ['ptile', `v${valueTier(p)}`, p.overdue ? 'od' : '', rot ? 'rot' : '', hz.includes('heat') ? 'heat' : '', hz.includes('nc') ? 'nc' : '', p.outdoor ? 'out' : '',
+    const cls = ['ptile', `v${valueTier(p)}`, p.rush ? (game.rushToday(p) ? 'rush now' : 'rush') : '', p.overdue ? 'od' : '', rot ? 'rot' : '', hz.includes('heat') ? 'heat' : '', hz.includes('nc') ? 'nc' : '', p.outdoor ? 'out' : '',
       s && s.sel.has(p.id) ? 'sel' : '', s && !s.elig.has(p.id) ? 'dis' : '', s && s.risk && s.risk.has(p.id) ? 'risk' : ''].filter(Boolean).join(' ');
-    const reward = p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize);
+    const reward = Math.round((p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize)) * game.rushMult(p));
     const tip = [t.name, T('fmt.cells', { n: p.size }), `${reward}c`].concat(a.map(k => D.ATTRS[k].name)).join(' · ');
     const ic = tileIcons(p);
     const cells = Array.from({ length: p.size }, (_, k) => `<i>${ic[k] ? `<span>${ic[k]}</span>` : ''}</i>`).join('');
-    const vb = valueTier(p) ? `<b class="vb">${valueTier(p) === 3 ? '✦' : valueTier(p) === 2 ? '◆' : '▲'}</b>` : '';
+    const vb = p.rush ? `<b class="vb rushb${game.rushToday(p) ? ' now' : ''}">⚡</b>` : valueTier(p) ? `<b class="vb">${valueTier(p) === 3 ? '✦' : valueTier(p) === 2 ? '◆' : '▲'}</b>` : '';
     return `<button type="button" class="${cls}" data-id="${p.id}" style="--c:${t.css}" title="${esc(tip)}" aria-label="${esc(tip)}">${cells}${vb}</button>`;
   }
   function renderStock(container, parcels, s) {
@@ -1178,7 +1179,7 @@
     container.innerHTML = buckets.map(({ b, ps }) => {
       // 같은 종류끼리 붙여 놓아야 색 덩어리로 읽힌다
       const tiles = ps.slice().sort((x, y) => (x.type < y.type ? -1 : x.type > y.type ? 1 : 0) || y.size - x.size).map(p => parcelTile(p, s)).join('');
-      const money = ps.reduce((n, x) => n + (x.reward != null ? x.reward : game.baseReward(x.type, x.baseSize)), 0);
+      const money = ps.reduce((n, x) => n + Math.round((x.reward != null ? x.reward : game.baseReward(x.type, x.baseSize)) * game.rushMult(x)), 0);
       return `<div class="prow ${b.cls}${head ? '' : ' nohead'}">${head ? `<div class="pl"><i class="urg ${b.dot}"></i><span>${b.label}</span></div>` : ''}<div class="pt">${tiles}</div><div class="pm">${money}c</div></div>`;
     }).join('');
   }
@@ -1282,7 +1283,7 @@
   // 우리 차(직접 배송) — 칸이 아니라 개수로 싣는다. 싣고 나면 오늘 영업은 끝이라, 보내기는 아래 버튼(직접 배송 N개)이 맡는다.
   function selfPlan() {
     const g = game, picked = [...pick.sel].map(id => g.parcels.find(x => x.id === id)).filter(Boolean);
-    const cost = picked.reduce((s, p) => s + g.selfCost(p), 0), income = picked.reduce((s, p) => s + p.reward, 0);
+    const cost = picked.reduce((s, p) => s + g.selfCost(p), 0), income = picked.reduce((s, p) => s + Math.round(p.reward * g.rushMult(p)), 0);
     return { picked, cost, income, net: income - cost };
   }
   function renderSelfBar(head, foot) {
@@ -1344,6 +1345,8 @@
     // 차마다 실리는 상자는 포장 결과 그대로 (쪼개지 않는다) — 3D 트럭도 같은 나눔으로 싣는다
     const packed = game.packTrucks(contract, ids.map(id => game.parcels.find(p => p.id === id)).filter(Boolean));
     const loads = Array.from({ length: trucks }, (_, k) => (packed[k] || []).map(p => p.id));
+    // 싹쓸이 판정용: 부르기 전 창고(야외 포함)와 오늘 들어온 ⚡ 긴급
+    const pre = game.parcels.length, preRush = game.parcels.filter(p => game.rushToday(p)).map(p => p.id);
     const r = game.callCarrier(i, ids, trucks);
     if (!r.ok) { toast(r.msg); return; }
     pendingCall = r;
@@ -1367,13 +1370,16 @@
     busy = true; renderAll();
     const events = game.takeEvents();
     const delivered = events.filter(e => e.type === 'deliver').map(e => e.parcel.id);
-    const topValue = events.filter(e => e.type === 'deliver').reduce((m, e) => Math.max(m, valueTier(e.parcel)), 0);
+    // 잭팟은 비싼 택배가 아니라 **판을 턴 순간**에 — 창고를 통째로 비웠거나, 오늘 들어온 ⚡ 긴급을 전부 내보냈을 때
+    const gone = new Set(delivered), sweep = pre > 0 && delivered.length >= 3 && delivered.length === pre;
+    const rushAll = !sweep && preRush.length >= 2 && preRush.every(id => gone.has(id));
+    const topValue = sweep ? 3 : rushAll ? 2 : 0;
     let broke = false;
     for (const e of events) if (e.type === 'broken') { broke = true; scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.broken', { short: D.PARCEL_TYPES[e.parcel.type].short }), true, 30); }
     if (broke) scene.mope(); else if (r.chain >= 2 || r.rush || topValue >= 2) scene.cheer(Math.max(r.chain || 0, r.rush ? 3 : 0, topValue));
     scene.deliver(delivered, () => {
       if (delivered.length) { SFX.coin(delivered.length); floatText(r.rush ? T('rush.float', { n: r.revenue }) : r.delay ? T('float.delayed', { n: r.revenue, delay: r.delay }) : `+${r.revenue}c`, false, 70); }
-      if (topValue >= 2) setTimeout(() => { rewardBurst(T('value.delivered.' + topValue), topValue); SFX.combo(topValue + 1); }, 180);
+      if (topValue >= 2) setTimeout(() => { rewardBurst(T(sweep ? 'jackpot.sweep' : 'jackpot.rush', { n: sweep ? pre : preRush.length }), topValue); SFX.combo(topValue + 1); }, 180);
       if (r.fee) setTimeout(() => floatText(T('call.fee', { fee: r.fee }), true, 30), 250);
       announceCustomers(events);
       afterTurn(events);
@@ -1940,7 +1946,7 @@
       const at = (P[t].attrs || []).map(a => (D.ATTRS[a] || {}).icon || '').join('');
       return `<tr><td>${sw(t)}</td><td><b>${esc(P[t].short || P[t].name)}</b> ${at}</td><td class="hv-sz">${P[t].sizes.join('·')}</td><td>${T('hv.kind.' + t)}</td></tr>`;
     }).join('');
-    const kind = `<table class="hv-tbl"><tr><th></th><th></th><th>${T('hv.kind.size')}</th><th></th></tr>${kinds}</table>`;
+    const kind = `<table class="hv-tbl"><tr><th></th><th></th><th>${T('hv.kind.size')}</th><th></th></tr>${kinds}</table>` + row('⚡', T('pd.rush', { a: D.RUSH_CARGO.sameDay, b: '½' }));
     // 4. 기한 · 신뢰 · 평판
     const L = D.TRUST_LEVELS, G = D.REP_GAIN;
     const tbar = pct => `<span class="trust"><small>${esc(T('common.trust'))}</small><b class="tlv">Lv1</b><span class="tbar"><i style="width:${pct}%"></i><i class="gain" style="width:20%"></i></span><small class="tnum">8<b class="arrow">→</b>10</small></span>`;

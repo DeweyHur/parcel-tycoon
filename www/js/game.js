@@ -670,7 +670,7 @@
 
     // ----- 적재 (4장) -----
     // 창고 안 우선순위: 급한 순. 야외 후보는 덜 급한 것부터
-    _urgencyKey(p) { return (p.overdue ? -10 : 0) + (p.noDeadline ? 90 : 0) + p.deadline + (p.customs || 0) - (this._attrs(p).includes('cold') || this._attrs(p).includes('frozen') ? 3 : 0); }
+    _urgencyKey(p) { if (this.rushToday(p)) return -20; return (p.overdue ? -10 : 0) + (p.noDeadline ? 90 : 0) + p.deadline + (p.customs || 0) - (this._attrs(p).includes('cold') || this._attrs(p).includes('frozen') ? 3 : 0); }
     setOutdoor(ids) {
       if (this.phase !== 'play') return { ok: false };
       this.outdoorPref = (ids || []).slice();
@@ -988,8 +988,11 @@
       const R = this.rules, car = D.CARRIERS[c.carrier], t = D.PARCEL_TYPES[p.type];
       let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll + this.trustPerkMap('rewardDelta', p.type);
       if (this.isSpecialist(car, p.type) && t.bonus) r += t.bonus + R.bonusDelta + (this.customerPerk(p.customer, 'bonusDelta') || 0) + this.trustPerkMap('bonusDelta', p.type);
-      return Math.round(r * (R.rewardMult[p.type] || 1));
+      return Math.round(r * (R.rewardMult[p.type] || 1) * this.rushMult(p));
     }
+    // ⚡ 긴급 화물 보상 배수 — 들어온 날(age 0) ×2, 그 뒤 ×½
+    rushMult(p) { return p && p.rush ? (p.age <= 0 ? D.RUSH_CARGO.sameDay : D.RUSH_CARGO.later) : 1; }
+    rushToday(p) { return !!(p && p.rush && p.age <= 0); }
     isSpecialist(car, type) { return Array.isArray(car.specialist) ? car.specialist.includes(type) : car.specialist === type; }
     canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)); }
     // 이 택배를 (파손 없이) 받아 주는 계열들 — 지금 계약이 없을 때 "뭘 사면 되는지" 말해 주려고
@@ -1030,7 +1033,7 @@
       // 1) 급한 것(기한 초과·오늘내일)은 순서대로 먼저 싣는다.
       // 2) 남은 칸은 '가장 꽉 차게' — 순서대로 담기만 하면 2·2·1 을 담고 남은 2칸짜리를 못 싣는다(5/6).
       //    합이 최대인 조합 중에서, 앞(더 급한) 것을 최대한 포함하는 조합을 고른다.
-      const urgent = p => p.overdue || (!p.noDeadline && p.deadline <= 1);
+      const urgent = p => p.overdue || this.rushToday(p) || (!p.noDeadline && p.deadline <= 1);
       const fill = maxCap => {
         const chosen = new Set(); let v = 0;
         for (const p of sorted) if (urgent(p) && v + p.size <= maxCap) { chosen.add(p.id); v += p.size; }
@@ -1361,6 +1364,7 @@
       if (!premium && ((this.growth && this.growth.branding) || 0) > 0 && this.rng.next() < this.growth.branding * D.GROWTH.branding.premiumChance) premium = true;
       const spec = { type, size: +this.rng.weighted(w), customer };
       if (attrs) spec.attrs = attrs; if (premium) spec.premium = true;
+      if (type === 'normal' && !attrs && this.shows('rushCargo') && this.rng.next() < D.RUSH_CARGO.chance) spec.rush = true;
       return spec;
     }
     _spawnParcel(spec) {
@@ -1375,10 +1379,10 @@
       let reward = this.baseReward(spec.type, spec.size); if (spec.premium) reward = Math.round(reward * 1.5);
       reward = Math.round(reward * (1 + ((this.growth && this.growth.branding) || 0) * D.GROWTH.branding.reward));
       if (spec.rewardDelta && spec.rewardDelta[spec.type]) reward += spec.rewardDelta[spec.type];
-      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, attrs, customer,
+      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, rush: !!spec.rush, attrs, customer,
         deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1,
         // 첫 사이클에는 기한을 붙이지 않는다 — '차를 꽉 채워 보낸다'를 먼저 익히고, 기한은 그 다음에 배운다 (levels.js noDeadlineCycles)
-        noDeadline: this.month <= (R.noDeadlineCycles || 0) };
+        noDeadline: this.month <= (R.noDeadlineCycles || 0) || !!spec.rush };   // ⚡ 긴급은 기한·반송 대신 '오늘 ×2 / 뒤엔 ×½'
       p.deadline0 = p.deadline;   // 처음 기한 — 얼마나 일찍 보냈는지(신뢰)를 잰다
       if (attrs.includes('customs')) { p.customs = R.customsWait + (this.trustPerkAny('customsDelta') || 0); if (this.rng.next() < R.customsDelayProb && this.items.customsBond !== this.month && !this.trustPerkAny('noCustomsDelay')) { p.customs += 1; p.customsDelayed = true; } if (cust.rule && cust.rule.kind === 'customsFast') p.customs += cust.rule.delta; const cd = this.customerPerk(customer, 'customsDelta'); if (cd) p.customs += cd; p.customs = Math.max(0, p.customs); p.coldDuringCustoms = true; }
       return p;
@@ -1476,7 +1480,7 @@
         if (p.customs > 0 && this.trustPerk(c.carrier, 'customsBonus')) r += this.trustPerk(c.carrier, 'customsBonus');
         const isSpec = specialistAll || this.isSpecialist(car, p.type);
         if (isSpec && t.bonus) { r += t.bonus + R.bonusDelta + (this.customerPerk(p.customer, 'bonusDelta') || 0) + this.trustPerkMap('bonusDelta', p.type); special = true; if (!this.stats.specialistTypes.includes(p.type)) this.stats.specialistTypes.push(p.type); }
-        r = Math.round(r * (R.rewardMult[p.type] || 1));
+        r = Math.round(r * (R.rewardMult[p.type] || 1) * this.rushMult(p));
         if (p.wet) { r = Math.round(r * 0.8); this.stats.wetDelivered++; }
         if (snow && this._attrs(p).includes('cold')) { r += 10; this.stats.snowDelivered++; }
         if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else { onTime++; this.stats.onTimeByType[p.type]++; if (p.baseSize >= 7) this.stats.xlOnTime++; if (p.baseSize >= 4) this.stats.bigDelivered++; }
@@ -1576,7 +1580,7 @@
           continue;
         }
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
-        r = Math.round(r * (R.rewardMult[p.type] || 1));
+        r = Math.round(r * (R.rewardMult[p.type] || 1) * this.rushMult(p));
         if (p.wet) r = Math.round(r * 0.8);
         if (p.overdue) { r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else this.stats.onTimeByType[p.type]++;
         r += this._custDeliver(p, r, !p.overdue, chosen.filter(q => q.customer === p.customer));

@@ -973,3 +973,11 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .cc-claim { color: var(--orange); } .cc-month { margin-left: auto; color: var(--dim); }
 .cc-rule { flex-basis: 100%; font-size: 11px; color: var(--gold); }
 .cc-soon { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; } .cc-soon .dim { opacity: .55; } .cc-soon small { font-size: 9px; color: var(--dim); }
+/* ⚡ 긴급 화물 — 오늘 들어온 것은 번쩍, 묵은 것은 흐리게 */
+.ptile .vb.rushb { font-size: 11px; color: #9a8f70; top: -3px; }
+.ptile .vb.rushb.now { color: #ffe14a; text-shadow: 0 0 4px #ffb400; animation: rushb .9s steps(2) infinite; }
+@keyframes rushb { 50% { opacity: .45; } }
+.ptile.rush.now { border-color: #ffe14a; box-shadow: 0 0 0 1px #1a1400, 0 0 7px #ffc400aa, 2px 2px 0 #00000066; }
+.ptile.rush.now::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: repeating-linear-gradient(45deg, #ffe14a 0 4px, #1a1400 4px 8px); pointer-events: none; }
+.ptile.rush:not(.now) { opacity: .8; }
+.prow.rush .pl span { color: #ffe14a; font-weight: 700; }
