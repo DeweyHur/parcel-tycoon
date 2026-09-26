@@ -2,8 +2,10 @@
 (function () {
   const D = window.DATA, M = window.META, I18n = window.I18n, T = I18n.t;
   const $ = s => document.querySelector(s);
-  const SAVE_KEY = 'save_v2', OPT_KEY = 'opts_v1';
+  const SAVE_KEY = 'save_v2', OPT_KEY = 'opts_v1', MULTI_KEY = 'multi_v1';
   let game = null, scene = null, busy = false;
+  // 멀티 「난투」: 진행 중인 매치(사람 + 봇 3). game 은 언제나 사람 판(players[0].game). 개인 런과 저장 키가 다르다
+  let match = null, lastRank = 0;
   if (typeof window !== 'undefined') Object.defineProperty(window, '__game', { get: () => game });
   const BUILD = Object.assign({ demo: false, iap: null, store: {}, api: '' }, window.BUILD || {});
   // 사이클 번호 → '3월 후반' (세이브 라벨·결과·기록처럼 game 이 없을 수도 있는 곳에서 쓴다)
@@ -19,8 +21,11 @@
   Profile.load();
 
   function saveOpts() { Store.set(OPT_KEY, opts); }
-  function saveGame() { if (game && game.phase !== 'over' && game.phase !== 'win') Store.set(SAVE_KEY, game.toJSON()); else Store.remove(SAVE_KEY); }
+  function saveGame() {
+    if (match) { if (game && game.phase !== 'over' && game.phase !== 'win') Store.set(MULTI_KEY, MULTI.toJSON(match)); else Store.remove(MULTI_KEY); return; }
+    if (game && game.phase !== 'over' && game.phase !== 'win') Store.set(SAVE_KEY, game.toJSON()); else Store.remove(SAVE_KEY); }
   function loadSave() { const s = Store.get(SAVE_KEY); return s && s.cfg ? s : null; }
+  function loadMultiSave() { const s = Store.get(MULTI_KEY); return s && s.players ? s : null; }
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   function ptype(p) { return D.PARCEL_TYPES[p.type]; }
   function today() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -82,7 +87,8 @@
   const storySeen = P => !!((P.story && P.story.seen) || ((P.campaign && P.campaign.cleared) || 0) >= LEVELS.IMPLEMENTED);
   function showTitle() {
     $('#story').hidden = true; $('#sms').hidden = true; clearStoryHl(); clearGate(); storyBusy = false;
-    const save = loadSave(), P = Profile.get();
+    const save = loadSave(), P = Profile.get(), msave = loadMultiSave();
+    match = null;
     // 캠페인을 아직 다 못 했으면 타이틀도 최소한만 보여 준다 — 시작 · 소리 · 언어 (levels.js)
     if ((P.campaign.cleared || 0) < LEVELS.IMPLEMENTED) return showTitleCampaign(save, P.campaign);
     const coOn = !companiesHidden();
@@ -94,6 +100,8 @@
         return `<button class="btn cta cont" id="t-continue">${T('title.continue')}<small class="cont-sub">${where}</small></button>`; })() : ''}
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
       <button class="btn gold" id="t-new">${T('title.new')}</button>
+      ${msave ? `<button class="btn cta cont" id="t-multi-cont">${T('title.multiCont')}<small class="cont-sub">⚔ D+${msave.players[0].game.totalTurn || 0}</small></button>` : ''}
+      <button class="btn" id="t-multi">⚔ ${T('title.multi')} <small style="color:var(--dim)">${T('title.multiSub')}</small></button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).filter(achShown).length, d: Object.keys(M.ACHIEVEMENTS).filter(achShown).length })}</small></button>
       ${BUILD.api ? `<button class="btn" id="t-rank">${T('title.rank')}</button>` : ''}
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
@@ -106,6 +114,8 @@
     m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort'), showTitle); return; }   /* 취소하면 타이틀로 — closeModal 만 하면 뒤에 판이 없어 까만 화면이 남았다 */ showScenarioSelect(); };
     // 인수인계는 캠페인으로 강제된다 — 끝낸 뒤 타이틀에는 다시 보이지 않는다
     const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
+    m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); if (msave) { askConfirm(T('multi.confirmNew'), () => { Store.remove(MULTI_KEY); startMulti(); }, T('title.newShort'), showTitle); return; } startMulti(); };
+    const mc = m.querySelector('#t-multi-cont'); if (mc) mc.onclick = () => { SFX.resume(); SFX.select(); match = MULTI.fromJSON(msave); game = match.players[0].game; lastRank = myRank(); closeModal(); startPlay(); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex(companiesHidden() ? 'carriers' : 'companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
@@ -541,6 +551,75 @@
     withHowTo(() => { game = new Game(cfg); closeModal(); startPlay(); });
   }
 
+  // ---------- 멀티 「난투」 (docs/MULTIPLAYER_DESIGN.md · js/multi.js) ----------
+  // 1단계: 봇 3명과 로컬 매치. 서버·매칭·트레잇·폭탄은 다음 단계 — 여기서는 규칙 셋(장 하루 소모·배차 무제한·즉시 결제·퍽 3택1)과 상대 줄만
+  function startMulti() {
+    const nm = (Profile.get().campaign || {}).name || T('lv.nameDefault');
+    match = MULTI.newMatch({ name: nm, botNames: T('multi.botNames').split('·') });
+    game = match.players[0].game; lastRank = myRank();
+    closeModal(); startPlay();
+  }
+  function myRank() { if (!match) return 0; const r = MULTI.standings(match).find(x => x.human); return r ? r.rank : 0; }
+  // 사람이 하루를 넘겼다 → 봇도 따라오고, 순위가 바뀌었으면 토스트
+  function multiAfterDay() {
+    if (!match) return;
+    MULTI.tick(match);
+    const r = myRank();
+    if (lastRank && r < lastRank) { toastLater(r === 1 ? T('multi.rankTop') : T('multi.rankToast', { n: r }), 2000); SFX.levelup(); }
+    lastRank = r;
+  }
+  // 상단 상대 줄 — 포트레잇 4개(맨 왼쪽 나). 1단계는 이름 · 일차 · 잔액 · 평판 점 · 창고 막대만 (표정·연출은 2단계)
+  function renderMultiStrip() {
+    const el = $('#multi-strip'); if (!el) return;
+    el.hidden = !match; if (!match) return;
+    const rows = MULTI.standings(match);
+    el.innerHTML = match.players.map(p => {
+      const r = rows.find(x => x.p === p), g = p.game;
+      const dead = !r.alive, done = r.done && r.alive;
+      const fill = r.cap ? Math.min(1, r.used / r.cap) : 0, over = r.used > r.cap;
+      const reps = Array.from({ length: 5 }, (_, i) => `<i class="${g.rep >= (i + 1) * g.repCap() / 5 ? 'on' : ''}"></i>`).join('');
+      return `<div class="mp ${p.human ? 'me' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
+        <b class="nm">${esc(p.human ? T('multi.you') : p.name)}</b><span class="rk">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : T('multi.rank', { n: r.rank })}</span>
+        <div class="wh ${over ? 'over' : fill >= 0.8 ? 'hot' : fill >= 0.5 ? 'mid' : ''}"><i style="width:${Math.round(fill * 100)}%"></i></div>
+        <span class="reps">${reps}</span>
+        <span class="cash ${g.cash < 0 ? 'neg' : ''}">${g.cash}c</span><span class="day">${T('multi.day', { n: r.day })}</span></div>`;
+    }).join('');
+    el.querySelectorAll('.mp').forEach(d => d.onclick = () => { SFX.click(); showOpponent(match.players[+d.dataset.id]); });
+  }
+  // 포트레잇 탭 → 그 사람 창고 요약(계약 3줄·퍽) — 관전 정보이지 조작 아님
+  function showOpponent(p) {
+    const g = p.game, r = MULTI.standings(match).find(x => x.p === p);
+    const cs = g.contracts.filter(Boolean).map(c => `<div class="kv2"><span>${esc(g.contractName(c))}${gradeBadge(c.grade)}</span><span class="v">${T('fmt.trucks', { n: g.vehicleCap(c) })} · ${g.truckFee(c)}c</span></div>`).join('');
+    const pk = g.mperks.length ? `<div class="mperks">${g.mperks.map(id => `<span title="${esc(M.MULTI.PERKS[id].name)}">${M.MULTI.PERKS[id].icon}</span>`).join('')}</div>` : `<div class="d">${T('common.none')}</div>`;
+    const body = `<div class="kv"><span>${T('multi.colDay')}</span><span class="v">${T('multi.day', { n: r.day })} / ${r.days}</span><span>${T('multi.colCash')}</span><span class="v">${g.cash}c</span><span>${T('multi.colRep')}</span><span class="v">${g.rep}/${g.repCap()} · ${esc(g.repTierName())}</span><span>${T('common.warehouse')}</span><span class="v">${r.used}/${r.cap}</span></div>${cs}${pk}`;
+    modal(`${esc(p.human ? T('multi.you') : p.name)} · ${r.alive ? T('multi.rank', { n: r.rank }) : T('multi.closed')}`, body, [{ label: T('btn.close'), onClick: closeModal }]);
+  }
+  // 퍽 3택1 — 평판 등급이 오르면 뜬다. 시간은 가지 않는다
+  function showPerkPick() {
+    const g = game, offer = g.perkOffer; if (!offer) return;
+    BGM.stinger('fanfare', 0.8);
+    const cards = offer.map(id => { const pk = M.MULTI.PERKS[id], n = g.mperks.filter(x => x === id).length; return `<button class="btn pkcard fam-${pk.family}" data-id="${id}"><span class="ic">${pk.icon}</span><b>${esc(pk.name)}</b><small>${esc(pk.desc)}</small><em>${esc(M.MULTI.FAMILY_NAMES[pk.family])}${n ? ' ' + T('multi.perkStack', { n: n + 1 }) : ''}</em></button>`; }).join('');
+    const m = modal(T('multi.perkTitle', { n: g.repTier }), `<div class="d" style="text-align:center">${T('multi.perkSub')}</div><div class="pkrow">${cards}</div>`, null);
+    m.querySelectorAll('.pkcard').forEach(b => b.onclick = () => {
+      const r = g.pickPerk(b.dataset.id); if (!r.ok) return toast(r.msg);
+      SFX.buy(); closeModal(); rewardBurst(`${M.MULTI.PERKS[r.perk].icon} ${M.MULTI.PERKS[r.perk].name}`, 2);
+      game.takeEvents(); scene.sync(game, { animate: true }); saveGame(); renderAll(); checkPhase();
+    });
+  }
+  // 결과: 순위표. 사람이 먼저 끝났으면(마감·폐업) 남은 봇을 끝까지 돌린다 (관전은 4단계)
+  function showMultiResult() {
+    const r = game.result;
+    if (!r.recorded) { r.recorded = true; MULTI.finishAll(match); Store.remove(MULTI_KEY); BGM.stop(0.5); renderMultiStrip(); }
+    const rows = MULTI.standings(match), me = rows.find(x => x.human);
+    if (!r.fanfare) { r.fanfare = true; if (me.rank === 1) { SFX.win(); BGM.oneShot('fanfare'); } else if (!me.alive) { SFX.over(); setTimeout(() => BGM.oneShot('gameover'), 300); } else SFX.levelup(); }
+    const P = Profile.get(); if (!r.profiled) { r.profiled = true; P.multi = P.multi || { played: 0, wins: 0, best: 0 }; P.multi.played++; if (me.rank === 1) P.multi.wins++; P.multi.best = Math.max(P.multi.best || 0, me.alive ? me.cash : 0); Profile.save(); }
+    const table = `<div class="mtable">${rows.map(x => `<div class="mrow ${x.human ? 'me' : ''} ${x.alive ? '' : 'dead'}"><b class="rank">${x.rank}</b><span class="nm">${esc(x.human ? T('multi.you') : x.name)}</span><span class="st">${x.alive ? T('multi.done') : T('multi.closed')} · ${T('multi.day', { n: x.day })}</span><span class="cash">${x.cash}c</span><span class="rep">★${x.rep}</span></div>`).join('')}</div>`;
+    const body = `<div class="big-num">${T('multi.rank', { n: me.rank })}</div><p style="text-align:center;color:var(--dim)">${esc(I18n.text(r.reason))}</p>${table}
+      <div class="kv"><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${game.mperks.map(id => M.MULTI.PERKS[id].icon).join('') || T('common.none')}</span><span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
+    modal(me.alive ? T('multi.resultWin', { rank: me.rank }) : T('multi.resultOver', { rank: me.rank }), body,
+      [{ label: T('res.toTitle'), onClick: () => { closeModal(); match = null; game = null; showTitle(); } }, { label: T('multi.again'), cls: 'primary', onClick: () => { closeModal(); startMulti(); } }]);
+  }
+
   // 런 카드: 이 런의 **특징** 몇 줄 — 이름 + 판에 걸리는 수치 하나. 세세한 달별 수치는 숨긴다.
   //   추석 주문 폭주 — 주문 ×1.6 · 5일 · 연휴 3일 차 없음 / 폭염 경보 — 폭염 ×2 / 12월 성수기 — 주문 ×1.4 …
   // 공휴일은 해마다 날짜가 달라서 그 런의 해로 판을 하나 만들어 센다 (저장하지 않는다)
@@ -704,7 +783,7 @@
     const g = game, R = g.rules;
     // 재고는 늘 펼쳐져 있다 — 상자 격자가 곧 창고이고, 차를 부르면 그대로 고르는 판이 된다
     const pk = ensurePick();
-    $('#invest-btn').hidden = !(g.shows('invest') && g.campaignOpen());   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다
+    $('#invest-btn').hidden = !(g.shows('invest') && g.campaignOpen()) || R.multi;   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다 (멀티엔 홍보가 없다)
     // 돌고 있는 캠페인은 버튼에 매체 아이콘 + 남은 날(물량이 아직 들어오는 날 수)로 — 📰2 📻3
     { const act = (g.campaignRuns || []).filter(r => r.m === g.month && r.end > g.turn), ib = $('#invest-btn');
       ib.classList.toggle('active', act.length > 0);
@@ -714,13 +793,18 @@
     $('#app').classList.toggle('calling', !!pk);
     updateMusic();
     $('#hud-month').innerHTML = `${g.seasonMods().icon || ''}${T('fmt.calMonth', { y: g.yearOf(), cal: g.calMonth(), n: g.month })}`;
-    $('#hud-turn').textContent = T('hud.turn', { d: g.dateOf(g.turn), dow: g.dowName(g.turn) });
+    // 멀티: 시계가 다르니 날짜 대신 일차(D+41). 마지막 30일부터는 D-카운트
+    if (match) { const left = MULTI.totalDays(g) - MULTI.dayOf(g); $('#hud-turn').textContent = left <= 30 ? T('multi.dleft', { n: left }) : T('multi.day', { n: MULTI.dayOf(g) }); }
+    else $('#hud-turn').textContent = T('hud.turn', { d: g.dateOf(g.turn), dow: g.dowName(g.turn) });
+    renderMultiStrip();
+    { const sb = $('#shop-btn'); if (sb) { sb.hidden = !R.shopDay; sb.disabled = busy || g.phase !== 'play'; sb.innerHTML = `${esc(T('multi.shopBtn'))}<small>${esc(T('multi.shopBtnSub'))}</small>`; } }
     // 자금은 월말 정산 후 예상 잔액으로 보여준다 (사이클 중엔 모든 지출이 어음 — 자금 때문에 막히는 일이 없다)
     const pj = g.projectedCash(); const hc = $('#hud-cash'); const inPlay = g.phase === 'play';
     // 가계약 뒤로는 장(보름)이 끝날 때마다 잔금 회차가 나간다 — 월말 예상에도 미리 뺀다
     const inst = instalmentDue(g); if (inst) pj.total -= inst;
-    hc.textContent = inPlay ? pj.total : g.cash; hc.style.color = inPlay && pj.total < 0 ? 'var(--red)' : '';
-    $('#hud-cash-lbl').textContent = inPlay ? T('hud.cashLbl') : T('hud.cash');
+    // 멀티: 어음이 없으니 예상이 아니라 지금 잔액 그대로 — 보이는 숫자가 곧 점수다
+    hc.textContent = inPlay && !R.multi ? pj.total : g.cash; hc.style.color = (inPlay && !R.multi ? pj.total : g.cash) < 0 ? 'var(--red)' : '';
+    $('#hud-cash-lbl').textContent = inPlay && !R.multi ? T('hud.cashLbl') : T('hud.cash');
     const due = $('#hud-due'); if (due && !inPlay) { due.textContent = g.debt ? T('hud.debt', { n: pj.loan }) : ''; due.hidden = false; }
     else if (due) { const parts = [T('hud.cashNow', { n: g.cash })]; if (pj.pending) parts.push(T('hud.pending', { n: pj.pending })); if (pj.stock) parts.push(T('hud.stock', { n: pj.stock })); if (g.feesDue) parts.push(T('hud.feesDue', { n: g.feesDue })); parts.push(T('hud.opCostDue', { n: pj.opCost + pj.premium })); if (inst) parts.push(T('hud.instalment', { n: inst })); if (g.debt) parts.push(T('hud.debt', { n: pj.loan })); due.innerHTML = parts.join(' · ') + (pj.total < 0 && g.turn >= 5 ? ` · <span style="color:var(--orange)">${T('hud.loanWarn')}</span>` : ''); due.hidden = !hudDueOpen; }
     // 자금 분해(현금·재고·운영비·보험)는 매 턴 볼 필요가 없다 — 기본은 접고, 자금 칸을 누르면 펼친다.
@@ -740,7 +824,9 @@
     // 아직 안 연 것은 화면에도 없다 (levels.js) — 평판 게이지·회사 줄은 레벨이 열어 준다
     $('#hud-right').hidden = !g.shows('rep') && !g.shows('perks');
     $('#stress-wrap').hidden = !g.shows('rep');
-    $('#hud-perks').innerHTML = !g.shows('perks') ? `<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName ? g.companyName() : g.company.name)}</a>` : [`<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName())}</a>`, ...(g.perks.length ? [`<span class="hud-pk">${g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}" title="${esc(M.PERKS[p].name)}">${perkIcon(p)}</a>`).join('')}</span>`] : []), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ');
+    if (R.multi) $('#hud-perks').innerHTML = `<a class="hl">${esc(g.companyName())}</a>${g.mperks.length ? ` <span class="hud-pk">${[...new Set(g.mperks)].map(id => `<a class="hl" data-mperk="${id}" title="${esc(M.MULTI.PERKS[id].name)}">${M.MULTI.PERKS[id].icon}${g.mperks.filter(x => x === id).length > 1 ? `<sub>${g.mperks.filter(x => x === id).length}</sub>` : ''}</a>`).join('')}</span>` : ''}`;
+    else $('#hud-perks').innerHTML = !g.shows('perks') ? `<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName ? g.companyName() : g.company.name)}</a>` : [`<a class="hl" data-pop="company">${g.company.icon} ${esc(g.companyName())}</a>`, ...(g.perks.length ? [`<span class="hud-pk">${g.perks.map(p => `<a class="hl" data-pop="perk" data-id="${p}" title="${esc(M.PERKS[p].name)}">${perkIcon(p)}</a>`).join('')}</span>`] : []), `<a class="hl" data-pop="insurer">${g.insurer !== 'none' ? M.INSURERS[g.insurer].icon + esc(M.INSURERS[g.insurer].name) : esc(M.INSURERS.none.name)}</a>`].join(' · ');
+    $('#hud-perks').querySelectorAll('[data-mperk]').forEach(el => el.onclick = () => { const pk = M.MULTI.PERKS[el.dataset.mperk]; SFX.click(); toast(`${pk.icon} ${pk.name} — ${pk.desc}`, 2600); });
     $('#hud-perks').querySelectorAll('[data-pop]').forEach(el => el.onclick = () => { SFX.click(); if (el.dataset.pop === 'company') showCompanyInfo(); else if (el.dataset.pop === 'insurer') showInsurance(closeModal); else { const pk = M.PERKS[el.dataset.id]; modal(pk.name, `<p>${esc(pk.desc)}</p><p style="color:var(--dim);font-size:12px">${esc(T('hud.familyPerk', { family: M.PERK_FAMILIES[pk.family] }))}</p>`, [{ label: T('btn.close'), onClick: closeModal }]); } });
     // 창고·냉장 막대는 패널에서 뺐다 — 3D 간판이 '창고 12/24 · 냉장 2/6' 을 읽는다 (scene3d _buildTiles)
     const up = g.upcoming();
@@ -773,7 +859,7 @@
     const slotsOn = g.visibleSlots();
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) {
       const btn = $('#c' + i), c = g.contracts[i];
-      if (!c) { btn.hidden = !g.shows('market') || i >= slotsOn; btn.innerHTML = `<div class="nm">${T('err.emptySlot')}</div><div class="sub">${T('hud.buyInMarket')}</div>`; btn.disabled = true; btn.className = 'btn contract'; continue; }
+      if (!c) { btn.hidden = !g.shows('market') || i >= slotsOn || R.multi; /* 멀티: 새 계약이 없으니 빈 슬롯도 없다 */ btn.innerHTML = `<div class="nm">${T('err.emptySlot')}</div><div class="sub">${T('hud.buyInMarket')}</div>`; btn.disabled = true; btn.className = 'btn contract'; continue; }
       btn.hidden = false;
       const car = D.CARRIERS[c.carrier], vcap = g.vehicleCap(c), elig = g.eligibleParcels(c), lv = g.trustLevel(c);
       const can = g.canCall(c) && !busy;
@@ -879,6 +965,9 @@
   }
   function showRepInfo() {
     const g = game, floor = g.repFloor(), cap = g.repCap(), top = g.repTier >= D.REP_TIERS.length - 1;
+    // 멀티: 등급표가 아니라 사다리 — 상한에 닿으면 상한 +step, 퍽 3택1
+    if (g.rules.repStep) { const band = Math.max(1, cap - floor), inBand = Math.max(0, Math.min(band, g.rep - floor));
+      modal(T('hud.rep'), `<div class="kv"><span>${T('repi.tier')}</span><span class="v">${esc(g.repTierName())} ${g.rep}/${cap}</span></div><div class="gauge rep" style="width:100%;height:14px"><i style="width:${Math.round(inBand / band * 100)}%"></i></div><div class="d">${T('multi.repLadder', { n: g.repToNext(), step: g.rules.repStep })}</div><div class="d" style="color:var(--green);margin-top:8px">${T('repi.up')}</div><div class="d" style="color:var(--red)">${T('repi.down')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]); return; }
     const band = Math.max(1, cap - floor), inBand = Math.max(0, Math.min(band, g.rep - floor));
     const next = top ? null : D.REP_TIERS[g.repTier + 1];
     const newCust = top ? [] : g.customersAtTier(g.repTier + 1).filter(k => !g.customers[k]);
@@ -1534,6 +1623,8 @@
     for (const e of events) if (e.type === 'stolen') { scene.discard(e.parcel.id); SFX.discard(); floatText(T('float.stolen', { short: D.PARCEL_TYPES[e.parcel.type].short, size: e.parcel.size }), true, 30); }
     const pen = events.find(e => e.type === 'penalty');
     if (pen) { scene.shake(); scene.mope(); SFX.penalty(); floatText(T('float.rep', { n: pen.amount }), true, 50); toast(pen.reasons.map(I18n.text).join(' · '), 2600); }
+    for (const e of events) if (e.type === 'settle' && match) toastLater(T('multi.settle', { cal: game.calMonth(e.month), half: T('fmt.half' + game.half(e.month)), net: (e.net >= 0 ? '+' : '') + e.net }), 2200);
+    multiAfterDay();
     setTimeout(() => {
       scene.sync(game, { animate: true });
       if (events.some(e => e.type === 'arrive')) SFX.thud();
@@ -1547,6 +1638,7 @@
   }
   function checkPhase() {
     if (game.phase !== 'play') clearGate();
+    if (game.phase === 'play' && game.perkOffer) return showPerkPick();   // 멀티: 등급업 → 퍽 3택1 (시간은 안 간다)
     if (game.phase === 'weekend') {
       // 고를 것이 '휴식' 하나뿐이면 카드를 띄울 이유가 없다 — 읽을 것만 늘고 누를 것은 하나다.
       // 선택지가 열리는 장(5장)부터 카드가 돌아온다.
@@ -1671,7 +1763,7 @@
       const cards = mk.items.map((it, i) => {
         if (it.kind === 'refill') return ''; // 충전은 위 '현재 계약' 칸에서
         let price = it.kind === 'contract' ? game.contractPrice(it) : it.price, desc = '';
-        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); const pc = { carrier: it.carrier, grade: it.grade || 'normal', enh: { limit: 0, cap: 0, capDelta: 0, regular: false, express: false, opt: null } }; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}<span class="ospec">${miniTruck(game, pc)} ${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> <b>${T('mk.feeEach', { n: o.fee })}</b> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span></span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge} ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
+        if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); const pc = { carrier: it.carrier, grade: it.grade || 'normal', enh: { limit: 0, cap: 0, capDelta: 0, regular: false, express: false, opt: null } }; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}<span class="ospec">${miniTruck(game, pc)} ${game.shows('calls') ? `${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> ` : ''}<b>${T('mk.feeEach', { n: o.fee })}</b> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span></span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge} ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') { const tg = enhTargets(it.enh); desc = `${D.ENHANCEMENTS[it.enh].desc}<br>${tg.length ? `<span style="color:var(--green)">→ ${tg.map(esc).join(' · ')}</span>` : `<span style="color:var(--red)">${T('mk.enhNoTarget')}</span>`}`; }
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
         else if (it.kind === 'adTicket') desc = `${mediaEffect(it.media)} <span class="media-fx"><span>${esc(T('media.ticketOnce'))}</span></span>`;
@@ -1694,7 +1786,7 @@
       const anyFree = game.contracts.slice(0, D.CONTRACT_SLOTS).some(c => !c);
       const curCard = (c, si) => {
         const ri = mk.items.findIndex(it => it.kind === 'refill' && it.contractId === c.id && !it.sold), rit = ri >= 0 ? mk.items[ri] : null;
-        return `<div class="card cur" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)} ${takesDots(game, c, true)}</span><span class="price ${c.calls === 0 ? 'bad' : ''}"><small class="lbl">${esc(T('cd.calls'))}</small> ${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span></div>
+        return `<div class="card cur" style="cursor:default"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)} ${takesDots(game, c, true)}</span>${game.shows('calls') ? `<span class="price ${c.calls === 0 ? 'bad' : ''}"><small class="lbl">${esc(T('cd.calls'))}</small> ${callPipsHtml(c.calls, c.maxCalls)} <small>${c.calls}/${c.maxCalls}</small></span>` : ''}</div>
           <div class="crow"><span class="d">${miniTruck(game, c)}${game.shows('market') ? enhPips(game, c) : ''}${trustBar(game, c.carrier) ? ` ${trustBar(game, c.carrier)}` : ''}</span><span class="ob"><button class="btn small" data-detail="${si}">${T('mk.detail')}</button>${rit ? `<button class="btn small ${c.calls === 0 ? 'gold' : ''} ${sf.short > 0 && c.calls < c.maxCalls ? 'need' : ''}" id="mk-refill-${si}" data-refill="${ri}" ${game.cash < rit.price ? 'disabled' : ''}>${T('mk.refillBtn', { price: rit.price })}</button>` : ''}</span></div></div>`;
       };
       const usedIdx = new Set();
@@ -1717,13 +1809,15 @@
       const rng = r => r[0] === r[1] ? `${r[0]}` : `${r[0]}~${r[1]}`;
       const byType = {}; for (const f of game.customerForecast()) for (const t in f.range) { if (!(f.range[t][1] > 0)) continue; if (t !== 'normal' && !(f.special > 0)) continue; byType[t] = byType[t] || [0, 0]; byType[t][0] += f.range[t][0]; byType[t][1] += f.range[t][1]; }
       const fcParts = Object.keys(D.PARCEL_TYPES).filter(t => byType[t]).map(t => { const bad = !game.canTakeType(t); return `<span class="${bad ? 'fcwarn' : ''}" title="${esc(D.PARCEL_TYPES[t].name)}${bad ? ' — ' + esc(T('mk.cantTake')) : ''}"><i style="display:inline-block;width:8px;height:8px;background:${D.PARCEL_TYPES[t].css}"></i> ${rng(byType[t])}${bad ? '✖' : ''}</span>`; });
-      const shortLine = sf.short > 0 ? `<div class="d fcshort">${T('mk.callShort', { vol: sf.vol, cap: sf.cap })}</div>` : '';
+      const shortLine = sf.short > 0 && game.shows('calls') ? `<div class="d fcshort">${T('mk.callShort', { vol: sf.vol, cap: sf.cap })}</div>` : '';
       const fcLine = nm <= game.monthsTotal() ? `<div class="d fcline1" id="mk-fc"><span class="lbl">${T(mk.prep ? 'mk.fcNow' : 'mk.fcNext')}</span>${fcParts.join(' ')}</div>${shortLine}` : '';
       const body = `${R.marketMaxBuy ? `<div class="pickinfo"><span>${T('mk.bought')} <b>${mk.bought}</b>/${R.marketMaxBuy}</span></div>` : ''}${fcLine}${contracts}${newContracts}${items}${insurance}
-        ${!game.shows('attrs') ? '' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
+        ${!game.shows('attrs') || mk.shop ? '' : `<button class="btn small" id="mk-refresh" ${game.cash < rc ? 'disabled' : ''}>${T('mk.refresh', { cost: rc ? rc + 'c' : T('mk.free') })}</button>`}`;
       // 마지막 사이클의 마켓을 닫으면 다음 사이클이 아니라 **장**이 끝난다
       const lastCycle = mk.month >= game.rules.months;
-      const m = modal(mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), body, [{ label: lastCycle ? T('mk.endChapter') : T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], { html: `<b class="mk-cash"${game.cash < 0 ? ' style="color:var(--red)"' : ''}>${game.cash}</b>c` });   // 가격 배율 대신 자금 — HUD 자금과 같은 색 — 살 수 있는지가 먼저다
+      // 멀티 장(shop): 나오면 하루가 간다 — 대기와 같은 마감 연출(afterTurn)로
+      const shopClose = () => { closeModal(); game.closeMarket(); busy = true; renderAll(); const evs = game.takeEvents(); saveGame(); SFX.wait(); setTimeout(() => afterTurn(evs), 250); };
+      const m = modal(mk.shop ? T('multi.shopTitle') : mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), (mk.shop ? `<div class="d" style="text-align:center;margin-bottom:6px">${T('multi.shopSub')}</div>` : '') + body, [{ label: mk.shop ? T('multi.shopClose') : lastCycle ? T('mk.endChapter') : T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: mk.shop ? shopClose : () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], { html: `<b class="mk-cash"${game.cash < 0 ? ' style="color:var(--red)"' : ''}>${game.cash}</b>c` });   // 가격 배율 대신 자금 — HUD 자금과 같은 색 — 살 수 있는지가 먼저다
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
       storyCheck({ kind: 'market', bought: mk.bought, fcOpen: true });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
       const bind = (sel, fn) => { const el = m.querySelector(sel); if (el) el.onclick = fn; };
@@ -1879,6 +1973,7 @@
   // ---------- result ----------
   function showResult() {
     const r = game.result;
+    if (match) return showMultiResult();
     if (r.level) return showLevelDone(r);   // 레벨 런은 점수·기록이 아니라 '완료'로 끝난다
     if (!r.recorded) {
       r.recorded = true;
@@ -2273,7 +2368,7 @@
   // 6월 이후 월초 문자 한 줄 (스토리 모드가 아니어도 옵션이 켜져 있으면)
   let smsTimer = null;
   function showSms() {
-    const el = $('#sms'); if (!game || !opts.sms || game.month < 5 || game.turn !== 1 || (game.story && Story.active(game))) { el.hidden = true; return; }
+    const el = $('#sms'); if (!game || !opts.sms || match || game.month < 5 || game.turn !== 1 || (game.story && Story.active(game))) { el.hidden = true; return; }
     const s = Story.sms(game); if (!s) { el.hidden = true; return; }
     $('#sms-from').textContent = T('sms.from'); $('#sms-text').textContent = s; el.hidden = false;
     // 액션 영역(계약 카드·대기 버튼·하단 바) 위로 띄운다 — 결정에 쓰는 버튼을 가리면 안 된다
@@ -2379,7 +2474,7 @@
       music: () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); showMenu(); },
       story: () => { if (!g.story) g.story = { seen: [], notes: [] }; g.story.off = !g.story.off; saveGame(); showMenu(); },
       sms: () => { opts.sms = !opts.sms; saveOpts(); showMenu(); },
-      quit: () => askConfirm(T('menu.abandonConfirm'), () => { Store.remove(SAVE_KEY); game = null; showTitle(); }, T('menu.abandonBtn'), showMenu),
+      quit: () => askConfirm(T('menu.abandonConfirm'), () => { Store.remove(match ? MULTI_KEY : SAVE_KEY); game = null; match = null; showTitle(); }, T('menu.abandonBtn'), showMenu),
     };
     m.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { SFX.click(); run[b.dataset.act](); });
     m.querySelectorAll('.menu-perks .pslot.on').forEach(el => el.onclick = () => { const pk = M.PERKS[el.dataset.id]; toast(`${perkIcon(el.dataset.id)} ${pk.name} — ${pk.desc}`, 2600); });
@@ -2404,6 +2499,7 @@
     $('#hud-cash-box').onclick = () => { SFX.click(); hudDueOpen = !hudDueOpen; renderAll(); };
     $('#wait-btn').onclick = () => { if (busy) return; if (pickAction && pickAction.on) { SFX.click(); pickAction.on(); } else doWait(null); };
     $('#invest-btn').onclick = () => { if (game) { SFX.click(); showGrowth(); } };
+    $('#shop-btn').onclick = () => { if (!game || busy || game.phase !== 'play') return; SFX.click(); const r = game.openShop(); if (!r.ok) return toast(r.msg); saveGame(); showMarket(); };
     $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
     $('#hud-month').onclick = () => { if (game) { SFX.click(); showCalendar(closeModal); } };
     document.addEventListener('touchstart', () => { SFX.resume(); BGM.resume(); }, { once: true });
@@ -2415,6 +2511,6 @@
     // 1장 스튜디오 → 2장 타이틀. 2장은 별도 화면이 아니라 showTitle() 그 자체다
     if (window.Splash) Splash.play(showTitle); else showTitle();
   }
-  window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, Profile, renderAll, saveGame, prep, startRun, showTitle, showResult, showRanking };
+  window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, get match() { return match; }, Profile, renderAll, saveGame, prep, startRun, showTitle, showResult, showRanking, startMulti };
   init();
 })();

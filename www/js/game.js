@@ -51,9 +51,15 @@
     // 4단계: 난이도·시나리오 고객 규칙
     feeMult: 1, feeFixed: null, feeDelta: 0,
     cycleOffset: 0, noRepEnd: false, gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, customerClaimMult: {}, noHolidays: false,
+    // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
+    multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, payNow: false, noLoan: false,
+    shopDay: false, noCycleMarket: false, autoSummary: false,
+    repStep: 0, perkPick: false, noRepUnlock: false,
+    sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
+    finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, returnGraceDelta: 0,
   };
   const MULT_KEYS = ['theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
-  const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'storeBigDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'selfCapDelta', 'allStartTrust'];
+  const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'storeBigDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'selfCapDelta', 'allStartTrust', 'finalRushReward', 'freeTrucksPerCycle', 'earlyRepBonus', 'returnGraceDelta'];
   const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust', 'premiumDelta'];
   const MAP_MULT_KEYS = ['rewardMult', 'marketWeight', 'customerWeights', 'weatherWeights', 'customerClaimMult'];
   const LIST_KEYS = ['banCarriers', 'guaranteeCarriers'];
@@ -100,6 +106,7 @@
       this._buildRules();
       this.phase = 'play';           // play | summary | market | over | win
       this.perks = cfg.perks.slice();
+      this.mperks = (cfg.mperks || []).slice(); this.perkOffer = null;   // 멀티: 평판 등급업마다 3택1로 고른 퍽 · 지금 떠 있는 카드 3장
       this.month = 0; this.turn = 0;
       // 런의 해. 시나리오(rules.year)나 cfg 가 지정하면 그 해, 아니면 시작한 해를 찍어 세이브에 고정한다.
       // 로그라이크라 해마다 요일·영업일 수가 달라지는 건 그대로 받는다 — 인수인계(대본)만 해를 고정한다.
@@ -161,6 +168,8 @@
       if (this.level) { mods.push({ months: this.level.cycles }); if (this.level.year) mods.push({ year: this.level.year }); if (this.level.startMonth) mods.push({ startMonth: this.level.startMonth }); if (this.level.monthOffset) mods.push({ monthOffset: this.level.monthOffset }); if (this.level.cycleOffset) mods.push({ cycleOffset: this.level.cycleOffset }); if (this.level.mods) mods.push(this.level.mods); }
       if (c.noHolidays) mods.push({ noHolidays: true });   // 테스트·시뮬레이터: 공휴일 없이 돌리기
       for (const p of c.perks) if (M.PERKS[p]) mods.push(M.PERKS[p].mods);
+      // 멀티 「난투」: 시나리오·회사 위에 멀티 규칙 셋을 덮고, 런 중에 고른 퍽(3택1)을 그 위에 얹는다
+      if (c.multi && M.MULTI) { mods.push(M.MULTI.mods); for (const p of c.mperks || []) if (M.MULTI.PERKS[p] && M.MULTI.PERKS[p].mods) mods.push(M.MULTI.PERKS[p].mods); }
       this.rules = mergeMods(mods);
       this.scenario = sc; this.company = co;
     }
@@ -406,7 +415,7 @@
     _customerWeightsFor(m) {
       const R = this.rules, w = {};
       if (this.bizMode()) return { anon: 1 };   // 바탕 물량은 개인 고객 — 기업 물량은 계약으로 따로 얹는다(_makeSchedule)
-      for (const id in this.customers) { const c = this.customers[id]; if (c.suspended) continue; const vol = id === 'anon' ? 1 : M.CUSTOMER_VOLUME[this.customerLevel(id)]; w[id] = c.slots * vol * (R.customerWeights[id] || 1); if (this.insurer === 'none' && M.CUSTOMERS[id].claimMult >= 2) w[id] *= 0.5; if (M.CUSTOMERS[id].storage) delete w[id]; }
+      for (const id in this.customers) { const c = this.customers[id]; if (c.suspended && R.fixedCustLevel == null) continue; const vol = id === 'anon' ? 1 : M.CUSTOMER_VOLUME[R.fixedCustLevel != null ? R.fixedCustLevel : this.customerLevel(id)]; w[id] = c.slots * vol * (R.customerWeights[id] || 1); if (this.insurer === 'none' && M.CUSTOMERS[id].claimMult >= 2) w[id] *= 0.5; if (M.CUSTOMERS[id].storage) delete w[id]; }
       if (!Object.keys(w).length) w.anon = 1;
       return w;
     }
@@ -637,7 +646,7 @@
     seasonMods(m) { return this.calendar().months[this.calMonth(m)] || { arrivalsMult: 1, typeShift: {} }; }
     // 이번 달(개월차 m)의 달력 이벤트 목록 [{ id, turns: [a, b], ... }]
     // 이번 사이클의 달력 이벤트: 달력에 박힌 것(선물 주간·쇼핑 행사) + 실제 날짜로 계산한 공휴일·명절
-    monthEvents(c) { const h = this.half(c); return (this.seasonMods(c).events || []).filter(e => !e.half || e.half === h).concat(this.holidayEvents(c)); }
+    monthEvents(c) { if (this.rules.noCalendarEvents) return []; const h = this.half(c); return (this.seasonMods(c).events || []).filter(e => !e.half || e.half === h).concat(this.holidayEvents(c)); }
     // ----- 공휴일: 실제 날짜 (META.CALENDARS[id].holidays) -----
     // 그 해의 특별한 날 전부: 'M-D' → { id, off } (업체 휴무) | { id, rush } (명절 앞 폭주).
     // 달력에 holidays 가 없거나 캠페인(rules.noHolidays — 대본은 턴 번호로 짜여 있다)이면 비어 있다.
@@ -747,7 +756,7 @@
     cycleLabel(c) { return T('fmt.cycle', { cal: this.calMonth(c), half: T('fmt.half' + this.half(c)) }); }
     dateLabel(t, m) { return T('fmt.date', { cal: this.calMonth(m), d: this.dateOf(t, m) }); }
     dateDowLabel(t, m) { return T('fmt.dateDow', { cal: this.calMonth(m), d: this.dateOf(t, m), dow: this.dowName(t, m) }); }
-    returnGraceFor(p) { const R = this.rules; return Math.max(1, (this._attrs(p).includes('cold') ? R.returnGraceFresh : R.returnGrace) + (this.seasonMods().returnGraceDelta || 0)); }
+    returnGraceFor(p) { const R = this.rules; return Math.max(1, (this._attrs(p).includes('cold') ? R.returnGraceFresh : R.returnGrace) + R.returnGraceDelta + (this.seasonMods().returnGraceDelta || 0)); }
     season(m) { const R = this.rules; if (R.season) return R.season; const c = this.calMonth(m); return c >= 3 && c <= 5 ? 'spring' : c >= 6 && c <= 8 ? 'summer' : c >= 9 && c <= 11 ? 'autumn' : 'winter'; }
     _genWeather(m) {
       if (!this.shows('weather')) return Array.from({ length: this.turns(m) }, () => 'sunny');   // 날씨가 열리기 전(레벨 1·2)엔 언제나 맑음
@@ -1014,6 +1023,7 @@
       let evMult = 1; for (const ev of this.eventsAt()) { const m = famVal(ev.feeMult, c.carrier); if (m) evMult *= m; }
       if (c.enh && c.enh.holiday && this.isOffTurn()) evMult *= D.ENHANCEMENTS.holiday.feeMult;   // 휴무 특약: 쉬는 날 부르면 할증
       fee = fee * (this.trustPerk(c.carrier, 'feeMult') || 1) * R.feeMult * evMult * this.inflation() + R.feeDelta;
+      if (R.fuelRate) fee *= 1 + R.fuelRate * (this.totalTurn || 0);   // 멀티: 유가 — 배차비가 일차에 따라 조금씩 오른다
       return Math.max(0, Math.round(fee));
     }
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
@@ -1065,7 +1075,7 @@
       else return false;
       return true;
     }
-    regularFreeLeft(c) { return Math.max(0, (+c.enh.regular || 0) - (c.freeUsed || 0)); }
+    regularFreeLeft(c) { return Math.max(0, (+c.enh.regular || 0) + this.rules.freeTrucksPerCycle - (c.freeUsed || 0)); }
     // 특약을 붙인 계약은 그 속성도 '받는 것'에 들어간다. caps 만 넓히고 need 를 그대로 두면
     // 전문 계열(냉장·파손·냉동·통관)은 특약을 붙여도 그 물건을 거절한다 — 특약이 아무 쓸모가 없어진다.
     // 이 특약을 붙일 수 있는 계약이 하나라도 있는가
@@ -1256,18 +1266,20 @@
     returnIn(p) { return p.overdue ? Math.max(0, this.returnGraceFor(p) - (p.overdueTurns || 0)) : null; }
     // ----- 평판 -----
     repTierDef() { return D.REP_TIERS[Math.min(this.repTier, D.REP_TIERS.length - 1)]; }
-    repCap() { return this.repTier === 0 ? this.rules.gameoverStress : this.repTierDef().cap; }
-    // 등급은 난이도 스케일러: 소문이 나면 물량이 늘고 규모가 커져 운영비도 는다
-    repScaleArrivals() { return this.repTierDef().arrivals || 1; }
-    repScaleOpCost() { return this.repTierDef().opCost || 1; }
-    // 이 등급부터 들어오기 시작하는 품목 (그 전에는 일반으로 돌린다)
-    repUnlocked(type) { return (this.repTierDef().unlock || []).indexOf(type) >= 0; }
+    // 멀티(repStep): 등급표 대신 사다리 — 상한에 닿을 때마다 상한 +step · 등급 +1 · 퍽 3택1. 등급 수 상한 없음
+    repCap() { const R = this.rules; if (R.repStep) return R.gameoverStress + R.repStep * this.repTier; return this.repTier === 0 ? R.gameoverStress : this.repTierDef().cap; }
+    repMaxTier() { return this.rules.repStep ? Infinity : D.REP_TIERS.length - 1; }
+    // 등급은 난이도 스케일러: 소문이 나면 물량이 늘고 규모가 커져 운영비도 는다 (멀티는 일차가 그 일을 한다 — 등급은 퍽만 준다)
+    repScaleArrivals() { return this.rules.repStep ? 1 : this.repTierDef().arrivals || 1; }
+    repScaleOpCost() { return this.rules.repStep ? 1 : this.repTierDef().opCost || 1; }
+    // 이 등급부터 들어오기 시작하는 품목 (그 전에는 일반으로 돌린다). 멀티는 새 계약이 없으니 열리지 않는다
+    repUnlocked(type) { if (this.rules.noRepUnlock) return false; return (this.repTierDef().unlock || []).indexOf(type) >= 0; }
     // 지금 평판 등급에서 찾아올 수 있는 고객 (아직 거래 안 하는 고객 중)
     openCustomers() { return Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !this.customers[k] && (M.CUSTOMERS[k].repTier || 0) <= this.repTier); }
     // 이 등급에서 새로 열린 고객 (등급이 막 올랐을 때 알려 주려고)
     customersAtTier(tier) { return Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && (M.CUSTOMERS[k].repTier || 0) === tier); }
     repTierId() { return D.REP_TIERS[Math.min(this.repTier, D.REP_TIERS.length - 1)].id; }
-    repTierName() { return T('rep.tier.' + this.repTierId()); }
+    repTierName() { return this.rules.repStep ? T('multi.tier', { n: this.repTier }) : T('rep.tier.' + this.repTierId()); }
     // 평판 증감. 사고는 깎고(pen 양수 = 깎임), 잘한 일은 올린다. 상한을 넘지 않고, 0 이하면 런이 끝난다
     addRep(n, why) {
       if (!n || !this.shows('rep')) return 0;
@@ -1276,7 +1288,37 @@
       this.rep = Math.max(0, Math.min(this.repCap(), this.rep + n));
       const d = this.rep - before;
       if (d) this.emit('rep', { delta: d, why, rep: this.rep });
+      // 멀티: 상한에 닿는 순간 등급이 오른다(정산을 기다리지 않는다) → 상한 +step, 퍽 카드 3장. 팝업은 시간을 안 쓴다
+      if (this.rules.perkPick && d > 0 && this.rep >= this.repCap() && !this.perkOffer) this._repLadderUp();
       return d;
+    }
+    _repLadderUp() {
+      this.repTier++;
+      this.say('log.repTierUp', { name: this.repTierName(), cap: this.repCap() });
+      this.perkOffer = this._drawPerks(3);
+      this.emit('repTier', { tier: this.repTier, cap: this.repCap(), customers: [], perks: this.perkOffer.slice() });
+    }
+    // 퍽 카드 뽑기: 계열(💰🛡⚔)에서 하나씩. 지금 구현 단계에서 실제로 작동하는 카드만(phase). 계열에 남은 카드가 없으면 다른 계열에서 채운다
+    _drawPerks(n) {
+      const MP = (M.MULTI && M.MULTI.PERKS) || {}, phase = (M.MULTI && M.MULTI.PHASE) || 1;
+      const pool = Object.keys(MP).filter(k => (MP[k].phase || 1) <= phase);
+      const byFam = {}; for (const k of pool) (byFam[MP[k].family] = byFam[MP[k].family] || []).push(k);
+      const out = [];
+      for (const f of this.rng.shuffle(Object.keys(byFam))) { if (out.length >= n) break; out.push(this.rng.pick(byFam[f])); }
+      while (out.length < n && pool.length) { const k = this.rng.pick(pool); if (!out.includes(k) || out.length >= pool.length) out.push(k); }
+      return out.slice(0, n);
+    }
+    // 3택1: 고른 퍽을 얹고 규칙을 다시 짠다. 즉시 효과(now: 칸·현금)는 여기서 한 번 적용
+    pickPerk(id) {
+      if (!this.perkOffer || !this.perkOffer.includes(id)) return { ok: false, msg: T('err.cannotCallNow') };
+      const pk = M.MULTI.PERKS[id];
+      this.mperks.push(id); (this.cfg.mperks = this.cfg.mperks || []).push(id);
+      this._buildRules();
+      if (pk.now) { if (pk.now.cap) { this.warehouse.cap += pk.now.cap; this._assignCold(); } if (pk.now.cash) { this.cash += pk.now.cash; this.run.revenue += pk.now.cash; } }
+      this.perkOffer = null;
+      this.say('log.perkPicked', { name: pk.name, icon: pk.icon });
+      this.emit('perkPicked', { perk: id });
+      return { ok: true, perk: id };
     }
     // 평판이 낮으면 개인 고객이 안 맡긴다 — 상한까지 채우면 1.0배(기준), 바닥이면 0.55배
     repArrivalMult() { const c = this.repCap(); return 0.55 + 0.45 * (c ? Math.min(1, this.rep / c) : 1); }
@@ -1289,7 +1331,7 @@
     tableMonth(c) { return this.monthIndex(c) + (this.rules.monthOffset || 0); }
     // 튜토리얼 대본(1~3개월차). 「인수인계」로 시작한 런에서만 (docs/STORY_TUTORIAL_DESIGN.md 부록 I)
     // 이 런에서 그 기능이 켜져 있는가. 캠페인 레벨 밖(자유 런)은 전부 켜져 있다 (levels.js FLAGS)
-    shows(k) { if ((D.DISABLED_FEATURES || []).includes(k)) return false; return !this._shows || this._shows.has(k); }
+    shows(k) { if ((D.DISABLED_FEATURES || []).includes(k)) return false; if (k === 'calls' && this.rules.unlimitedCalls) return false;   /* 멀티: 배차 눈금·충전 자체가 없다 */ return !this._shows || this._shows.has(k); }
     // 상호: 레벨 1을 끝내면 플레이어가 붙인 이름이 회사 이름을 대신한다
     companyName() { return this.cfg.companyName || this.company.name; }
     // 준비 마켓은 아직 사이클 0 이다 — 그 장의 대본(사이클 1)을 보게 한다
@@ -1439,6 +1481,28 @@
     campaignPreview(id) {
       return this._campaignRoll(id).map(x => { const before = (this.schedule[x.slot] || []).reduce((a, s) => a + this._specCells(s), 0); return { day: x.day, n: x.specs.length, before, after: before + x.specs.reduce((a, s) => a + this._specCells(s), 0) }; });
     }
+    // 멀티: 입고 대본은 매치 공유 — 넷이 같은 시드·같은 사이클이면 같은 짐을 받는다. 본 난수 흐름(파손·도난 굴림)은 사람마다 갈리므로
+    // 대본은 (시드, 사이클)에서 파생한 씨앗으로 따로 굴린다(_campaignRoll 과 같은 수법). 사람에 따라 달라지는 입력(평판·고객 단계)은 쓰지 않는다.
+    // 물량은 일차에 비례해 오른다: × (1 + rate × 지난 영업일), 마지막 보름은 × finalRushMult 「마감 폭주」
+    _sharedSchedule(m) {
+      const R = this.rules, turns = this.turns(m);
+      const seed = (this.seed ^ Math.imul(m, 2654435761) ^ 0x5bd1e995) >>> 0;
+      const saved = this.rng; this.rng = new Rng(seed);
+      try {
+        const sched = Array.from({ length: turns }, () => []);
+        const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
+        const gen = () => this._genParcelSpec(ratio, m, cw);
+        let daysDone = 0; for (let c = 1; c < m; c++) daysDone += this.turns(c);
+        const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
+        for (const t of organicTurns) sched[t].push(gen());
+        const scale = (1 + R.dayArrivalsRate * daysDone) * (m >= R.months ? R.finalRushMult : 1);
+        const extra = Math.round(D.EXTRA_ARRIVALS[1] * D.ARRIVALS_SCALE * R.arrivalsMult * scale);
+        const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
+        for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
+        for (let t = 0; t < turns - 1; t++) if (this.weather[t] === 'storm' && sched[t].length) { sched[t + 1].push(...sched[t]); sched[t] = []; }
+        return sched;
+      } finally { this.rng = saved; }
+    }
     _makeSchedule(m) {
       const R = this.rules, turns = this.turns(m);
       const sc = this.script(m);
@@ -1448,6 +1512,7 @@
         const out = rows.slice(0, turns);
         return out;
       }
+      if (R.sharedSchedule) return this._sharedSchedule(m);
       const sched = Array.from({ length: turns }, () => []);
       const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
       const gen = () => this._genParcelSpec(ratio, m, cw);
@@ -1489,7 +1554,7 @@
       const cust = M.CUSTOMERS[customer] || M.CUSTOMERS.anon;
       let type, attrs, sizes, premium = false;
       // 고객 특수 품목은 신뢰 단계로 열린다 (3장): 0단계 일반 85%, 1단계 55%, 2단계 고객 정의, 3단계 + 프리미엄 품목
-      const clv = cust.items ? (this.bizMode() ? Math.max(2, this.relation(customer)) : this.customerLevel(customer)) : 0;
+      const clv = cust.items ? (R.fixedCustLevel != null ? R.fixedCustLevel : this.bizMode() ? Math.max(2, this.relation(customer)) : this.customerLevel(customer)) : 0;
       // 0단계 고객은 일반만, 1단계 30%, 2단계부터 고객 품목 그대로
       const normalShare = clv === 0 ? 1 : clv === 1 ? 0.7 : 0;
       if (!cust.items || this.rng.next() < normalShare) type = this.rng.weighted(cust.items ? { normal: 1 } : ratio);
@@ -1561,6 +1626,8 @@
       if (this.isOffTurn()) note = MSG('log.holidayOff');
       this.say('log.arrive', { date: this.dateLabel(), list: arrived.map(p => D.PARCEL_TYPES[p.type].short + p.size).join(', '), usage: Math.round(this.usage() * 100), note });
     }
+    // 이번 사이클 대본의 하루 평균 입고 칸수 (봇·장 보기 판단용)
+    parcelsPerDay() { const n = this.turns() || 1; return this.schedule.reduce((a, t) => a + t.reduce((b, s) => b + this._specCells(s), 0), 0) / n; }
     upcoming() {
       const out = [];
       for (let i = 0; i < this.rules.upcomingTurns; i++) {
@@ -1593,7 +1660,8 @@
       const c = this.contracts[slotIdx], R = this.rules;
       if (!c) return { ok: false, msg: T('err.emptySlot') };
       if (this.offFor(c)) return { ok: false, msg: T('err.holidayOff') };
-      const useSpare = c.calls <= 0;
+      const unlimited = R.unlimitedCalls || !this.shows('calls');   // 멀티: 배차 무제한 — 호출은 배차비만 든다
+      const useSpare = !unlimited && c.calls <= 0;
       if (useSpare && !(R.spareCall && !this.monthStats.spareUsed)) return { ok: false, msg: T('err.noCalls') };
       const car = D.CARRIERS[c.carrier], usedBefore = this.usedVolume(), rushReady = this.rushState().ready;
       const elig = this.eligibleParcels(c);
@@ -1604,11 +1672,14 @@
       let trucks = Math.max(this.trucksNeeded(c, chosen), trucksArg || 1);
       const maxT = this.shows('simul') ? D.MAX_TRUCKS : 1;
       if (trucks > maxT) return { ok: false, msg: T('err.overTrucks', { n: maxT, cap: vcap * maxT }) };
-      const avail = c.calls + (useSpare ? 1 : 0);
+      const avail = unlimited ? Infinity : c.calls + (useSpare ? 1 : 0);
       if (trucks > avail) return { ok: false, msg: T('err.noTrucks', { n: c.calls }) };
       const fee = this.callFee(c, trucks);
       // 후불: 배차비는 월말 정산에서 빠진다 (자금 부족으로 호출이 막히지 않는다)
-      this.feesDue += fee; this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
+      // 멀티(payNow): 즉시 차감 — 잔액이 곧 점수라 보이는 숫자가 실제 숫자여야 한다. 돈이 모자라면 못 부른다
+      if (R.payNow && this.cash < fee) return { ok: false, msg: T('err.noCashFee', { fee, cash: this.cash }) };
+      if (R.payNow) this.cash -= fee; else this.feesDue += fee;
+      this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
       if (this.regularFreeLeft(c) > 0) c.freeUsed = (c.freeUsed || 0) + 1;
       const fill = volume / (vcap * trucks);
       if (fill >= 0.8) this.stats.fullTrucks++;
@@ -1645,7 +1716,7 @@
       }
       if (!delivered.length && broken) {
         // 전부 파손: 호출은 소모, 보상 없음
-        if (!this.shows('calls')) { /* 무제한 */ } else if (useSpare) { this.monthStats.spareUsed = true; c.calls = Math.max(0, c.calls - (trucks - 1)); } else c.calls -= trucks;
+        if (unlimited) { /* 무제한 */ } else if (useSpare) { this.monthStats.spareUsed = true; c.calls = Math.max(0, c.calls - (trucks - 1)); } else c.calls -= trucks;
         c.totalCalls++;
         this.monthStats.calls++; this.run.calls++; this.stats.calls++;
         this.waitStack = 0; this.loadChain = 0; this._assignCold();
@@ -1657,6 +1728,7 @@
       if (R.bigCallPenalty && chosen.length >= R.bigCallPenalty) revenue = Math.round(revenue * 0.9);
       if (R.bigCallBonus && chosen.length >= R.bigCallBonus.min) revenue = Math.round(revenue * R.bigCallBonus.mult);
       revenue = Math.round(revenue * R.revenueMult);
+      if (R.finalRushReward && this.month >= R.months) revenue = Math.round(revenue * (1 + R.finalRushReward));   // 멀티 퍽: 마감 폭주 보수
       const deliveredVolume = chosen.reduce((sum, p) => sum + p.size, 0);
       const actualFill = deliveredVolume / (vcap * trucks);
       const chainQualified = this.shows('chain') && actualFill >= D.LOAD_CHAIN.minFill && broken === 0;
@@ -1684,17 +1756,18 @@
       // 신뢰와 평판: 얼마나 일찍 보냈나 (기한 맞춰 보내면 0, 늦으면 깎인다)
       xp = this.trustGainPreview(c, chosen).xp;
       this._addTrust(c.carrier, xp);
-      const repD = this.repDeltaFor(chosen);
+      let repD = this.repDeltaFor(chosen);
+      if (repD > 0 && R.earlyRepBonus) repD += R.earlyRepBonus;   // 멀티 퍽: 일찍 보낸 호출의 평판 보너스
       if (repD) this.addRep(repD, MSG(repD > 0 ? 'why.repEarly' : 'why.repLate'));
       // 배차 대수 소모
       let refunded = false;
       if (useSpare) { this.monthStats.spareUsed = true; this.say('log.spareCall'); c.calls = Math.max(0, c.calls - (trucks - 1)); }
-      else if (!this.shows('calls')) { /* 무제한 */ }
+      else if (unlimited) { /* 무제한 */ }
       else if (R.bundleRefund && chosen.length >= R.bundleRefund && !this.monthStats.bundleUsed) { this.monthStats.bundleUsed = true; refunded = true; c.calls -= Math.max(0, trucks - 1); }
       else c.calls -= trucks;
       c.successCalls++; c.totalCalls++; c.delivered += chosen.length;
       const pd = this.trustPerk(c.carrier, 'delay');
-      const delay = pd != null ? pd : (car.delay || 0);
+      const delay = R.payNow ? 0 : pd != null ? pd : (car.delay || 0);   // 멀티: 어음 없음 — 전부 즉시 입금
       // 지연 입금은 어음이다 — 사이클 단위로, delay 사이클 뒤 정산 때 현금이 된다 (1 = 보름 뒤 정산, 2 = 한 달 뒤)
       if (delay > 0) { (this.pendingRevenue = this.pendingRevenue || []).push({ due: this.month + delay, amount: revenue, count: chosen.length, name: car.name }); }
       else { this.cash += revenue; this.monthStats.revenue += revenue; this.run.revenue += revenue; }
@@ -1721,7 +1794,9 @@
       if (!chosen.length) return { ok: false, msg: T('err.nothingSelf') };
       if (chosen.length > this.selfCount()) return { ok: false, msg: T('err.selfLimit', { n: this.selfCount() }) };
       const cost = chosen.reduce((s, p) => s + this.selfCost(p), 0);
-      this.feesDue += cost; this.monthStats.spent += cost; this.run.spent += cost; this.monthStats.selfCost = (this.monthStats.selfCost || 0) + cost;
+      if (R.payNow && this.cash < cost) return { ok: false, msg: T('err.noCashFee', { fee: cost, cash: this.cash }) };
+      if (R.payNow) this.cash -= cost; else this.feesDue += cost;
+      this.monthStats.spent += cost; this.run.spent += cost; this.monthStats.selfCost = (this.monthStats.selfCost || 0) + cost;
       let revenue = 0, broken = 0;
       for (const p of chosen) {
         const bp = this.selfBreakProb(p);
@@ -1851,7 +1926,7 @@
         this.emit('penalty', { amount: pen, reasons });
       } else if (reasons.length) this.say(reasons.join(', '));
       if (this.rep <= 0 && !this.rules.noRepEnd) return this._gameOver(MSG('over.rep'));
-      if (this.isWeekendAfter(this.turn)) return this._startWeekend();
+      if (!this.rules.noWeekend && this.isWeekendAfter(this.turn)) return this._startWeekend();   // 멀티: 일요일은 카드 없이 그냥 지나간다
       if (this.turn >= this.turns()) return this._endMonth();
       this._startTurn();
     }
@@ -1918,7 +1993,7 @@
       // 평판: 사고 없이 넘긴 정산은 소문이 좋아지고, 상한까지 채운 채로 넘기면 등급이 오른다
       let repClean = 0, repTierUp = null, repPerks = null;
       if (ms.penalty === 0) repClean = this.addRep(D.REP_GAIN.cleanMonth, MSG('why.repClean'));
-      if (this.rep >= this.repCap() && this.repTier < D.REP_TIERS.length - 1) {
+      if (!R.repStep && this.rep >= this.repCap() && this.repTier < D.REP_TIERS.length - 1) {
         this.repTier++; repTierUp = this.repTierId();
         this.say('log.repTierUp', { name: this.repTierName(), cap: this.repCap() });
         const opened = this.customersAtTier(this.repTier).filter(k => !this.customers[k]);
@@ -1941,8 +2016,9 @@
         rep: this.rep, repCap: this.repCap(), repTier: this.repTierId(), repClean, repTierUp, repPerks, repDelta: this.rep - (ms.repStart != null ? ms.repStart : this.rep), usage: Math.round(this.usage() * 100), left: this.parcels.length, deals };
       // 단기 금융: 지난달 차입 상환(원금+이자) → 그래도 음수면 새로 차입해 0으로 맞춤
       const loan = { interest: 0, repaid: 0, borrowed: 0, debt: 0 };
-      if (this.debt > 0) { loan.interest = Math.ceil(this.debt * D.LOAN.interest); loan.repaid = this.debt; this.cash -= this.debt + loan.interest; this.run.spent += loan.interest; this.stats.interestPaid += loan.interest; this.debt = 0; }
-      if (this.cash < 0) { loan.borrowed = -this.cash; this.debt = loan.borrowed; this.cash = 0; this.stats.loans++; }
+      if (R.noLoan) { /* 멀티: 차입 없음 — 마이너스는 마이너스대로 (호출을 못 해 물량으로 죽는다) */ }
+      else if (this.debt > 0) { loan.interest = Math.ceil(this.debt * D.LOAN.interest); loan.repaid = this.debt; this.cash -= this.debt + loan.interest; this.run.spent += loan.interest; this.stats.interestPaid += loan.interest; this.debt = 0; }
+      if (!R.noLoan && this.cash < 0) { loan.borrowed = -this.cash; this.debt = loan.borrowed; this.cash = 0; this.stats.loans++; }
       loan.debt = this.debt; this.summary.loan = loan; this.summary.cash = this.cash;
       this.say('log.settle', { cal: this.calMonth(), half: this.half(), revenue: ms.revenue, opCost, fees: feesDue, closing: closing ? MSG('log.settleClosing', { closing }) : '' });
       if (loan.repaid) this.say('log.loanRepaid', { n: loan.repaid, interest: loan.interest });
@@ -1950,10 +2026,12 @@
       // 레벨 1은 실패가 없다 — 배우는 자리에서 부도로 끊지 않는다 (levels.js noBankrupt)
       if (!this.rules.noBankrupt && this.debt > D.LOAN.limit) return this._gameOver(MSG('over.bankrupt', { debt: this.debt, limit: D.LOAN.limit }));
       this.phase = 'summary';
+      // 멀티: 정산은 자동 — 팝업 없이 로그 한 줄(위 log.settle)과 이벤트 하나. 곧장 다음 사이클로
+      if (R.autoSummary) { this.emit('settle', { month: this.month, net: this.summary.net, cash: this.cash, opCost, last: this.month >= R.months }); this.closeSummary(); }
     }
     closeSummary() {
       if (this.phase !== 'summary') return false;
-      if (!this.shows('market')) {                                   // 마켓이 열리기 전(서장)엔 정산 다음이 바로 다음 사이클
+      if (!this.shows('market') || this.rules.noCycleMarket) {                 // 멀티: 사이클 끝 마켓 없음 — 장은 아무 날에나 하루 써서 간다(openShop)                                   // 마켓이 열리기 전(서장)엔 정산 다음이 바로 다음 사이클
         if (this.month >= this.rules.months) return this._finish();
         this._startMonth(this.month + 1); return true;
       }
@@ -2058,8 +2136,8 @@
       return out;
     }
     // 평판: 지금 등급이 시작된 지점(이전 등급의 상한)과 다음 등급까지 남은 양
-    repFloor() { return this.repTier > 0 ? D.REP_TIERS[this.repTier - 1].cap : 0; }
-    repToNext() { return this.repTier >= D.REP_TIERS.length - 1 ? 0 : Math.max(0, this.repCap() - this.rep); }
+    repFloor() { if (this.rules.repStep) return this.repTier > 0 ? this.repCap() - this.rules.repStep : 0; return this.repTier > 0 ? D.REP_TIERS[this.repTier - 1].cap : 0; }
+    repToNext() { return this.repTier >= this.repMaxTier() ? 0 : Math.max(0, this.repCap() - this.rep); }
     // 계약마다 '가득 충전' 상시 카드 (배차는 소모품 — 정액이라 다 쓰고 충전하는 게 이득)
     _refillItems() {
       const items = [];
@@ -2388,10 +2466,42 @@
       this.cash -= price; this.run.spent += price; this.market.bought++; it.sold = true;
       return { ok: true };
     }
+    // ----- 멀티 장(shop): 「장 보러 간 날」 -----
+    // 아무 영업일에나 들어갈 수 있고, 나오면 하루가 간다(입고는 쌓이고 배송은 없다). 그래서 자주 못 가고, 가면 한 번에 사고 나와야 한다.
+    // 매물은 보유 계약의 다음 등급 센터(갈아타기) · 강화 · 창고 확장·냉장·마당만 — 새 계약·배차 항목·매물 새로고침 없음
+    openShop() {
+      if (this.phase !== 'play') return { ok: false, msg: T('err.notPlay') };
+      if (!this.rules.shopDay) return { ok: false, msg: T('err.notMarket') };
+      this.phase = 'market';
+      this.market = { items: this._shopItems(), bought: 0, refreshes: 0, month: this.month, shop: true, freeRefresh: 0 };
+      return { ok: true };
+    }
+    _shopItems() {
+      const R = this.rules, items = [], mult = D.PRICE_MULT[Math.min(12, this.tableMonth(this.month))] * R.itemPriceMult * R.priceMult;
+      for (const c of this.contracts) {
+        if (!c) continue;
+        const nx = D.centersOf(FAM(c.carrier)).find(k => D.CARRIERS[k].tier === D.CARRIERS[c.carrier].tier + 1);
+        if (nx) { const car = D.CARRIERS[nx]; items.push({ kind: 'contract', carrier: nx, grade: car.grade, price: Math.round(car.price * R.priceMult), name: car.name, sold: false, hint: T('market.switchHint', { name: D.CARRIERS[c.carrier].name }), switchFrom: c.id, standing: true }); }
+      }
+      // 강화: 배차 한도·휴무 특약은 뜻이 없다(무제한·명절 없음). 적재 보강 · 첫 배차 무료 · 신뢰 · 속성 특약
+      for (const e of ['cap1', 'regular', 'seal', 'optFragile', 'optCold']) { const E = D.ENHANCEMENTS[e]; if (e.startsWith('opt') && !this._canFitOpt(e)) continue; items.push({ kind: 'enh', enh: e, price: Math.round(E.price * mult), name: E.name, sold: false, standing: true }); }
+      const facPrice = f => Math.round(D.FACILITIES[f].price * mult * R.facilityPriceMult * ((R.facilityPriceMap && R.facilityPriceMap[f]) || 1));
+      const fac = f => { const F = D.FACILITIES[f]; if (this.warehouse[f] || (F.requires && !this.warehouse[F.requires])) return; items.push({ kind: 'fac', fac: f, standing: true, price: facPrice(f), name: F.name, sold: false }); };
+      fac(['expand1', 'expand2', 'expand3'].find(f => !this.warehouse[f]) || 'expand3');
+      fac(['cold1', 'cold2'].find(f => !this.warehouse[f]) || 'cold2');
+      fac('yard');
+      return items;
+    }
     closeMarket() {
       if (this.phase !== 'market') return false;
-      const prep = this.market.prep;
+      const prep = this.market.prep, shop = this.market.shop;
       this.market = null;
+      if (shop) {   // 장 보러 간 날: 하루가 간다 — 대기와 같은 마감(입고·기한·정산 그대로), 배송만 없다
+        this.phase = 'play'; this.stats.shopDays = (this.stats.shopDays || 0) + 1; this.monthStats.waits++; this.run.waits++; this.stats.waits++;
+        this.waitStack = 0; this.loadChain = 0;
+        this.say('log.shopDay'); this.emit('shopDay', {});
+        this._endTurn(true); return true;
+      }
       if (prep) { this.phase = 'play'; this.say('log.monthStart', { m: 1, y: this.yearOf(1), cal: this.calMonth(1), half: 1 }); this._startTurn(); return true; }
       // 캠페인: 마지막 사이클의 마켓을 닫으면 그때 장이 끝난다 (충전을 배우고 나서 결과가 나온다)
       if (this.month >= this.rules.months) return this._finish(), true;

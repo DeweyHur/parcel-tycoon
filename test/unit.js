@@ -926,4 +926,79 @@ t('포워더(항공·철도·해상)는 무역 고객(🛃 짐을 맡기는 화�
   const gl = new Game({ seed: 2, scenario: 'kr_spring', months: 24, company: 'global', noHolidays: true }); assert.ok(gl.hasTradeCustomer(), '글로벌 익스프레스는 수입상·명품관이 있어 처음부터 포워더가 열린다');
 });
 
+// ----- 멀티 「난투」 (docs/MULTIPLAYER_DESIGN.md · 1단계) -----
+const MULTI = require('../www/js/multi.js'), BOT = require('../www/js/bot.js');
+const MG = (seed, extra) => new Game(Object.assign({ multi: true, seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false }, extra || {}));
+t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4', () => {
+  const g = MG(1), R = g.rules;
+  assert.ok(R.multi && R.months === 6 && R.noHolidays && R.noCalendarEvents && R.noWeekend && R.unlimitedCalls && R.payNow && R.noLoan && R.noInsurance && R.shopDay);
+  assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
+  assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk', 'cold', 'fragile']);
+  assert.ok(!g.shows('calls'), '배차 눈금 자체가 없다'); assert.equal(g.monthEvents(1).length, 0); assert.equal(g.insurer, 'none');
+});
+t('멀티: 입고 대본은 매치 공유 — 같은 시드면 같은 짐, 평판이 달라도 같다', () => {
+  const a = MG(5), b = MG(5); assert.deepEqual(a.schedule, b.schedule);
+  b.rep = 3; b.repTier = 4; assert.deepEqual(a._makeSchedule(3), b._makeSchedule(3));
+  assert.notDeepEqual(MG(6).schedule, a.schedule);
+  const types = new Set(a.schedule.flat().map(x => x.type)); for (const t of ['intl', 'large', 'frozen']) assert.ok(!types.has(t), t + ' 은 오지 않는다 (새 계약이 없으니 실을 곳도 없다)');
+});
+t('멀티: 물량은 일차에 비례해 오르고 마지막 보름은 마감 폭주', () => {
+  const g = MG(2); const n = m => g._makeSchedule(m).flat().length;
+  assert.ok(n(3) > n(1) && n(6) > n(5) * 1.4, `${n(1)} ${n(3)} ${n(5)} ${n(6)}`);
+});
+t('멀티: 배차 무제한 — 배차를 다 써도 부를 수 있고, 배차비는 즉시 차감, 돈이 없으면 못 부른다', () => {
+  const g = MG(3); g.parcels = []; g.schedule = g.schedule.map(() => []);
+  const si = slot(g, 'bulk'), c = g.contracts[si]; c.calls = 0;
+  g.parcels.push(P(1, 'normal', 2), P(2, 'normal', 2));
+  const cash = g.cash, r = g.callCarrier(si, [1, 2]);
+  assert.ok(r.ok, r.msg); assert.equal(g.feesDue, 0); assert.equal(g.cash, cash - r.fee + r.revenue); assert.equal(c.calls, 0);
+  g.parcels.push(P(3, 'normal', 2)); g.cash = 5;
+  const r2 = g.callCarrier(si, [3]); assert.ok(!r2.ok && /잔액/.test(r2.msg));
+});
+t('멀티: 유가 — 배차비가 일차에 따라 오른다', () => {
+  const g = MG(4), c = g.contracts[slot(g, 'bulk')]; const f0 = g.truckFee(c); g.totalTurn = 60; assert.ok(g.truckFee(c) > f0 * 1.4);
+});
+t('멀티: 장 보러 간 날 — 매물은 업그레이드·강화·창고뿐, 나오면 하루가 간다', () => {
+  const g = MG(7); g.cash = 2000; const day = g.totalTurn, turn = g.turn;
+  assert.ok(g.openShop().ok && g.phase === 'market' && g.market.shop);
+  const kinds = new Set(g.market.items.map(it => it.kind)); assert.deepEqual([...kinds].sort(), ['contract', 'enh', 'fac']);
+  assert.ok(g.market.items.filter(it => it.kind === 'contract').every(it => it.switchFrom), '계약은 갈아타기(업그레이드)뿐');
+  assert.ok(!g.market.items.some(it => it.kind === 'refill' || (it.kind === 'enh' && /^limit|holiday/.test(it.enh))), '충전·한도·휴무 특약 없음');
+  const i = g.market.items.findIndex(it => it.kind === 'fac' && it.fac === 'expand1'); const cap = g.warehouse.cap; assert.ok(g.buy(i, null).ok); assert.ok(g.warehouse.cap > cap);
+  assert.ok(g.closeMarket()); assert.equal(g.phase, 'play'); assert.equal(g.totalTurn, day + 1); assert.equal(g.turn, turn + 1); assert.equal(g.stats.shopDays, 1);
+  assert.ok(!g.openShop.call(Object.assign(Object.create(Game.prototype), g, { phase: 'market' })).ok);
+});
+t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary) 없이 다음 사이클, 어음·차입 없음', () => {
+  const g = MG(8); g.parcels = []; g.schedule = g.schedule.map(() => []); g.cash = -50;
+  while (g.month === 1) { g.schedule = g.schedule.map(() => []); g.wait([]); }
+  assert.equal(g.phase, 'play'); assert.equal(g.month, 2); assert.equal(g.debt, 0); assert.ok(g.cash < 0, '마이너스는 마이너스대로'); assert.ok(g.events.some(e => e.type === 'settle'));
+});
+t('멀티: 평판 사다리 — 상한에 닿으면 상한 +8 · 등급 +1 · 퍽 카드 3장(계열 셋) · 고르면 규칙에 얹힌다', () => {
+  const g = MG(9); const cap0 = g.repCap(); g.addRep(99);
+  assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + 8); assert.equal(g.rep, cap0); assert.ok(g.perkOffer && g.perkOffer.length === 3);
+  assert.equal(new Set(g.perkOffer.map(k => M.MULTI.PERKS[k].family)).size, 3, '세 계열에서 하나씩');
+  assert.ok(g.perkOffer.every(k => (M.MULTI.PERKS[k].phase || 1) <= M.MULTI.PHASE), '아직 안 되는 단계의 카드는 안 뜬다');
+  assert.ok(!g.pickPerk('m_shield').ok, '카드에 없는 퍽은 못 고른다');
+  g.addRep(99); assert.equal(g.repTier, 1, '카드가 떠 있는 동안은 또 오르지 않는다');
+  g.perkOffer = ['m_fee', 'm_space', 'm_early']; const cap = g.warehouse.cap, fee = g.truckFee(g.contracts[0]);
+  assert.ok(g.pickPerk('m_space').ok); assert.equal(g.warehouse.cap, cap + 4); assert.equal(g.perkOffer, null); assert.deepEqual(g.mperks, ['m_space']);
+  g.perkOffer = ['m_fee']; g.pickPerk('m_fee'); assert.ok(g.truckFee(g.contracts[0]) < fee); assert.deepEqual(g.cfg.mperks, ['m_space', 'm_fee']);
+  const s = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.ok(s.rules.feeMult < 1 && s.rules.multi && s.repCap() === cap0 + 8, '세이브를 열어도 퍽·멀티 규칙이 돌아온다');
+});
+t('멀티: 매치 — 봇 3명이 각자 시계로 따라오고, 순위는 생존 → 잔액 → 평판, 저장·복원', () => {
+  const m = MULTI.newMatch({ seed: 21, name: '나', botNames: ['가', '나', '다'] });
+  assert.equal(m.players.length, 4); assert.ok(m.players[0].human && m.players[0].game.rules.multi);
+  for (let i = 0; i < 10; i++) { BOT.multiDay(m.players[0].game, 'balanced'); MULTI.tick(m); }
+  const days = m.players.map(p => MULTI.dayOf(p.game)); assert.equal(days[0], 11, '첫날이 D+1'); assert.ok(days[1] >= 12 && days[2] === 11 && days[3] === 9, days.join(','));
+  const j = JSON.parse(JSON.stringify(MULTI.toJSON(m))), m2 = MULTI.fromJSON(j);
+  assert.deepEqual(m2.players.map(p => MULTI.dayOf(p.game)), days); assert.equal(m2.players[1].strat, m.players[1].strat);
+  m.players[2].game.phase = 'over'; m.players[3].game.cash = 9999; m.players[0].game.cash = 100; m.players[1].game.cash = 100; m.players[1].game.rep = m.players[0].game.rep + 1;
+  const st = MULTI.standings(m); assert.deepEqual(st.map(r => r.name), ['다', m.players[1].name, '나', m.players[2].name].map((x, i) => i === 0 ? m.players[3].name : x));
+  assert.ok(st[3].rank === 4 && !st[3].alive);
+});
+t('멀티: 사람이 먼저 끝나면 봇은 끝까지 돌아 전원 완주·폐업으로 끝난다', () => {
+  const m = MULTI.newMatch({ seed: 22, name: 'H' }); MULTI.finishAll(m);
+  assert.ok(m.players.slice(1).every(p => p.game.phase === 'win' || p.game.phase === 'over')); assert.ok(!MULTI.allDone(m), '사람 판은 그대로');
+});
+
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);

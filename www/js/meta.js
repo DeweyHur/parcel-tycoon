@@ -323,6 +323,56 @@
 
   // 캠페인 런(봄)은 완주 기록이 clearsByScenario 에 남지 않는다 — '전 런 완주'는 자유 런만 센다
   function soloRuns() { return Object.keys(SCENARIOS).filter(k => !SCENARIOS[k].campaign); }
-  const META = { CALENDARS, CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, DEAL, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, SPANS, FREE_RUNS, DEFAULT_SCENARIO, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['kr_spring', 'kr_summer'], perkSlots: 1 } };
+
+  // ----- 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md) -----
+  // 규칙은 개인 런에서 **빼고**(새 계약·배차 제한·어음·명절·주말·보험·보관), 상호작용을 **더한다**(트레잇·폭탄·퍽 3택1).
+  // 여기 있는 것은 데이터만 — 매치 진행(봇·순위·저장)은 js/multi.js, 규칙 훅은 game.js 의 rules.* 문.
+  const MULTI = {
+    PLAYERS: 4, CYCLES: 6, PHASE: 1,   // PHASE: 지금 구현된 단계(docs/MULTIPLAYER_DESIGN.md 13장). 퍽 카드 풀이 이 값을 본다
+    // 개인 런 시나리오 위에 얹는 멀티 규칙 셋 (mergeMods 로 병합 — 뒤가 앞을 덮는다)
+    mods: {
+      multi: true,
+      months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
+      noHolidays: true, noCalendarEvents: true, noWeekend: true,
+      unlimitedCalls: true, payNow: true, noLoan: true, noBankrupt: true,   // 배차 무제한 · 즉시 결제 · 어음 없음. 잔액 마이너스면 호출을 못 해 물량으로 죽는다
+      shopDay: true, noCycleMarket: true, autoSummary: true,             // 마켓 = 「장 보러 간 날」(하루 소모). 정산은 자동, 팝업 없이 로그 한 줄
+      noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 폭탄으로 돌아온다)
+      repStep: 8, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +8 · 퍽 3택1 (문서는 +5 — 봇 판에서 13번 올라 8로. 석 달에 7~9번). 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
+      sharedSchedule: true, fixedCustLevel: 2, dayArrivalsRate: 0.03, finalRushMult: 1.8,   // 입고 대본은 매치 공유 · 일차에 비례해 오른다(문서 0.025) · 마지막 보름 「마감 폭주」(문서 ×1.5). 봇 판(test/multi-sim.js)으로 올렸다
+      fuelRate: 0.01,                                                    // 배차비 유가: 하루 +1% (78일이면 +78%) — 후반 잔액이 그냥 쌓이지 않게
+      capDelta: 4,                                                       // 시작 창고 +4칸 (열린 질문 4 — 후보값)
+      marketMaxBuy: 0, upcomingTurns: 2,
+    },
+    // 퍽 3택1 — 평판 등급이 오를 때마다 세 계열에서 한 장씩. 장착 상한 없음, 중복 가능(중첩 수치 표기).
+    // 값은 개인 런 퍽 상한(월 40~80c)을 의도적으로 넘긴다 — 석 달짜리 난투에서 퍽은 양념이 아니라 빌드다.
+    // phase: 그 퍽이 실제로 작동하는 구현 단계. 지금 단계보다 뒤인 카드는 뽑기 풀에 안 들어간다(효과 없는 카드를 고르게 하지 않는다).
+    // 이름·설명은 locales meta.MULTI_PERKS[id]
+    PERKS: {
+      // 💰 경제
+      m_fee:      { family: 'eco', icon: '⛽', phase: 1, mods: { feeMult: 0.85 } },
+      m_reward:   { family: 'eco', icon: '💵', phase: 1, mods: { revenueMult: 1.1 } },
+      m_upgrade:  { family: 'eco', icon: '🏷', phase: 1, mods: { contractPriceMult: 0.8, itemPriceMult: 0.8, facilityPriceMult: 0.8 } },
+      m_rush:     { family: 'eco', icon: '🏁', phase: 1, mods: { finalRushReward: 0.2 } },
+      m_cash:     { family: 'eco', icon: '💰', phase: 1, now: { cash: 300 } },
+      m_regular:  { family: 'eco', icon: '🎫', phase: 1, mods: { freeTrucksPerCycle: 1 } },
+      // 🛡 방어
+      m_space:    { family: 'def', icon: '📦', phase: 1, now: { cap: 4 } },
+      m_yard:     { family: 'def', icon: '⛺', phase: 1, mods: { overflowGrace: 2 } },
+      m_grace:    { family: 'def', icon: '⏳', phase: 1, mods: { returnGrace: 1 } },
+      m_shield:   { family: 'def', icon: '🛡', phase: 2, mods: { shieldPassive: 1 } },
+      m_roof:     { family: 'def', icon: '🏠', phase: 2, mods: { rainImmune: true } },
+      m_dodge:    { family: 'def', icon: '💨', phase: 2, mods: { dodgeProb: 0.5 } },
+      // ⚔ 공격
+      m_early:    { family: 'atk', icon: '🚀', phase: 1, mods: { earlyRepBonus: 1 } },
+      m_trait:    { family: 'atk', icon: '🎲', phase: 2, mods: { attackTraitBonus: 0.1 } },
+      m_heavy:    { family: 'atk', icon: '🧨', phase: 2, mods: { bombGrow: 2 } },
+      m_sharp:    { family: 'atk', icon: '⚔', phase: 2, mods: { attackMult: 1.5 } },
+    },
+    PERK_FAMILIES: { eco: '💰', def: '🛡', atk: '⚔' },
+    // 등급(택배 테마) — ELO 200 구간, 시작 1200. 3단계(서버)에서 쓴다. 이름은 locales meta.MULTI_RANKS
+    RANKS: ['trainee', 'driver', 'lead', 'chief', 'branch', 'hq', 'god'], ELO_START: 1200, ELO_STEP: 200,
+  };
+
+  const META = { CALENDARS, CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, DEAL, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, SPANS, FREE_RUNS, DEFAULT_SCENARIO, ACHIEVEMENTS, MULTI, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['kr_spring', 'kr_summer'], perkSlots: 1 } };
   if (typeof module !== 'undefined') module.exports = META; else root.META = META;
 })(typeof window !== 'undefined' ? window : globalThis);
