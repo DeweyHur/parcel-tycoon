@@ -178,7 +178,7 @@
         contracts = (cy && cy.contracts) || (lc && lc.contracts) || co.contracts;
       }
       // 앞 장을 망쳐도(확장을 못 샀어도) 그 장의 대본이 성립하도록 바닥값을 보장한다.
-      // 냉장·냉동 칸도 같이 봐야 한다 — 칸만 보장하고 냉장을 안 보장하면 ❄·❆ 가 갈 데가 없다.
+      // 냉장·냉동 칸도 같이 봐야 한다 — 칸만 보장하고 냉장을 안 보장하면 ❄·🧊 가 갈 데가 없다.
       if (this.level && this.level.minCap != null) wh.cap = Math.max(wh.cap, this.level.minCap);
       const mw = this.level && this.level.minWarehouse;
       if (mw) for (const k of ['cap', 'cold', 'frozen', 'xl']) if (mw[k] != null) wh[k] = Math.max(wh[k] || 0, mw[k]);
@@ -881,7 +881,7 @@
     selfCost(p) { return D.SELF_DELIVERY.costBase + D.SELF_DELIVERY.costPerSize * p.size; }
     selfCapacity() { return this.selfCount(); }
     selfSizeMax() { return this.warehouse.bigvan ? 4 : D.SELF_DELIVERY.sizeMax; }
-    // 자체 배송 가능: 크기 범위 안이고 속성마다 차량이 있어야 (❄❆ 냉동 탑차, ⚠ 완충 포장차, 🛃 통관 끝난 뒤)
+    // 자체 배송 가능: 크기 범위 안이고 속성마다 차량이 있어야 (❄🧊 냉동 탑차, ⚠ 완충 포장차, 🛃 통관 끝난 뒤)
     selfCan(p) {
       if (!this.shows('self')) return false;
       if (p.size > this.selfSizeMax()) return false;
@@ -1297,7 +1297,7 @@
       const sm = this.seasonMods(sm0).typeShift; for (const t in sm) base[t] = Math.max(0, (base[t] || 0) + sm[t]);
       if (R.typeOverride) base = { ...R.typeOverride };
       if (R.typeShift) for (const t in R.typeShift) base[t] = Math.max(0, (base[t] || 0) + R.typeShift[t]);
-      // 🛃 통관 · ❆ 냉동은 평판 등급이 열어 준다 — 아직이면 그 몫은 일반으로 (달력이 아니라 내가 키워서 여는 것).
+      // 🛃 통관 · 🧊 냉동은 평판 등급이 열어 준다 — 아직이면 그 몫은 일반으로 (달력이 아니라 내가 키워서 여는 것).
       // 시나리오가 그 품목을 주제로 삼은 경우(typeOverride·보장 업체)는 건드리지 않는다
       if (!R.typeOverride) for (const t of ['intl', 'large', 'frozen']) if (base[t] && !this.repUnlocked(t)) { base.normal = (base.normal || 0) + base[t]; base[t] = 0; }
       // 캠페인: 아직 안 연 품목은 아예 오지 않는다. 화면에서 숨기는 것으로는 부족하다 —
@@ -1983,6 +1983,21 @@
     }
     // 예상 물량 중 지금 계약(과 직접 배송)으로 못 받는 종류. 마켓에서 "이건 실을 차가 없다"를 미리 말해 주려고
     // 이 종류를 지금 계약(또는 직접 배송)으로 받을 수 있나 — 크기 후보 중 하나라도 되면 된다
+    // 계약을 바꾸면 처리 못 하게 되는 것 — 창고에 있는 택배와 앞으로 오는 종류. 마켓에서 교체 전에 경고한다
+    replaceLoss(slot, carrier, grade) {
+      const old = this.contracts[slot];
+      // 직접 배송은 보름에 한두 번뿐이라 '처리 가능'으로 치지 않는다 — 계약 차로 안전하게 실을 수 있느냐만 본다
+      const safe = p => this.contracts.some(c => c && this.canHandle(c, p) && this.breakProb(c, p) === 0);
+      const byType = t => (D.PARCEL_TYPES[t].sizes || [1, 2]).some(sz => safe({ type: t, size: sz, customs: 0 }));
+      const ratio = this._typeRatio(this.month + 1) || {};
+      const types = Object.keys(D.PARCEL_TYPES).filter(t => (ratio[t] || 0) > 0 || this.parcels.some(p => p.type === t) || this.activeDeals().some(d => Object.keys((M.CUSTOMERS[d.customer] || {}).items || {}).some(k => (M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k) === t)));
+      const before = { parcels: this.parcels.filter(safe).map(p => p.id), types: types.filter(byType) };
+      this.contracts[slot] = { id: -1, carrier: this.resolveCenter(carrier, grade), grade: grade || 'normal', maxCalls: 1, calls: 1, enh: { limit: 0, cap: 0, regular: false, express: false, opt: null, capDelta: 0 } };
+      let parcels, lostTypes;
+      try { parcels = this.parcels.filter(p => before.parcels.includes(p.id) && !safe(p)); lostTypes = before.types.filter(t => !byType(t)); }
+      finally { this.contracts[slot] = old; }
+      return { parcels, types: lostTypes, any: parcels.length > 0 || lostTypes.length > 0 };
+    }
     canTakeType(t) {
       const T = D.PARCEL_TYPES[t]; if (!T) return true;
       const covers = this.contracts.filter(Boolean);
@@ -2052,7 +2067,7 @@
       return items;
     }
     // 아직 안 연 기능을 푸는 물건은 마켓에도 안 나온다.
-    // (입고 쪽은 _typeRatio 가 막는다 — 오지도 않는 ❆ 냉동을 위해 냉동고를 파는 것은 돈만 태우는 함정이다)
+    // (입고 쪽은 _typeRatio 가 막는다 — 오지도 않는 🧊 냉동을 위해 냉동고를 파는 것은 돈만 태우는 함정이다)
     // 이 계열 계약이 이 장에 나올 수 있는가. **매물을 거르기 전에 가중치에서 빼야 한다** —
     // 거르기만 하면 '막힌 품목 보장'이 철도·항공 같은 닫힌 계열을 골라 놓고, 그게 걸러져 해결책이 사라진다.
     // 무역 고객: 🛃 통관 짐을 맡기는 화주(수입상·명품관)가 하나라도 있는가 — 포워더(항공·철도·해상)는 이들이 있어야 찾아온다
@@ -2095,7 +2110,7 @@
       const R = this.rules, m = this.month, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(m))] * R.itemPriceMult * R.priceMult;
       const sc = this.script(m);
       // 대본이 명시한 매물은 거르지 않는다. 플래그 문은 **무작위 마켓**이 안 열린 기능의 물건을 파는 것을 막는 장치지,
-      // 작가가 일부러 놓은 것까지 막으면 안 된다 — '다음 장에 ❆ 가 오니 지금 특약을 사 둬라' 같은 자리가 통째로 사라진다.
+      // 작가가 일부러 놓은 것까지 막으면 안 된다 — '다음 장에 🧊 가 오니 지금 특약을 사 둬라' 같은 자리가 통째로 사라진다.
       if (sc && sc.market) return this._scriptedMarketItems(sc.market);
       const items = [];
       const gp = this._gradeProb(m);

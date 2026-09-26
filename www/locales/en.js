@@ -96,7 +96,7 @@
     'hv.wh.frozen': 'Freezer',
     'hv.wh.yard': 'Yard',
     'hv.wh.over': 'Overflow goes to the yard — theft {th}',
-    'hv.wh.coldRule': '❄ ❆ belong in cold/freezer zones',
+    'hv.wh.coldRule': '❄ 🧊 belong in cold/freezer zones',
     'hv.wh.wait': 'A no-call day lets you rearrange the yard',
     'hv.wx.fc': 'Forecast shows two days ahead — the Tomorrow / Day-after chips',
     'hv.camp.lv': 'Orange dots = uses that refill every half-month (ad runs, self-delivery). Media level sets how many',
@@ -173,6 +173,10 @@
     'slot.replaceHint': 'Slots full — tap to swap one out',
     'slot.pickSwap': 'To install {name}, remove one upgrade. Pick which (no refund)',
     'log.enhReplace': '{contract}: swapped {old} → {name}',
+    'mk.lossLine': 'No longer carried: {types} · {n} in the warehouse',
+    'mk.lossTitle': 'Some cargo will have no carrier',
+    'mk.lossBody': 'After this swap, nothing can safely carry the parcels below. Left alone they may run past their deadline and be returned.',
+    'mk.lossGo': 'Swap anyway',
     'slot.block.full': 'Upgrade slots are full',
     'slot.block.plain': 'Plain-only carrier — no attribute riders',
     'slot.block.has': 'Already handles this attribute',
@@ -532,7 +536,7 @@
     'hud.regular': 'regular',
     'wait.overdue': '⏳overdue {n}',
     'wait.spoil': '🥀spoil {n}',
-    'wait.frozenOver': '❆no freezer {n}',
+    'wait.frozenOver': '🧊no freezer {n}',
     'wait.btn': '📦 No call · Self-deliver',
     'wait.btnRest': "🛌 Rest",
     'wait.btnPlain': '📦 No call',
@@ -550,8 +554,8 @@
     'weather.head': 'Season: {season} · forecast {n#d} days ahead (forecasts are exact)',
     'weather.tent': 'Tent: no wetting',
     'weather.note': 'Parcels stored outside are hit hardest by weather. Heat waves also spoil 🌾 produce inside the warehouse (safe in the cold zone or with ventilation).',
-    'up.frozenOk': '❆ freezer OK',
-    'up.frozenNo': '❆ no freezer space → discarded on arrival',
+    'up.frozenOk': '🧊 freezer OK',
+    'up.frozenNo': '🧊 no freezer space → discarded on arrival',
     'up.coldOk': '❄ cold zone OK',
     'up.coldNo': '❄ no cold space → room temp',
     'up.customs': '🛃 customs {n#d:# day|# days}',
@@ -587,7 +591,7 @@
     'rep.greet.fragile.2': "{center}, Ahn speaking. These vans are bigger — ⚠ up to size 7. {cap} slots, {fee}c a truck, {trucks} trucks. The bigger the glass, the more you want us.",
     'rep.greet.fragile.3': "{center}, Ahn speaking. Our trucks have a cold section, so fragile fresh goods are fine too. {cap} slots, {fee}c a truck, {trucks} trucks. Send me the fussiest cargo you have.",
     'rep.greet.cold': 'Kang from {center}. {vehicle}, {cap} cells, {fee}c per truck, {trucks} trucks. Fresh goods start dying the moment they leave the cold zone. Don\'t call late.',
-    'rep.greet.cold.2': 'Kang from {center}. This truck has a freezer compartment — ❄ cold and ❆ frozen ride together. {cap} cells, {fee}c per truck, {trucks} trucks.',
+    'rep.greet.cold.2': 'Kang from {center}. This truck has a freezer compartment — ❄ cold and 🧊 frozen ride together. {cap} cells, {fee}c per truck, {trucks} trucks.',
     'rep.greet.frozen': 'Kang from {center}. Frozen is gone the moment it leaves the freezer, so batch them up when you call. {cap} cells, {fee}c per truck, {trucks} trucks.',
     'rep.greet.large': 'Noh, {center}. Big stuff doesn\'t break on my truck. {cap} cells, {fee}c a truck, {trucks} trucks lined up. Only send me the size-4-plus ones.',
     'rep.greet.large.2': 'Noh, {center}. This one\'s a reefer heavy truck — ❄ big fresh goods ride too. {cap} cells, {fee}c a truck, {trucks} trucks.',
@@ -664,7 +668,7 @@
     'story.special.cold': '❄ Fresh goods. They go into the cold zone automatically — but if the zone\'s full and they end up outside, they spoil in a day.<br>Send them by reefer truck and you get the bonus too.',
     'story.special.fragile': '⚠ Fragile. Any truck can carry it, but without a padded van there\'s a chance it breaks.<br>Broken means you pay.',
     'story.special.customs': '🛃 Customs goods. Two turns stuck at the border — can\'t touch it, it just takes up space.<br>The deadline starts after clearance.',
-    'story.special.frozen': '❆ Frozen. The moment it leaves the freezer, it\'s gone. Freezer trucks only.',
+    'story.special.frozen': '🧊 Frozen. The moment it leaves the freezer, it\'s gone. Freezer trucks only.',
     'story.noContract.1': 'That parcel — none of your contracts can carry it. Tap End Day: before closing, I can haul one myself with self-delivery.',
     'story.noContract.2': 'It costs a bit, but less than a return. The real fix is buying the right contract at the next market.',
     'story.waitSelf.1': 'This list is what you can haul yourself. Pick one — the cost is right there.',
@@ -859,7 +863,7 @@
     'story.l6holiday.1': 'New Year holiday coming. <b>Two days with no trucks at all.</b> The firms rest too.',
     'story.l6holiday.2': '<b>Empty the warehouse first.</b> Freight piles up just before it, and holding that for two days<br>runs every due date out at once. It caught me every single year.',
     'story.l6off.1': 'No trucks today. Self-delivery still works \u2014 carry the urgent ones by hand.',
-    'story.l5frozen.1': 'Next half brings ❆ <b>frozen</b>. Chilled trucks won\u2019t do — only the frozen line takes it.<br>You\u2019ve got a free slot. Fill it with this.',
+    'story.l5frozen.1': 'Next half brings 🧊 <b>frozen</b>. Chilled trucks won\u2019t do — only the frozen line takes it.<br>You\u2019ve got a free slot. Fill it with this.',
     'story.l5full.1': 'Hold on. <b>All four contract slots are taken.</b> Nowhere to put another.',
     'story.l5full.2': 'Then it isn\u2019t a contract you want, it\u2019s a <b>clause</b> \u2014 an extra term fitted to a contract you already have.<br>Takes no contract slot — but it uses one of that contract\u2019s <b>upgrade slots</b>.',
     'story.l5full.3': 'Buy that and fit it to the right contract; that truck will take \u2746 as well.<br>Last thing I\u2019ll teach you: when you\u2019re out of room, you don\u2019t add \u2014 you <b>fit</b>.',
@@ -1088,7 +1092,7 @@
     'ps.cold': '❄ Cold',
     'ps.produceCold': '🌾 in spare cold space (heat-safe)',
     'ps.frozenOut': '🔥 Outside freezer',
-    'ps.frozen': '❆ Frozen',
+    'ps.frozen': '🧊 Frozen',
     'ps.heat': '🔥 Heat damage',
     'ps.customsShort': '🛃 <b>{n#d}</b>d{delayed}',
     'ps.customs': '🛃 Customs {n#d}d{delayed}',
@@ -1132,12 +1136,12 @@
     'pd.sizeOut': 'size out of range',
     'pd.plainOnly': 'plain parcels only',
     'pd.notSpecial': 'not its specialty',
-    'pd.noFrozenCap': '❆ no ability',
+    'pd.noFrozenCap': '🧊 no ability',
     'pd.no': 'unavailable',
     'wm.rewardCost': 'reward <b>{reward}</b>c · cost <b style="color:var(--orange)">{cost}</b>c',
     'wm.overdue': '⏳ overdue {n}',
     'wm.spoil': '🥀 spoil {n}',
-    'wm.frozenOver': '❆ no freezer space {n}',
+    'wm.frozenOver': '🧊 no freezer space {n}',
     'wm.nextWarehouse': 'After next arrivals',
     'wm.ifWait': 'If you skip calling',
     'wm.outdoor': '🌧 Outside {vol} cells · theft this turn {pct}%',
@@ -1397,7 +1401,7 @@
     'codex.ach.multi': 'First clear',
     'codex.ach.perk': 'Perk unlocks',
     'codex.ach.none': 'Records',
-    'help.body': '<div class="help">\n      <p>Parcels arrive at your warehouse every turn. Calls are per <b>vehicle</b>: each contract has a vehicle (N slots) and you pay a <b>dispatch fee</b> per vehicle every call. The fee is the same however much is on board, so <b>half full is break-even</b> — call below that and every call loses money; carrier trust and reputation rise the <b>earlier</b> you ship before the deadline and fall when you ship late — independent of how full the truck is. Dispatch fees are <b>paid at month end</b>, so you can always call, but they all come out at settlement. If cash goes negative after settlement, a <b>short-term loan</b> covers it and is repaid next month with 15% interest — debt over 400c means bankruptcy. Call a carrier to ship them, or <b>wait</b> and let them pile up. A call costs the same regardless of how many parcels it ships — you pay per <b>call</b>, so the more you ship at once, the better.</p>\n      <h3>Setting up a run</h3><p>Pick a <b>run</b> (which country\'s calendar, when it starts, how long — quarter, half year or full year) → a <b>company</b> (starting warehouse, contracts, passive) → <b>perks</b> (small rule tweaks). Companies, perks and runs unlock through <b>achievements</b>; the Codex shows conditions and progress.</p>\n      <h3>Turn order</h3><p>Arrivals → call a carrier or wait → delivery → freshness and deadlines tick → overflow and delay penalties</p>\n      <h3>Parcel attributes — what happens in the warehouse</h3><table><tr><th>Attribute</th><th>Rule</th><th>Who can ship it</th></tr>\n      <tr><td>❄ Fresh</td><td>Outside the cold zone: <b>discarded next turn</b>. Deadline 3 turns</td><td>Any carrier (bonus from Cold Logistics only)</td></tr>\n      <tr><td>⚠ Fragile</td><td>A carrier without the ⚠ ability has a <b>25% break chance</b> (discard, +2 stress)</td><td>Any carrier. Safe: Fragile Pro · Heavy Haul · Rail · Air · Urgent · Padded Packing Rider</td></tr>\n      <tr><td>🛃 Customs</td><td><b>2 turns in customs</b> after arrival (20% chance of +1 delay). Takes space while waiting; the deadline starts afterwards</td><td>Any carrier once cleared. While in customs: Customs Broker · Air · Sea · Urgent only</td></tr>\n      <tr><td>❆ Frozen</td><td>Outside the freezer: <b>discarded immediately</b>. Deadline 8 turns. From month 4. Parcels larger than the freezer never arrive</td><td>Frozen Logistics · Reefer Container Rider only</td></tr>\n      <tr><td>🌾 Produce</td><td>Even inside, <b>heat waves cut the deadline by 2</b> (discarded if outside). Safe in spare cold space or with Ventilation. Deadline 5 turns</td><td>Any carrier (bonus from Cold Logistics). Self-delivery OK</td></tr>\n      <tr><td>Large (4–7)</td><td>Only carriers whose size range fits</td><td>Van Hire · Heavy Haul · Rail · Sea · Customs Broker</td></tr></table>\n      <h3>Wait · self-delivery · vehicles</h3><p>Pressing <b>Wait</b> opens the end-turn screen, where you can pick parcels to <b>self-deliver</b> — 1 per turn (Big Truck +1, City Quick and National Post +1), plain, produce and ⚠ fragile (break risk without a Padded Van), up to size 2. You keep the full reward but pay a <b>delivery cost</b> (15c + size×5c). Expand it with market <b>vehicles</b>: Reefer Van (❄❆), Padded Van (⚠ safe), Big Truck (size 4, +1). If anything is stored outside, the same screen leads to Arrange Storage. Tap a parcel row to see which contracts or self-delivery can handle it.</p>\n      <h3>Prep market</h3><p>Every run starts with a <b>prep market</b>. Before the first turn of month 1 you can spend your starting cash on contracts, upgrades, facilities and insurance, and you can see the first 1–2 turns of arrivals and weather. One free refresh.</p>\n      <h3>Runs and the calendar</h3><p>A run is <b>calendar × start month × length</b>. The Korean calendar opens with Spring (Mar–May); each finish opens the next season — Summer, Autumn, Winter. All four seasons unlock both half-year runs, and one half-year unlocks the Full Year. Holidays fall on their <b>real dates for that year</b>: Seollal and Chuseok follow the lunar calendar, the five days before them bring arrivals ×1.6 with deadlines one day shorter, and the three holiday days (plus a substitute day when one lands on Sunday) close the carriers — no calls. March 1st, Children\'s Day, Buddha\'s Birthday, Memorial Day, Liberation Day, Foundation Day, Hangul Day, Christmas and New Year\'s Day are single days off. Arrivals never stop.</p>\n      <h3>Weather · storage · contracts · insurance</h3><p>Each turn has weather, forecast 2 turns ahead. <b>🌧 Rain</b> wets standard and ⚠ parcels outside (reward -20%), <b>🔥 heat waves</b> discard ❄❆ outside cold zones immediately, a <b>❄️ blizzard</b> turns the yard into a fridge (no ❄ spoilage, theft halved, ❄ shipping +10), and a <b>🌀 typhoon</b> doubles theft and pushes that turn\'s arrivals to the next turn.</p><p>When the warehouse overflows, pressing <b>Wait</b> opens <b>Arrange Storage</b>. Choose what goes outside yourself or use presets (urgent · high reward · high damages · by customer). It doesn\'t open on call turns — it\'s the reward for waiting.</p><p>Customers like the Moving Center offer <b>storage contracts</b>. Accepting pays an upfront fee and the volume occupies your warehouse for the term (not callable or arrangeable). Ending safely gives trust +2; returning early refunds the remaining term minus a 30c penalty. If it\'s put outside and stolen, damages ×2.</p><p><b>Insurance</b> is chosen at run start and can be switched in the market. It covers part of each damage claim, and the monthly premium is deducted at settlement. 0 claims → -20% next month (2 months in a row -30% + customer trust +1); many claims raise it. Uninsured, customers with damages ×2 (Glass Studio, Moving Center) send half the volume. The market also sells one-time insurance (Transit Certificate · Yard Insurance · Customs Bond).</p>\n      <h3>Customers</h3><p>Every parcel has a <b>customer</b> (icon on the left of the row). On-time delivery +1xp, meeting the customer\'s special rule +1xp, discard -3xp. Trust levels 1–3 raise volume and per-parcel reward, and levels 2–3 unlock customer perks. A discard (spoilage, return, theft, breakage) triggers a <b>damage claim</b> (base reward × damage multiplier) taken from your cash immediately, and if xp drops below 0 the customer stops trading until next month. Check the <b>Customers</b> button at the bottom.</p>\n      <p>The <b>ability</b> icons on a carrier card are the attributes it handles safely. A <b>rider</b> from the upgrade slot adds one attribute to a contract (1 per contract). ✈🚆🚢 only mark the transport mode and don\'t affect matching; Rail and port forwarders pay with notes — cash at a later settlement (half a month or a month).</p>\n      <h3>Three ways to ship</h3><p><b>Self-delivery</b>: on a wait turn, pick 1 parcel, pay the delivery cost, keep the full reward. <b>Carrier call</b>: spends 1 remaining call and the turn. Specialists get bonuses. <b>⚡Urgent Express</b>: ships 1 parcel instantly without using a turn — the safety net of a waiting strategy.</p>\n      <p>Van Hire takes any 1 parcel (no bonus, ⚠ break risk). Missing a deadline costs reward -25% and stress +1; 3 turns later the parcel is <b>returned</b> (stress +2). Whatever exceeds capacity is <b>stored outside</b>, newest arrivals first, and rolls for theft every turn (overflow 1–2: 15%, 3–5: 30%, 6+: 50%). Fresh food drops to 50% reward after 3 turns and is discarded the turn after (+3). Fresh food at room temperature (not ❄) spoils twice as fast.</p>\n      <h3>Warehouse</h3><p>Overflow of 1–2: +1 stress, 3 or more: +2 — the real danger is theft of what\'s outside. Stress {stress} is game over. <b>Operating cost</b> (rent 120c + 10c per contract slot + facility upkeep) and the insurance premium are settled at month end.</p>\n      <h3>Contracts and the market</h3><p>Each contract has a number of remaining calls, and you can\'t buy new contracts mid-month. Replace contracts and buy upgrades and facilities in the month-end market. Replacing a contract loses its remaining calls and upgrades. Grades: Standard &lt; Trusted &lt; Expert &lt; Master.</p>\n      <h3>Carrier trust</h3><p>Trust accrues per <b>carrier</b> and survives contract changes. It grows with <b>how early</b> you ship before the deadline. Each parcel scores right away (3/4 of the window left) +2, comfortably (2/5 left) +1, on the deadline 0, <b>late −2</b>, and the carrier gains the <b>average score of one truck</b> (rounded, −2~+2). Loading more earns no more. The trust gauge on the call screen flashes what this call will gain or lose.</p>\n      <table><tr><th>Level</th><th>xp</th><th>Effect</th></tr><tr><td>1</td><td>3</td><td>Capacity +1 per call</td></tr><tr><td>2</td><td>8</td><td>+1 parcel every 4th call</td></tr><tr><td>3</td><td>15</td><td>Signature ability (Cold: deadlines freeze / Bulk · Broker · Heavy · Frozen · Urgent: +1 parcel / Van: special bonus / Fragile Pro: +15c / Air: size 4 / Rail · Port forwarders: note matures one cycle sooner)</td></tr></table>\n      <p>Fastest route: ship through the same carrier <b>the day parcels arrive</b> or the next — +2 per truck, so four calls reach tier 2. Holding until the deadline earns nothing.</p></div>',
+    'help.body': '<div class="help">\n      <p>Parcels arrive at your warehouse every turn. Calls are per <b>vehicle</b>: each contract has a vehicle (N slots) and you pay a <b>dispatch fee</b> per vehicle every call. The fee is the same however much is on board, so <b>half full is break-even</b> — call below that and every call loses money; carrier trust and reputation rise the <b>earlier</b> you ship before the deadline and fall when you ship late — independent of how full the truck is. Dispatch fees are <b>paid at month end</b>, so you can always call, but they all come out at settlement. If cash goes negative after settlement, a <b>short-term loan</b> covers it and is repaid next month with 15% interest — debt over 400c means bankruptcy. Call a carrier to ship them, or <b>wait</b> and let them pile up. A call costs the same regardless of how many parcels it ships — you pay per <b>call</b>, so the more you ship at once, the better.</p>\n      <h3>Setting up a run</h3><p>Pick a <b>run</b> (which country\'s calendar, when it starts, how long — quarter, half year or full year) → a <b>company</b> (starting warehouse, contracts, passive) → <b>perks</b> (small rule tweaks). Companies, perks and runs unlock through <b>achievements</b>; the Codex shows conditions and progress.</p>\n      <h3>Turn order</h3><p>Arrivals → call a carrier or wait → delivery → freshness and deadlines tick → overflow and delay penalties</p>\n      <h3>Parcel attributes — what happens in the warehouse</h3><table><tr><th>Attribute</th><th>Rule</th><th>Who can ship it</th></tr>\n      <tr><td>❄ Fresh</td><td>Outside the cold zone: <b>discarded next turn</b>. Deadline 3 turns</td><td>Any carrier (bonus from Cold Logistics only)</td></tr>\n      <tr><td>⚠ Fragile</td><td>A carrier without the ⚠ ability has a <b>25% break chance</b> (discard, +2 stress)</td><td>Any carrier. Safe: Fragile Pro · Heavy Haul · Rail · Air · Urgent · Padded Packing Rider</td></tr>\n      <tr><td>🛃 Customs</td><td><b>2 turns in customs</b> after arrival (20% chance of +1 delay). Takes space while waiting; the deadline starts afterwards</td><td>Any carrier once cleared. While in customs: Customs Broker · Air · Sea · Urgent only</td></tr>\n      <tr><td>🧊 Frozen</td><td>Outside the freezer: <b>discarded immediately</b>. Deadline 8 turns. From month 4. Parcels larger than the freezer never arrive</td><td>Frozen Logistics · Reefer Container Rider only</td></tr>\n      <tr><td>🌾 Produce</td><td>Even inside, <b>heat waves cut the deadline by 2</b> (discarded if outside). Safe in spare cold space or with Ventilation. Deadline 5 turns</td><td>Any carrier (bonus from Cold Logistics). Self-delivery OK</td></tr>\n      <tr><td>Large (4–7)</td><td>Only carriers whose size range fits</td><td>Van Hire · Heavy Haul · Rail · Sea · Customs Broker</td></tr></table>\n      <h3>Wait · self-delivery · vehicles</h3><p>Pressing <b>Wait</b> opens the end-turn screen, where you can pick parcels to <b>self-deliver</b> — 1 per turn (Big Truck +1, City Quick and National Post +1), plain, produce and ⚠ fragile (break risk without a Padded Van), up to size 2. You keep the full reward but pay a <b>delivery cost</b> (15c + size×5c). Expand it with market <b>vehicles</b>: Reefer Van (❄🧊), Padded Van (⚠ safe), Big Truck (size 4, +1). If anything is stored outside, the same screen leads to Arrange Storage. Tap a parcel row to see which contracts or self-delivery can handle it.</p>\n      <h3>Prep market</h3><p>Every run starts with a <b>prep market</b>. Before the first turn of month 1 you can spend your starting cash on contracts, upgrades, facilities and insurance, and you can see the first 1–2 turns of arrivals and weather. One free refresh.</p>\n      <h3>Runs and the calendar</h3><p>A run is <b>calendar × start month × length</b>. The Korean calendar opens with Spring (Mar–May); each finish opens the next season — Summer, Autumn, Winter. All four seasons unlock both half-year runs, and one half-year unlocks the Full Year. Holidays fall on their <b>real dates for that year</b>: Seollal and Chuseok follow the lunar calendar, the five days before them bring arrivals ×1.6 with deadlines one day shorter, and the three holiday days (plus a substitute day when one lands on Sunday) close the carriers — no calls. March 1st, Children\'s Day, Buddha\'s Birthday, Memorial Day, Liberation Day, Foundation Day, Hangul Day, Christmas and New Year\'s Day are single days off. Arrivals never stop.</p>\n      <h3>Weather · storage · contracts · insurance</h3><p>Each turn has weather, forecast 2 turns ahead. <b>🌧 Rain</b> wets standard and ⚠ parcels outside (reward -20%), <b>🔥 heat waves</b> discard ❄🧊 outside cold zones immediately, a <b>❄️ blizzard</b> turns the yard into a fridge (no ❄ spoilage, theft halved, ❄ shipping +10), and a <b>🌀 typhoon</b> doubles theft and pushes that turn\'s arrivals to the next turn.</p><p>When the warehouse overflows, pressing <b>Wait</b> opens <b>Arrange Storage</b>. Choose what goes outside yourself or use presets (urgent · high reward · high damages · by customer). It doesn\'t open on call turns — it\'s the reward for waiting.</p><p>Customers like the Moving Center offer <b>storage contracts</b>. Accepting pays an upfront fee and the volume occupies your warehouse for the term (not callable or arrangeable). Ending safely gives trust +2; returning early refunds the remaining term minus a 30c penalty. If it\'s put outside and stolen, damages ×2.</p><p><b>Insurance</b> is chosen at run start and can be switched in the market. It covers part of each damage claim, and the monthly premium is deducted at settlement. 0 claims → -20% next month (2 months in a row -30% + customer trust +1); many claims raise it. Uninsured, customers with damages ×2 (Glass Studio, Moving Center) send half the volume. The market also sells one-time insurance (Transit Certificate · Yard Insurance · Customs Bond).</p>\n      <h3>Customers</h3><p>Every parcel has a <b>customer</b> (icon on the left of the row). On-time delivery +1xp, meeting the customer\'s special rule +1xp, discard -3xp. Trust levels 1–3 raise volume and per-parcel reward, and levels 2–3 unlock customer perks. A discard (spoilage, return, theft, breakage) triggers a <b>damage claim</b> (base reward × damage multiplier) taken from your cash immediately, and if xp drops below 0 the customer stops trading until next month. Check the <b>Customers</b> button at the bottom.</p>\n      <p>The <b>ability</b> icons on a carrier card are the attributes it handles safely. A <b>rider</b> from the upgrade slot adds one attribute to a contract (1 per contract). ✈🚆🚢 only mark the transport mode and don\'t affect matching; Rail and port forwarders pay with notes — cash at a later settlement (half a month or a month).</p>\n      <h3>Three ways to ship</h3><p><b>Self-delivery</b>: on a wait turn, pick 1 parcel, pay the delivery cost, keep the full reward. <b>Carrier call</b>: spends 1 remaining call and the turn. Specialists get bonuses. <b>⚡Urgent Express</b>: ships 1 parcel instantly without using a turn — the safety net of a waiting strategy.</p>\n      <p>Van Hire takes any 1 parcel (no bonus, ⚠ break risk). Missing a deadline costs reward -25% and stress +1; 3 turns later the parcel is <b>returned</b> (stress +2). Whatever exceeds capacity is <b>stored outside</b>, newest arrivals first, and rolls for theft every turn (overflow 1–2: 15%, 3–5: 30%, 6+: 50%). Fresh food drops to 50% reward after 3 turns and is discarded the turn after (+3). Fresh food at room temperature (not ❄) spoils twice as fast.</p>\n      <h3>Warehouse</h3><p>Overflow of 1–2: +1 stress, 3 or more: +2 — the real danger is theft of what\'s outside. Stress {stress} is game over. <b>Operating cost</b> (rent 120c + 10c per contract slot + facility upkeep) and the insurance premium are settled at month end.</p>\n      <h3>Contracts and the market</h3><p>Each contract has a number of remaining calls, and you can\'t buy new contracts mid-month. Replace contracts and buy upgrades and facilities in the month-end market. Replacing a contract loses its remaining calls and upgrades. Grades: Standard &lt; Trusted &lt; Expert &lt; Master.</p>\n      <h3>Carrier trust</h3><p>Trust accrues per <b>carrier</b> and survives contract changes. It grows with <b>how early</b> you ship before the deadline. Each parcel scores right away (3/4 of the window left) +2, comfortably (2/5 left) +1, on the deadline 0, <b>late −2</b>, and the carrier gains the <b>average score of one truck</b> (rounded, −2~+2). Loading more earns no more. The trust gauge on the call screen flashes what this call will gain or lose.</p>\n      <table><tr><th>Level</th><th>xp</th><th>Effect</th></tr><tr><td>1</td><td>3</td><td>Capacity +1 per call</td></tr><tr><td>2</td><td>8</td><td>+1 parcel every 4th call</td></tr><tr><td>3</td><td>15</td><td>Signature ability (Cold: deadlines freeze / Bulk · Broker · Heavy · Frozen · Urgent: +1 parcel / Van: special bonus / Fragile Pro: +15c / Air: size 4 / Rail · Port forwarders: note matures one cycle sooner)</td></tr></table>\n      <p>Fastest route: ship through the same carrier <b>the day parcels arrive</b> or the next — +2 per truck, so four calls reach tier 2. Holding until the deadline earns nothing.</p></div>',
   },
   data:   {
     "ATTRS": {
@@ -1488,13 +1492,13 @@
         "name": "ColdChain Center",
         "short": "ColdChain",
         "vehicle": "reefer/freezer truck",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus · Elite — trucks +2 · cap +2 · fee +40% · ❆ frozen-capable added"
+        "desc": "Fresh & produce specialist. Fresh/produce bonus · Elite — trucks +2 · cap +2 · fee +40% · 🧊 frozen-capable added"
       },
       "cold3": {
         "name": "Farm Direct",
         "short": "FarmDirect",
         "vehicle": "large reefer",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus · Master — trucks +3 · cap +3 · fee +60% · ❆ frozen-capable added · up to size 7"
+        "desc": "Fresh & produce specialist. Fresh/produce bonus · Master — trucks +3 · cap +3 · fee +60% · 🧊 frozen-capable added · up to size 7"
       },
       "frozen0": {
         "name": "Glacier Frozen",
@@ -1738,7 +1742,7 @@
       },
       "optFrozen": {
         "name": "Reefer Container Rider",
-        "desc": "This contract handles ❆ frozen, capacity -1 (contracts with max size ≤ 4 only)"
+        "desc": "This contract handles 🧊 frozen, capacity -1 (contracts with max size ≤ 4 only)"
       }
     },
     "FACILITIES": {
@@ -1776,7 +1780,7 @@
       },
       "coldvan": {
         "name": "Reefer Van",
-        "desc": "Self-deliver ❄ fresh and ❆ frozen"
+        "desc": "Self-deliver ❄ fresh and 🧊 frozen"
       },
       "padvan": {
         "name": "Padded Van",
@@ -1954,8 +1958,8 @@
       },
       "coldguard": {
         "name": "ColdGuard",
-        "desc": "❄❆ spoilage damages 80%, others 20%",
-        "short": "❄❆ 80% · others 20%"
+        "desc": "❄🧊 spoilage damages 80%, others 20%",
+        "short": "❄🧊 80% · others 20%"
       },
       "safebox": {
         "name": "SafeBox",
@@ -1993,11 +1997,11 @@
       },
       "heat": {
         "name": "Heat Wave",
-        "desc": "❄❆ outside cold zones discarded immediately"
+        "desc": "❄🧊 outside cold zones discarded immediately"
       },
       "snow": {
         "name": "Blizzard",
-        "desc": "No ❄ spoilage outside · ❆ 1-turn grace, theft halved, ❄ deadlines frozen, ❄ shipping +10"
+        "desc": "No ❄ spoilage outside · 🧊 1-turn grace, theft halved, ❄ deadlines frozen, ❄ shipping +10"
       },
       "storm": {
         "name": "Typhoon",

@@ -26,7 +26,7 @@
     factory: { repTier: 2, icon: '🪑', items: { large: 80, normal: 20 }, sizeBias: 'big', claimMult: 1.3,
       rule: { kind: 'sameArrival', bonus: 25 },
       perks: { 2: { xl: 1 }, 3: { bigSizeDelta: -1 } } },
-    ice:     { repTier: 2, icon: '❆', items: { frozen: 90, fresh: 10 }, sizeBias: null, claimMult: 1.8,
+    ice:     { repTier: 2, icon: '🧊', items: { frozen: 90, fresh: 10 }, sizeBias: null, claimMult: 1.8,
       rule: { kind: 'frozenSafe', bonus: 15 },
       perks: { 2: { facilityPrice: { freezer1: 0.5 } }, 3: { deadlineDelta: 2 } } },
     luxury:  { repTier: 3, icon: '💎', items: { intl: 50, intlfragile: 50 }, sizeBias: 'small', claimMult: 2.0,

@@ -26,7 +26,7 @@
     REP_TIERS: [
       { id: 'unknown', cap: 20, arrivals: 1.0,  opCost: 1.0,  unlock: [] },               // 무명 — 동네 사람들만 안다 (대형·통관·냉동 없음: 시작 계약으로 다 실을 수 있어야 한다)
       { id: 'local',   cap: 35, arrivals: 1.15, opCost: 1.10, unlock: ['intl', 'large'] }, // 동네 소문 — 🛃 통관·대형이 들어오기 시작
-      { id: 'ward',    cap: 50, arrivals: 1.35, opCost: 1.25, unlock: ['intl', 'large', 'frozen'] },// 구내 유명 — ❆ 냉동까지
+      { id: 'ward',    cap: 50, arrivals: 1.35, opCost: 1.25, unlock: ['intl', 'large', 'frozen'] },// 구내 유명 — 🧊 냉동까지
       { id: 'city',    cap: 70, arrivals: 1.60, opCost: 1.45, unlock: ['intl', 'large', 'frozen'] },// 시내 최고
     ],
     CYCLES_PER_MONTH: 2,   // 한 사이클 = 2주. 달력 한 달 = 전반·후반 두 사이클
@@ -93,7 +93,7 @@
     START_MONTH: 3,
 
     // 월별 택배 종류 비율 (large = 대형화물, 4개월차부터)
-    // intl = 🛃 통관 (구 국제운송), frozen = ❆ 냉동 (4개월차부터)
+    // intl = 🛃 통관 (구 국제운송), frozen = 🧊 냉동 (4개월차부터)
     TYPE_RATIO: {
       // 1~2개월차는 일반 위주 — 특수는 고객 신뢰가 쌓이며 열린다 (docs/BALANCE_DESIGN.md 3장)
       1: { normal: 85, fresh: 0, produce: 5, fragile: 6, intl: 4, large: 0, frozen: 0 },
@@ -107,8 +107,8 @@
     // 크기 등장 비율 (1 소형, 2 중형, 4 대형, 7 초대형)
     SIZE_WEIGHT: { 1: 55, 2: 33, 4: 10, 7: 2 },
 
-    // 속성(attrs): 창고에서 벌어지는 일. cold=❄ 냉장 구역 밖이면 다음 턴 폐기 / fragile=⚠ 능력 없는 업체면 파손 확률 / customs=🛃 통관 대기 중 처리 불가 / frozen=❆ 냉동 구역 밖이면 즉시 폐기
-    ATTRS: { cold: { icon: '❄' }, fragile: { icon: '⚠' }, customs: { icon: '🛃' }, frozen: { icon: '❆' }, produce: { icon: '🌾' } },
+    // 속성(attrs): 창고에서 벌어지는 일. cold=❄ 냉장 구역 밖이면 다음 턴 폐기 / fragile=⚠ 능력 없는 업체면 파손 확률 / customs=🛃 통관 대기 중 처리 불가 / frozen=🧊 냉동 구역 밖이면 즉시 폐기
+    ATTRS: { cold: { icon: '❄' }, fragile: { icon: '⚠' }, customs: { icon: '🛃' }, frozen: { icon: '🧊' }, produce: { icon: '🌾' } },
     // 업체 매칭에 관여하는 속성 (🌾 농산물은 날씨 속성이라 아무 업체나 처리)
     GATING_ATTRS: ['cold', 'fragile', 'customs', 'frozen'],
     // 크기: 일반·파손·신선·냉동은 소형(1)부터 — 깨지는 것·신선·냉동은 보통 작다. 농산물은 2부터, 통관·대형은 4부터.
@@ -140,7 +140,7 @@
     THEFT_PROB: [[2, 0.15], [5, 0.30], [Infinity, 0.50]],
 
     // 업체 능력: caps = 안전하게 다루는 속성. need = 이 속성 중 하나가 있는 택배만 받음(전문). onlyPlain = 속성 없는 택배만.
-    // 매칭: 크기 범위 && need && (❆는 caps 필수) && (🛃 대기 중이면 caps 필수). ❄·⚠는 caps 없어도 받되 ⚠는 파손 확률.
+    // 매칭: 크기 범위 && need && (🧊는 caps 필수) && (🛃 대기 중이면 caps 필수). ❄·⚠는 caps 없어도 받되 ⚠는 파손 확률.
     // specialist = 이 종류를 처리하면 특수 운송 보너스. delay = 보상이 N턴 뒤 입금. badge = 운송 수단(매칭 무관)
     // 업체 = 배차 계약 (docs/BALANCE_DESIGN.md 1장): cap = 차량 한 대의 부피(칸), fee = 대당 배차비(호출 즉시 차감), trucks = 월 배차 한도(대), price = 계약가
     // caps = 안전하게 다루는 속성. need = 이 속성 중 하나가 있는 택배만. onlyPlain = 속성 없는 택배만. specialist = 특수 운송 보너스 종류. delay = 입금 지연 턴. badge = 운송 수단
@@ -191,11 +191,11 @@
       frozen1: { family: 'frozen', tier: 1 },
       frozen2: { family: 'frozen', tier: 2, extraCaps: ['cold'] },
       // 파손
-      // 파손 계열은 ⚠ 전문이지만 일반·🌾 농산물도 싣는다(need 없음) — 냉장·통관 설비가 없어 ❄·❆·🛃 은 못 싣는다(allowAttrs)
+      // 파손 계열은 ⚠ 전문이지만 일반·🌾 농산물도 싣는다(need 없음) — 냉장·통관 설비가 없어 ❄·🧊·🛃 은 못 싣는다(allowAttrs)
       fragile0: { family: 'fragile', tier: 0, need: null, allowAttrs: ['fragile'] },
       // 캠페인 2장에서 붙는 작은 완충 밴 — ⚠ 도 안전하게, 일반도 받는다(need 없음). 차가 4칸이라
       // 일반만 실으면 배차비와 똔똔이고, ⚠ 를 실어야 남는다. 마켓·랜덤 시작에는 안 나온다(campaign).
-      pack0: { family: 'fragile', tier: 0, need: null, campaign: true, rep: 'ahn', allowAttrs: ['fragile'] },   // 냉장 설비가 없다 — ❄·❆·🛃 는 못 싣는다
+      pack0: { family: 'fragile', tier: 0, need: null, campaign: true, rep: 'ahn', allowAttrs: ['fragile'] },   // 냉장 설비가 없다 — ❄·🧊·🛃 는 못 싣는다
       fragile1: { family: 'fragile', tier: 1, need: null, allowAttrs: ['fragile'] },
       fragile2: { family: 'fragile', tier: 2, sizeMax: 7, need: null, allowAttrs: ['fragile'] },                    // 대형 파손까지
       fragile3: { family: 'fragile', tier: 3, sizeMax: 7, extraCaps: ['cold'], need: null, allowAttrs: ['fragile', 'cold'] },
@@ -283,7 +283,7 @@
       optFragile: { price: 150, kind: 'opt', attr: 'fragile', capDelta: -1, icon: '⚠', tint: 'fragile' },
       optCold:    { price: 170, kind: 'opt', attr: 'cold', capDelta: -1, icon: '❄', tint: 'fresh' },
       optCustoms: { price: 190, kind: 'opt', attr: 'customs', callsDelta: -1, icon: '🛃', tint: 'intl' },
-      optFrozen:  { price: 220, kind: 'opt', attr: 'frozen', capDelta: -1, maxSizeMax: 4, icon: '❆', tint: 'frozen' },
+      optFrozen:  { price: 220, kind: 'opt', attr: 'frozen', capDelta: -1, maxSizeMax: 4, icon: '🧊', tint: 'frozen' },
     },
     FACILITIES: {
       // 창고 확장 — 땅은 그대로다. 같은 건물 안에 선반 랙을 세우고, 복층을 올리고, 마지막에 옆 칸을 빌려 벽을 튼다.

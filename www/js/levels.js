@@ -22,7 +22,7 @@
     'theft',        // 마당 도난·젖음
     'self',         // 직접 배송
     'cold',         // 냉장 구역과 ❄ 신선
-    'frozen',       // 냉동 구역과 ❆
+    'frozen',       // 냉동 구역과 🧊
     'attrs',        // ⚠🛃🌾 등 특수 속성 전반
     'customers',    // 고객 이름·신뢰
     'rep',          // 평판 게이지(= 런 종료 조건)
@@ -200,11 +200,11 @@
           ['normal 2 mart', 'normal 2 anon', 'normal 2 mart'],
           ['normal 2 anon', 'normal 2 mart', 'fragile 2 glass'],
         ]),
-          // 다음 보름에 ❆ 가 온다. 자리가 비었으면 ❆ 계약을, 다 찼으면 **특약**을 붙인다
+          // 다음 보름에 🧊 가 온다. 자리가 비었으면 🧊 계약을, 다 찼으면 **특약**을 붙인다
           market: { contracts: ['frozen0'], enh: ['optFrozen', 'limit1'], item: ['transitCert'], fac: ['expand2', 'freezer1'] } },
       },
     },
-    // ----- 5장 (5월 후반): 마지막 봄. ❆ 냉동 · 일요일 선택 · 그리고 자리가 없을 때 '붙이는' 법 -----
+    // ----- 5장 (5월 후반): 마지막 봄. 🧊 냉동 · 일요일 선택 · 그리고 자리가 없을 때 '붙이는' 법 -----
     // 이 장 끝에서 잔금을 턴다 — 본계약서에 도장을 찍는 자리다.
     {
       n: 6, cycles: 1, year: 2027, startMonth: 3, cycleOffset: 5, grants: ['frozen', 'weekendChoice', 'perks', 'codex'],

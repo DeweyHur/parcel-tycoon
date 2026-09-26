@@ -744,7 +744,8 @@
     if (showWx) $('#upcoming').innerHTML = `<span class="chip wx ${wxNow}" title="${esc(W.name + (W.desc ? ' — ' + W.desc : ''))}"><b class="ahead">${T('hud.today')}</b> ${W.icon}</span>` + $('#upcoming').innerHTML;
     $('#wxline').onclick = () => { SFX.click(); showWeatherInfo(); };
     $('#wxline').className = 'wxline ' + wxNow; $('#wxline').innerHTML = wxNow !== 'sunny' ? `${W.icon} ${esc(W.desc)}` : ''; $('#wxline').hidden = wxNow === 'sunny' || !showWx;
-    if (g.items.transitCert || g.items.yardIns === g.month || g.items.customsBond === g.month) $('#upcoming').innerHTML += `<span class="chip">${[g.items.transitCert ? `${M.INS_ITEMS.transitCert.icon} ${esc(M.INS_ITEMS.transitCert.name)} ${g.items.transitCert}` : '', g.items.yardIns === g.month ? `${M.INS_ITEMS.yardIns.icon} ${esc(M.INS_ITEMS.yardIns.name)}` : '', g.items.customsBond === g.month ? `${M.INS_ITEMS.customsBond.icon} ${esc(M.INS_ITEMS.customsBond.name)}` : ''].filter(Boolean).join(' · ')}</span>`;
+    // 1회성 보험은 아이콘만(이름은 눌러 보면) — 줄 하나를 통째로 먹지 않게
+    if (g.items.transitCert || g.items.yardIns === g.month || g.items.customsBond === g.month) $('#upcoming').innerHTML += `<span class="chip insb">${[g.items.transitCert ? `<span title="${esc(M.INS_ITEMS.transitCert.name)}">${M.INS_ITEMS.transitCert.icon}${g.items.transitCert > 1 ? g.items.transitCert : ''}</span>` : '', g.items.yardIns === g.month ? `<span title="${esc(M.INS_ITEMS.yardIns.name)}">${M.INS_ITEMS.yardIns.icon}</span>` : '', g.items.customsBond === g.month ? `<span title="${esc(M.INS_ITEMS.customsBond.name)}">${M.INS_ITEMS.customsBond.icon}</span>` : ''].filter(Boolean).join('')}</span>`;
     if (g.outdoorVolume() > 0) $('#upcoming').innerHTML += `<span class="chip heat" id="wm-reorder" role="button">${T('hud.outdoor', { vol: g.outdoorVolume(), n: g.outdoorParcels().length, storage: g.storage.some(s => s.outdoor) ? T('hud.outdoorStorage') : '', pct: Math.round(g.theftProb() * 100) })} · <b>${T('re.title')} ▸</b></span>`;
     // 칩을 다 그린 뒤에 단다 — innerHTML += 가 앞서 단 핸들러를 지워 버린다
     $('#upcoming').querySelectorAll('.chip.wx').forEach(el => el.onclick = () => { SFX.click(); showWeatherInfo(); });
@@ -754,8 +755,7 @@
     renderStock($('#parcels'), g.parcels, pk ? callState() : null);
     $('#parcels').querySelectorAll('.ptile[data-id]').forEach(bindTile);
     renderCallBar();
-    if (g.storage.length) $('#parcels').insertAdjacentHTML('afterbegin', g.storage.map(s => { const K = M.STORAGE_KINDS[s.kind], cu = M.CUSTOMERS[s.customer]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#a8845a"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${cu.icon}${esc(cu.name)}${s.perTurn ? ` · ${T('log.storagePerTurn', { perTurn: s.perTurn })}` : ''}</div><div class="st">${s.outdoor ? `${T('hud.outdoorTag')} · ` : ''}${T('storage.left', { n: s.left })}</div></div>`; }).join(''));
-    $('#parcels').querySelectorAll('.parcel.storage').forEach(el => el.onclick = () => showStorage(+el.dataset.sid));
+    // 보관 계약(이삿짐·계절 재고)은 재고 격자에 줄로 늘어놓지 않는다 — 3D 창고에 큰 상자로 보이고, 누르면 상세(조기 반환)
     const slotsOn = g.visibleSlots();
     for (let i = 0; i < D.CONTRACT_SLOTS; i++) {
       const btn = $('#c' + i), c = g.contracts[i];
@@ -943,7 +943,7 @@
     const anyOk = g.contracts.some(c => c && g.canHandle(c, p));
     const rows = g.contracts.map(c => { if (!c || (anyOk && !g.canHandle(c, p))) return ''; const car = D.CARRIERS[c.carrier]; const ok = g.canHandle(c, p), bp = ok ? g.breakProb(c, p) : 0, can = g.canCall(c); const why = !ok ? T(p.size > g.contractSizeMax(c) || p.size < car.sizeMin ? 'pd.sizeOut' : car.onlyPlain ? 'pd.plainOnly' : car.need ? 'pd.notSpecial' : a.includes('frozen') ? 'pd.noFrozenCap' : p.customs > 0 ? 'self.customsWait' : 'pd.no') : ''; const spec = ok && g.isSpecialist(car, p.type) && t.bonus; return `<div class="ttrow ${ok ? 'on' : ''}"><span class="lv">${car.badge || '🚚'}</span><span class="ef">${esc(car.short)}${gradeBadge(c.grade)} ${ok ? `${spec ? `<span style="color:var(--gold)">${T('pd.specialBonus', { n: t.bonus })}</span> ` : ''}${bp ? `<span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(bp * 100) })}</span>` : ''}${!can ? `<span style="color:var(--dim)">(${T('pd.cannotCall')})</span>` : ''}` : `<span style="color:var(--dim)">${why}</span>`}</span><span class="st">${ok ? T('fmt.calls', { n: c.calls }) : '—'}</span></div>`; }).join('');
     const selfOk = g.selfCan(p), selfWhy = g.selfBlockReason(p);
-    const body = `<div class="parcel" style="margin-bottom:6px"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${g.shows('customers') ? `<span class="cust">${cu.icon}</span>` : ''}<span class="nm">${esc(t.name)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${T('pd.baseReward', { n: p.reward })}</div><div class="st">${parcelStatus(p)}</div></div>
+    const body = `<div class="parcel pd-top" style="margin-bottom:6px"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${g.shows('customers') ? `<span class="cust">${cu.icon}</span>` : ''}<span class="nm">${esc(t.name)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${T('pd.baseReward', { n: p.reward })}</div><div class="st">${parcelStatus(p)}</div></div>
       ${g.shows('customers') ? `<div class="d">${T('company.customers')} <b>${cu.icon} ${esc(cu.name)}</b>${p.customer !== 'anon' ? ` · ${T('cust.trustLv', { n: lv })} ${T('pd.perPiece', { n: M.CUSTOMER_BONUS[lv] })}` : ''}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}</div>` : ''}
       ${p.wet || p.outdoor ? `<div class="d">${[p.wet ? T('pd.wet') : '', p.outdoor ? T('pd.outdoor') : ''].filter(Boolean).join(' · ')}</div>` : ''}
       ${attrRows}
@@ -1737,7 +1737,16 @@
     render();
   }
   // 계약 구매 → 그 센터 담당자가 인사한다 (스토리 안내가 꺼져 있으면 생략)
-  function buyContractInto(it, idx, slot, back) {
+  // 계약 교체로 못 싣게 되는 것 한 줄: 종류 색점 + 창고에 있는 개수
+  function lossText(loss) {
+    const dots = loss.types.map(t => `<i class="dot" style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>${esc(D.PARCEL_TYPES[t].short || D.PARCEL_TYPES[t].name)}`).join(' ');
+    return T('mk.lossLine', { types: dots || '—', n: loss.parcels.length });
+  }
+  function buyContractInto(it, idx, slot, back, confirmed) {
+    const loss = game.contracts[slot] ? game.replaceLoss(slot, it.carrier, it.grade) : null;
+    if (loss && loss.any && !confirmed) {
+      return modal(T('mk.lossTitle'), `<p>${T('mk.lossBody')}</p><p class="why-box">⚠ ${lossText(loss)}</p>`, [{ label: T('btn.cancel'), onClick: () => chooseSlot(it, idx, back) }, { label: T('mk.lossGo'), cls: 'warn', onClick: () => { closeModal(); buyContractInto(it, idx, slot, back, true); } }]);
+    }
     const old = game.contracts[slot]; const from = old ? old.carrier : null;
     const r = game.buy(idx, slot); if (!r.ok) { toast(r.msg); return; }
     SFX.buy(); saveGame(); announce(Profile.evaluate(game, null)); back();
@@ -1838,9 +1847,10 @@
       const tb = trustBar(game, c.carrier);
       // 못 붙이는 계약은 회색으로, 이유 한 줄과 함께 (칸이 참 · 일반 전용 · 이미 처리 · 크기 초과)
       const block = isContract ? null : enhBlock(it.enh, c);
+      const loss = isContract ? game.replaceLoss(s, it.carrier, it.grade) : null;   // 바꾸면 못 싣게 되는 것
       const names = enhNames(game, c);
       const full = !isContract && !block && D.ENHANCEMENTS[it.enh].kind !== 'trust' && game.enhUsed(c) >= game.enhSlots(c);
-      const info = isContract ? `${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}` : `${enhPips(game, c)}${names.length ? ` ${names.join(' · ')}` : ''}${block ? `<br><span class="why">${T('slot.block.' + block)}</span>` : full ? `<br><span class="swap">${T('slot.replaceHint')}</span>` : ''}`;
+      const info = isContract ? `${T('mk.contractLine', { calls: c.calls, max: c.maxCalls, cap: game.baseCapacity(c) })}${tb ? ` · ${tb}` : ''}${loss && loss.any ? `<br><span class="why">⚠ ${lossText(loss)}</span>` : ''}` : `${enhPips(game, c)}${names.length ? ` ${names.join(' · ')}` : ''}${block ? `<br><span class="why">${T('slot.block.' + block)}</span>` : full ? `<br><span class="swap">${T('slot.replaceHint')}</span>` : ''}`;
       return `<div class="card ${block ? 'dis' : ''}" data-s="${s}"><div class="t"><span>${esc(game.contractName(c))}${gradeBadge(c.grade)}</span></div><div class="d">${info}</div></div>`;
     }).join('');
     const m = modal(it.name, body, [{ label: T('btn.cancel'), onClick: back }]);
@@ -2098,7 +2108,7 @@
       + row('⏳', T('hv.due.late', { pct: Math.round((1 - 0.75) * 100), n: D.RETURN_GRACE }));
     // 5. 창고
     const th = D.THEFT_PROB.map(x => Math.round(x[1] * 100) + '%').join(' / ');
-    const store = `<div class="hv-chips"><span class="chip">🏠 ${T('hv.wh.main')} 6/24</span><span class="chip">❄ ${T('hv.wh.cold')} 2/6</span><span class="chip">❆ ${T('hv.wh.frozen')} 0/4</span><span class="chip heat">🌧 ${T('hv.wh.yard')} 3</span></div>`
+    const store = `<div class="hv-chips"><span class="chip">🏠 ${T('hv.wh.main')} 6/24</span><span class="chip">❄ ${T('hv.wh.cold')} 2/6</span><span class="chip">🧊 ${T('hv.wh.frozen')} 0/4</span><span class="chip heat">🌧 ${T('hv.wh.yard')} 3</span></div>`
       + row('📤', T('hv.wh.over', { th })) + row('❄', T('hv.wh.coldRule')) + row('🌙', T('hv.wh.wait'));
     // 6. 날씨
     const wx = Object.keys(W).map(k => `<tr><td class="hv-ic">${W[k].icon}</td><td><b>${esc(W[k].name)}</b></td><td>${esc(W[k].desc || T('weather.noEffect'))}</td></tr>`).join('');
@@ -2190,10 +2200,10 @@
       SFX.nudge(); pt.classList.remove('shake'); void pt.offsetWidth; pt.classList.add('shake'); place();
     };
   }
-  // 대사 속 속성 아이콘(⚠❄❆🌾🛃)은 픽셀 글꼴이 흑백으로 그린다 — 그 종류 색 상자에 얹어 창고 상자와 같은 색으로 보이게
-  const ICON_TYPE = { '⚠': 'fragile', '❄': 'fresh', '❆': 'frozen', '🌾': 'produce', '🛃': 'intl' };
+  // 대사 속 속성 아이콘(⚠❄🧊🌾🛃)은 픽셀 글꼴이 흑백으로 그린다 — 그 종류 색 상자에 얹어 창고 상자와 같은 색으로 보이게
+  const ICON_TYPE = { '⚠': 'fragile', '❄': 'fresh', '🧊': 'frozen', '🌾': 'produce', '🛃': 'intl' };
   function tintIcons(html) {
-    return html.replace(/(<[^>]*>)|([⚠❄❆🌾🛃])\uFE0F?/gu, (m, tag, ic) => tag ? tag : `<span class="sicon" style="background:${D.PARCEL_TYPES[ICON_TYPE[ic]].css}" title="${esc(D.PARCEL_TYPES[ICON_TYPE[ic]].name)}">${ic}</span>`);
+    return html.replace(/(<[^>]*>)|([⚠❄🧊🌾🛃])\uFE0F?/gu, (m, tag, ic) => tag ? tag : `<span class="sicon" style="background:${D.PARCEL_TYPES[ICON_TYPE[ic]].css}" title="${esc(D.PARCEL_TYPES[ICON_TYPE[ic]].name)}">${ic}</span>`);
   }
   function showStoryBeat(beat, after) {
     const el = $('#story'); let i = 0; storyBusy = true; clearGate();
@@ -2267,6 +2277,13 @@
       return true;
     };
     const base = u.specs || [], add = added || [];
+    // 칸이 많으면 종류별로 묶는다(색 한 칸 + 칸 수) — 내일·모레 두 칩이 한 줄에 들어가게
+    const total = base.reduce((a, s) => a + s.size, 0);
+    if (!add.length && total > 8) {
+      const by = {}; for (const sp of base) by[sp.type] = (by[sp.type] || 0) + sp.size;
+      const grp = Object.keys(D.PARCEL_TYPES).filter(t => by[t]).map(t => `<span class="grp" title="${esc(D.PARCEL_TYPES[t].name)} ${by[t]}"><i style="background:${D.PARCEL_TYPES[t].css}"></i>${by[t]}</span>`).join('');
+      return `<span class="chip up grouped ${u.heat ? 'heat' : u.off ? 'off' : ''}" data-turn="${u.turn}"><b class="ahead">${esc(label)}</b> ${wx}${u.heat ? '🌡' : ''}${u.burst ? '⚡' : ''}${u.off ? `🎑${T('hud.off')}` : ''}<span class="boxes">${grp}</span></span>`;
+    }
     // 새 짐이 잘리지 않게: 자리가 모자라면 기존 짐을 먼저 줄인다
     const addCells = add.reduce((a, s) => a + s.size, 0);
     let room = Math.max(0, LIM - addCells), cut = false;

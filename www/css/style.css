@@ -564,7 +564,7 @@ body.chain-hit #scene::before { content: ''; position: absolute; z-index: 19; in
 .bars { padding: 5px 8px 1px; }
 #upcoming { flex-wrap: wrap; overflow-x: hidden; min-height: 29px; scrollbar-width: none; }
 /* 야외 적재·보험 칩은 다음 줄로 — 한 줄에 끼면 내일·모레 칩이 짜부라져 상자가 세로로 쏟아졌다 */
-#upcoming > .chip:not(.up):not(.wx):not(.none) { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#upcoming > .chip:not(.up):not(.wx):not(.none):not(.insb) { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #upcoming .chip.up .boxes { max-height: 22px; overflow: hidden; }
 #upcoming::-webkit-scrollbar, #contract-strip::-webkit-scrollbar { display: none; }
 #parcels { padding-top: 4px; }
@@ -1007,3 +1007,14 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .lbrow { display: grid; grid-template-columns: 30px 1fr auto; gap: 6px; padding: 3px 4px; border-bottom: 1px solid #ffffff10; }
 .lbrow span:first-child { color: var(--dim); text-align: right; }
 .lbrow.me { background: #ffd24a22; color: var(--gold); }
+/* 택배 상세 머리: 상태 줄이 길면(실을 차 없음 · 속성 · 초과·반송) 이름 칸이 글자 단위로 쪼개졌다 — 상태는 아래 줄로 */
+.parcel.pd-top { grid-template-columns: 14px 1fr; }
+.parcel.pd-top .st { grid-column: 1 / -1; text-align: left; }
+.card .why i.dot, .why-box i.dot { display: inline-block; width: 8px; height: 8px; margin: 0 2px 0 4px; border: 1px solid #0006; vertical-align: middle; }
+.why-box { color: var(--orange); font-size: 12px; }
+
+/* 내일·모레 칸이 많을 때: 종류별 색 한 칸 + 칸 수 */
+#upcoming .chip.grouped .boxes { flex-wrap: nowrap; max-height: none; }
+#upcoming .chip .grp { display: inline-flex; align-items: center; gap: 1px; margin-left: 4px; font-size: 11px; color: var(--ink); }
+#upcoming .chip .grp i { width: 8px; height: 10px; border: 1px solid #0006; }
+#upcoming .chip.insb { flex: 0 0 auto; gap: 2px; cursor: help; }

@@ -298,7 +298,7 @@
     // 쇼핑 행사 폭주
     { id: 'l5rush', kind: 'turn', when: g => g.isRushTurn && g.isRushTurn(), pages: [{ expr: 'worry', hl: '#upcoming' }] },
     // 이 장의 진짜 교훈 — 자리가 다 찼을 때는 계약이 아니라 특약이다
-    // 캠페인에서 자리가 하나 비어 있으면 ❆ 는 계약으로 받는다 (다 찼으면 아래 l5full 이 특약을 가르친다)
+    // 캠페인에서 자리가 하나 비어 있으면 🧊 는 계약으로 받는다 (다 찼으면 아래 l5full 이 특약을 가르친다)
     { id: 'l5frozen', kind: 'market', when: g => g.contracts.filter(Boolean).length < root.DATA.CONTRACT_SLOTS && !!mkItem(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen'), pages: [
       { expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen'), gate: true },
     ] },
@@ -311,7 +311,7 @@
   ];
 
   // ----- 레벨 6 전용 비트 (5장 · 5월 후반 · 마지막 봄) -----
-  // 마지막 장. 새로 여는 것은 ❆ 냉동과 일요일 선택뿐이고, 나머지는 한 해를 마무리하는 이야기다.
+  // 마지막 장. 새로 여는 것은 🧊 냉동과 일요일 선택뿐이고, 나머지는 한 해를 마무리하는 이야기다.
   const frozenCar = g => mkItem(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen');
   const optItem = g => mkItem(g, it => it.kind === 'enh' && (root.DATA.ENHANCEMENTS[it.enh] || {}).kind === 'opt');
   const freezerFac = g => mkItem(g, it => it.kind === 'fac' && /^freezer/.test(it.fac || ''));
@@ -327,7 +327,7 @@
       { expr: 'neutral' },
       { expr: 'neutral', hl: '.wkopts .wkc', gate: true },
     ] },
-    // ❆ 냉동 — 오기 전에 마켓이 먼저. 그런데 이번엔 계약 자리가 없다
+    // 🧊 냉동 — 오기 전에 마켓이 먼저. 그런데 이번엔 계약 자리가 없다
     { id: 'l6frozenWarn', kind: 'market', when: g => g.forecastBlocked().length > 0 || !!optItem(g), pages: [{ expr: 'worry', hl: '#mk-fc' }] },
     { id: 'l6frozenCar', kind: 'market', when: g => !!frozenCar(g), pages: [{ expr: 'think', hl: g => cardSel(g, it => it.kind === 'contract' && root.DATA.familyOf(it.carrier) === 'frozen') }] },
     { id: 'l6freezer', kind: 'market', when: g => !!freezerFac(g), pages: [

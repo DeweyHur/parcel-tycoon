@@ -221,6 +221,13 @@ t('강화 교체: 칸이 다 차면 하나를 빼고 새 걸 끼운다 — 뺀 �
   assert.ok(c.enh.holiday); assert.equal(c.enh.limit, n - 1); assert.equal(c.maxCalls, max0 + n - 1, '뺀 배차 한도는 되돌아간다');
   assert.ok(!buy('cap1', { replace: 'nope' }).ok, '끼운 적 없는 강화는 뺄 수 없다');
 });
+t('계약 교체 경고: 바꾸면 못 싣게 되는 종류·창고 택배를 미리 알려 준다', () => {
+  const g = EMPTY(23); const i = slot(g, 'bulk'); g.contracts = g.contracts.map((c, k) => k === i ? c : null);
+  g.parcels = [P(1, 'normal', 2), P(2, 'fresh', 1, { attrs: ['cold'] })];
+  const l = g.replaceLoss(i, 'fragile0'); assert.ok(!l.any || !l.types.includes('normal'), '파손 계열도 일반을 싣는다');
+  const l2 = g.replaceLoss(i, 'frozen0'); assert.ok(l2.any && l2.types.includes('normal') && l2.parcels.some(p => p.id === 1), '냉동으로 바꾸면 일반을 못 싣는다 — ' + JSON.stringify(l2.types));
+  assert.equal(D.familyOf(g.contracts[i].carrier), 'bulk', '미리보기는 계약을 건드리지 않는다');
+});
 t('휴무 특약: 쉬는 날에도 그 계약만 부를 수 있고, 그날 배차비 ×1.8 · 강화 칸 하나', () => {
   const g = EMPTY(21); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.parcels = [P(1, 'normal', 2)]; const fee0 = g.truckFee(c);

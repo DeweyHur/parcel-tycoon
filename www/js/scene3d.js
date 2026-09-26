@@ -18,7 +18,7 @@ window.Scene3D = (function () {
   // 구역 표지용 도트 아이콘 (픽셀 UI와 결 맞추기 — 이모지 대신 직접 찍는다)
   const SIGN_ICONS = {
     cold: ['X..X..X', '.X.X.X.', '..XXX..', 'XXXXXXX', '..XXX..', '.X.X.X.', 'X..X..X'],
-    frozen: ['X..X..X', '.XXXXX.', '.XXXXX.', 'XXXXXXX', '.XXXXX.', '.XXXXX.', 'X..X..X'],   // 두툼한 얼음 결정 (냉장의 가는 눈송이와 구분)
+    frozen: ['.XXXXXX', 'X....XX', 'XXXXX.X', 'X.X.X.X', 'X...X.X', 'X...XX.', 'XXXXX..'],   // 얼음 큐브 🧊 (냉장은 눈송이 ❄ — 둘이 헷갈리지 않게)
     rain: ['...XXX...', '.XXXXXXX.', 'XXXXXXXXX', 'XXXXXXXXX', '.........', '..X..X..X', '.X..X..X.', 'X..X..X..'],
     box: ['XXXXXXX', 'X..X..X', 'XXXXXXX', 'X.....X', 'X.....X', 'X.....X', 'XXXXXXX'],   // 상자 — 창고 칸 수 간판
   };
