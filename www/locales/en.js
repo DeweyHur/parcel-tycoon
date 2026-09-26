@@ -1479,8 +1479,8 @@
         "desc": "Fresh & produce specialist. Fresh/produce bonus · standard contract"
       },
       "cold1": {
-        "name": "Ice Road",
-        "short": "Ice Road",
+        "name": "Crisp Logis",
+        "short": "Crisp",
         "vehicle": "reefer truck",
         "desc": "Fresh & produce specialist. Fresh/produce bonus · Premium — trucks +1 · cap +1 · fee +20%"
       },
@@ -1491,8 +1491,8 @@
         "desc": "Fresh & produce specialist. Fresh/produce bonus · Elite — trucks +2 · cap +2 · fee +40% · ❆ frozen-capable added"
       },
       "cold3": {
-        "name": "Polar Logis",
-        "short": "Polar",
+        "name": "Farm Direct",
+        "short": "FarmDirect",
         "vehicle": "large reefer",
         "desc": "Fresh & produce specialist. Fresh/produce bonus · Master — trucks +3 · cap +3 · fee +60% · ❆ frozen-capable added · up to size 7"
       },
