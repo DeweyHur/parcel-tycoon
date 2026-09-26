@@ -941,7 +941,8 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .card.poor, .card.na { opacity: .45; }
 .card.poor .price { color: var(--red); }
 /* 타이틀 이어하기: 큰 글씨 한 단어 + 작은 한 줄 */
-.modal.titlecard .title .btn.cta.cont { font-size: 17px; padding-top: 8px; padding-bottom: 8px; }
+/* 이어하기도 아래 버튼들과 같은 폭·모양 — 금색으로 채워 '먼저 누를 것'만 표시 */
+.modal.titlecard .title .btn.cta.cont { display: block; width: 100%; min-width: 0; margin: 24px 0 8px; font-size: 16px; padding: 7px 10px; box-shadow: 3px 3px 0 #6b3c18; }
 .btn.cta.cont .cont-sub { display: block; font-size: 11px; font-weight: 400; color: #6b3c18; margin-top: 2px; white-space: nowrap; }
 
 /* 퍽 장착 칸 — 아이콘 슬롯 */

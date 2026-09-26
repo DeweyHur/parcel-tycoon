@@ -1309,8 +1309,10 @@
       }
       return base;
     }
+    // 사업 규모 0~3: 최근 두 사이클 평균 배송 수익으로 (BIZ_LEVELS)
+    bizLevel() { const h = (this.revHist || []).slice(-2); if (!h.length) return 0; const avg = h.reduce((a, b) => a + b, 0) / h.length; let lv = 0; for (const t of D.BIZ_LEVELS) if (avg >= t) lv++; return lv; }
     _gradeProb(m) {
-      const R = this.rules; m = this.tableMonth(m);
+      const R = this.rules; m = Math.max(this.tableMonth(m), [0, 4, 6, 7][this.bizLevel()] || 0);   // 달력과 사업 규모 중 앞선 쪽
       const p = { ...(D.GRADE_PROB[Math.min(6, m)]) };
       if (m > 6) { p.master = 30; p.expert = 30; p.trusted = 30; p.normal = 10; }
       if (m < R.expertFrom) { p.normal += p.expert + p.master; p.expert = 0; p.master = 0; }
@@ -1880,6 +1882,7 @@
       let closing = 0;
       if (R.closingBonus && this.usage() <= R.closingBonus.usage) { closing = R.closingBonus.amount; this.cash += closing; }
             if (R.erosion) { const cands = this.contracts.filter(c => c && this.startContractIds.includes(c.id) && c.maxCalls > 1); if (cands.length) { const c = this.rng.pick(cands); c.maxCalls--; c.calls = Math.min(c.calls, c.maxCalls); this.say('log.erosion', { name: this.contractName(c) }); } }
+      (this.revHist || (this.revHist = [])).push(ms.revenue);
       const deals = this.bizMode() ? this._settleDeals() : [];
       // 평판: 사고 없이 넘긴 정산은 소문이 좋아지고, 상한까지 채운 채로 넘기면 등급이 오른다
       let repClean = 0, repTierUp = null, repPerks = null;
@@ -2149,6 +2152,13 @@
         const car = D.CARRIERS[carrier]; grade = car.grade;
         const own = ownedFam(fam);
         items.push({ kind: 'contract', carrier, grade, price: Math.round(car.price * R.priceMult), name: car.name, sold: false, hint: f && f.hint || (own ? T('market.switchHint', { name: D.CARRIERS[own.carrier].name }) : null), switchFrom: own ? own.id : null });
+      }
+      // 사업이 커졌으면(규모 1+) 제일 많이 쓰는 계약의 **다음 등급 센터**를 한 장 보장한다 — 무작위 두 장에 안 걸려 업그레이드가 안 뜨는 일이 없게
+      if (this.bizLevel() >= 1 && !this.level) {
+        const main = this.contracts.filter(Boolean).sort((a, b) => (b.delivered || 0) - (a.delivered || 0))
+          .find(c => { const nx = D.centersOf(FAM(c.carrier)).find(k => D.CARRIERS[k].tier === D.CARRIERS[c.carrier].tier + 1 && !D.CARRIERS[k].campaign); return nx && !items.some(it => it.carrier === nx); });
+        if (main) { const nx = D.centersOf(FAM(main.carrier)).find(k => D.CARRIERS[k].tier === D.CARRIERS[main.carrier].tier + 1 && !D.CARRIERS[k].campaign), car = D.CARRIERS[nx];
+          items.push({ kind: 'contract', carrier: nx, grade: car.grade, price: Math.round(car.price * R.priceMult), name: car.name, sold: false, hint: T('market.switchHint', { name: D.CARRIERS[main.carrier].name }), switchFrom: main.id }); }
       }
       // 상시 배차 충전: 배차가 빈 계약마다 '가득 충전' 카드. 정액이라 다 쓰지 않고 충전하면 그만큼 손해
       items.push(...this._refillItems());

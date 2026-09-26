@@ -228,6 +228,13 @@ t('계약 교체 경고: 바꾸면 못 싣게 되는 종류·창고 택배를 �
   const l2 = g.replaceLoss(i, 'frozen0'); assert.ok(l2.any && l2.types.includes('normal') && l2.parcels.some(p => p.id === 1), '냉동으로 바꾸면 일반을 못 싣는다 — ' + JSON.stringify(l2.types));
   assert.equal(D.familyOf(g.contracts[i].carrier), 'bulk', '미리보기는 계약을 건드리지 않는다');
 });
+t('사업 규모: 최근 수익이 크면 마켓 등급표가 앞서고, 주력 계약의 다음 등급 센터가 한 장 보장된다', () => {
+  const g = NG(31); assert.equal(g.bizLevel(), 0);
+  g.revHist = [5000, 5000]; assert.equal(g.bizLevel(), 3); assert.ok(g._gradeProb(1).master > 0, '1사이클이라도 마스터가 나온다');
+  const main = g.contracts.find(Boolean); main.delivered = 999;
+  const items = g._genMarketItems(); const nx = D.centersOf(D.familyOf(main.carrier)).find(k => D.CARRIERS[k].tier === D.CARRIERS[main.carrier].tier + 1);
+  assert.ok(items.some(it => it.kind === 'contract' && it.carrier === nx && it.switchFrom === main.id), '주력 계약 업그레이드 보장 — ' + nx);
+});
 t('휴무 특약: 쉬는 날에도 그 계약만 부를 수 있고, 그날 배차비 ×1.8 · 강화 칸 하나', () => {
   const g = EMPTY(21); const i = slot(g, 'bulk'), c = g.contracts[i];
   g.parcels = [P(1, 'normal', 2)]; const fee0 = g.truckFee(c);

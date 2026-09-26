@@ -250,6 +250,8 @@
       expert:  { cap: 0, calls: 0, fee: 1.0, trust: 0, price: 4.0 },
       master:  { cap: 0, calls: 0, fee: 1.0, trust: 0, price: 7.0, special: true },
     },
+    // 사업 규모(최근 두 사이클 평균 수익)가 이 선을 넘으면 마켓 계약 등급표가 달력보다 앞서 간다 — 돈이 쌓이는데 상위 센터가 안 나오면 쓸 데가 없다
+    BIZ_LEVELS: [2000, 3200, 4500],
     GRADE_PROB: {
       1: { normal: 70, trusted: 30, expert: 0, master: 0 },
       2: { normal: 55, trusted: 40, expert: 5, master: 0 },
