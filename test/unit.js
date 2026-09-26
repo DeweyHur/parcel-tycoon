@@ -353,8 +353,7 @@ t('런 = 나라 달력 × 시작 달 × 길이: 분기 6·반기 12·한 해 24�
   assert.equal(new Game({ seed: 1 }).cfg.scenario, 'kr_spring');
   assert.equal(new Game({ seed: 1, scenario: 'standard' }).cfg.scenario, 'kr_year', '옛 세이브 id 는 새 런으로'); assert.equal(new Game({ seed: 1, scenario: 'peak' }).cfg.scenario, 'kr_spring');
   for (const [id, months, start, mult] of [['kr_spring', 6, 3, 1], ['kr_winter', 6, 12, 1], ['kr_h2', 12, 9, 1.25], ['kr_year', 24, 3, 1.5]]) { const g = new Game({ seed: 1, scenario: id }); assert.equal(g.rules.months, months, id); assert.equal(g.calMonth(1), start, id); assert.equal(g.rules.scoreMult, mult, id); assert.equal(g.rules.calendar, 'kr'); }
-  assert.deepEqual(M.DEFAULT_UNLOCK.scenarios, ['kr_spring']);
-  for (const id in M.SCENARIOS) { const u = M.SCENARIOS[id].unlock; assert.ok(!u || M.ACHIEVEMENTS[u], id + ' 해금 도전과제가 있어야 한다'); }
+    for (const id in M.SCENARIOS) { const u = M.SCENARIOS[id].unlock; assert.ok(!u || M.ACHIEVEMENTS[u], id + ' 해금 도전과제가 있어야 한다'); }
   assert.ok(!M.DIFFICULTIES && !M.DAILY_VARIANTS, '난이도·데일리는 없다');
 });
 t('공휴일은 실제 날짜: 2026 추석 9/24~26 + 앞 닷새 폭주, 2027 설은 일요일 겹침 → 대체공휴일, 3·1절 단일 휴무', () => {
@@ -720,30 +719,27 @@ t('스토리: 비트 문구 키가 ko/en 에 모두 있다', () => {
   for (const id in M.ACHIEVEMENTS) assert.ok(KO.meta.ACHIEVEMENTS[id] && EN.meta.ACHIEVEMENTS[id], id);
   for (const k of ['prep.runWhenSame', 'prep.runWhenNext', 'prep.span.quarter', 'prep.span.half', 'prep.span.year']) assert.ok(KO.ui[k] && EN.ui[k], k);
 });
-t('데모: demoMonths 개월 정산이 끝나면 데모 종료(승리도 패배도 아님), 본편은 그대로 이어진다', () => {
-  const run3 = (extra) => { const g = EMPTY(7, extra); for (let m = 1; m <= 3; m++) { g.turn = D.TURNS_PER_MONTH; g.cash = 5000; g.feesDue = 0; g._endMonth(); assert.equal(g.phase, 'summary', 'month ' + m); if (m < 3) { g.closeSummary(); assert.equal(g.phase, 'market', 'market ' + m); g.closeMarket(); } } return g; };
-  const demo = run3({ demoMonths: 3 });
-  demo.closeSummary();
-  assert.equal(demo.phase, 'over');
-  assert.ok(demo.result.demo, 'result.demo');
-  assert.equal(demo.result.win, false);
-  assert.equal(demo.result.monthsDone, 3);          // 3개월을 채운 것으로 기록
-  assert.ok(demo.result.score > 0, 'score ' + demo.result.score);
-  const full = run3({});
-  full.closeSummary();
-  assert.equal(full.phase, 'market');               // 본편은 4개월차로 이어진다
-  full.closeMarket(); assert.equal(full.month, 4);
-});
-t('데모: 컷이 런 길이보다 길거나 같으면 데모 컷은 동작하지 않는다(분기 런 등)', () => {
-  const g = EMPTY(8, { scenario: 'kr_spring', demoMonths: 6 });
-  assert.equal(g.rules.months, 6);
-  g.month = g.rules.months; g.turn = D.TURNS_PER_MONTH; g.cash = 5000; g.run.delivered = 99; g._endMonth();
-  g.closeSummary();
-  assert.ok(g.phase === 'win' || g.phase === 'over', g.phase);
-  assert.ok(!g.result.demo, '데모 컷이 아니라 시나리오 승패로 끝난다');
+t('계절 이어하기: 봄=캠페인 · 여름부터 앞 계절의 창고를 물려받는다 · 겨울 완주 → 반기·한 해', () => {
+  assert.deepEqual(M.DEFAULT_UNLOCK.scenarios, ['kr_spring', 'kr_summer']);
+  assert.deepEqual(M.FREE_RUNS, ['kr_spring', 'kr_summer']);
+  assert.ok(M.SCENARIOS.kr_spring.campaign);
+  assert.equal(M.SCENARIOS.kr_summer.chainFrom, 'campaign'); assert.equal(M.SCENARIOS.kr_summer.chainNext, 'kr_autumn');
+  assert.equal(M.SCENARIOS.kr_autumn.chainFrom, 'kr_summer'); assert.equal(M.SCENARIOS.kr_winter.chainFrom, 'kr_autumn');
+  assert.deepEqual(M.ACHIEVEMENTS.kr_winter_clear.reward, ['scenario:kr_h1', 'scenario:kr_h2', 'scenario:kr_year']);
+  for (const id of ['kr_h1', 'kr_h2', 'kr_year']) assert.equal(M.SCENARIOS[id].unlock, 'kr_winter_clear');
+  // 물려받은 판: 자금·창고·계약·고객이 그대로, 해도 그대로
+  const carry = { cash: 1777, year: 2027, warehouse: { cap: 40, cold: 8, frozen: 4, xl: 0 }, contracts: [{ carrier: 'bulk0', grade: 'normal', calls: 3, enh: {} }, { carrier: 'cold0', grade: 'normal', calls: 2, enh: {} }], customers: [['anon', 0], ['mart', 1], ['ice', 0]], trust: {}, growth: {}, media: {} };
+  const g = new Game({ seed: 3, scenario: 'kr_summer', carry, year: 2027 });
+  assert.equal(g.cash, 1777); assert.equal(g.warehouse.cap, 40); assert.equal(g.warehouse.frozen, 4); assert.equal(g.year, 2027); assert.equal(g.calMonth(1), 6);
+  assert.deepEqual(g.contracts.filter(Boolean).map(c => c.carrier), ['bulk0', 'cold0']);
+  assert.ok(g.customers.ice && g.customers.mart);
+  assert.ok(!g.level, '여름은 캠페인이 아니다 — 보정 없음'); assert.ok(!g.rules.noBankrupt);
+  // 여름을 넘기면 결과에 다음 계절로 넘길 판이 실린다. 겨울은 다음이 없다
+  g.phase = 'play'; g._win(); assert.ok(g.result.carry && g.result.carry.warehouse && g.result.carry.year === 2027, 'summer carry');
+  const w = new Game({ seed: 3, scenario: 'kr_winter' }); w._win(); assert.equal(w.result.carry, null);
 });
 t('데모: 문구 키가 ko/en 에 모두 있다', () => {
-  for (const k of ['demo.fullOnly', 'demo.cta', 'demo.gateTitle', 'demo.gateBody', 'demo.resultTitle', 'demo.resultHead', 'demo.resultBody', 'demo.endReason', 'demo.soon', 'demo.storySub',
+  for (const k of ['demo.fullOnly', 'demo.cta', 'demo.gateTitle', 'demo.gateBody', 'demo.resultTitle', 'demo.resultHead', 'demo.resultBody', 'demo.soon', 'prep.springTitle', 'prep.springBody', 'prep.springPick', 'prep.springStart', 'prep.chain.kr_spring', 'prep.chain.kr_summer', 'prep.chain.kr_autumn', 'prep.chain.kr_winter', 'prep.chainFresh.kr_summer', 'prep.chainFresh.kr_autumn', 'prep.chainFresh.kr_winter',
     'stat.export', 'stat.import', 'stat.exportHelp', 'stat.importHelp', 'stat.importOk', 'stat.importFail', 'stat.copy', 'stat.copied', 'stat.copyFail', 'stat.importBtn', 'stat.transferNote'])
     assert.ok(KO.ui[k] && EN.ui[k], k);
 });

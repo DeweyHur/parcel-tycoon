@@ -2,7 +2,7 @@
 """단일 파일 웹 빌드: www/ 전체(three.js·폰트·오디오 포함)를 한 HTML로 인라인한다.
   python3 tools/build-web.py            → dist/parcel-tycoon.html (브라우저에서 바로 열기)
   python3 tools/build-web.py --artifact → dist/parcel-tycoon.artifact.html (claude.ai 아티팩트용: doctype/html/head/body 없음)
-  python3 tools/build-web.py --demo     → dist/parcel-tycoon.demo.html (인수인계 3개월까지 · itch.io·웹 배포용)
+  python3 tools/build-web.py --demo     → dist/parcel-tycoon.demo.html (봄·여름까지 무료 · itch.io·웹 배포용)
   --demo 는 js/build.js 의 demo 값을 true 로 바꿔 인라인한다(원본 파일은 건드리지 않는다).
 """
 import base64, re, sys, pathlib

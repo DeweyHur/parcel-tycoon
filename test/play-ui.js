@@ -297,6 +297,9 @@ const say = m => { console.log(m); log.push(m); };
     if (await page.evaluate(() => !!(window.PT && PT.game && PT.game.phase === 'play' && !document.getElementById('modal-root').classList.contains('show')))) break;
     const warn = await page.$('#modal .foot .btn.warn');
     if (warn) { await warn.click(); await page.waitForTimeout(600); continue; }
+    // 봄은 인수인계(캠페인)다 — 자유 런은 여름부터 (캠페인 끝 판이 없으면 기본 창고로 시작)
+    const summer = await page.$('#modal .card[data-id="kr_summer"]:not(.sel)');
+    if (summer) { await summer.click(); await page.waitForTimeout(400); continue; }
     const pri = await page.$('#modal .foot .btn.primary');
     if (pri) { await pri.click(); await page.waitForTimeout(500); continue; }
     break;

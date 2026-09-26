@@ -9,7 +9,7 @@ window.Profile = (function () {
       bigDelivered: 0, bestScore: 0, clearsByCompany: {}, clearsByScenario: {} };
   }
   function fresh() {
-    return { version: 1, license: { full: false, source: 'demo' }, splashSeen: 0, campaign: { level: 1, cleared: 0, name: '' }, unlocked: JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), achievements: {}, stats: emptyStats(), records: {}, recentRuns: [], createdAt: Date.now() };
+    return { version: 1, license: { full: false, source: 'demo' }, splashSeen: 0, campaign: { level: 1, cleared: 0, name: '' }, chain: {}, unlocked: JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), achievements: {}, stats: emptyStats(), records: {}, recentRuns: [], createdAt: Date.now() };
   }
   function load() {
     P = Store.get(KEY);
@@ -34,6 +34,7 @@ window.Profile = (function () {
     P.license = Object.assign({ full: false, source: 'demo' }, P.license);
     if (typeof P.splashSeen !== 'number') P.splashSeen = 0;   // 스플래시 본 횟수 (2회차부터 짧게)
     P.campaign = Object.assign({ level: 1, cleared: 0, name: '' }, P.campaign);   // 캠페인 레벨 진행 (levels.js)
+    if (!P.chain || typeof P.chain !== 'object') P.chain = {};   // 계절 이어하기: 런 id → 그 런의 시작 판 (meta.js chainFrom)
     P.unlocked = Object.assign(JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), P.unlocked);
     for (const k of ['companies', 'perks', 'scenarios']) for (const d of M.DEFAULT_UNLOCK[k]) if (!P.unlocked[k].includes(d)) P.unlocked[k].push(d);
     evaluate(null, null); // 해금 조건이 바뀐 경우(누적·메타) 기존 기록으로 즉시 반영
@@ -51,7 +52,7 @@ window.Profile = (function () {
   function setFull(source) { P.license = { full: true, source: source || 'unknown', at: Date.now() }; save(); return P.license; }
   // 프로필 이동(데모 → 본편, 모바일 → Steam): 코드 문자열로 내보내고 합친다
   function exportCode() {
-    const payload = { v: 1, license: P.license, unlocked: P.unlocked, achievements: P.achievements, stats: P.stats, records: P.records, recentRuns: P.recentRuns.slice(0, 20) };
+    const payload = { v: 1, license: P.license, campaign: P.campaign, chain: P.chain, unlocked: P.unlocked, achievements: P.achievements, stats: P.stats, records: P.records, recentRuns: P.recentRuns.slice(0, 20) };
     const json = JSON.stringify(payload);
     const b64 = typeof btoa !== 'undefined' ? btoa(unescape(encodeURIComponent(json))) : Buffer.from(json, 'utf8').toString('base64');
     return b64.replace(/=+$/, '');
@@ -73,10 +74,24 @@ window.Profile = (function () {
       else if (a && b && typeof a === 'object' && typeof b === 'object') for (const kk in b) if (typeof b[kk] === 'number') a[kk] = Math.max(a[kk] || 0, b[kk]);
     }
     for (const sc in o.records || {}) for (const co in o.records[sc]) setRecord(sc, co, o.records[sc][co].bestScore || 0, o.records[sc][co].bestMonth || 0);
+    // 캠페인·계절 진행: 이쪽이 더 앞서 있으면 그대로 둔다 (데모에서 여름까지 한 판이 본편에서 가을로 이어지게)
+    if (o.campaign && (o.campaign.cleared || 0) > (P.campaign.cleared || 0)) { P.campaign = Object.assign({}, P.campaign, o.campaign); added++; }
+    for (const id in o.chain || {}) if (!P.chain[id]) { P.chain[id] = o.chain[id]; added++; }
     // 접근권은 내려가지 않는다(본편 빌드에서 데모 코드를 넣어도 유지)
     if (o.license && o.license.full && !hasFull()) P.license = Object.assign({}, o.license, { imported: true });
     save(); evaluate(null, null); save();
     return { ok: true, added };
+  }
+  // 계절 런의 시작 판. 봄(캠페인)을 끝낸 창고가 여름으로, 여름을 넘긴 창고가 가을로 — 없으면 null(기본 창고로 시작).
+  // 몇 번을 다시 해도 같은 시작 판에서 출발한다. 앞 계절을 다시 넘기면 그 판으로 바뀐다.
+  function chainStart(id) {
+    const sc = M.SCENARIOS[id]; if (!sc || !sc.chainFrom) return null;
+    let c = null;
+    if (sc.chainFrom === 'campaign') {
+      const LV = typeof window !== 'undefined' && window.LEVELS, cp = P.campaign || {};
+      if (LV && (cp.cleared || 0) >= LV.LAST) c = (cp.carryAt && cp.carryAt[LV.LAST + 1]) || null;   // 5장을 끝낸 판만 — 중간 장의 판(carry)은 여름이 아니다
+    } else c = P.chain[id] || null;
+    return c ? JSON.parse(JSON.stringify(c)) : null;
   }
   function perkSlots() { return P.unlocked.perkSlots || 1; }
 
@@ -131,6 +146,9 @@ window.Profile = (function () {
       p.clears++;
       p.clearsByCompany[result.company] = (p.clearsByCompany[result.company] || 0) + 1;
       p.clearsByScenario[result.scenario] = (p.clearsByScenario[result.scenario] || 0) + 1;
+      // 계절을 넘겼으면 이 창고가 다음 계절의 시작 판이 된다
+      const sc = M.SCENARIOS[result.scenario];
+      if (sc && sc.chainNext && result.carry) P.chain[sc.chainNext] = result.carry;
     }
     setRecord(result.scenario, result.company, result.score, result.monthsDone);
     P.recentRuns.unshift({ date: new Date().toISOString().slice(0, 10), score: result.score, win: result.win, demo: !!result.demo, month: result.month, turn: result.turn, cash: result.cash, scenario: result.scenario, company: result.company, level: result.level || 0, perks: result.perks, reason: result.reason });
@@ -140,5 +158,5 @@ window.Profile = (function () {
     return got;
   }
   function reset() { P = fresh(); save(); }
-  return { load, get, save, isUnlocked, perkSlots, evaluate, recordRun, reset, hasFull, setFull, exportCode, importCode, KEY };
+  return { load, get, save, chainStart, isUnlocked, perkSlots, evaluate, recordRun, reset, hasFull, setFull, exportCode, importCode, KEY };
 })();

@@ -238,24 +238,30 @@
   // ----- 런 = 나라 달력 × 시작 달 × 길이 -----
   // 테마 시나리오(성수기·폭염·파업…)는 걷어냈다. 이제 런은 "어느 나라의 달력에서, 언제 시작해, 얼마나 굴리는가"로만 정해진다.
   // 명절·공휴일·계절은 달력(CALENDARS)이 실제 날짜로 넣어 주므로, 같은 석 달이라도 시작 달이 다르면 다른 판이 된다.
-  // months 는 사이클(반월) 수. 해금은 차례로: 봄 → 여름 → 가을 → 겨울 → (사계절 다 돌면) 상·하반기 → (반기 하나 돌면) 한 해.
-  // 나라가 늘면 같은 틀로 kr_ 대신 us_/jp_ 를 붙인다 (달력만 끼우면 된다).
+  // months 는 사이클(반월) 수. 나라가 늘면 같은 틀로 kr_ 대신 us_/jp_ 를 붙인다 (달력만 끼우면 된다).
+  //
+  // 첫 해는 한 창고의 이야기로 이어진다 (STORY_TUTORIAL_DESIGN 부록 BB):
+  //   봄   = 캠페인(인수인계) 그 자체. 고르면 박 반장과 서장부터 다시 한다(campaign: true).
+  //   여름 = 캠페인을 끝낸 창고를 그대로 물려받아 혼자 굴린다(chainFrom: 'campaign').
+  //   가을 = 여름을 완주한 창고, 겨울 = 가을을 완주한 창고 — 몇 번이든 다시 할 수 있고, 매번 그 시작 판에서 출발한다.
+  //   겨울까지 넘기면 반기·한 해 같은 다른 런이 열린다.
+  // 무료판(BUILD.demo)은 FREE_RUNS(봄·여름)까지. 여름을 넘기면 본편 안내로 간다.
   const SPANS = { quarter: { months: 6, scoreMult: 1 }, half: { months: 12, scoreMult: 1.25 }, year: { months: 24, scoreMult: 1.5 } };
-  const RUN = (country, span, startMonth, icon, unlock) => ({ country, span, icon, months: SPANS[span].months, mods: { calendar: country, startMonth, scoreMult: SPANS[span].scoreMult }, unlock });
+  const RUN = (country, span, startMonth, icon, unlock, extra) => Object.assign({ country, span, icon, months: SPANS[span].months, mods: { calendar: country, startMonth, scoreMult: SPANS[span].scoreMult }, unlock }, extra || {});
   const SCENARIOS = {
-    kr_spring: RUN('kr', 'quarter', 3,  '🌸', null),
-    kr_summer: RUN('kr', 'quarter', 6,  '☔', 'kr_spring_clear'),
-    kr_autumn: RUN('kr', 'quarter', 9,  '🎑', 'kr_summer_clear'),
-    kr_winter: RUN('kr', 'quarter', 12, '❄', 'kr_autumn_clear'),
-    kr_h1:     RUN('kr', 'half',    3,  '🌱', 'kr_seasons'),
-    kr_h2:     RUN('kr', 'half',    9,  '🍂', 'kr_seasons'),
-    kr_year:   RUN('kr', 'year',    3,  '📅', 'kr_half'),
+    kr_spring: RUN('kr', 'quarter', 3,  '🌸', null, { campaign: true }),
+    kr_summer: RUN('kr', 'quarter', 6,  '☔', null, { chainFrom: 'campaign', chainNext: 'kr_autumn' }),
+    kr_autumn: RUN('kr', 'quarter', 9,  '🎑', 'kr_summer_clear', { chainFrom: 'kr_summer', chainNext: 'kr_winter' }),
+    kr_winter: RUN('kr', 'quarter', 12, '❄', 'kr_autumn_clear', { chainFrom: 'kr_autumn' }),
+    kr_h1:     RUN('kr', 'half',    3,  '🌱', 'kr_winter_clear'),
+    kr_h2:     RUN('kr', 'half',    9,  '🍂', 'kr_winter_clear'),
+    kr_year:   RUN('kr', 'year',    3,  '📅', 'kr_winter_clear'),
   };
+  const FREE_RUNS = ['kr_spring', 'kr_summer'];
   const DEFAULT_SCENARIO = 'kr_spring';
 
   // 도전과제: kind = run(런 중 즉시) | end(런 종료 시, 승리 필요 여부 needWin) | cum(누적) | meta(해금 상태)
   // check(s, p, r): s=game.stats, p=profile.stats, r=result(런 종료 시)
-  const KR_Q = ['kr_spring', 'kr_summer', 'kr_autumn', 'kr_winter'];
   const ACHIEVEMENTS = {
     // 회사 해금 — 1단계(하다 보면) → 2단계(누적 특화) → 3단계(도전)
     rookie:       { kind: 'cum', rewardType: 'company', reward: 'quick', check: (s, p) => p.runs >= 3, prog: p => [p.runs, 3] },
@@ -272,11 +278,9 @@
     unbreakable:  { kind: 'run', rewardType: 'none', check: s => s.onTimeByType.fragile >= 12 },
     patience:     { kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => s.calls / Math.max(1, r.monthsDone) <= 4 },
     // 런(시나리오) 해금 — 한국 달력을 차례로 연다
-    kr_spring_clear:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'kr_summer', check: (s, p, r) => r.scenario === 'kr_spring' },
     kr_summer_clear:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'kr_autumn', check: (s, p, r) => r.scenario === 'kr_summer' },
     kr_autumn_clear:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'kr_winter', check: (s, p, r) => r.scenario === 'kr_autumn' },
-    kr_seasons:   { kind: 'meta', rewardType: 'multi', reward: ['scenario:kr_h1', 'scenario:kr_h2'], check: (s, p) => KR_Q.every(k => p.clearsByScenario[k]), prog: p => [KR_Q.filter(k => p.clearsByScenario[k]).length, 4] },
-    kr_half:      { kind: 'meta', rewardType: 'scenario', reward: 'kr_year', check: (s, p) => !!(p.clearsByScenario.kr_h1 || p.clearsByScenario.kr_h2) },
+    kr_winter_clear:{ kind: 'end', needWin: true, rewardType: 'multi', reward: ['scenario:kr_h1', 'scenario:kr_h2', 'scenario:kr_year'], check: (s, p, r) => r.scenario === 'kr_winter' },
     kr_year_clear:{ kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.scenario === 'kr_year' },
     // 기록용
     cust_l3:      { kind: 'run', rewardType: 'none', check: s => (s.customerL3 || 0) >= 1 },
@@ -318,9 +322,11 @@
     trust_badge:  { kind: 'run', rewardType: 'none', check: s => s.maxTrustL3Simul >= 2 },
     millionaire:  { kind: 'run', rewardType: 'none', check: s => s.maxCash >= 2000 },
     all_companies:{ kind: 'meta', rewardType: 'none', check: (s, p) => Object.keys(p.clearsByCompany || {}).length >= 9, prog: p => [Object.keys(p.clearsByCompany || {}).length, 9] },
-    all_scenarios:{ kind: 'meta', rewardType: 'none', check: (s, p) => Object.keys(SCENARIOS).every(k => p.clearsByScenario[k]), prog: p => [Object.keys(SCENARIOS).filter(k => p.clearsByScenario[k]).length, Object.keys(SCENARIOS).length] },
+    all_scenarios:{ kind: 'meta', rewardType: 'none', check: (s, p) => soloRuns().every(k => p.clearsByScenario[k]), prog: p => [soloRuns().filter(k => p.clearsByScenario[k]).length, soloRuns().length] },
   };
 
-  const META = { CALENDARS, CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, DEAL, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, SPANS, DEFAULT_SCENARIO, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: [DEFAULT_SCENARIO], perkSlots: 1 } };
+  // 캠페인 런(봄)은 완주 기록이 clearsByScenario 에 남지 않는다 — '전 런 완주'는 자유 런만 센다
+  function soloRuns() { return Object.keys(SCENARIOS).filter(k => !SCENARIOS[k].campaign); }
+  const META = { CALENDARS, CUSTOMERS, CUSTOMER_ITEMS, CUSTOMER_SLOTS, STORAGE_KINDS, INSURERS, PREMIUM_STEPS, INS_ITEMS, WEATHER, WEATHER_BY_SEASON, CUSTOMER_LEVELS, CUSTOMER_VOLUME, CUSTOMER_EXTRA, CUSTOMER_BONUS, DEAL, COMPANIES, PERKS, PERK_FAMILIES, SCENARIOS, SPANS, FREE_RUNS, DEFAULT_SCENARIO, ACHIEVEMENTS, DEFAULT_UNLOCK: { companies: ['local'], perks: ['longdeal', 'compact', 'skip', 'insure'], scenarios: ['kr_spring', 'kr_summer'], perkSlots: 1 } };
   if (typeof module !== 'undefined') module.exports = META; else root.META = META;
 })(typeof window !== 'undefined' ? window : globalThis);

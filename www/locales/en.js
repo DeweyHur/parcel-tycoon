@@ -1321,17 +1321,28 @@
     'demo.storySub': 'story tutorial · demo covers {n} months',
     'demo.cta': 'About the full game',
     'demo.gateTitle': 'This is the demo',
-    'demo.gateBody': 'The demo covers the first {n} months of the handover. The full game lets you pick a quarter, a half-year or a full year — peak season, holiday rushes and rising costs included.',
-    'demo.rowMonths': 'Full game year',
+    'demo.gateBody': 'The free version covers spring (the handover) and summer. The full game carries the same warehouse on into autumn (Chuseok) and winter (year-end and Seollal); get through winter and the half-year and full-year runs open.',
+    'demo.rowMonths': 'Full-game runs',
     'demo.rowScenarios': 'Runs',
     'demo.rowCompanies': 'Companies',
     'demo.rowPerks': 'Perks',
     'demo.keepProfile': 'Achievements and records from the demo carry over — copy them with "Export profile" on the records screen.',
     'demo.soon': 'Coming soon.',
-    'demo.resultTitle': 'Probation over',
-    'demo.resultHead': 'End of the demo',
-    'demo.resultBody': 'You lasted {n} months. The full game takes the same warehouse through a quarter, a half-year or a full year.',
+    'demo.resultTitle': 'Summer survived',
+    'demo.resultHead': 'End of the free version',
+    'demo.resultBody': 'Your warehouse is saved. Carry it on into autumn and winter in the full game.',
     'demo.endReason': 'Demo ends here — you ran the warehouse for {n} months',
+    'prep.springStart': 'Start',
+    'prep.springPick': 'Start from which chapter?',
+    'prep.springBody': 'Play it again with Foreman Park. The warehouse you finish with becomes summer\'s starting point.',
+    'prep.chain.kr_spring': '📖 The handover with Foreman Park — from the prologue',
+    'prep.chain.kr_summer': '🏠 The warehouse you took over · on your own now',
+    'prep.chain.kr_autumn': '🏠 The warehouse that got through summer',
+    'prep.chain.kr_winter': '🏠 The warehouse that got through autumn',
+    'prep.chainFresh.kr_summer': '🏠 Default warehouse (finish the handover to carry yours over)',
+    'prep.chainFresh.kr_autumn': '🏠 Default warehouse (get through summer to carry yours over)',
+    'prep.chainFresh.kr_winter': '🏠 Default warehouse (get through autumn to carry yours over)',
+    'prep.springTitle': 'Spring — the handover',
     'stat.export': 'Export profile',
     'stat.import': 'Import profile',
     'stat.transferNote': 'Use this to carry unlocks and records from the demo to the full game, or to another device.',
@@ -2166,19 +2177,19 @@
     "SCENARIOS": {
       "kr_spring": {
         "name": "Spring (Mar–May)",
-        "desc": "Start in the March moving season and run to Family Month in May. Carriers rest on Mar 1, Children's Day and Buddha's Birthday. Your first three months"
+        "desc": "The handover with Foreman Park, from the prologue again. The warehouse you finish with carries into summer"
       },
       "kr_summer": {
         "name": "Summer (Jun–Aug)",
-        "desc": "Monsoon and heatwave. Outdoor stock gets wet, fresh goods spoil — no surviving without cold storage. Memorial Day and Liberation Day off"
+        "desc": "The warehouse you finished spring with — on your own now. Monsoon and heatwave: outdoor stock gets wet, fresh goods spoil. Memorial Day and Liberation Day off"
       },
       "kr_autumn": {
         "name": "Autumn (Sep–Nov)",
-        "desc": "Five days before Chuseok arrivals hit ×1.6 with deadlines one day shorter, then three holiday days with no trucks. Then Foundation Day, Hangul Day and the November sale"
+        "desc": "The warehouse that made it through summer. Five days before Chuseok arrivals hit ×1.6 with deadlines one day shorter, then three holiday days with no trucks. The November sale too"
       },
       "kr_winter": {
         "name": "Winter (Dec–Feb)",
-        "desc": "Year-end volume ×1.4, Christmas and New Year off, blizzards, and the Seollal holiday in February. The tightest three months of the year"
+        "desc": "The warehouse that made it through autumn. Year-end volume ×1.4, Christmas and New Year off, blizzards, and Seollal in February. The tightest three months of the year"
       },
       "kr_h1": {
         "name": "First half (Mar–Aug)",
@@ -2390,9 +2401,9 @@
         "name": "Every Run",
         "desc": "Finish every run at least once"
       },
-      "kr_spring_clear": {
-        "name": "Through Spring",
-        "desc": "Finish Spring (Mar–May) → unlocks Summer"
+      "kr_winter_clear": {
+        "name": "Through the Winter",
+        "desc": "Finish Winter (Dec–Feb) → unlocks First half, Second half and Full year"
       },
       "kr_summer_clear": {
         "name": "Through Summer",
@@ -2401,14 +2412,6 @@
       "kr_autumn_clear": {
         "name": "Through Autumn",
         "desc": "Finish Autumn (Sep–Nov) → unlocks Winter"
-      },
-      "kr_seasons": {
-        "name": "Four Seasons",
-        "desc": "Finish all four Korean quarter runs → unlocks both half-year runs"
-      },
-      "kr_half": {
-        "name": "Half-Year Boss",
-        "desc": "Finish either half-year run → unlocks Full Year"
       },
       "kr_year_clear": {
         "name": "Full Lap",

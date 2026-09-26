@@ -231,6 +231,7 @@
     carryState() {
       return {
         cash: this.cash,
+        year: this.year,   // 계절을 이어 갈 때(여름 → 가을 → 겨울) 같은 해의 달력으로 이어지게
         warehouse: Object.assign({ cap: this.warehouse.cap, cold: this.warehouse.cold, frozen: this.warehouse.frozen, xl: this.warehouse.xl || 0, rackCap: this.warehouse.rackCap || 0, mezzCap: this.warehouse.mezzCap || 0 },
           Object.fromEntries(Object.keys(D.FACILITIES).filter(f => this.warehouse[f]).map(f => [f, true]))),   // 산 시설도 넘긴다 — 다음 장에서 랙을 또 팔면 안 된다
         contracts: this.contracts.filter(Boolean).map(c => ({ carrier: c.carrier, grade: c.grade, calls: c.calls, enh: { ...c.enh } })),
@@ -1917,8 +1918,6 @@
     }
     closeSummary() {
       if (this.phase !== 'summary') return false;
-      const dm = this.cfg.demoMonths || 0;
-      if (dm && this.month >= dm && this.month < this.rules.months) return this._finishDemo();
       if (!this.shows('market')) {                                   // 마켓이 열리기 전(서장)엔 정산 다음이 바로 다음 사이클
         if (this.month >= this.rules.months) return this._finish();
         this._startMonth(this.month + 1); return true;
@@ -1933,14 +1932,6 @@
       return true;
     }
     _finish() { return this._win(); }
-    // 데모 종료: 승리도 패배도 아니다(win false, demo true). 본편에서 이어지는 지점.
-    _finishDemo() {
-      this.phase = 'over';
-      this.result = this._makeResult(false, MSG('demo.endReason', { n: this.monthIndex() }), this.month);
-      this.result.demo = true;
-      this.say('demo.endReason', { n: this.monthIndex() });
-      return true;
-    }
     // rules.months 는 사이클 수다. 사람에게 보일 '개월'은 여기로 환산한다
     runMonths() { return Math.ceil(this.rules.months / D.CYCLES_PER_MONTH); }
     _gameOver(reason) {
@@ -1962,7 +1953,7 @@
       // 장 리포트(박 반장)가 쓰는 숫자 — 처리·정시·반송·파손
       const sum = o => Object.keys(o).reduce((a, k) => a + o[k], 0);
       const onTimeCount = sum(this.stats.onTimeByType), deliveredCount = sum(this.stats.deliveredByType);
-      return { win, demo: false, story: !!this.cfg.scripted, level: this.cfg.level || 0, carry: this.cfg.level ? this.carryState() : null, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
+      return { win, demo: false, story: !!this.cfg.scripted, level: this.cfg.level || 0, carry: (this.cfg.level || (this.scenario && this.scenario.chainNext)) ? this.carryState() : null, reason, score, month: this.month, turn: this.turn, monthsDone, cash: this.cash, rep: this.rep, repTier: this.repTierId(), seed: this.seed,
         onTimeCount, deliveredCount, returned: this.stats.returned || 0, broken: this.stats.broken || 0,
         scenario: this.cfg.scenario, company: this.cfg.company, perks: this.perks.slice(), ...this.run };
     }
