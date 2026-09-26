@@ -65,6 +65,9 @@
     // 광고 매체 — 마켓에서 계약·강화하고, 플레이 중 📣 로 가진 매체 하나를 골라 집행한다(보름에 한 번).
     // 집행하면 동네에 이름이 알려져 평판이 오른다(rep). 레벨 = 보름에 집행할 수 있는 횟수(배차처럼 파란 눈금). 한 번의 건수·집행비는 매체마다 고정. mix: 그 매체가 끌어오는 종류 가중(월별 비율에 곱한다 — 평판 문은 그대로)
     // 전단지는 처음부터 가진다. 버스·옥외는 대형을 더 부르지만 대형은 평판(동네 소문)이 열어야 온다
+    // 자유 런은 매체를 '보유'하지 않는다 — 마켓에서 1회성 캠페인권을 산다(ticketPrice ≈ 집행비 ×1.5, 산 값에 집행비 포함).
+    // 캠페인 물량이나 캠페인이 도는 동안의 반송은 평판 벌점이 AD_RETURN_PEN 만큼 더 붙는다(남용 방지)
+    AD_TICKET_MULT: 1.5, AD_RETURN_PEN: 2,
     AD_MEDIA: {
       flyer: { icon: '📰', rep: 1, price: 0,   per: 4,  cost: 40,  days: 2, max: 4, upPrice: 70,  mix: { normal: 2 } },
       sns:   { icon: '📱', rep: 1, price: 120, per: 6,  cost: 70,  days: 2, max: 4, upPrice: 100, mix: { fresh: 2.5, produce: 2 } },
@@ -252,6 +255,8 @@
     },
     // 사업 규모(최근 두 사이클 평균 수익)가 이 선을 넘으면 마켓 계약 등급표가 달력보다 앞서 간다 — 돈이 쌓이는데 상위 센터가 안 나오면 쓸 데가 없다
     BIZ_LEVELS: [2000, 3200, 4500],
+    // 계절 인계(가을·겨울 시작): 앞 계절 돈의 share 만, [min, max] 안에서. 창고·계약 등급은 여름 시작으로 되돌린다 (ui.js seasonHandover)
+    SEASON_CARRY: { share: 0.25, min: 400, max: 1500 },
     GRADE_PROB: {
       1: { normal: 70, trusted: 30, expert: 0, master: 0 },
       2: { normal: 55, trusted: 40, expert: 5, master: 0 },
@@ -291,10 +296,10 @@
       // 창고 확장 — 땅은 그대로다. 같은 건물 안에 선반 랙을 세우고, 복층을 올리고, 마지막에 옆 칸을 빌려 벽을 튼다.
       // 랙·복층은 **따로 떨어진 칸**이다: 한 택배는 한 칸에 통째로 들어간다(4칸짜리를 바닥 반·랙 반으로 나눠 두지 않는다). area → D.AREAS
       expand1: { price: 160, upkeep: 15, cap: 8,  area: 'rack' },                          // 선반 랙 — 작은 짐(크기 2 이하)만
-      expand2: { price: 320, upkeep: 35, cap: 12, area: 'mezz', requires: 'expand1' },     // 복층 — 크기 4 이하
-      expand3: { price: 640, upkeep: 70, cap: 16, requires: 'expand2' },                    // 옆 칸 임대 — 바닥이 넓어진다
+      expand2: { price: 480, upkeep: 35, cap: 12, area: 'mezz', requires: 'expand1' },     // 확장값은 ×3씩 — 칸이 늘수록 기하급수로 비싸다(유저: 70칸을 너무 쉽게 썼다)     // 복층 — 크기 4 이하
+      expand3: { price: 1440, upkeep: 70, cap: 16, requires: 'expand2' },                    // 옆 칸 임대 — 바닥이 넓어진다
       cold1:   { price: 140, upkeep: 15, cold: 4 },
-      cold2:   { price: 300, upkeep: 35, cold: 6, requires: 'cold1' },
+      cold2:   { price: 420, upkeep: 35, cold: 6, requires: 'cold1' },
       yard:    { price: 180, upkeep: 10, xl: 1 },
       freezer1: { price: 220, upkeep: 25, frozen: 4 },
       vent:    { price: 150, upkeep: 10, vent: true },

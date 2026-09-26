@@ -119,6 +119,7 @@
       this.mediaRuns = { m: 0, used: {} };    // 이번 사이클에 매체별로 집행한 횟수 (사이클이 바뀌면 다시 찬다)
       this.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0, automation: 0, branding: 0, coldchain: 0 }, (cfg.carry && cfg.carry.growth) || {});
       this.media = Object.assign({ flyer: 1 }, (cfg.carry && cfg.carry.media) || {});   // 광고 매체 → 레벨. 전단지는 처음부터
+      this.adTickets = { flyer: 1 };   // 자유 런: 전단지 한 장으로 시작
       this.monthStats = null;
       this.run = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, discarded: 0 };
       this.loadChain = 0;
@@ -930,13 +931,16 @@
     // ----- 광고 매체 -----
     mediaPlan(id) {
       const A = D.AD_MEDIA[id]; if (!A) return null;
+      if (this.adTicketMode()) { const n = (this.adTickets || {})[id] || 0; return { id, level: n > 0 ? 1 : 0, owned: n > 0, icon: A.icon, parcels: A.per, days: A.days, cost: 0, max: n, runs: n, left: n, next: null, ticket: true }; }
       const lv = (this.media && this.media[id]) || 0, L = Math.max(1, lv);
       const runs = lv, used = this.mediaRuns && this.mediaRuns.m === this.month ? (this.mediaRuns.used[id] || 0) : 0;
       return { id, level: lv, owned: lv > 0, icon: A.icon, parcels: A.per, days: A.days, cost: A.cost, max: A.max, runs, left: Math.max(0, runs - used),
         next: lv > 0 && lv < A.max ? { runs: L + 1 } : null };
     }
     mediaScore() { return Math.max(0, Object.values(this.media || {}).reduce((a, b) => a + b, 0) - 1); }
-    ownedMedia() { return Object.keys(D.AD_MEDIA).filter(id => (this.media || {})[id] > 0); }
+    // 자유 런(레벨 밖): 캠페인은 1회성 권(adTickets). 스토리 장은 예전처럼 매체 레벨(보름마다 다시 참)
+    adTicketMode() { return !this.level; }
+    ownedMedia() { if (this.adTicketMode()) return Object.keys(D.AD_MEDIA).filter(id => ((this.adTickets || {})[id] || 0) > 0); return Object.keys(D.AD_MEDIA).filter(id => (this.media || {})[id] > 0); }
     // 캠페인(광고 집행) 계획. id 를 안 주면 가진 매체 중 첫째(전단지) — 스토리·옛 호출과 맞춘다
     // 겹친 캠페인은 효과가 반감된다 — 아직 끝나지 않은(물량이 들어오는 중인) 캠페인 수만큼 ½ 씩. 끝난 뒤에 다시 하면 온전하다.
     // 같은 날들에 광고를 몰아 부어 창고를 억지로 채우는 것을 막는다 (비용은 그대로)
@@ -967,7 +971,8 @@
       this.campaignCycle = this.month;
       if (!this.mediaRuns || this.mediaRuns.m !== this.month) this.mediaRuns = { m: this.month, used: {} };
       this.mediaRuns.used[p.id] = (this.mediaRuns.used[p.id] || 0) + 1;
-      let n = 0; for (const x of roll) for (const sp of x.specs) { this.schedule[x.slot].push(sp); n++; }
+      if (this.adTicketMode()) this.adTickets[p.id] = Math.max(0, (this.adTickets[p.id] || 0) - 1);   // 권 한 장을 쓴다
+      let n = 0; for (const x of roll) for (const sp of x.specs) { sp.ad = true; this.schedule[x.slot].push(sp); n++; }
       this.campaignRuns = (this.campaignRuns || []).filter(r => r.m === this.month && r.end > this.turn);
       this.campaignRuns.push({ m: this.month, end: this.turn + p.days, media: p.id });
       const rg = p.rep; if (rg) this.addRep(rg, MSG('why.repAd'));
@@ -1498,7 +1503,7 @@
       reward = Math.round(reward * (1 + ((this.growth && this.growth.branding) || 0) * D.GROWTH.branding.reward));
       if (spec.rewardDelta && spec.rewardDelta[spec.type]) reward += spec.rewardDelta[spec.type];
       { const dl = this.bizMode() && customer !== 'anon' && this.dealFor(customer); if (dl) reward = Math.round(reward * dl.rate); }   // 계약 단가
-      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, rush: !!spec.rush, attrs, customer,
+      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, rush: !!spec.rush, ad: !!spec.ad, attrs, customer,
         deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1,
         // 첫 사이클에는 기한을 붙이지 않는다 — '차를 꽉 채워 보낸다'를 먼저 익히고, 기한은 그 다음에 배운다 (levels.js noDeadlineCycles)
         noDeadline: this.month <= (R.noDeadlineCycles || 0) && !spec.rush };
@@ -1800,7 +1805,8 @@
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.monthStats.returned++; this.stats.returned++;
         if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push(MSG('r.returnedInsured')); this.emit('returned', { parcel: p }); }
-        else { const ns = M.INSURERS[this.insurer].noReturnStress; if (!ns) pen += 2; reasons.push(MSG('r.returned', { short: D.PARCEL_TYPES[p.type].short, pen: ns ? '' : ' +2' })); this.emit('returned', { parcel: p }); this._claim(p, MSG('why.returned'), 'returned'); }
+        else { const ns = M.INSURERS[this.insurer].noReturnStress, adPen = this.adTicketMode() && (p.ad || this.campaignStack() > 0) ? D.AD_RETURN_PEN : 0; const rp = (ns ? 0 : 2) + adPen; pen += rp;   // 캠페인 물량·캠페인 중 반송은 벌점이 더 크다
+          reasons.push(MSG('r.returned', { short: D.PARCEL_TYPES[p.type].short, pen: rp ? ` +${rp}` : '' })); this.emit('returned', { parcel: p }); this._claim(p, MSG('why.returned'), 'returned'); }
       }
       this._assignCold();
       pen += this._theftRoll(reasons);
@@ -2101,6 +2107,13 @@
     // 광고 매체(새 계약 1 · 강화 1)와 성장 투자(D.GROWTH_OFFERS 개). 투자가 열린 판에서만
     _adAndGrowthItems(mult) {
       const out = []; if (!this.shows('invest') || !this.campaignOpen()) return out;
+      if (this.adTicketMode()) {
+        // 1회성 캠페인권 두 장(서로 다른 매체). 값에 집행비가 들어 있다
+        for (const id of this.rng.shuffle(Object.keys(D.AD_MEDIA)).slice(0, 2)) out.push({ kind: 'adTicket', media: id, price: Math.round(D.AD_MEDIA[id].cost * D.AD_TICKET_MULT * mult), name: T('media.ticket', { name: T('media.' + id) }), sold: false });
+        const kinds = ['fleet', 'automation', 'branding'].filter(k => { const pl = this.growthPlan(k); return pl && pl.cost != null && !pl.locked; });
+        for (const k of this.rng.shuffle(kinds).slice(0, D.GROWTH_OFFERS)) { const pl = this.growthPlan(k); out.push({ kind: 'growth', growth: k, price: pl.cost, name: T('growth.' + k) + ' Lv.' + (pl.level + 1), sold: false }); }
+        return out;
+      }
       const fresh = Object.keys(D.AD_MEDIA).filter(id => !((this.media || {})[id] > 0));
       if (fresh.length) { const id = this.rng.pick(fresh); out.push({ kind: 'media', media: id, price: Math.round(D.AD_MEDIA[id].price * mult), name: T('media.' + id), sold: false }); }
       const up = this.ownedMedia().filter(id => this.media[id] < D.AD_MEDIA[id].max).sort((a, b) => this.media[a] - this.media[b]);
@@ -2315,6 +2328,10 @@
         if (this.customerCount() >= M.CUSTOMER_SLOTS) return { ok: false, msg: T('err.customerMax', { n: M.CUSTOMER_SLOTS }) };
         if (!this.addCustomer(it.customer)) return { ok: false, msg: T('err.customerDup') };
         this.say('log.buyCustomer', { name: M.CUSTOMERS[it.customer].name, price });
+      } else if (it.kind === 'adTicket') {
+        if (this.cash < price) return { ok: false, msg: T('err.noCash') };
+        this.adTickets = this.adTickets || {}; this.adTickets[it.media] = (this.adTickets[it.media] || 0) + 1;
+        this.say('log.buyItem', { name: it.name, price });
       } else if (it.kind === 'media' || it.kind === 'mediaUp') {
         if (this.cash < price) return { ok: false, msg: T('err.noCash') };
         const lv = (this.media[it.media] || 0);
@@ -2390,7 +2407,7 @@
       if (g.monthStats) for (const k of ['returned', 'stolen', 'broken']) if (g.monthStats[k] == null) g.monthStats[k] = 0;
       if (g.monthStats) { if (g.monthStats.missionEarned == null) g.monthStats.missionEarned = g.monthStats.revenue || 0; if (g.monthStats.missionRank == null) g.monthStats.missionRank = 0; if (g.monthStats.missionBonus == null) g.monthStats.missionBonus = 0; if (!g.monthStats.missionTarget) g.monthStats.missionTarget = g._missionTarget(g.schedule); }
       if (!g.pendingRevenue) g.pendingRevenue = []; if (g.feesDue == null) g.feesDue = 0; if (g.debt == null) g.debt = 0; if (g.totalTurn == null) g.totalTurn = (g.month - 1) * D.TURNS_PER_MONTH + g.turn;
-      if (!g.deals) g.deals = []; if (!g.relations) g.relations = {};
+      if (!g.deals) g.deals = []; if (!g.relations) g.relations = {}; if (!g.adTickets) g.adTickets = { flyer: 1 };
       if (!g.customers) { g._initCustomers(); for (const p of g.parcels) if (!p.customer) p.customer = 'anon'; }
       for (const id in g.customers) { const c = g.customers[id]; if (!c.total) c.total = { delivered: 0, revenue: 0, claims: 0, discarded: 0 }; if (!c.month) c.month = g._emptyCustMonth(); }
       if (g.monthStats && g.monthStats.claims == null) g.monthStats.claims = 0;

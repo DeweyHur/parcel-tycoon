@@ -147,7 +147,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   for (let i = 0; i < 10; i++) { if (await page.$('#t-rank')) break; await page.mouse.click(200, 400); await page.waitForTimeout(300); }
   await page.click('#t-rank'); await page.waitForTimeout(800);
   t = await modalText(page);
-  ok('순위표: 계절 탭 셋 · 1위 한길택배 · 내 줄 강조', /여름/.test(t) && /가을/.test(t) && /겨울/.test(t) && !/🌸/.test(t) && /1한길택배99999점/.test(t) && (await page.$$('#lb-list .lbrow.me')).length === 1, t.slice(0, 120));
+  ok('순위표: 계절 탭 넷(봄 포함) · 1위 한길택배 · 내 줄 강조', /여름/.test(t) && /가을/.test(t) && /겨울/.test(t) && /🌸/.test(t) && /1한길택배99999점/.test(t) && (await page.$$('#lb-list .lbrow.me')).length === 1, t.slice(0, 120));
   await page.screenshot({ path: `${OUT}/runs-07-rank.png` });
   console.log(`\n에러: ${errors.length ? errors.join('\n') : '없음'}`);
   console.log(fail.length ? `\n실패 ${fail.length}건:\n${fail.join('\n')}` : `\n전부 통과 (${pass.length})`);

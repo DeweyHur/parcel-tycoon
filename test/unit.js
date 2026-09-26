@@ -27,8 +27,8 @@ t('실시간 성장 투자: 홍보는 캠페인 크기, 트럭은 배차, 창고
   const fresh = g._makeContract('bulk1'); assert.ok(fresh.maxCalls >= D.CARRIERS.bulk1.trucks + 1, '새 계약에도 차량 투자가 적용된다');
   const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.deepEqual(h.growth, { marketing: 1, fleet: 1, warehouse: 1, automation: 0, branding: 0, coldchain: 0 });
 });
-t('광고 집행: 전단지로 시작, 보름에 한 번, 며칠 안에 물량을 끌어온다', () => {
-  const g = NG(73); g.cash = 3000;
+t('광고 집행(스토리 장 방식 — 매체 레벨): 전단지로 시작, 보름에 한 번, 며칠 안에 물량을 끌어온다', () => {
+  const g = NG(73); g.cash = 3000; g.adTicketMode = () => false;
   const F = D.AD_MEDIA.flyer;
   assert.deepEqual(g.ownedMedia(), ['flyer'], '처음엔 전단지만 가진다');
   assert.equal(g.rep, Math.round(g.rules.gameoverStress * D.START_REP), '자유 런은 평판 막대 절반에서 시작한다 — 가득 차 있으면 채울 게 없다');
@@ -72,7 +72,7 @@ t('광고 집행: 전단지로 시작, 보름에 한 번, 며칠 안에 물량�
   assert.equal(g.schedule.slice(g.turn).flat().length, before2 + p2.parcels, '반감된 만큼만 붙는다');
   { const k = g.turn; g.turn += D.AD_MEDIA.radio.days + 1; assert.equal(g.campaignStack(), 0, '끝난 캠페인은 겹침으로 안 센다'); assert.ok(g.campaignPlan('flyer').ready, '끝나면 전단지 다음 눈금'); assert.ok(g.runCampaign('flyer').ok, 'Lv2 는 같은 보름에 한 번 더'); g.turn = k; }
   assert.equal(g.runCampaign('flyer').ok, false, '눈금을 다 쓰면 그 보름엔 끝');
-  const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
+  const h = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); h.adTicketMode = () => false;
   assert.equal(h.campaignPlan().used, true, '세이브를 건너도 이번 보름에 쓴 것이 남는다');
   assert.equal(h.media.flyer, 2, '매체 레벨도 저장된다');
 });
@@ -91,8 +91,8 @@ t('창고 구역: 랙·복층은 따로 떨어진 칸 — 한 택배는 한 구�
   assert.equal(g.parcels.find(p => p.id === 7).area, 'mezz', '크기 4 는 복층에');
   assert.equal(g.parcels.find(p => p.id === 8).outdoor, true, '크기 7 은 복층에 못 올린다');
 });
-t('마켓: 새 광고 매체·매체 강화·성장 투자를 판다', () => {
-  const g = NG(74); g.cash = 5000;
+t('마켓(스토리 장 방식): 새 광고 매체·매체 강화·성장 투자를 판다', () => {
+  const g = NG(74); g.cash = 5000; g.adTicketMode = () => false;
   g.phase = 'market'; g.market = { items: g._adAndGrowthItems(1), bought: 0, refreshes: 0, month: g.month };
   const kinds = g.market.items.map(it => it.kind);
   assert.ok(kinds.includes('media') && kinds.includes('mediaUp'), '새 매체와 강화가 있다 — ' + kinds);
@@ -234,6 +234,15 @@ t('사업 규모: 최근 수익이 크면 마켓 등급표가 앞서고, 주력 
   const main = g.contracts.find(Boolean); main.delivered = 999;
   const items = g._genMarketItems(); const nx = D.centersOf(D.familyOf(main.carrier)).find(k => D.CARRIERS[k].tier === D.CARRIERS[main.carrier].tier + 1);
   assert.ok(items.some(it => it.kind === 'contract' && it.carrier === nx && it.switchFrom === main.id), '주력 계약 업그레이드 보장 — ' + nx);
+});
+t('자유 런 캠페인: 마켓의 1회성 권 — 쓰면 없어지고, 캠페인 물량·캠페인 중 반송은 벌점이 더 크다', () => {
+  const g = NG(75); assert.ok(g.adTicketMode()); assert.deepEqual(g.ownedMedia(), ['flyer'], '전단지 한 장으로 시작');
+  const items = g._adAndGrowthItems(1); assert.ok(items.some(it => it.kind === 'adTicket') && !items.some(it => it.kind === 'media' || it.kind === 'mediaUp'), '매체 계약·강화 대신 권');
+  const r = g.runCampaign('flyer'); assert.ok(r.ok); assert.equal(g.adTickets.flyer, 0); assert.deepEqual(g.ownedMedia(), [], '한 번 쓰면 끝');
+  assert.ok(g.schedule.flat().some(sp => sp.ad), '캠페인 물량 표시');
+  assert.ok(!g.campaignPlan('flyer').ready, '권이 없으면 못 건다');
+  g.phase = 'market'; g.market = { items: [{ kind: 'adTicket', media: 'sns', price: 10, name: 'x', sold: false }], bought: 0, refreshes: 0 }; g.cash = 100;
+  assert.ok(g.buy(0).ok); assert.equal(g.adTickets.sns, 1);
 });
 t('휴무 특약: 쉬는 날에도 그 계약만 부를 수 있고, 그날 배차비 ×1.8 · 강화 칸 하나', () => {
   const g = EMPTY(21); const i = slot(g, 'bulk'), c = g.contracts[i];

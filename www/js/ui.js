@@ -230,6 +230,8 @@
       const carryAt = Object.assign({}, P.campaign.carryAt, { [next]: carry });
       P.campaign = Object.assign({}, P.campaign, { cleared: Math.max(P.campaign.cleared || 0, r.level), level: next, carry, carryAt });
       Profile.save(); game = null;
+      { const P2 = Profile.get(); P2.campaign.levelScores = Object.assign({}, P2.campaign.levelScores, { [r.level]: r.score || 0 }); Profile.save(); }   // 장마다 점수 — 봄 순위는 그 합
+      if (!hasNext && r.score != null) { const P2 = Profile.get(), sum = Object.values(P2.campaign.levelScores || {}).reduce((a, b) => a + b, 0); lbCall('POST', { board: 'kr_spring', pid: P2.pid, name: P2.campaign.name || T('lv.nameDefault'), score: sum, cash: r.cash, rep: r.rep, win: true, months: r.monthsDone, seed: r.seed, v: 'v0.3' }); }   // 봄 순위
       if (hasNext) return startLevel(next);            // 타이틀로 돌아가지 않는다 — 장은 이어진다
       // 마지막 장 — 인수인계가 끝났다. 엔딩 씬 한 번 보여 주고 타이틀로
       closeModal();
@@ -581,12 +583,24 @@
     if (sc.chainFrom) { const c = Profile.chainStart(id); return (c && c.year) || camp || new Date().getFullYear(); }
     return new Date().getFullYear();
   }
+  // 계절이 바뀌면 판을 그대로 넘기지 않는다 — 석 달이면 시설이 이미 너무 좋아서 다음 계절이 쉬워졌다.
+  // 창고는 여름 시작(인수인계를 마친 판)으로 되돌리고, 계약은 같은 계열의 표준 센터로(강화 없이, 배차 가득),
+  // 돈은 일부만(D.SEASON_CARRY), 성장 투자·광고는 처음부터. 업체 신뢰·고객 관계는 사람 사이의 일이라 남긴다
+  function seasonHandover(c) {
+    const base = Profile.chainStart('kr_summer'), SC = D.SEASON_CARRY;
+    if (base && base.warehouse) c.warehouse = JSON.parse(JSON.stringify(base.warehouse));
+    c.contracts = (c.contracts || []).map(k => ({ carrier: D.centerFor(D.familyOf(k.carrier), 0) || k.carrier, grade: 'normal' }));
+    c.cash = Math.max(SC.min, Math.min(SC.max, Math.round((c.cash || 0) * SC.share)));
+    c.growth = {}; c.media = {};
+    return c;
+  }
   // 계절 런이면 앞 계절을 넘긴 창고(시작 판)와 그 해를 붙인다. 박 반장은 없다 — 인수인계는 봄에 끝났다
   function withChain(cfg) {
     const sc = M.SCENARIOS[cfg.scenario] || {};
     if (!sc.chainFrom) return cfg;
     cfg.story = false;
     const carry = Profile.chainStart(cfg.scenario);
+    if (carry && sc.chainFrom !== 'campaign') seasonHandover(carry);
     if (carry) { cfg.carry = carry; if (carry.year) cfg.year = carry.year; }
     else if (window.LEVELS && LEVELS.LEVELS[0].year) cfg.year = LEVELS.LEVELS[0].year;   // 시작 판이 없어도 같은 해의 달력으로
     return cfg;
@@ -1659,6 +1673,7 @@
         if (it.kind === 'contract') { const o = offerSpec(it); const nw = newlyHandles(it); const pc = { carrier: it.carrier, grade: it.grade || 'normal', enh: { limit: 0, cap: 0, capDelta: 0, regular: false, express: false, opt: null } }; desc = `${it.hint ? `<span style="color:var(--green)">✔ ${esc(it.hint)}</span><br>` : ''}${nw ? `<span style="color:var(--gold)">${T('mk.newlyHandles', { list: nw })}</span><br>` : ''}<span class="ospec">${miniTruck(game, pc)} ${callPipsHtml(o.trucks, o.trucks)} <small>${T('fmt.trucks', { n: o.trucks })}</small> <b>${T('mk.feeEach', { n: o.fee })}</b> <span class="eslots" title="${esc(T('kind.enh'))}"><small>${esc(T('kind.enh'))}</small>${'<i></i>'.repeat((D.ENH_SLOTS || {})[it.grade || 'normal'] || 2)}</span></span><br>${offerTakes(it)}${game.shows('attrs') ? `${o.badge} ${T('call.size', { min: o.sizeMin, max: o.sizeMax })}` : ''}${o.delay ? ` · ${T('call.payLater', { n: o.delay })}` : ''}`; }
         else if (it.kind === 'enh') { const tg = enhTargets(it.enh); desc = `${D.ENHANCEMENTS[it.enh].desc}<br>${tg.length ? `<span style="color:var(--green)">→ ${tg.map(esc).join(' · ')}</span>` : `<span style="color:var(--red)">${T('mk.enhNoTarget')}</span>`}`; }
         else if (it.kind === 'item') desc = M.INS_ITEMS[it.item].icon + ' ' + M.INS_ITEMS[it.item].desc + ' ' + T('mk.oneTime');
+        else if (it.kind === 'adTicket') desc = `${mediaEffect(it.media)} <span class="media-fx"><span>${esc(T('media.ticketOnce'))}</span></span>`;
         else if (it.kind === 'media') { const mp = game.mediaPlan(it.media); desc = `${mediaEffect(it.media)} <span class="media-fx"><span>💸${D.AD_MEDIA[it.media].cost}c</span></span> ${callPipsHtml(1, 1, 'runs')}`; }
         else if (it.kind === 'mediaUp') { const mp = game.mediaPlan(it.media); desc = mp.next ? `${D.AD_MEDIA[it.media].icon} ${T('media.upLine', { n: mp.runs, n2: mp.next.runs })} ${callPipsHtml(mp.next.runs, mp.next.runs, 'runs')}` : ''; }
         else if (it.kind === 'growth') desc = T('growth.desc.' + it.growth, { n: D.GROWTH.warehouse.cap });
@@ -1689,7 +1704,7 @@
       const contractHead = `<div class="mkhead">${T('kind.contract')}${R.keepCalls ? T('mk.keepCalls', { n: R.keepCalls }) : ''}</div>`;
       const contracts = `<div id="mk-contracts">${contractHead}${contractRows}</div>`;
       // 섹션: 강화 · 시설 · 광고(새 매체·매체 강화) · 성장 투자 · 고객
-      const ORDER = [['enh', ['enh'], 'kind.enh'], ['fac', ['fac'], 'kind.fac'], ['media', ['media', 'mediaUp'], 'media.newHead'], ['growth', ['growth'], 'growth.head'], ['customer', ['customer', 'deal'], 'kind.customer']];
+      const ORDER = [['enh', ['enh'], 'kind.enh'], ['fac', ['fac'], 'kind.fac'], ['media', ['media', 'mediaUp', 'adTicket'], 'media.newHead'], ['growth', ['growth'], 'growth.head'], ['customer', ['customer', 'deal'], 'kind.customer']];
       const items = ORDER.map(([, ks, head]) => { const rows = mk.items.map((it, i) => ks.includes(it.kind) ? cards[i] : '').filter(Boolean); return rows.length ? `<div class="mkhead">${T(head)}</div>` + rows.join('') : ''; }).join('');
       // 보험 섹션: 지금 든 보험 한 줄 + 바꾸기, 그 아래 1회성 보험 매물
       const insRows = mk.items.map((it, i) => it.kind === 'item' ? cards[i] : '').filter(Boolean).join('');
@@ -1723,7 +1738,7 @@
         if (R.marketMaxBuy && mk.bought >= R.marketMaxBuy) return toast(T('err.marketMax', { n: R.marketMaxBuy }));
         const price = it.kind === 'contract' ? game.contractPrice(it) : it.price;
         if (game.cash < price) return toast(T('err.noCash'));
-        if (['fac', 'item', 'customer', 'deal', 'media', 'mediaUp', 'growth'].includes(it.kind)) { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); game.takeEvents(); scene.sync(game, { animate: true }); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
+        if (['fac', 'item', 'customer', 'deal', 'media', 'mediaUp', 'adTicket', 'growth'].includes(it.kind)) { const r = game.buy(+el.dataset.i, null); if (r.ok) { SFX.buy(); game.takeEvents(); scene.sync(game, { animate: true }); saveGame(); announce(Profile.evaluate(game, null)); render(); } else toast(r.msg); return; }
         // 같은 계열 상위 센터로 갈아타기: 그 슬롯을 바로 대상으로, 확인만
         if (it.kind === 'contract' && it.switchFrom) {
           const si = game.contracts.findIndex(c => c && c.id === it.switchFrom), c = game.contracts[si];
@@ -1888,7 +1903,8 @@
   }
   // ---------- 순위 (www/api/scores.js) ----------
   // 보드 = 계절 런 하나. 봄(인수인계)은 대본이라 순위가 없다. 위클리 런이 생기면 weekly-YYYYWww 로 같은 틀에 얹는다
-  const lbBoard = id => { const s = M.SCENARIOS[id]; return !!(BUILD.api && s && !s.campaign); };
+  // 봄(인수인계)도 보드가 있다 — 마지막 장을 마칠 때 그 장의 점수를 올린다(showLetter → advance)
+  const lbBoard = id => { const s = M.SCENARIOS[id]; return !!(BUILD.api && s); };
   function lbCall(method, data) {
     if (!BUILD.api || typeof fetch === 'undefined') return Promise.resolve(null);
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null; const tm = ctl && setTimeout(() => ctl.abort(), 7000);
@@ -2323,9 +2339,9 @@
       const mp = g.mediaPlan(id), cp = g.campaignPlan(id), ok = cp.ready;
       return `<button class="growth-card" data-media="${id}" ${k === 0 ? 'id="camp-go"' : ''} ${ok ? '' : 'disabled'}>
         <span class="growth-icon">${D.AD_MEDIA[id].icon}</span><span class="growth-copy"><b>${esc(T('media.' + id))}</b>${mediaEffect(id)}</span>
-        <span class="growth-buy"><span class="camp-runs"><small>${esc(T('camp.runs'))}</small> ${callPipsHtml(mp.left, mp.runs, 'runs')}</span>${cp.active ? `<b class="camp-on">${esc(T('camp.activeNow', { n: cp.activeLeft }))}</b>` : `<b>${mp.cost}c</b><small>${T('media.run')}</small>`}</span></button>`;
+        <span class="growth-buy"><span class="camp-runs"><small>${esc(T('camp.runs'))}</small> ${callPipsHtml(mp.left, mp.runs, 'runs')}</span>${cp.active ? `<b class="camp-on">${esc(T('camp.activeNow', { n: cp.activeLeft }))}</b>` : mp.ticket ? `<b>${T('media.ticketLeft', { n: mp.left })}</b><small>${T('media.run')}</small>` : `<b>${mp.cost}c</b><small>${T('media.run')}</small>`}</span></button>`;
     }).join('');
-    const body = `<div class="growth-grid">${cards}</div>`;
+    const body = cards ? `<div class="growth-grid">${cards}</div>` : `<p style="color:var(--dim);text-align:center">${T('camp.noTicket')}</p>`;
     const m = modal(T('camp.title'), body, [{ label: T('btn.close'), onClick: closeModal }]);
     storyCheck({ kind: 'modal', modal: 'growth', ready: cp0.ready });
     m.querySelectorAll('[data-media]').forEach(el => el.onclick = () => {

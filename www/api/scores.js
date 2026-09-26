@@ -1,11 +1,11 @@
 // 리더보드 API (Vercel Serverless Function) — GET 순위 · POST 기록
 //   저장소: Upstash Redis REST (Vercel 마켓플레이스 'Upstash for Redis' 를 붙이면 KV_REST_API_URL/TOKEN 이 생긴다)
-//   보드 = 런 하나(kr_summer · kr_autumn · kr_winter). 위클리 런은 weekly-2026W40 같은 id 로 같은 틀에 얹는다.
+//   보드 = 런 하나(kr_spring · kr_summer · kr_autumn · kr_winter). 봄은 캠페인 장 점수의 합. 위클리 런은 weekly-2026W40 같은 id 로 같은 틀에 얹는다.
 //   플레이어마다 최고 기록 하나만 남긴다(ZADD GT). 이름은 캠페인에서 지은 상호.
 //
 // 조작 방지는 지금은 '말이 되는 값인가'까지만 본다(범위·빈도). 게임이 시드 고정이라
 // 다음 단계에서 행동 기록을 같이 보내 서버가 다시 돌려 검증할 수 있다 (docs/RELEASE_PLAN.md 리더보드).
-const BOARDS = ['kr_summer', 'kr_autumn', 'kr_winter'];
+const BOARDS = ['kr_spring', 'kr_summer', 'kr_autumn', 'kr_winter'];
 const WEEKLY = /^weekly-\d{4}W\d{2}$/;
 const TOP = 50;
 const MAX_SCORE = 500000;          // 계절 런(6사이클) 기준으로 넉넉히 — 이보다 크면 받지 않는다

@@ -35,8 +35,9 @@ let n = 0; const t = async (name, fn) => { await fn(); n++; console.log('ok ' + 
     const r = await call('POST', '/api/scores', { board: 'kr_summer', pid: 'aaaaaaaaaaaaaaaa', name: '새봄택배', score: 5000 });
     assert.equal(r.body.best, false); assert.equal(r.body.me.score, 9000);
   });
-  await t('보드는 계절 셋 + 위클리 형식만', async () => {
-    assert.equal((await call('GET', '/api/scores?board=kr_spring')).code, 400);
+  await t('보드는 계절 넷(봄 포함) + 위클리 형식만', async () => {
+    assert.equal((await call('GET', '/api/scores?board=kr_spring')).code, 200);
+    assert.equal((await call('GET', '/api/scores?board=kr_fall')).code, 400);
     assert.equal((await call('GET', '/api/scores?board=weekly-2026W40')).code, 200);
   });
   await t('말이 안 되는 값은 받지 않는다', async () => {
