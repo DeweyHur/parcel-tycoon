@@ -23,6 +23,7 @@ window.Scene3D = (function () {
     box: ['XXXXXXX', 'X..X..X', 'XXXXXXX', 'X.....X', 'X.....X', 'X.....X', 'XXXXXXX'],   // 상자 — 창고 칸 수 간판
   };
   const SIGN = { bg: '#2a2740', line: '#0f0e1a', hi: '#3d3a5c', alt: '#eef6ff', unit: 0.036, scale: 2 };
+  const STORAGE_COLOR = 0x8c7bc0;   // 맡아 둔 짐(보관 계약) — 내 택배와 헷갈리지 않게 보라빛
   const FOOT = { 1: [1, 1, 0.65], 2: [2, 1, 0.78], 4: [2, 2, 1.18], 7: [3, 2, 1.85] }; // [w, d, h] — 화면에서 상자 크기와 적재량을 즉시 읽을 수 있게 높이를 강조한다.
   const TRUCK_PARK = 6.6, TRUCK_DOCK = 4.9, TRUCK_GONE = 12;
   // 계열별 차 도색 (캡 · 띠 · 짐칸)
@@ -661,7 +662,9 @@ window.Scene3D = (function () {
       if (game.upcoming) { const u = game.upcoming()[0]; this._syncGhosts(u && u.specs ? u.specs : [], D); }
       const cold = [], main = [], yard = [];
       const items = [];
-      for (const s of game.storage || []) items.push({ id: 's' + s.id, type: 'storage', size: s.vol, baseSize: s.vol, baseSizeVis: s.vol >= 7 ? 7 : s.vol >= 4 ? 4 : 2, outdoor: s.outdoor, storage: true });
+      // 보관 짐(이삿짐·계절 재고)은 칸 수만큼 바닥을 차지하게 4·2·1칸 상자로 나눠 쌓는다 — 큰 상자 하나로는 10칸이 3칸처럼 보였다.
+      // 누르면 어느 조각이든 그 보관 계약 상세(sid)
+      for (const s of game.storage || []) { let left = game.storageVol ? game.storageVol(s) : s.vol, k = 0; while (left > 0) { const sz = left >= 4 ? 4 : left >= 2 ? 2 : 1; items.push({ id: 's' + s.id + '#' + (k++), sid: 's' + s.id, type: 'storage', size: sz, baseSize: sz, baseSizeVis: sz, outdoor: s.outdoor, storage: true }); left -= sz; } }
       for (const p of game.parcels) items.push(p);
       const rack = [], mezz = [];
       for (const p of items) { if (!p.storage) p.baseSizeVis = this._visSize(p); (p.outdoor ? yard : ((p.inCold || p.inFrozen) ? cold : p.area === 'rack' && this.Z.RACK ? rack : p.area === 'mezz' && this.Z.MEZZ ? mezz : main)).push(p); }
@@ -678,7 +681,7 @@ window.Scene3D = (function () {
         if (!b) {
           const valueTier = this._valueTier(p);
           const accents = [0xf7e9c5, 0x6fdcff, 0xffd166, 0xff70d2];
-          const bodyColor = new THREE.Color(p.storage ? 0xa8845a : D.PARCEL_TYPES[p.type].color);
+          const bodyColor = new THREE.Color(p.storage ? STORAGE_COLOR : D.PARCEL_TYPES[p.type].color);
           if (valueTier) bodyColor.lerp(new THREE.Color(accents[valueTier]), valueTier === 3 ? 0.32 : 0.16);
           b = this._box(w * CELL - 0.08, h, d * CELL - 0.08, bodyColor.getHex());
           // 테이프
@@ -691,7 +694,8 @@ window.Scene3D = (function () {
           if (p.type === 'fragile') b.add(this._tagMark('!', '#f0a04b', '#1b1a2e', w, h, d));   // 깨지는 것 — 대사 속 ⚠ 상자와 같은 '!' 딱지
           if (p.type === 'intl') { const mark = this._box(w * CELL * 0.4, 0.05, 0.16, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
           if (p.type === 'fresh') { const mark = this._box(w * CELL * 0.5, 0.04, d * CELL * 0.5, 0xffffff); mark.position.set(0, h / 2 + 0.03, 0); b.add(mark); }
-          b.userData = { h, id: p.id, valueTier, inspect: { kind: 'parcel', id: p.id } };
+          if (p.storage) { const band = this._box(w * CELL - 0.04, h * 0.14, d * CELL - 0.04, 0xe8e0ff); band.position.y = -h * 0.18; b.add(band); }   // 맡은 짐 표시 — 흰 띠
+          b.userData = { h, id: p.id, valueTier, inspect: { kind: 'parcel', id: p.sid || p.id } };
           if (!p.storage) { const cu = (window.META && window.META.CUSTOMERS[p.customer || 'anon']); if (cu) b.add(this._iconMark(cu.icon, w, h, d)); }
           this.scene.add(b); this.boxes.set(p.id, b);
           const t = pos.get(p.id);
@@ -703,7 +707,7 @@ window.Scene3D = (function () {
         }
         // 상태 색상
         const m = b.material;
-        const base = new THREE.Color(p.storage ? 0xa8845a : D.PARCEL_TYPES[p.type].color);
+        const base = new THREE.Color(p.storage ? STORAGE_COLOR : D.PARCEL_TYPES[p.type].color);
         const vt = this._valueTier(p); if (vt) base.lerp(new THREE.Color([0, 0x6fdcff, 0xffd166, 0xff70d2][vt]), vt === 3 ? 0.32 : 0.16);
         if (p.wet) base.multiplyScalar(0.7);
         m.color.copy(base);

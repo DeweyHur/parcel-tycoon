@@ -278,7 +278,7 @@ t('신뢰도: 차 한 대에 실은 택배 점수 평균(−2~+2) — 들어오�
   assert.equal(g.trustGainPreview(c, [P(9, 'normal', 2, { deadline0: 4, deadline: 4 }), P(10, 'normal', 2, { deadline0: 4, deadline: 0, overdue: true })]).xp, 0, '미리보기도 같은 셈');
   const cc = g.contracts[slot(g, 'cold')]; const cap0 = g.vehicleCap(cc); g._addTrust('cold0', 3); assert.equal(g.vehicleCap(cc), cap0 + 2);
   const cold0 = g.warehouse.cold; g._addTrust('cold0', 12); assert.equal(g.trustLevel('cold0'), 3); assert.equal(g.warehouse.cold, cold0 + 2);
-  assert.equal(D.trustEffectText('cold', 1), '용량 +2칸'); assert.equal(D.trustEffectText('rail', 2), '배차 한도 +1대');
+  assert.equal(D.trustEffectText('cold', 1), '용량 +2칸'); assert.equal(D.trustEffectText('rail', 2), '배차 +1대');
 });
 t('센터: 상위 tier 센터 = 다른 센터와 신규 계약 (배차 +2·용량 +1·배차비 +20%, 신뢰도는 센터별 새로 시작), 복합 능력', () => {
   const g = EMPTY(3); const c = g._makeContract('bulk', 'trusted'); g.contracts[3] = c;
@@ -484,7 +484,7 @@ t('i18n: 자리표시자·복수형·메시지 객체 렌더링', () => {
   assert.equal(I18n.text('옛 세이브 문자열'), '옛 세이브 문자열');
   assert.ok(I18n.setLang('en'));
   assert.equal(I18n.t('fmt.calls', { n: 1 }), '1 call'); assert.equal(I18n.t('fmt.calls', { n: 3 }), '3 calls');
-  assert.equal(D.PARCEL_TYPES.fresh.name, 'Fresh Food'); assert.equal(M.COMPANIES.local.name, 'Local Parcel'); assert.equal(D.trustEffectText('cold', 2), 'Fresh/produce deadlines freeze on call turns');
+  assert.equal(D.PARCEL_TYPES.fresh.name, 'Fresh Food'); assert.equal(M.COMPANIES.local.name, 'Local Parcel'); assert.equal(D.trustEffectText('cold', 2), 'fresh/produce deadlines freeze on call days');
   assert.ok(I18n.setLang('ko')); assert.equal(D.PARCEL_TYPES.fresh.name, '신선식품');
 });
 // ----- 달력 (docs/STORY_TUTORIAL_DESIGN.md 5장) -----

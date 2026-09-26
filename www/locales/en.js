@@ -40,9 +40,9 @@
     'media.upLine': "{n} → {n2} runs per half-month",
     'media.newHead': "Advertising",
     'media.ticket': '{name} campaign pass',
-    'media.ticketOnce': 'one use · run cost included',
+    'media.ticketOnce': 'run cost included',
     'media.ticketLeft': '×{n}',
-    'camp.noTicket': 'No campaign passes — buy one-use passes in the settlement market',
+    'camp.noTicket': 'No campaign passes — you can buy them in the settlement market',
     'media.run': "Run",
     'growth.fleet': "Fleet",
     'growth.warehouse': "Warehouse",
@@ -103,7 +103,7 @@
     'hv.wh.coldRule': '❄ 🧊 belong in cold/freezer zones',
     'hv.wh.wait': 'A no-call day lets you rearrange the yard',
     'hv.wx.fc': 'Forecast shows two days ahead — the Tomorrow / Day-after chips',
-    'hv.camp.lv': 'Campaign passes are one-use, bought in the market. Returns of campaign cargo (or during a campaign) cost extra reputation',
+    'hv.camp.lv': 'Campaign passes are bought in the market and used up when run. Returns of campaign cargo (or during a campaign) cost extra reputation',
     'hv.camp.half': 'Overlapping a running campaign halves the effect',
     'hv.camp.same': 'The same medium cannot run again until it ends',
     'hv.pay.fee': 'Dispatch fees are paid at settlement',
@@ -360,6 +360,14 @@
     'hv.deal.grade': 'Graded S/A/B/C at expiry — on-time rate, plus ⚡ rush shipped same day, minus incidents. S/A raise relation and reputation, C lowers them and pauses offers',
     'hv.deal.bonus': 'Finish without incidents for a <b>completion bonus</b>',
     'hv.deal.rel': 'Higher relation means a bigger per-parcel bonus and bigger, better offers. New businesses appear as your reputation tier rises',
+    'tierfx.label.0': 'standard contract', 'tierfx.label.1': 'Premium', 'tierfx.label.2': 'Elite', 'tierfx.label.3': 'Master',
+    'tierfx.trucks': 'trucks +{n}', 'tierfx.cap': '{n} slots', 'tierfx.fee': 'fee +{n}%', 'tierfx.size': 'up to size {n}',
+    'tierfx.addCap.fragile': '⚠ break-safe added', 'tierfx.addCap.cold': '❄ cold-capable added', 'tierfx.addCap.frozen': '🧊 frozen-capable added', 'tierfx.addCap.customs': '🛃 customs-capable added',
+    'tierfx.delay0': 'paid immediately, no note', 'tierfx.delay1': '📄 half-month note', 'tierfx.delay2': '📄 1-month note',
+    'perkfx.trucks': 'trucks +{n}', 'perkfx.feeMult': 'fee -{n}%', 'perkfx.rewardDelta': '{type} reward +{n}', 'perkfx.bonusDelta': '{type} bonus +{n}', 'perkfx.cap': 'cap +{n}',
+    'perkfx.freezeOnCall': 'fresh/produce deadlines freeze on call days', 'perkfx.coldZone': 'cold zone +{n}', 'perkfx.frozenZone': 'freezer +{n}', 'perkfx.customsDelta': 'customs wait -{n}',
+    'perkfx.noCustomsDelay': 'no customs delays', 'perkfx.xlDelta': 'oversize footprint -{n}', 'perkfx.sizeMax': 'up to size {n}', 'perkfx.customsBonus': '+{n} when clearing customs',
+    'perkfx.delay0': 'paid immediately, no note', 'perkfx.delay1': '📄 half-month note', 'perkfx.delay2': '📄 1-month note',
     'market.newCustomer': 'New customer: {name}',
     'trust.l3prefix': 'Trust lv3: ',
     // ----- UI: title · prep · HUD · popups -----
@@ -1461,73 +1469,73 @@
         "name": "Hangil Logistics",
         "short": "Hangil",
         "vehicle": "box truck",
-        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · standard contract"
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build"
       },
       "bulk1": {
         "name": "QuickHands Express",
         "short": "QuickHands",
         "vehicle": "box truck",
-        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Premium — trucks +1 · cap +1 · fee +20%"
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build"
       },
       "bulk2": {
         "name": "Blueway Logis",
         "short": "Blueway",
         "vehicle": "padded box truck",
-        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Elite — trucks +2 · cap +2 · fee +40% · ⚠ break-safe added"
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build"
       },
       "bulk3": {
         "name": "MegaHub Logistics",
         "short": "MegaHub",
         "vehicle": "padded box truck",
-        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build · Master — trucks +3 · cap +3 · fee +60% · ⚠ break-safe added"
+        "desc": "Loads plain parcels (size 1-2) on a box truck. The backbone of a standard-parcel build"
       },
       "cold0": {
         "name": "Dawn Chill",
         "short": "Dawn Chill",
         "vehicle": "reefer truck",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus · standard contract"
+        "desc": "Fresh & produce specialist. Fresh/produce bonus"
       },
       "cold1": {
         "name": "Crisp Logis",
         "short": "Crisp",
         "vehicle": "reefer truck",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus · Premium — trucks +1 · cap +1 · fee +20%"
+        "desc": "Fresh & produce specialist. Fresh/produce bonus"
       },
       "cold2": {
         "name": "ColdChain Center",
         "short": "ColdChain",
         "vehicle": "reefer/freezer truck",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus · Elite — trucks +2 · cap +2 · fee +40% · 🧊 frozen-capable added"
+        "desc": "Fresh & produce specialist. Fresh/produce bonus"
       },
       "cold3": {
         "name": "Farm Direct",
         "short": "FarmDirect",
         "vehicle": "large reefer",
-        "desc": "Fresh & produce specialist. Fresh/produce bonus · Master — trucks +3 · cap +3 · fee +60% · 🧊 frozen-capable added · up to size 7"
+        "desc": "Fresh & produce specialist. Fresh/produce bonus"
       },
       "frozen0": {
         "name": "Glacier Frozen",
         "short": "Glacier",
         "vehicle": "freezer truck",
-        "desc": "Frozen only. Frozen bonus · standard contract"
+        "desc": "Frozen only. Frozen bonus"
       },
       "frozen1": {
         "name": "Snowfield Frozen",
         "short": "Snowfield",
         "vehicle": "freezer truck",
-        "desc": "Frozen only. Frozen bonus · Premium — trucks +1 · cap +1 · fee +20%"
+        "desc": "Frozen only. Frozen bonus"
       },
       "frozen2": {
         "name": "Minus 30",
         "short": "Minus30",
         "vehicle": "freezer/reefer truck",
-        "desc": "Frozen only. Frozen bonus · Elite — trucks +2 · cap +2 · fee +40% · ❄ cold-capable added"
+        "desc": "Frozen only. Frozen bonus"
       },
       "fragile0": {
         "name": "Easy Does It",
         "short": "EasyDoes",
         "vehicle": "padded van",
-        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce · standard contract"
+        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce"
       },
       "pack0": {
         "name": "Gentle Parcel",
@@ -1539,91 +1547,91 @@
         "name": "Glass Hands",
         "short": "GlassHands",
         "vehicle": "padded van",
-        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce · Premium — trucks +1 · cap +1 · fee +20%"
+        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce"
       },
       "fragile2": {
         "name": "Padding Masters",
         "short": "Padding",
         "vehicle": "large padded truck",
-        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce · Elite — trucks +2 · cap +2 · fee +40% · up to size 7"
+        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce"
       },
       "fragile3": {
         "name": "Porcelain Logis",
         "short": "Porcelain",
         "vehicle": "chilled padded truck",
-        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce · Master — trucks +3 · cap +3 · fee +60% · ❄ cold-capable added · up to size 7"
+        "desc": "Fragile specialist. No breakage, fragile bonus · also carries standard and produce"
       },
       "intl0": {
         "name": "Customs Bridge",
         "short": "Customs",
         "vehicle": "bonded truck",
-        "desc": "Clears and ships 🛃 cargo still waiting at customs, and carries general cargo too (no refrigeration). Customs bonus · 8 slots · standard contract"
+        "desc": "Clears and ships 🛃 cargo still waiting at customs, and carries general cargo too (no refrigeration). Customs bonus"
       },
       "intl1": {
         "name": "Bonded Express",
         "short": "Bonded",
         "vehicle": "bonded truck",
-        "desc": "Clears and ships 🛃 cargo still waiting at customs, and carries general cargo too (no refrigeration). Customs bonus · Premium — trucks +2 · 8 slots · fee +20%"
+        "desc": "Clears and ships 🛃 cargo still waiting at customs, and carries general cargo too (no refrigeration). Customs bonus"
       },
       "intl2": {
         "name": "WorldGate",
         "short": "WorldGate",
         "vehicle": "bonded padded truck",
-        "desc": "Clears and ships 🛃 cargo still waiting at customs, and carries general cargo too (no refrigeration). Customs bonus · Elite — trucks +4 · 12 slots · fee +40% · ⚠ break-safe added"
+        "desc": "Clears and ships 🛃 cargo still waiting at customs, and carries general cargo too (no refrigeration). Customs bonus"
       },
       "large0": {
         "name": "Giant Freight",
         "short": "Giant",
         "vehicle": "heavy truck",
-        "desc": "Handles size 4+ parcels (break-safe). Large bonus · 8 slots (two 4s) · standard contract"
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus"
       },
       "large1": {
         "name": "Taesan Heavy",
         "short": "Taesan",
         "vehicle": "heavy truck",
-        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Premium — trucks +2 · 8 slots · fee +20%"
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus"
       },
       "large2": {
         "name": "Elephant Special",
         "short": "Elephant",
         "vehicle": "reefer heavy truck",
-        "desc": "Handles size 4+ parcels (break-safe). Large bonus · Elite — trucks +4 · 12 slots (three 4s) · fee +40% · ❄ cold-capable added"
+        "desc": "Handles size 4+ parcels (break-safe). Large bonus"
       },
       "air0": {
         "name": "Airport Cargo Agent",
         "short": "Airport",
         "vehicle": "airport shuttle truck",
-        "desc": "A forwarder that hauls importers’ goods to the airport cargo terminal. Small (1-2) only, handles customs & fragile safely. Pricey but fast · standard contract"
+        "desc": "A forwarder that hauls importers’ goods to the airport cargo terminal. Small (1-2) only, handles customs & fragile safely. Pricey but fast"
       },
       "air1": {
         "name": "Jet Forwarding",
         "short": "Jet",
         "vehicle": "airport shuttle truck",
-        "desc": "Airport cargo forwarder. Handles customs & fragile safely. Pricey but fast · Premium — trucks +1 · cap +1 · fee +20% · up to size 4"
+        "desc": "Airport cargo forwarder. Handles customs & fragile safely. Pricey but fast"
       },
       "rail0": {
         "name": "Rail Terminal Shuttle",
         "short": "Rail shuttle",
         "vehicle": "terminal trailer",
-        "desc": "A forwarder that hauls big batches to the freight terminal. Break-safe. Paid as a 📄 half-month note (cash at next settlement) · standard contract"
+        "desc": "A forwarder that hauls big batches to the freight terminal. Break-safe. Paid as a 📄 half-month note (cash at next settlement)"
       },
       "rail1": {
         "name": "Bullet Forwarding",
         "short": "Bullet",
         "vehicle": "terminal trailer",
-        "desc": "Freight-terminal forwarder with an express connection. Break-safe · Premium — trucks +1 · cap +1 · fee +20% · paid immediately, no note"
+        "desc": "Freight-terminal forwarder with an express connection. Break-safe"
       },
       "sea0": {
         "name": "Wave Forwarding",
         "short": "Wave",
         "vehicle": "port trailer",
-        "desc": "A forwarder that hauls importers’ containers to the port. Size 2+, customs & fragile safe. Paid as a 📄 1-month note (cash at the second settlement) · standard contract"
+        "desc": "A forwarder that hauls importers’ containers to the port. Size 2+, customs & fragile safe. Paid as a 📄 1-month note (cash at the second settlement)"
       },
       "sea1": {
         "name": "Ocean Forwarding",
         "short": "Ocean",
         "vehicle": "port trailer",
-        "desc": "Port forwarder. Size 2+, customs & fragile safe · Premium — trucks +1 · cap +1 · fee +20% · 📄 half-month note"
+        "desc": "Port forwarder. Size 2+, customs & fragile safe"
       }
     },
     "FAMILIES": {
@@ -1636,53 +1644,6 @@
       "air": { "name": "Air forwarder" },
       "rail": { "name": "Rail forwarder" },
       "sea": { "name": "Port forwarder" }
-    },
-    "TRUST_PERK_TEXT": {
-      "bulk": [
-        "Dispatches +1",
-        "Dispatch fee -30%",
-        "Standard parcel reward +5"
-      ],
-      "cold": [
-        "Capacity +2",
-        "Fresh/produce deadlines freeze on call turns",
-        "Cold zone +2"
-      ],
-      "frozen": [
-        "Dispatch fee -20%",
-        "Capacity +2",
-        "Freezer zone +2"
-      ],
-      "fragile": [
-        "Dispatch fee -20%",
-        "Capacity +1",
-        "Fragile reward +15"
-      ],
-      "intl": [
-        "Customs wait -1 turn",
-        "Capacity +4",
-        "No customs delay events"
-      ],
-      "large": [
-        "XL parcels take 1 less slot",
-        "Dispatches +1",
-        "Large reward +10"
-      ],
-      "air": [
-        "Handles up to size 4",
-        "Dispatch fee -30%",
-        "+20 when shipping cargo still in customs"
-      ],
-      "rail": [
-        "Paid immediately, no note",
-        "Monthly dispatch +1",
-        "Capacity +6"
-      ],
-      "sea": [
-        "📄 half-month note",
-        "Capacity +6",
-        "Paid immediately, no note"
-      ]
     },
     "SELF_DELIVERY": {
       "name": "Self-delivery"

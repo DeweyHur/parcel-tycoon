@@ -331,5 +331,35 @@
   DATA.centersOf = fam => Object.keys(DATA.CARRIERS).filter(k => DATA.CARRIERS[k].family === fam && !DATA.CARRIERS[k].campaign).sort((a, b) => DATA.CARRIERS[a].tier - DATA.CARRIERS[b].tier);
   DATA.centerFor = (fam, tier) => { const list = DATA.centersOf(fam); if (!list.length) return null; let best = list[0]; for (const k of list) if (DATA.CARRIERS[k].tier <= tier) best = k; return best; };
   DATA.familyOf = k => (DATA.CARRIERS[k] || {}).family || k;
+  // ----- 설명 자동 생성 (i18n.js apply 뒤에 불린다) -----
+  // 센터 설명 = 번역의 계열 소개(desc) + 데이터에서 계산한 등급 줄. 신뢰 특성 문구도 TRUST_PERKS 값에서.
+  // 번역에 '배차 +2·용량 +2' 같은 숫자를 박아 두면 밸런스를 바꿀 때마다 도감이 거짓말을 한다.
+  DATA.tierLine = (k, t) => {
+    const c = DATA.CARRIERS[k]; if (!c) return '';
+    const base = DATA.CARRIERS[DATA.centerFor(c.family, 0)] || c, parts = [];
+    if (c.tier > 0) {
+      if (c.trucks !== base.trucks) parts.push(t('tierfx.trucks', { n: c.trucks - base.trucks }));
+      parts.push(t('tierfx.cap', { n: c.cap }));
+      if (c.fee !== base.fee) parts.push(t('tierfx.fee', { n: Math.round((c.fee / base.fee - 1) * 20) * 5 }));   // 5% 단위로 (반올림 오차 41% → 40%)
+      for (const a of c.caps) if (!base.caps.includes(a)) parts.push(t('tierfx.addCap.' + a));
+      if (c.sizeMax > base.sizeMax) parts.push(t('tierfx.size', { n: c.sizeMax }));
+      if ((c.delay || 0) !== (base.delay || 0)) parts.push(t('tierfx.delay' + (c.delay || 0)));
+      return `${t('tierfx.label.' + c.tier)} — ${parts.join(' · ')}`;
+    }
+    return `${t('tierfx.label.0')} · ${t('tierfx.cap', { n: c.cap })}`;
+  };
+  DATA.perkText = (pk, t) => Object.keys(pk).map(key => {
+    const v = pk[key], T = DATA.PARCEL_TYPES;
+    if (key === 'rewardDelta' || key === 'bonusDelta') return Object.keys(v).map(ty => t('perkfx.' + key, { type: (T[ty] && (T[ty].short || T[ty].name)) || ty, n: v[ty] })).join(' · ');
+    if (key === 'feeMult') return t('perkfx.feeMult', { n: Math.round((1 - v) * 100) });
+    if (key === 'delay') return t('perkfx.delay' + v);
+    if (typeof v === 'boolean') return t('perkfx.' + key);
+    return t('perkfx.' + key, { n: key === 'customsDelta' ? -v : v });
+  }).join(' · ');
+  DATA._afterI18n = t => {
+    // 번역 오버레이가 매번 desc 를 계열 소개로 되돌려 놓으니(apply → overlay) 여기서는 뒤에 붙이기만 한다
+    for (const k in DATA.CARRIERS) { const c = DATA.CARRIERS[k]; if (c.campaign) continue; c.desc = `${c.desc || ''} · ${DATA.tierLine(k, t)}`; }
+    for (const f in DATA.TRUST_PERKS) DATA.TRUST_PERK_TEXT[f] = DATA.TRUST_PERKS[f].map(pk => DATA.perkText(pk, t));
+  };
   if (typeof module !== 'undefined') module.exports = DATA; else root.DATA = DATA;
 })(typeof window !== 'undefined' ? window : globalThis);

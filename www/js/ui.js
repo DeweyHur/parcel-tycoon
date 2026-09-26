@@ -1011,7 +1011,7 @@
     const render = () => {
       g.setOutdoor(pref); pref = [...g.outdoorParcels().map(p => p.id), ...g.storage.filter(s => s.outdoor).map(s => 's' + s.id)];
       const row = (p, out) => { const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], claim = Math.round(((p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))) * cu.claimMult); return `<div class="parcel ${p.overdue ? 'overdue' : ''}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${p.reward}c · ${T('re.claim', { n: claim })}${out && (a.includes('cold') || a.includes('frozen')) ? ` <b style="color:var(--red)">${T('re.outOfZone')}</b>` : ''}${out && nextWx !== 'sunny' && nextWx !== 'snow' && !a.includes('cold') && !a.includes('frozen') && !g.rules.tent ? ` <b style="color:var(--orange)">${T('re.wet')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`; };
-      const srow = s => { const K = M.STORAGE_KINDS[s.kind]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#a8845a"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${T('re.storageClaim')}</div><div class="st">${T('storage.left', { n: s.left })}</div></div>`; };
+      const srow = s => { const K = M.STORAGE_KINDS[s.kind]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#8c7bc0"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${T('re.storageClaim')}</div><div class="st">${T('storage.left', { n: s.left })}</div></div>`; };
       const inside = sortByUrgency(g.parcels.filter(p => !p.outdoor)), outside = sortByUrgency(g.parcels.filter(p => p.outdoor));
       const inVol = g.usedVolume() - g.outdoorVolume(), outVol = g.outdoorVolume();
       const body = `<div class="pickinfo"><span>${T('re.inside')} <b class="${inVol > cap ? 'bad' : ''}">${inVol}/${cap}</b></span><span>${T('re.outside', { vol: outVol, pct: Math.round(g.theftProb(nextWx) * 100) })}</span><span>${T('re.nextTurn')} ${NW.icon} ${NW.name}</span></div>
@@ -1108,13 +1108,14 @@
     return `<span class="pips ${kind === 'runs' ? 'runs' : 'calls'}">${h}</span>`;
   }
   function pips(cells, cap, over, trucks) {
-    if (cap > PIP_MAX) return '';
+    // 칸이 많은 차(대형·통관 12~16칸)도 숫자 대신 칸으로 — 다섯 칸마다 틈을 두어 센다. 합이 길면 눈금을 가늘게(dense)
+    const total = cap * (trucks || 1), dense = total > 16;
     let h = '';
-    for (let i = 0; i < cap * (trucks || 1); i++) { if (i && i % cap === 0) h += '<i class="gap"></i>'; h += cells[i] ? `<i class="on" style="background:${cells[i]}"></i>` : '<i></i>'; }
+    for (let i = 0; i < total; i++) { const k = i % cap; if (i && k === 0) h += '<i class="gap"></i>'; else if (cap > PIP_MAX && k && k % 5 === 0) h += '<i class="g5"></i>'; h += cells[i] ? `<i class="on" style="background:${cells[i]}"></i>` : '<i></i>'; }
     h += '<b class="cab"></b>';   // 트럭 앞머리 — 계약 목록에서만 보인다
     // 넘치는 칸은 많아야 여섯까지만 그린다 — 그 이상은 눈금이 아니라 벽이 된다
     if (over.length) { h += '<i class="gap"></i>'; over.slice(0, 6).forEach((css, i) => { h += `<i class="over${over.length > 6 && i === 5 ? ' more' : ''}" style="background:${css}"></i>`; }); }
-    return `<span class="pips">${h}</span>`;
+    return `<span class="pips${dense ? ' dense' : ''}">${h}</span>`;
   }
   // 계약 카드용 한 대 적재 미리보기 (호출 팝업의 '급한 순 자동 선택'과 같은 규칙)
   // 지금 한 대 부르면 얼마를 받고 얼마를 내는가. '개당 Nc' 는 버는 돈으로 읽혀서(유저 지적)

@@ -1019,3 +1019,6 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 #upcoming .chip .grp { display: inline-flex; align-items: center; gap: 1px; margin-left: 4px; font-size: 11px; color: var(--ink); }
 #upcoming .chip .grp i { width: 8px; height: 10px; border: 1px solid #0006; }
 #upcoming .chip.insb { flex: 0 0 auto; gap: 2px; cursor: help; }
+/* 큰 차(10칸 넘음): 다섯 칸마다 작은 틈, 합이 길면 눈금을 가늘게 */
+.pips i.g5 { width: 2px; background: none; box-shadow: none; }
+.pips.dense i:not(.gap):not(.g5) { width: 4px; }

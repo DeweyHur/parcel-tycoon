@@ -36,6 +36,8 @@
       if (D && L.data) overlay(D, L.data);
       if (M && L.meta) overlay(M, L.meta);
     }
+    // 숫자가 들어가는 설명(센터 등급 효과·신뢰 특성)은 번역에 박지 않고 데이터에서 만든다 — 값을 바꿔도 도감이 낡지 않게
+    if (D && D._afterI18n) D._afterI18n(t);
   }
 
   // 조사 자동 선택: 문자열 안에 '{name}은/는' 처럼 써 두면 값의 받침에 맞춰 고른다.

@@ -1481,6 +1481,8 @@
       if (type === 'fresh' && R.freshSizes && !sizes) allowed = R.freshSizes;
       const w = {}; for (const s of allowed) { let wt = (D.PARCEL_TYPES[type].sizeWeight || {})[s] || D.SIZE_WEIGHT[s]; if (s === 7 && R.xlWeight != null) wt = R.xlWeight; if (s >= 4) wt *= R.bigWeight; if (cust.sizeBias === 'small' && s >= 2) wt *= s >= 4 ? 0.2 : 0.6; if (cust.sizeBias === 'big' && s < 4) wt *= 0.3; if (cust.sizeBias === 'mid' && s !== 2) wt *= 0.5; w[s] = wt; }
       // 냉동: 냉동 구역보다 큰 택배는 오지 않는다 (구역이 0이면 신선으로)
+      // …그리고 지금 계약 중 🧊 를 실을 곳이 하나도 없으면 오지 않는다 — 마켓까지 며칠을 들고만 있다 반송되는 건 억울하다
+      if (type === 'frozen' && !this.contracts.some(c => c && this.contractCaps(c).includes('frozen'))) type = 'fresh';
       if (type === 'frozen') { const fz = this.warehouse.frozen || 0; const ok = {}; for (const s in w) if (+s <= fz) ok[s] = w[s]; if (!Object.keys(ok).length) { type = 'fresh'; } else { for (const s in w) delete w[s]; Object.assign(w, ok); } }
       // 대형(4칸 이상)이 아직 안 열린 장에는 어떤 품목도 4칸으로 오지 않는다 —
       // 그걸 실을 수 있는 계열(대형·철도·해상)도 마켓에 안 나오기 때문이다
