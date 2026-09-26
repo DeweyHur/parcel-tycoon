@@ -401,10 +401,11 @@
       const when = T(y2 === year ? 'prep.runWhenSame' : 'prep.runWhenNext', { y1: year, m1: sm, y2, m2: em });
       // 줄글 대신 달력 칩: 석 달이면 달마다 아이콘+이름, 그보다 길면 아이콘만 줄지어. 긴 런은 점수 배율
       const nM = s.months / D.CYCLES_PER_MONTH;
-      const chips = s.campaign ? '' : runMonthsHtml(id, year, nM <= 3);   // 봄은 대본(인수인계)이라 달력 수치가 판에 안 걸린다
+      const feats = s.campaign ? [] : runFeatures(id, year);   // 봄은 대본(인수인계)이라 달력이 판에 안 걸린다
+      const chips = feats.length ? `<div class="runfeat">${feats.map(f => `<div>${f}</div>`).join('')}</div>` : '';
       const mult = s.mods.scoreMult && s.mods.scoreMult !== 1 ? `<span class="co-plus">⭐×${s.mods.scoreMult}</span>` : '';
       return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">📅${esc(when)}</small></span><span class="price">${best ? T('fmt.pts', { n: best }) : ''}</span></div>
-        ${nM <= 3 ? chips : `<div class="co-row mons">${chips}${mult}</div>`}${un ? '' : `<div class="d">${paid ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
+        ${chips}${mult ? `<div class="co-row">${mult}</div>` : ''}${un ? '' : `<div class="d">${paid ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
     };
     // 아직 못 고르는 런은 보여 주지 않는다 (해금 조건은 도감에 있다).
     // 무료판은 본편 런(가을·겨울)을 잠근 채 보여 준다 — 뒤에 무엇이 있는지 보이게, 누르면 본편 안내로
@@ -412,7 +413,7 @@
     const countries = [...new Set(Object.keys(M.SCENARIOS).filter(avail).map(id => M.SCENARIOS[id].country))];
     const cards = countries.map(cc => {
       const cal = M.CALENDARS[cc];
-      const head = `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${cal.icon || ''} ${esc(cal.name || T('cal.' + cc + '.name'))}</div><div class="d runlg">${T('prep.legend')}</div>`;
+      const head = `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${cal.icon || ''} ${esc(cal.name || T('cal.' + cc + '.name'))}</div>`;
       return head + Object.keys(M.SPANS).map(sp => { const ids = Object.keys(M.SCENARIOS).filter(id => avail(id) && M.SCENARIOS[id].country === cc && M.SCENARIOS[id].span === sp); return ids.length ? `<div class="d" style="font-size:11px;color:var(--dim);margin:6px 0 2px">${esc(T('prep.span.' + sp))}</div>` + ids.map(card).join('') : ''; }).join('');
     }).join('');
     const spring = !!(M.SCENARIOS[prep.scenario] || {}).campaign;
@@ -536,43 +537,41 @@
     withHowTo(() => { game = new Game(cfg); closeModal(); startPlay(); });
   }
 
-  // 런 카드의 달별 수치 — 계절 이름 대신 판에 실제로 걸리는 것만:
-  // 📦 입고 배수 · 색 점 + 품목 비중 이동 · 날씨 가중 · 🚫 업체 휴무일 · 🔺 입고 폭주일(배수)
+  // 런 카드: 이 런의 **특징** 몇 줄 — 이름 + 판에 걸리는 수치 하나. 세세한 달별 수치는 숨긴다.
+  //   추석 주문 폭주 — 주문 ×1.6 · 5일 · 연휴 3일 차 없음 / 폭염 경보 — 폭염 ×2 / 12월 성수기 — 주문 ×1.4 …
   // 공휴일은 해마다 날짜가 달라서 그 런의 해로 판을 하나 만들어 센다 (저장하지 않는다)
-  const runMonthsCache = {};
-  function runMonthStats(id, year) {
-    const key = id + '@' + year; if (runMonthsCache[key]) return runMonthsCache[key];
+  const runFeatCache = {};
+  function runFeatures(id, year) {
+    const key = id + '@' + year; if (runFeatCache[key]) return runFeatCache[key];
     let g; try { g = new Game({ scenario: id, seed: 1, year, perks: [], insurer: 'none', prep: true }); } catch (e) { return []; }
-    const out = [];
+    const out = [], seenMonth = new Set(), best = {};
+    const keep = (k, score, html) => { if (!best[k] || best[k].score < score) best[k] = { k, score, html }; };
+    const fx = (name, eff) => `<b>${esc(name)}</b> ${esc(eff)}`;
+    const holi = {};   // 명절: 폭주 일수·배수 + 연휴 일수
     for (let c = 1; c <= g.rules.months; c++) {
-      const mi = g.monthIndex(c);
-      let row = out[mi - 1];
-      if (!row) { const sm = g.seasonMods(c); row = out[mi - 1] = { cal: g.calMonth(c), arr: sm.arrivalsMult || 1, shift: sm.typeShift || {}, wx: sm.weather || {}, off: 0, rush: [] }; }
+      const mi = g.monthIndex(c), sm = g.seasonMods(c), cal = g.calMonth(c);
+      if (!seenMonth.has(mi)) {
+        seenMonth.add(mi);
+        const a = sm.arrivalsMult || 1;
+        if (a >= 1.25) keep('surge' + cal, 3 + a, fx(T('feat.surge', { m: cal }), T('feat.orders', { x: a })));
+        if (a <= 0.85) keep('low' + cal, 1, fx(T('feat.low', { m: cal }), T('feat.orders', { x: a })));
+        for (const w of ['rain', 'heat', 'snow']) { const x = (sm.weather || {})[w]; if (x >= 1.4) keep(w, 2 + x, fx(T('feat.' + w), T('feat.' + w + 'Fx', { x }))); }
+        if ((sm.storageMult || 1) >= 1.5) keep('moving', 1.5, fx(T('feat.moving'), T('feat.movingFx', { x: sm.storageMult })));
+      }
       for (const e of g.monthEvents(c)) {
-        const n = e.turns[1] - e.turns[0] + 1;
-        if (e.noCalls) row.off += n;
-        else if (e.arrivalsMult > 1) row.rush.push({ n, x: e.arrivalsMult });
-        for (const t in e.rewardDelta || {}) row.bonus = { t, v: e.rewardDelta[t], n };
+        const n = e.turns[1] - e.turns[0] + 1, base = String(e.id).replace(/_rush$/, '');
+        if (/_rush$/.test(e.id)) { const h = holi[base] = holi[base] || { rush: 0, off: 0, x: e.arrivalsMult }; h.rush += n; }
+        else if (holi[base] || e.id === 'seol' || e.id === 'chuseok') { const h = holi[base] = holi[base] || { rush: 0, off: 0, x: 1 }; if (e.noCalls) h.off += n; }
+        else if (e.id === 'sale') keep('sale', 5, fx(T('feat.sale'), T('feat.ordersDays', { x: e.arrivalsMult, n })));
+        else if (e.id === 'gift') for (const t in e.rewardDelta || {}) keep('gift', 2, fx(T('feat.gift'), T('feat.giftFx', { v: e.rewardDelta[t] })));
       }
     }
-    return (runMonthsCache[key] = out);
-  }
-  function runMonthsHtml(id, year, full) {
-    const rows = runMonthStats(id, year);
-    const WX = { rain: '🌧', heat: '🔥', snow: '❄️', storm: '🌀' };
-    const dot = t => D.PARCEL_TYPES[t] ? `<i class="tdot" style="background:${D.PARCEL_TYPES[t].css}"></i>` : '';
-    if (!full) return rows.map(r => `<span class="co-chip" title="${esc(T('prep.mon', { m: r.cal }))}">${T('prep.mon', { m: r.cal })}<b>×${r.arr}</b>${r.off ? '🚫' : ''}</span>`).join('');
-    return `<div class="runmons">` + rows.map(r => {
-      const parts = [`<span title="${esc(T('prep.lg.arr'))}">📦×${r.arr}</span>`];
-      const sh = Object.keys(r.shift).filter(t => r.shift[t] > 0 && t !== 'normal').map(t => `${dot(t)}+${r.shift[t]}`).join(' ');
-      if (sh) parts.push(`<span title="${esc(T('prep.lg.shift'))}">${sh}</span>`);
-      const wx = Object.keys(r.wx).filter(k => r.wx[k] > 1 && WX[k]).map(k => `${WX[k]}×${r.wx[k]}`).join(' ');
-      if (wx) parts.push(`<span title="${esc(T('prep.lg.wx'))}">${wx}</span>`);
-      if (r.off) parts.push(`<span title="${esc(T('prep.lg.off'))}">🚫${r.off}${esc(T('media.fx.dayUnit'))}</span>`);
-      for (const x of r.rush) parts.push(`<span title="${esc(T('prep.lg.rush'))}">🔺${x.n}${esc(T('media.fx.dayUnit'))}×${x.x}</span>`);
-      if (r.bonus) parts.push(`<span title="${esc(T('prep.lg.bonus'))}">${dot(r.bonus.t)}+${r.bonus.v}c</span>`);
-      return `<div class="rm"><b>${T('prep.mon', { m: r.cal })}</b>${parts.join('')}</div>`;
-    }).join('') + `</div>`;
+    for (const h in holi) { const o = holi[h], parts = [];
+      if (o.rush) parts.push(T('feat.xDays', { x: o.x, n: o.rush }));
+      if (o.off) parts.push(T('feat.off', { n: o.off }));
+      keep('holi' + h, 9, fx(T('feat.rush', { h: T('feat.h.' + h) }), parts.join(' · '))); }
+    const list = Object.values(best).sort((a, b) => b.score - a.score).slice(0, 3).map(x => x.html);
+    return (runFeatCache[key] = list);
   }
   function runYear(id) {
     const sc = M.SCENARIOS[id] || {}, camp = window.LEVELS && LEVELS.LEVELS[0].year;

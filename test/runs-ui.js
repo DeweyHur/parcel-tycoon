@@ -45,7 +45,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('런 선택: 한국 · 분기 · 봄 · 여름', /한국/.test(t) && /분기/.test(t) && /봄 \(3~5월\)/.test(t) && /여름 \(6~8월\)/.test(t));
   ok('봄·여름 카드는 캠페인의 해(2027)', (t.match(/📅2027/g) || []).length >= 2, (t.match(/📅[^📅]{0,12}/g) || []).join(' '));
   ok('카드에 이어하기 설명 줄이 없다', !/창고 그대로|기본 창고로|박 반장과 인수인계/.test(t));
-  ok('카드에 달별 수치 (📦 입고 배수 · 🚫 휴무)', !/3월📦/.test(t) && /6월📦×1/.test(t) && !/이사철|가정의 달/.test(t), (t.match(/[0-9]+월📦[^월]{0,30}/g) || []).slice(0, 3).join(' | '));
+  ok('카드에 런 특징 (이름 + 수치)', /장마 비 ×2\.2/.test(t) && /폭염 경보 폭염 ×2/.test(t) && !/📦/.test(t) && !/이사철 마무리|가정의 달/.test(t), (t.match(/여름[^]{0,80}/) || [''])[0]);
   ok('난이도 줄이 없다', !/수습|베테랑|정규/.test(t));
   const locked = await page.evaluate(() => [...document.querySelectorAll('#modal .card.dis')].length);
   ok('잠긴 런 카드가 없다 (가을·반기·한 해는 아직 안 보임)', locked === 0 && !/가을 \(9~11월\)/.test(t) && !/반기/.test(t) && !/한 해/.test(t), String(locked));
