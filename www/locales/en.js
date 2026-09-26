@@ -238,6 +238,7 @@
     'log.buyContractOld': ', {name} dropped ({calls} calls lost)',
     'log.hireContract': 'Rush-hired: {name} (-{price}c){old}',
     'log.enhance': 'Upgrade applied: {name} → {contract} (-{price}c)',
+    'log.startOpt': 'Starting setup: {name} fitted to {contract} (nothing could carry cargo due this first cycle)',
     'log.buyCustomer': 'New customer signed: {name} (-{price}c)',
     'log.buyItem': 'Bought: {name} (-{price}c)',
     'log.buyFacility': 'Facility bought: {name} (-{price}c)',

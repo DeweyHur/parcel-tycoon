@@ -760,6 +760,15 @@ t('계절 이어하기: 봄=캠페인 · 여름부터 앞 계절의 창고를 �
   g.phase = 'play'; g._win(); assert.ok(g.result.carry && g.result.carry.warehouse && g.result.carry.year === 2027, 'summer carry');
   const w = new Game({ seed: 3, scenario: 'kr_winter' }); w._win(); assert.equal(w.result.carry, null);
 });
+t('이어하기 첫 사이클: 올 수 있는 화물을 실을 곳이 없으면 셋업이 채운다 (빈 자리엔 센터, 없으면 특약) — 화물은 안 바꾼다', () => {
+  const mk = cs => ({ cash: 1800, year: 2026, warehouse: { cap: 32, cold: 8, frozen: 4, xl: 0 }, contracts: cs.map(k => ({ carrier: k, grade: 'normal', calls: 3, enh: {} })), customers: [['anon', 0], ['ice', 0]], trust: {}, growth: {}, media: {} });
+  const a = new Game({ seed: 3, scenario: 'kr_autumn', carry: mk(['bulk0', 'cold0']), year: 2026, prep: false });
+  assert.ok(a.contracts.some(c => c && c.carrier === 'frozen0'), '빈 자리 → 냉동 기본 센터');
+  const b = new Game({ seed: 3, scenario: 'kr_autumn', carry: mk(['bulk0', 'cold0', 'fragile0', 'intl0']), year: 2026, prep: false });
+  assert.ok(b.contracts.some(c => c && b.contractOpts(c).includes('optFrozen')), '자리가 다 찼으면 냉동 특약');
+  const p = new Game({ seed: 3, scenario: 'kr_autumn', carry: mk(['bulk0', 'cold0']), year: 2026, prep: true });
+  assert.ok(!p.contracts.some(c => c && p.contractCaps(c).includes('frozen')), '준비 마켓이 있으면 플레이어 몫');
+});
 t('데모: 문구 키가 ko/en 에 모두 있다', () => {
   for (const k of ['demo.fullOnly', 'demo.cta', 'demo.gateTitle', 'demo.gateBody', 'demo.resultTitle', 'demo.resultHead', 'demo.soon', 'prep.springTitle', 'prep.springPick', 'prep.springStart',
     'stat.export', 'stat.import', 'stat.exportHelp', 'stat.importHelp', 'stat.importOk', 'stat.importFail', 'stat.copy', 'stat.copied', 'stat.copyFail', 'stat.importBtn', 'stat.transferNote'])

@@ -1358,6 +1358,29 @@
     }
 
     // ----- flow -----
+    // 첫 마켓 없이 바로 시작하는 판(이어하기·스토리)은 셋업이 곧 전부다 — 첫 사이클에 올 수 있는 품목인데
+    // 지금 계약·자가 배송으로 실을 곳이 하나도 없으면, 빈 자리에 그 계열 기본 센터를 넣고 자리가 없으면 맞는 특약을 붙여 준다.
+    // 화물은 바꾸지 않는다. 마켓을 한 번 지난 뒤부터는 갖추는 건 플레이어 몫
+    _ensureStartCaps() {
+      const ratio = this._typeRatio(1), types = new Set(Object.keys(ratio).filter(t => ratio[t] > 0));
+      for (const id in this.customers) { const cu = this.customers[id], C = M.CUSTOMERS[id]; if (!cu || cu.suspended || !C || !C.items) continue;
+        for (const k in C.items) types.add(M.CUSTOMER_ITEMS[k] ? M.CUSTOMER_ITEMS[k].type : k); }
+      if (!(this.warehouse.frozen > 0)) types.delete('frozen');   // 냉동 구역이 없으면 냉동은 신선으로 온다(_spec). 평판 잠금은 비율 쪽에서 이미 걸렀고, 고객 품목은 그와 무관하게 온다
+      const OPT = { frozen: 'optFrozen', cold: 'optCold', customs: 'optCustoms' }, FAM = { frozen: 'frozen', fresh: 'cold', produce: 'cold', intl: 'intl' };
+      for (const t of types) {
+        const T0 = D.PARCEL_TYPES[t]; if (!T0) continue;
+        const pp = { type: t, size: 1, attrs: T0.attrs, customs: T0.attrs.includes('customs') ? 1 : 0 };
+        if (this.contracts.some(c => c && this.canHandle(c, pp))) continue;
+        if (this.warehouse.coldvan && !T0.attrs.includes('customs')) continue;   // 냉장 밴이 있으면 직접 배송으로 나른다
+        const empty = this.contracts.indexOf(null), fam = FAM[t], key = fam && D.centerFor(fam, 0);
+        if (empty >= 0 && key) { const c = this._makeContract(key, null, null, true); c.calls = Math.max(c.calls, Math.ceil(c.maxCalls * D.CARRY_CALLS_FLOOR)); this.contracts[empty] = c; continue; }
+        const miss = T0.attrs.find(a => OPT[a]), oid = miss && OPT[miss], e = oid && D.ENHANCEMENTS[oid]; if (!e) continue;
+        const ok = c => c && !D.CARRIERS[c.carrier].onlyPlain && !(e.maxSizeMax && D.CARRIERS[c.carrier].sizeMax > e.maxSizeMax) && !this.contractCaps(c).includes(e.attr);
+        const c = this.contracts.find(c => ok(c) && this.enhUsed(c) < this.enhSlots(c)) || this.contracts.find(ok); if (!c) continue;
+        c.enh.opts = this.contractOpts(c).concat(oid); c.enh.opt = null; if (e.capDelta) c.enh.capDelta += e.capDelta; if (e.callsDelta) { c.maxCalls = Math.max(1, c.maxCalls + e.callsDelta); c.calls = Math.max(0, Math.min(c.calls, c.maxCalls)); }
+        this.say('log.startOpt', { name: e.name, contract: this.contractName(c) });
+      }
+    }
     _startMonth(m) {
       const R = this.rules;
       this.month = m; this.turn = 0; this._bdCache = null; this.loadChain = 0;
@@ -1383,6 +1406,7 @@
         this.say('log.prepMarket');
         return;
       }
+      if (m === 1 && this.cfg.prep === false && !this.level) this._ensureStartCaps();   // 캠페인 장은 대본이 셋업을 정한다
       this.phase = 'play';
       this.say('log.monthStart', { m: this.monthIndex(m), y: this.yearOf(m), cal: this.calMonth(m), half: this.half(m) });
       this._startTurn();
@@ -1481,8 +1505,6 @@
       if (type === 'fresh' && R.freshSizes && !sizes) allowed = R.freshSizes;
       const w = {}; for (const s of allowed) { let wt = (D.PARCEL_TYPES[type].sizeWeight || {})[s] || D.SIZE_WEIGHT[s]; if (s === 7 && R.xlWeight != null) wt = R.xlWeight; if (s >= 4) wt *= R.bigWeight; if (cust.sizeBias === 'small' && s >= 2) wt *= s >= 4 ? 0.2 : 0.6; if (cust.sizeBias === 'big' && s < 4) wt *= 0.3; if (cust.sizeBias === 'mid' && s !== 2) wt *= 0.5; w[s] = wt; }
       // 냉동: 냉동 구역보다 큰 택배는 오지 않는다 (구역이 0이면 신선으로)
-      // …그리고 지금 계약 중 🧊 를 실을 곳이 하나도 없으면 오지 않는다 — 마켓까지 며칠을 들고만 있다 반송되는 건 억울하다
-      if (type === 'frozen' && !this.contracts.some(c => c && this.contractCaps(c).includes('frozen'))) type = 'fresh';
       if (type === 'frozen') { const fz = this.warehouse.frozen || 0; const ok = {}; for (const s in w) if (+s <= fz) ok[s] = w[s]; if (!Object.keys(ok).length) { type = 'fresh'; } else { for (const s in w) delete w[s]; Object.assign(w, ok); } }
       // 대형(4칸 이상)이 아직 안 열린 장에는 어떤 품목도 4칸으로 오지 않는다 —
       // 그걸 실을 수 있는 계열(대형·철도·해상)도 마켓에 안 나오기 때문이다

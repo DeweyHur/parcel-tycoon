@@ -77,7 +77,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('런 시작', !!(await page.evaluate(() => !!PT.game)));
   let info = await page.evaluate(() => { const g = PT.game; return { sc: g.cfg.scenario, months: g.rules.months, year: g.year, cal: g.calMonth(1), cash: g.cash, cap: g.warehouse.cap, frozen: g.warehouse.frozen, cts: g.contracts.filter(Boolean).map(c => c.carrier), ice: !!g.customers.ice, story: !!g.story, level: !!g.level, evs: Array.from({ length: g.rules.months }, (_, i) => g.holidayEvents(i + 1).map(e => e.id)).flat() }; });
   ok('여름 런: 6사이클 · 6월 · 2027년', info.sc === 'kr_summer' && info.months === 6 && info.cal === 6 && info.year === 2027, JSON.stringify(info));
-  ok('인수인계를 끝낸 창고를 그대로 물려받는다 (자금·창고·계약·고객)', info.cash === 1777 && info.cap === 40 && info.frozen === 4 && info.cts.join() === 'bulk0,cold0' && info.ice, JSON.stringify(info));
+  ok('인수인계를 끝낸 창고를 그대로 물려받는다 (자금·창고·계약·고객) — 🧊 고객이 있는데 실을 곳이 없으면 빈 자리에 냉동 센터', info.cash === 1777 && info.cap === 40 && info.frozen === 4 && info.cts.join() === 'bulk0,cold0,frozen0' && info.ice, JSON.stringify(info));
   ok('박 반장 없음 · 캠페인 보정 없음', !info.story && !info.level);
   ok('여름 공휴일이 실제 날짜로 걸린다 (2027 현충일은 일요일 — 광복절 8/15 도 일요일이라 대체공휴일)', info.evs.includes('liberation'), info.evs.join(','));
   await page.evaluate(() => { if (PT.game.phase === 'market') { PT.game.closeMarket(); PT.renderAll(); } }); await page.waitForTimeout(300);

@@ -238,6 +238,7 @@
     'log.buyContractOld': ', {name} 폐기 (잔여 {calls}회 소멸)',
     'log.hireContract': '실시간 계약: {name} (-{price}c){old}',
     'log.enhance': '강화 적용: {name} → {contract} (-{price}c)',
+    'log.startOpt': '출발 셋업: {contract} 에 {name} 기본 장착 (첫 사이클에 올 화물을 실을 곳이 없어서)',
     'log.buyCustomer': '신규 고객 계약: {name} (-{price}c)',
     'log.buyItem': '구매: {name} (-{price}c)',
     'log.buyFacility': '시설 구매: {name} (-{price}c)',
