@@ -591,7 +591,7 @@
     if (base && base.warehouse) c.warehouse = JSON.parse(JSON.stringify(base.warehouse));
     c.contracts = (c.contracts || []).map(k => ({ carrier: D.centerFor(D.familyOf(k.carrier), 0) || k.carrier, grade: 'normal' }));
     c.cash = Math.max(SC.min, Math.min(SC.max, Math.round((c.cash || 0) * SC.share)));
-    c.growth = {}; c.media = {};
+    c.growth = {}; c.media = {}; c.adTickets = {};
     return c;
   }
   // 계절 런이면 앞 계절을 넘긴 창고(시작 판)와 그 해를 붙인다. 박 반장은 없다 — 인수인계는 봄에 끝났다

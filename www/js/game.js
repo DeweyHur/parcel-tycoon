@@ -119,7 +119,7 @@
       this.mediaRuns = { m: 0, used: {} };    // 이번 사이클에 매체별로 집행한 횟수 (사이클이 바뀌면 다시 찬다)
       this.growth = Object.assign({ marketing: 0, fleet: 0, warehouse: 0, automation: 0, branding: 0, coldchain: 0 }, (cfg.carry && cfg.carry.growth) || {});
       this.media = Object.assign({ flyer: 1 }, (cfg.carry && cfg.carry.media) || {});   // 광고 매체 → 레벨. 전단지는 처음부터
-      this.adTickets = { flyer: 1 };   // 자유 런: 전단지 한 장으로 시작
+      this.adTickets = Object.assign({ flyer: 1 }, (cfg.carry && cfg.carry.adTickets) || {});   // 전단지 한 장으로 시작 — 장·계절을 넘기면 남은 권이 따라온다
       this.monthStats = null;
       this.run = { revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, discarded: 0 };
       this.loadChain = 0;
@@ -241,6 +241,7 @@
         trust: { ...this.trust },
         growth: { ...this.growth },
         media: { ...this.media },
+        adTickets: { ...(this.adTickets || {}) },
         seen: this.story ? this.story.seen.slice() : [],
         notes: this.story ? this.story.notes.slice() : [],
       };
@@ -938,8 +939,8 @@
         next: lv > 0 && lv < A.max ? { runs: L + 1 } : null };
     }
     mediaScore() { return Math.max(0, Object.values(this.media || {}).reduce((a, b) => a + b, 0) - 1); }
-    // 자유 런(레벨 밖): 캠페인은 1회성 권(adTickets). 스토리 장은 예전처럼 매체 레벨(보름마다 다시 참)
-    adTicketMode() { return !this.level; }
+    // 캠페인은 1회성 권(adTickets) — 스토리 장(3장 튜토리얼)도 같은 규칙. 옛 매체 레벨 규칙은 테스트가 끄고 볼 때만 남는다
+    adTicketMode() { return true; }
     ownedMedia() { if (this.adTicketMode()) return Object.keys(D.AD_MEDIA).filter(id => ((this.adTickets || {})[id] || 0) > 0); return Object.keys(D.AD_MEDIA).filter(id => (this.media || {})[id] > 0); }
     // 캠페인(광고 집행) 계획. id 를 안 주면 가진 매체 중 첫째(전단지) — 스토리·옛 호출과 맞춘다
     // 겹친 캠페인은 효과가 반감된다 — 아직 끝나지 않은(물량이 들어오는 중인) 캠페인 수만큼 ½ 씩. 끝난 뒤에 다시 하면 온전하다.

@@ -229,7 +229,7 @@
     // 캠페인은 '창고가 빈 날'을 두 번 겪은 다음에 — 비어 노는 게 아깝다는 걸 느낀 뒤라야 버튼이 뜻이 있다
     { id: 'l3invest', kind: 'turn', when: g => (g.emptyDays || 0) >= 2, act: () => {}, pages: [{ expr: 'think', hl: '#scene' }, { expr: 'smile', hl: '#invest-btn', gate: true }] },
     { id: 'l3campGo', kind: 'modal', modal: 'growth', when: (g, ctx) => ctx.ready, pages: [{ expr: 'neutral', hl: '#camp-go', gate: true }] },
-    { id: 'l3campDone', kind: 'turn', when: g => g.campaignCycle === g.month, pages: [{ expr: 'laugh', hl: '#upcoming' }] },
+    { id: 'l3campDone', kind: 'turn', when: g => g.campaignCycle === g.month, pages: [{ expr: 'laugh', hl: '#upcoming' }, { expr: 'worry', hl: '#invest-btn' }] },
     // 첫날 고객사 택배가 이미 있으면 여기서 바로 꾹 누르기를 시킨다 (따로 l4cust 로 미루지 않는다)
     { id: 'l4intro', kind: 'start', when: () => true, act: g => { if (custTile(g)) g.story.custHeld = true; }, pages: [
       { expr: 'neutral' },
