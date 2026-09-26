@@ -42,6 +42,7 @@
     move:   { icon: '🏠', vol: [6, 10], turns: [3, 6], perVolTurn: 5, weight: 70 },
     season: { icon: '📦', vol: [4, 4], turns: [12, 15], perTurn: 10, weight: 20 },
     event:  { icon: '🎪', vol: [2, 2], turns: [2, 2], fee: 60, weight: 0, peakWeight: 40 },
+    bomb:   { icon: '🧨', vol: [3, 3], turns: [6, 6], perTurn: 2, weight: 0 },   // 멀티 「난투」 이삿짐 폭탄 — 제안이 아니라 입고로 들어온다 (game.js receiveBomb)
   };
   // 보험사 (5장). cover: all | attrs+other | kinds+other. fans: 선호 고객(가입 중 월초 xp +1)
   const INSURERS = {
@@ -328,7 +329,7 @@
   // 규칙은 개인 런에서 **빼고**(새 계약·배차 제한·어음·명절·주말·보험·보관), 상호작용을 **더한다**(트레잇·폭탄·퍽 3택1).
   // 여기 있는 것은 데이터만 — 매치 진행(봇·순위·저장)은 js/multi.js, 규칙 훅은 game.js 의 rules.* 문.
   const MULTI = {
-    PLAYERS: 4, CYCLES: 6, PHASE: 1,   // PHASE: 지금 구현된 단계(docs/MULTIPLAYER_DESIGN.md 13장). 퍽 카드 풀이 이 값을 본다
+    PLAYERS: 4, CYCLES: 6, PHASE: 2,   // PHASE: 지금 구현된 단계(docs/MULTIPLAYER_DESIGN.md 13장). 퍽 카드 풀이 이 값을 본다
     // 개인 런 시나리오 위에 얹는 멀티 규칙 셋 (mergeMods 로 병합 — 뒤가 앞을 덮는다)
     mods: {
       multi: true,
@@ -342,7 +343,33 @@
       fuelRate: 0.01,                                                    // 배차비 유가: 하루 +1% (78일이면 +78%) — 후반 잔액이 그냥 쌓이지 않게
       capDelta: 4,                                                       // 시작 창고 +4칸 (열린 질문 4 — 후보값)
       marketMaxBuy: 0, upcomingTurns: 2,
+      // 2단계: 트레잇·이삿짐 폭탄 (3장·4장). 입고의 15%→35%(일차 비례)에 트레잇, 공격 40 : 보너스 60
+      traits: true, traitRate: [0.15, 0.35], attackShare: 0.4, bombs: true,
     },
+    // 택배 트레잇 — 기한 안에 출고하면 발동, 반송·폐기면 불발. 공격은 나 빼고 전원(살아 있고 마감 안 한 상대)에게, 보너스는 나에게.
+    // 원칙: 한 방은 반나절 손해를 넘지 않는다 — 죽이는 건 공격이 아니라 물량. 이름·설명은 locales meta.MULTI.TRAITS[id]
+    TRAITS: {
+      // 공격 (weight = 등장 비중)
+      t_bomb:   { kind: 'attack', icon: '🧨', weight: 10 },   // 이삿짐 폭탄 → BOMB
+      t_rain:   { kind: 'attack', icon: '🌧', weight: 14 },   // 다음 날 야외 적재 전부 젖음(기한 −1)
+      t_claim:  { kind: 'attack', icon: '📞', weight: 14 },   // 평판 −1
+      t_rat:    { kind: 'attack', icon: '🐭', weight: 12 },   // 신선 품목 1개 즉시 폐기
+      t_hurry:  { kind: 'attack', icon: '⏱', weight: 12 },   // 창고 안 모든 택배 기한 −1
+      t_road:   { kind: 'attack', icon: '🚧', weight: 12 },   // 다음 날 호출 불가
+      t_refund: { kind: 'attack', icon: '💸', weight: 13 },   // 반송 1건 강제(평판 −1)
+      t_seal:   { kind: 'attack', icon: '🔒', weight: 13 },   // 창고 상한 −3칸, 3일
+      // 보너스
+      t_gold:   { kind: 'bonus', icon: '💰', weight: 16 },    // 이 택배 보수 ×2
+      t_buzz:   { kind: 'bonus', icon: '⭐', weight: 14 },    // 평판 +1
+      t_shield: { kind: 'bonus', icon: '🛡', weight: 14 },    // 다음 공격 1회 무효(최대 2겹)
+      t_ice:    { kind: 'bonus', icon: '🧊', weight: 12 },    // 신선 부패 정지 3일
+      t_pack:   { kind: 'bonus', icon: '📦', weight: 12 },    // 창고 +3칸, 3일
+      t_truck:  { kind: 'bonus', icon: '🚚', weight: 12 },    // 다음 호출 트럭 +1 무료
+      t_return: { kind: 'bonus', icon: '🔄', weight: 10 },    // 들고 있는 폭탄 1개를 보낸 사람에게 반송
+      t_focus:  { kind: 'bonus', icon: '🎯', weight: 10 },    // 다음 공격 트레잇을 1위 한 명에게만 ×3
+    },
+    BOMB: { size: 3, days: 6, perDay: 2, maxSize: 6, max: 4 },   // 3칸/6일로 시작, 이사마다 +1칸 −1일, 6칸/1일이면 다음 이사 때 터진다. 매치당 동시 4개
+    SHIELD_MAX: 2, TEMP_DAYS: 3,
     // 퍽 3택1 — 평판 등급이 오를 때마다 세 계열에서 한 장씩. 장착 상한 없음, 중복 가능(중첩 수치 표기).
     // 값은 개인 런 퍽 상한(월 40~80c)을 의도적으로 넘긴다 — 석 달짜리 난투에서 퍽은 양념이 아니라 빌드다.
     // phase: 그 퍽이 실제로 작동하는 구현 단계. 지금 단계보다 뒤인 카드는 뽑기 풀에 안 들어간다(효과 없는 카드를 고르게 하지 않는다).
@@ -364,7 +391,7 @@
       m_dodge:    { family: 'def', icon: '💨', phase: 2, mods: { dodgeProb: 0.5 } },
       // ⚔ 공격
       m_early:    { family: 'atk', icon: '🚀', phase: 1, mods: { earlyRepBonus: 1 } },
-      m_trait:    { family: 'atk', icon: '🎲', phase: 2, mods: { attackTraitBonus: 0.1 } },
+      m_trait:    { family: 'atk', icon: '🎲', phase: 2, mods: { attackEcho: 0.25 } },
       m_heavy:    { family: 'atk', icon: '🧨', phase: 2, mods: { bombGrow: 2 } },
       m_sharp:    { family: 'atk', icon: '⚔', phase: 2, mods: { attackMult: 1.5 } },
     },

@@ -57,9 +57,10 @@
     repStep: 0, perkPick: false, noRepUnlock: false,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, returnGraceDelta: 0,
+    traits: false, traitRate: [0, 0], attackShare: 0.4, bombs: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, bombGrow: 0, attackMult: 1,
   };
-  const MULT_KEYS = ['theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
-  const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'storeBigDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'selfCapDelta', 'allStartTrust', 'finalRushReward', 'freeTrucksPerCycle', 'earlyRepBonus', 'returnGraceDelta'];
+  const MULT_KEYS = ['attackMult', 'theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
+  const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'storeBigDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'selfCapDelta', 'allStartTrust', 'finalRushReward', 'freeTrucksPerCycle', 'earlyRepBonus', 'returnGraceDelta', 'shieldPassive', 'dodgeProb', 'attackEcho', 'bombGrow'];
   const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust', 'premiumDelta'];
   const MAP_MULT_KEYS = ['rewardMult', 'marketWeight', 'customerWeights', 'weatherWeights', 'customerClaimMult'];
   const LIST_KEYS = ['banCarriers', 'guaranteeCarriers'];
@@ -107,6 +108,8 @@
       this.phase = 'play';           // play | summary | market | over | win
       this.perks = cfg.perks.slice();
       this.mperks = (cfg.mperks || []).slice(); this.perkOffer = null;   // 멀티: 평판 등급업마다 3택1로 고른 퍽 · 지금 떠 있는 카드 3장
+      // 멀티 2단계: 상대에게서 온 공격 큐(다음 날로 넘길 때 적용) · 나가는 것(공격·폭탄 이사, multi.js 가 라우팅) · 방패 · 임시 칸 · 한 방 · 덤 트럭
+      this.inbox = []; this.outbox = []; this.shields = 0; this.capMods = []; this.focusNext = false; this.freeTruckNext = false; this.freshFreezeUntil = 0; this.roadblockDay = 0;
       this.month = 0; this.turn = 0;
       // 런의 해. 시나리오(rules.year)나 cfg 가 지정하면 그 해, 아니면 시작한 해를 찍어 세이브에 고정한다.
       // 로그라이크라 해마다 요일·영업일 수가 달라지는 건 그대로 받는다 — 인수인계(대본)만 해를 고정한다.
@@ -612,6 +615,7 @@
     declineOffer() { if (!this.offer) return false; this.say('log.storageDecline'); this.offer = null; return true; }
     returnStorage(id) {
       const s = this.storage.find(x => x.id === id); if (!s) return { ok: false, msg: T('err.noStorage') };
+      if (s.kind === 'bomb') return { ok: false, msg: T('err.bombStuck') };   // 강제 수락 — 거절도 출고도 없다
       const refund = Math.round(s.fee * s.left / s.turns), pen = 30, cost = refund + pen;
       this.feesDue += cost; this.run.spent += cost; this.monthStats.storageIncome -= refund;
       this.storage.splice(this.storage.indexOf(s), 1);
@@ -623,6 +627,11 @@
     _tickStorage(reasons) {
       for (const s of this.storage.slice()) {
         s.left--;
+        if (s.kind === 'bomb') {   // 보관료는 날마다, 0이면 「이사 완료」 — 내 창고에서 사라지고 랜덤 상대에게 (multi.js 가 목적지를 정한다)
+          this.cash += s.perTurn; this.monthStats.storageIncome += s.perTurn; this.run.revenue += s.perTurn;
+          if (s.left <= 0) { this.storage.splice(this.storage.indexOf(s), 1); const nb = this._bombNext(s); this.outbox.push({ type: 'bombMove', bomb: nb }); this.say('log.bombOut', { size: nb.size }); this.emit('bombOut', { bomb: nb }); }
+          continue;
+        }
         if (s.left <= 0) {
           this.storage.splice(this.storage.indexOf(s), 1);
           let pay = 0; if (s.perTurn) { pay = s.perTurn * s.turns; this.cash += pay; this.monthStats.storageIncome += pay; this.run.revenue += pay; }
@@ -633,6 +642,81 @@
       }
     }
 
+    // ----- 멀티 2단계: 트레잇 · 공격 인박스 · 이삿짐 폭탄 (docs/MULTIPLAYER_DESIGN.md 3·4장) -----
+    traitDef(id) { return (M.MULTI && M.MULTI.TRAITS && M.MULTI.TRAITS[id]) || null; }
+    // 기한 안에 출고된 택배의 트레잇 발동. 보너스는 나에게 지금, 공격은 outbox 로 — multi.js 가 상대 인박스에 넣는다
+    _fireTrait(p) {
+      const tr = p.trait && this.traitDef(p.trait); if (!tr || p.overdue) return;
+      const R = this.rules;
+      if (tr.kind === 'bonus') {
+        if (p.trait === 't_buzz') this.addRep(1, MSG('why.trait', { icon: tr.icon }));
+        else if (p.trait === 't_shield') this.shields = Math.min(M.MULTI.SHIELD_MAX, this.shields + 1);
+        else if (p.trait === 't_ice') this.freshFreezeUntil = this.totalTurn + M.MULTI.TEMP_DAYS;
+        else if (p.trait === 't_pack') this._capMod(3, M.MULTI.TEMP_DAYS, 't_pack');
+        else if (p.trait === 't_truck') this.freeTruckNext = true;
+        else if (p.trait === 't_return') { const b = this.storage.find(x => x.kind === 'bomb'); if (b) { this.storage.splice(this.storage.indexOf(b), 1); this.outbox.push({ type: 'bombMove', bomb: this._bombNext(b), to: b.from, back: true }); this._assignCold(); } }
+        else if (p.trait === 't_focus') this.focusNext = true;
+        this.say('log.traitBonus', { icon: tr.icon, name: tr.name });
+        this.emit('traitBonus', { trait: p.trait, parcel: p });
+        return;
+      }
+      // 공격: 나 빼고 전원. 🎯 한 방이 걸려 있으면 1위 한 명에게 ×3
+      const n = 1 + (R.attackEcho && this.rng.next() < R.attackEcho ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1), focus: this.focusNext, size: p.trait === 't_bomb' ? M.MULTI.BOMB.size + R.bombGrow : 0 };
+        this.outbox.push(atk); this.emit('attackOut', atk);
+      }
+      this.focusNext = false;
+      this.say('log.traitAttack', { icon: tr.icon, name: tr.name });
+    }
+    _capMod(delta, days, why) { this.capMods.push({ delta, until: this.totalTurn + days, why }); this.warehouse.cap += delta; this._assignCold(); }
+    // 상대가 보낸 공격 — 큐에 쌓였다가 내가 다음 날로 넘길 때 적용된다. 마감·폐업한 창고에는 못 넣는다
+    receiveAttack(a) { if (this.phase === 'over' || this.phase === 'win') return false; this.inbox.push(a); return true; }
+    _multiDay() {
+      const R = this.rules;
+      for (const m of this.capMods.slice()) if (this.totalTurn >= m.until) { this.warehouse.cap -= m.delta; this.capMods.splice(this.capMods.indexOf(m), 1); }
+      if (R.shieldPassive && this.shields < R.shieldPassive) this.shields = R.shieldPassive;
+      const q = this.inbox.splice(0); for (const a of q) this._applyAttack(a);
+      this._assignCold();
+    }
+    _applyAttack(a) {
+      const R = this.rules, tr = this.traitDef(a.trait); if (!tr) return;
+      const k = Math.max(1, Math.round(a.mult || 1));
+      let blocked = null;
+      if (R.dodgeProb && this.rng.next() < R.dodgeProb) blocked = 'dodge';
+      else if (this.shields > 0) { this.shields--; blocked = 'shield'; }
+      else if (a.trait === 't_rain' && R.rainImmune) blocked = 'roof';
+      let detail = '';
+      if (!blocked) {
+        if (a.trait === 't_rain') { let n = 0; for (const p of this.outdoorParcels()) { if (!p.wet) { p.wet = true; n++; } p.deadline = Math.max(0, p.deadline - k); } detail = MSG('trait.d.rain', { n }); }
+        else if (a.trait === 't_claim') { this.addRep(-k, MSG('why.attack', { icon: tr.icon })); detail = MSG('trait.d.claim', { n: k }); }
+        else if (a.trait === 't_rat') { let n = 0; for (const p of this.parcels.filter(x => this._attrs(x).includes('cold')).slice(0, k)) { this._discardParcel(p, MSG('why.attack', { icon: tr.icon }), 1, 'discard'); n++; } detail = MSG('trait.d.rat', { n }); }
+        else if (a.trait === 't_hurry') { for (const p of this.parcels) p.deadline = Math.max(0, p.deadline - k); detail = MSG('trait.d.hurry', { n: k }); }
+        else if (a.trait === 't_road') { this.roadblockDay = this.totalTurn; detail = MSG('trait.d.road'); }
+        else if (a.trait === 't_refund') { const ps = this.parcels.slice().sort((x, y) => x.arrivalTurn - y.arrivalTurn).slice(0, k); for (const p of ps) this._discardParcel(p, MSG('why.attack', { icon: tr.icon }), 1, 'returned'); detail = MSG('trait.d.refund', { n: ps.length }); }
+        else if (a.trait === 't_seal') { this._capMod(-3 * k, M.MULTI.TEMP_DAYS, 't_seal'); detail = MSG('trait.d.seal', { n: 3 * k, d: M.MULTI.TEMP_DAYS }); }
+      }
+      this.say(blocked ? 'log.attackBlocked' : 'log.attackIn', { icon: tr.icon, name: tr.name, from: a.fromName || '', detail, how: blocked ? MSG('trait.blk.' + blocked) : '' });
+      this.emit('attackIn', { trait: a.trait, from: a.from, fromName: a.fromName, blocked, detail, mult: a.mult });
+    }
+    // ----- 이삿짐 폭탄: 강제 수락 · 출고 불가 · 하루 +perDay c · 카운트 0이면 랜덤 상대에게 이사(+1칸 −1일) -----
+    _bombNext(b) { const B = M.MULTI.BOMB; return { size: Math.min(B.maxSize, this.storageVol(b) + 1), days: Math.max(1, b.turns - 1), hops: (b.hops || 0) + 1, from: this.cfg.pid != null ? this.cfg.pid : null }; }
+    receiveBomb(b) {
+      if (this.phase === 'over' || this.phase === 'win') return { ok: false };
+      const B = M.MULTI.BOMB;
+      if (b.size >= B.maxSize && b.days <= 1 && b.hops > 0) {   // 다 커진 폭탄은 도착하는 순간 터진다 — 초과분 도난 판정 1회, 그 뒤 소멸
+        const over = Math.max(0, this.usedVolume() + b.size - this.warehouse.cap); let stolen = 0, vol = 0;
+        for (const p of this.parcels.slice().sort((x, y) => (y.outdoor ? 1 : 0) - (x.outdoor ? 1 : 0))) { if (vol >= over) break; vol += this.storeSize(p); this.parcels.splice(this.parcels.indexOf(p), 1); this.monthStats.stolen++; this.stats.stolen++; stolen++; this.emit('stolen', { parcel: p }); this._claim(p, MSG('why.bombBlast'), 'stolen'); }
+        if (stolen) this.addRep(-Math.min(3, stolen), MSG('why.bombBlast'));
+        this.say('log.bombBlast', { n: stolen }); this.emit('bombBlast', { stolen, from: b.from });
+        this._assignCold(); return { ok: true, blast: true, stolen };
+      }
+      const s = { id: 'b' + (this.nextId++), kind: 'bomb', vol: b.size, turns: b.days, left: b.days, fee: 0, perTurn: B.perDay, customer: 'anon', outdoor: false, hops: b.hops || 0, from: b.from };
+      this.storage.push(s); this._assignCold();
+      this.say('log.bombIn', { size: b.size, days: b.days }); this.emit('bombIn', { storage: s, from: b.from, back: !!b.back });
+      return { ok: true, storage: s };
+    }
+    bombCount() { return this.storage.filter(x => x.kind === 'bomb').length; }
     // ----- 날씨 (4.4장) -----
     // 물가: 임대·인건비·배차비가 매달 D.OPCOST_INFLATION씩 오른다 (수입이 커지는 만큼 지출 폭도 커진다)
     inflation(c) { const mi = this.monthIndex(c); let k = 0; for (let i = 1; i < mi; i++) if (!this.seasonMods(i * D.CYCLES_PER_MONTH).noInflation) k++; return Math.pow(D.OPCOST_INFLATION, k); }
@@ -1027,7 +1111,7 @@
       return Math.max(0, Math.round(fee));
     }
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
-    callFee(c, trucks) { const free = this.regularFreeLeft(c) > 0 ? 1 : 0; const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut;
+    callFee(c, trucks) { const free = (this.regularFreeLeft(c) > 0 ? 1 : 0) + (this.freeTruckNext ? 1 : 0); const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut;
       return Math.round(Math.max(0, trucks - free) * this.truckFee(c) * Math.max(0.7, 1 - cut)); }
     // 택배는 쪼개지지 않는다 — 2칸짜리 하나가 두 차에 나뉘어 실릴 수는 없다(유저가 잡은 버그: 7칸 차에 2칸짜리 넷을 6+2 가 아니라 7+1 로 그리고 있었다).
     // 큰 것부터 먼저 들어가는 자리에(first-fit decreasing) 담아 차 대수와 차별 적재를 정한다. 부피 합 ÷ 칸수 는 하한일 뿐이다.
@@ -1184,7 +1268,7 @@
       return { ids: r.take.map(p => p.id), vol: r.v, trucks: Math.max(1, this.packTrucks(c, r.take).length), trimmed };
     }
     // 휴무일이라도 휴무 특약이 붙은 계약은 부를 수 있다
-    offFor(c) { return this.isOffTurn() && !(c && c.enh && c.enh.holiday); }
+    offFor(c) { if (this.roadblockDay && this.roadblockDay === this.totalTurn) return true; return this.isOffTurn() && !(c && c.enh && c.enh.holiday); }
     canCall(c) {
       if (!c || this.offFor(c)) return false;
       if (!this.shows('calls')) return this.eligibleParcels(c).length > 0;   // 배차가 소모품이 되기 전(레벨 1)엔 잔량이 없다
@@ -1331,7 +1415,7 @@
     tableMonth(c) { return this.monthIndex(c) + (this.rules.monthOffset || 0); }
     // 튜토리얼 대본(1~3개월차). 「인수인계」로 시작한 런에서만 (docs/STORY_TUTORIAL_DESIGN.md 부록 I)
     // 이 런에서 그 기능이 켜져 있는가. 캠페인 레벨 밖(자유 런)은 전부 켜져 있다 (levels.js FLAGS)
-    shows(k) { if ((D.DISABLED_FEATURES || []).includes(k)) return false; if (k === 'calls' && this.rules.unlimitedCalls) return false;   /* 멀티: 배차 눈금·충전 자체가 없다 */ return !this._shows || this._shows.has(k); }
+    shows(k) { if (k === 'chain' && this.rules.multi) return true;   /* 난투는 연속 만차가 본체 연출이다 */ if ((D.DISABLED_FEATURES || []).includes(k)) return false; if (k === 'calls' && this.rules.unlimitedCalls) return false;   /* 멀티: 배차 눈금·충전 자체가 없다 */ return !this._shows || this._shows.has(k); }
     // 상호: 레벨 1을 끝내면 플레이어가 붙인 이름이 회사 이름을 대신한다
     companyName() { return this.cfg.companyName || this.company.name; }
     // 준비 마켓은 아직 사이클 0 이다 — 그 장의 대본(사이클 1)을 보게 한다
@@ -1491,8 +1575,12 @@
       try {
         const sched = Array.from({ length: turns }, () => []);
         const ratio = this._typeRatio(m), cw = this._customerWeightsFor(m);
-        const gen = () => this._genParcelSpec(ratio, m, cw);
         let daysDone = 0; for (let c = 1; c < m; c++) daysDone += this.turns(c);
+        // 트레잇: 대본에 박는다(매치 공유) — 누가 기한 안에 내보내느냐가 운이지, 무엇이 붙었느냐는 넷이 같다
+        const TR = (M.MULTI && M.MULTI.TRAITS) || {}, total = this.totalDays(), prog = total ? daysDone / total : 0;
+        const rate = R.traits ? R.traitRate[0] + (R.traitRate[1] - R.traitRate[0]) * prog : 0;
+        const atkW = {}, bonW = {}; for (const k in TR) (TR[k].kind === 'attack' ? atkW : bonW)[k] = TR[k].weight;
+        const gen = () => { const sp = this._genParcelSpec(ratio, m, cw); if (rate && this.rng.next() < rate) sp.trait = this.rng.weighted(this.rng.next() < R.attackShare ? atkW : bonW); return sp; };
         const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
         for (const t of organicTurns) sched[t].push(gen());
         const scale = (1 + R.dayArrivalsRate * daysDone) * (m >= R.months ? R.finalRushMult : 1);
@@ -1581,6 +1669,7 @@
       return spec;
     }
     _spawnParcel(spec) {
+      const tr = spec.trait;
       const R = this.rules, t = D.PARCEL_TYPES[spec.type];
       let size = spec.size + R.sizeDelta;
       if (spec.size >= 4) size += R.bigSizeDelta;
@@ -1593,7 +1682,7 @@
       reward = Math.round(reward * (1 + ((this.growth && this.growth.branding) || 0) * D.GROWTH.branding.reward));
       if (spec.rewardDelta && spec.rewardDelta[spec.type]) reward += spec.rewardDelta[spec.type];
       { const dl = this.bizMode() && customer !== 'anon' && this.dealFor(customer); if (dl) reward = Math.round(reward * dl.rate); }   // 계약 단가
-      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, rush: !!spec.rush, ad: !!spec.ad, attrs, customer,
+      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, rush: !!spec.rush, ad: !!spec.ad, attrs, customer, trait: tr || null,
         deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1,
         // 첫 사이클에는 기한을 붙이지 않는다 — '차를 꽉 채워 보낸다'를 먼저 익히고, 기한은 그 다음에 배운다 (levels.js noDeadlineCycles)
         noDeadline: this.month <= (R.noDeadlineCycles || 0) && !spec.rush };
@@ -1614,6 +1703,7 @@
       // 냉동: 냉동 구역에 못 들어가면 즉시 폐기
       for (const p of arrived) if (this._attrs(p).includes('frozen') && !p.inFrozen) this._discardParcel(p, MSG('why.noFrozenZone'), 2, 'discard');
       this._assignCold();
+      if (this.rules.multi) this._multiDay();   // 2단계: 임시 칸 만료 · 상시 방패 · 큐에 쌓인 공격 적용
       const xl = this.parcels.filter(p => p.baseSize >= 7).length; this.stats.maxXlSimul = Math.max(this.stats.maxXlSimul, xl);
       if (this.offer && this.offer.expires < this.totalTurn) { this.say('log.offerExpired'); this.offer = null; }
       const _sc = this.script();
@@ -1627,6 +1717,7 @@
       this.say('log.arrive', { date: this.dateLabel(), list: arrived.map(p => D.PARCEL_TYPES[p.type].short + p.size).join(', '), usage: Math.round(this.usage() * 100), note });
     }
     // 이번 사이클 대본의 하루 평균 입고 칸수 (봇·장 보기 판단용)
+    totalDays() { let n = 0; for (let c = 1; c <= this.rules.months; c++) n += this.turns(c); return n; }
     parcelsPerDay() { const n = this.turns() || 1; return this.schedule.reduce((a, t) => a + t.reduce((b, s) => b + this._specCells(s), 0), 0) / n; }
     upcoming() {
       const out = [];
@@ -1681,6 +1772,7 @@
       if (R.payNow) this.cash -= fee; else this.feesDue += fee;
       this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
       if (this.regularFreeLeft(c) > 0) c.freeUsed = (c.freeUsed || 0) + 1;
+      if (this.freeTruckNext) { this.freeTruckNext = false; this.say('log.traitTruckUsed'); }
       const fill = volume / (vcap * trucks);
       if (fill >= 0.8) this.stats.fullTrucks++;
 
@@ -1703,6 +1795,7 @@
         const isSpec = specialistAll || this.isSpecialist(car, p.type);
         if (isSpec && t.bonus) { r += t.bonus + R.bonusDelta + (this.customerPerk(p.customer, 'bonusDelta') || 0) + this.trustPerkMap('bonusDelta', p.type); special = true; if (!this.stats.specialistTypes.includes(p.type)) this.stats.specialistTypes.push(p.type); }
         r = Math.round(r * (R.rewardMult[p.type] || 1) * this.rushMult(p));
+        if (p.trait === 't_gold' && !p.overdue) r *= 2;   // 💰 웃돈 — 기한 안에 냈을 때만
         if (p.wet) { r = Math.round(r * 0.8); this.stats.wetDelivered++; }
         if (snow && this._attrs(p).includes('cold')) { r += 10; this.stats.snowDelivered++; }
         if (p.overdue) { if (!p.rush) r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else { onTime++; this.stats.onTimeByType[p.type]++; if (p.baseSize >= 7) this.stats.xlOnTime++; if (p.baseSize >= 4) this.stats.bigDelivered++; }
@@ -1780,6 +1873,7 @@
       this.waitStack = 0;
       this._assignCold();
       const freezeFresh = !!this.trustPerk(c.carrier, 'freezeOnCall');
+      for (const p of chosen) this._fireTrait(p);
       this.say('log.call', { name: this.contractName(c), count: chosen.length, revenue, delay: delay ? MSG('log.callDelay', { delay }) : '', broken: broken ? MSG('log.callBroken', { broken }) : '', refund: refunded ? MSG('log.callRefund') : '', calls: c.calls, fee });
       this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus });
       this._updateTrustStats();
@@ -1807,6 +1901,7 @@
         }
         let r = p.reward + (R.rewardDelta[p.type] || 0) + R.rewardAll;
         r = Math.round(r * (R.rewardMult[p.type] || 1) * this.rushMult(p));
+        if (p.trait === 't_gold' && !p.overdue) r *= 2;   // 💰 웃돈 — 기한 안에 냈을 때만
         if (p.wet) r = Math.round(r * 0.8);
         if (p.overdue) { if (!p.rush) r = Math.round(r * R.overdueMult); this.stats.overdueDelivered++; } else this.stats.onTimeByType[p.type]++;
         r += this._custDeliver(p, r, !p.overdue, chosen.filter(q => q.customer === p.customer));
@@ -1815,6 +1910,7 @@
         this.stats.deliveredByType[p.type]++;
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.emit('deliver', { parcel: p, reward: r });
+        this._fireTrait(p);
       }
       revenue = Math.round(revenue * R.revenueMult);
       this.cash += revenue;
@@ -1872,6 +1968,7 @@
     }
 
     _endTurn(waited, freezeFresh) {
+      if (this.freshFreezeUntil >= this.totalTurn) freezeFresh = true;   // 🧊 얼음: 신선 부패 정지
       const R = this.rules;
       this.weekendBonus = null; // 야근 보너스는 주말 다음 영업일 한 번만
       this.waitedLastTurn = waited;

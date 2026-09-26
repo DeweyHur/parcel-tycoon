@@ -56,6 +56,34 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const picked = await page.evaluate(() => { const b = document.querySelector('.pkcard'); const id = b.dataset.id; b.click(); return id; }); await page.waitForTimeout(400);
   const pk = await page.evaluate(() => ({ mperks: PT.game.mperks, offer: PT.game.perkOffer, hud: document.querySelector('#hud-perks').textContent }));
   ok('퍽 선택 → 장착 · 카드 닫힘 · HUD 아이콘', pk.mperks[0] === picked && !pk.offer && pk.hud.length > 0, JSON.stringify(pk));
+  // ===== 2단계: 트레잇 · 공격 · 폭탄 =====
+  // 내 창고에 🌧 소나기 트레잇 택배를 심고 대량으로 내보낸다 → 상대 전원에게 날아간다(outbox → 인박스)
+  const fired = await page.evaluate(() => { const g = PT.game, m = PT.match; const c = g.contracts.find(x => x && /bulk/.test(x.carrier)); const si = g.contracts.indexOf(c);
+    g.focusNext = false; g.parcels = g.parcels.filter(p => p.type !== 'normal'); const P = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: 't_rain' }); g.parcels.push(P); g._assignCold(); PT.renderAll();
+    const badge = !!document.querySelector(`.ptile[data-id="${P.id}"] .tb.attack`);
+    document.querySelector('#c' + si).click(); return { badge, id: P.id, si }; });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { const w = document.querySelector('#wait-btn'); if (!w.disabled) w.click(); }); await page.waitForTimeout(900); await idle();
+  const inb = await page.evaluate(() => ({ inboxes: PT.match.players.slice(1).map(p => p.game.inbox.length + p.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length), log: PT.game.log.find(l => l.k === 'log.traitAttack') }));
+  ok('공격 트레잇: 칩에 붉은 뱃지 · 출고하면 봇 3명 인박스로', fired.badge && inb.inboxes.every(n => n >= 1) && !!inb.log, JSON.stringify(inb));
+  // 상대의 공격이 내 인박스에 → 다음 날 적용(평판 −1) + 피격 로그, 방패가 있으면 막힌다
+  const hit = await page.evaluate(() => { const g = PT.game; const rep = g.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length; g.receiveAttack({ trait: 't_claim', mult: 1, from: 1, fromName: '봇' }); g.shields = 1; g.receiveAttack({ trait: 't_hurry', mult: 1, from: 2, fromName: '봇2' }); document.querySelector('#wait-btn').click(); return rep; });
+  await page.waitForTimeout(900); await idle();
+  const hitR = await page.evaluate(n => ({ shields: PT.game.shields, logs: PT.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').slice(0, PT.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length - n).map(l => l.k + ':' + l.p.icon) }), hit);
+  ok('피격: 방패 한 겹이 먼저 온 📞를 막고, ⏱는 맞았다', hitR.logs.includes('log.attackBlocked:📞') && hitR.logs.includes('log.attackIn:⏱') && hitR.shields === 0, JSON.stringify(hitR));
+  await page.screenshot({ path: `${OUT}/M-06-hit.png` });
+  // 이삿짐 폭탄: 강제 수락 — 창고를 먹고, 목록에 줄이 생기고, 돌려보낼 수 없다
+  const bomb = await page.evaluate(() => { const g = PT.game; const used = g.usedVolume(); const r = g.receiveBomb({ size: 3, days: 6, hops: 0, from: 1 }); PT.renderAll(); const s = g.storage.find(x => x.kind === 'bomb'); return { ok: r.ok, used, after: g.usedVolume(), rowText: document.querySelector('#multi-strip .mp.me').textContent, ret: g.returnStorage(s.id).ok }; });
+  ok('폭탄: 창고 +3칸 점유 · 상대 줄에 🧨 · 출고 불가', bomb.ok && bomb.after === bomb.used + 3 && /🧨/.test(bomb.rowText) && bomb.ret === false, JSON.stringify(bomb));
+  await page.screenshot({ path: `${OUT}/M-07-bomb.png` });
+  // 6일 지나면 이사 간다 → 상대에게 +1칸
+  const moved = await page.evaluate(() => { const g = PT.game; const b = g.storage.find(x => x.kind === 'bomb'); b.left = 1; document.querySelector('#wait-btn').click(); return b.id; });
+  await page.waitForTimeout(900); await idle();
+  const mv = await page.evaluate(id => ({ mine: PT.game.storage.filter(s => s.id === id).length, others: PT.match.players.slice(1).map(p => p.game.storage.filter(s => s.kind === 'bomb').map(s => s.vol)).flat(), news: PT.game.log.some(l => l.k === 'log.bombOut') }), moved);
+  ok('이사 완료: 내 창고에서 사라지고 상대 창고에 4칸으로', mv.mine === 0 && mv.others.includes(4) && mv.news, JSON.stringify(mv));
+  // 포트레잇 4개
+  const faces = await page.evaluate(() => [...document.querySelectorAll('#multi-strip .mp .face')].map(i => i.getAttribute('src').startsWith('data:image')));
+  ok('포트레잇 4개(스프라이트)', faces.length === 4 && faces.every(Boolean));
   // 저장 → 새로고침 → 이어하기
   await page.evaluate(() => PT.saveGame());
   const saved = await page.evaluate(() => ({ day: PT.game.totalTurn, cash: PT.game.cash, bots: PT.match.players.slice(1).map(p => p.game.totalTurn) }));

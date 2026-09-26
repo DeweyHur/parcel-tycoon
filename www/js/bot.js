@@ -139,7 +139,7 @@ function urgency(g) {
   // 퍽 3택1: 경제 우선, 없으면 첫 장
   function pickPerkBot(g) {
     const MP = (M.MULTI && M.MULTI.PERKS) || {};
-    const pref = ['m_cash', 'm_space', 'm_reward', 'm_fee', 'm_regular', 'm_upgrade', 'm_yard'];
+    const pref = ['m_cash', 'm_space', 'm_shield', 'm_reward', 'm_fee', 'm_regular', 'm_dodge', 'm_upgrade', 'm_yard', 'm_sharp', 'm_trait', 'm_heavy', 'm_roof', 'm_grace', 'm_early', 'm_rush'];
     const id = pref.find(k => g.perkOffer.includes(k)) || g.perkOffer[0];
     return g.pickPerk(id);
   }

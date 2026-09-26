@@ -1025,13 +1025,23 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 
 /* ---------- 멀티 「난투」 (docs/MULTIPLAYER_DESIGN.md 7장) ---------- */
 #multi-strip { position: absolute; left: 6px; right: 6px; top: 58px; display: flex; gap: 4px; z-index: 5; pointer-events: auto; }
-#multi-strip .mp { flex: 1 1 0; min-width: 0; background: var(--panel, rgba(20,18,40,.85)); border: 2px solid var(--line, #3a3860); box-shadow: 2px 2px 0 #000; padding: 3px 4px; font-size: 10px; line-height: 1.25; color: var(--fg, #eee); cursor: pointer; display: grid; grid-template-columns: 1fr auto; column-gap: 3px; align-items: center; }
+#multi-strip .mp { position: relative; flex: 1 1 0; min-width: 0; background: var(--panel, rgba(20,18,40,.85)); border: 2px solid var(--line, #3a3860); box-shadow: 2px 2px 0 #000; padding: 2px 3px 2px 34px; font-size: 9px; line-height: 1.2; color: var(--fg, #eee); cursor: pointer; display: grid; grid-template-columns: 1fr auto; column-gap: 2px; align-items: center; transition: transform .1s; }
+#multi-strip .mp .face { position: absolute; left: 2px; top: 3px; width: 28px; height: 28px; image-rendering: pixelated; border: 1px solid #000; background: #2a2740; }
+#multi-strip .mp .stamp { position: absolute; left: 0; width: 32px; top: 31px; text-align: center; font-size: 8px; font-weight: bold; color: var(--red, #ff6b6b); pointer-events: none; }
+#multi-strip .mp.done .stamp { color: var(--gold, #ffd166); }
+#multi-strip .mp.hit { animation: mpshake .45s; }
+@keyframes mpshake { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-3px,1px); } 40% { transform: translate(3px,-1px); } 60% { transform: translate(-2px,0); } 80% { transform: translate(2px,1px); } }
+#multi-strip .mp .shieldbreak { position: absolute; left: 4px; top: 2px; font-size: 26px; font-style: normal; animation: shieldbreak .7s ease-out both; pointer-events: none; }
+@keyframes shieldbreak { 0% { transform: scale(1); opacity: 1; } 60% { transform: scale(1.4) rotate(-12deg); opacity: .9; } 100% { transform: scale(2) rotate(18deg); opacity: 0; } }
+#multi-status { position: absolute; left: 6px; right: 6px; top: 104px; z-index: 5; font-size: 10px; color: var(--gold, #ffd166); background: rgba(15,14,26,.75); padding: 2px 6px; border: 1px solid #000; pointer-events: none; }
 #multi-strip .mp.me { border-color: var(--gold, #f2c14e); }
+#multi-strip .mp .day { display: none; }
+#multi-strip .mp .reps { white-space: nowrap; }
 #multi-strip .mp.top .rk { color: var(--gold, #f2c14e); }
 #multi-strip .mp.dead { filter: grayscale(1); opacity: .55; }
 #multi-strip .mp.done { filter: sepia(.8); }
 #multi-strip .nm { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-#multi-strip .rk { font-size: 9px; color: var(--dim, #aaa); }
+#multi-strip .rk { font-size: 9px; color: var(--dim, #aaa); white-space: nowrap; }
 #multi-strip .wh { grid-column: 1 / -1; height: 5px; background: #222; border: 1px solid #000; }
 #multi-strip .wh i { display: block; height: 100%; background: var(--green, #6dd36d); }
 #multi-strip .wh.mid i { background: var(--gold, #f2c14e); }
@@ -1064,3 +1074,18 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 #hud-perks sub { font-size: 8px; }
 #bottom-bar #shop-btn:not([hidden]) { flex: 1.4; white-space: normal; line-height: 1.15; font-size: 11px; padding: 3px 4px; }
 #bottom-bar #shop-btn small { display: block; font-size: 9px; color: var(--dim); }
+
+/* 2단계 연출: 발사 궤적 · 피격 비네트 · 트레잇 뱃지 · 배너 */
+.mfly { position: fixed; z-index: 60; font-size: 22px; line-height: 1; transform: translate(0,0) scale(1); transition: transform .5s cubic-bezier(.3,.9,.5,1), opacity .5s; pointer-events: none; filter: drop-shadow(0 2px 0 #000); margin: -11px 0 0 -11px; }
+body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; pointer-events: none; box-shadow: inset 0 0 60px 30px rgba(255,40,40,.55); animation: mhit .35s ease-out both; }
+@keyframes mhit { 0% { opacity: 1; } 100% { opacity: 0; } }
+.ptile .tb { position: absolute; left: -4px; top: -6px; font-size: 11px; line-height: 1; background: #0f0e1a; border: 1px solid #000; padding: 0 1px; font-style: normal; }
+.ptile .tb.attack { box-shadow: 0 0 0 1px var(--red, #ff6b6b); }
+.ptile .tb.bonus { box-shadow: 0 0 0 1px var(--gold, #ffd166); }
+.ptile.trait { overflow: visible; }
+#mbanner { position: fixed; left: 50%; top: 32%; z-index: 58; transform: translate(-50%, -50%) scale(.6); opacity: 0; padding: 8px 18px; background: var(--panel, #2a2740); border: 3px solid var(--gold, #ffd166); box-shadow: 4px 4px 0 #000; font-size: 20px; font-weight: bold; color: var(--ink, #f2ecd8); pointer-events: none; transition: transform .2s, opacity .2s; white-space: nowrap; }
+#mbanner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#mbanner.bad { border-color: var(--red, #ff6b6b); }
+#mbanner.gold { color: var(--gold, #ffd166); }
+#mbanner.sepia { filter: sepia(.6); }
+.parcel.storage.bomb { border-color: #c0553b; }

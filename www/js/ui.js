@@ -561,14 +561,37 @@
   }
   function myRank() { if (!match) return 0; const r = MULTI.standings(match).find(x => x.human); return r ? r.rank : 0; }
   // 사람이 하루를 넘겼다 → 봇도 따라오고, 순위가 바뀌었으면 토스트
-  function multiAfterDay() {
+  function multiAfterDay(events) {
     if (!match) return;
+    MULTI.route(match);
+    for (const e of events || []) if (e.type === 'settle') MULTI.cycleDrop(match, e.month);
     MULTI.tick(match);
+    multiFx(events || [], MULTI.takeNews(match));
+    multiBanners();
     const r = myRank();
     if (lastRank && r < lastRank) { toastLater(r === 1 ? T('multi.rankTop') : T('multi.rankToast', { n: r }), 2000); SFX.levelup(); }
     lastRank = r;
   }
   // 상단 상대 줄 — 포트레잇 4개(맨 왼쪽 나). 1단계는 이름 · 일차 · 잔액 · 평판 점 · 창고 막대만 (표정·연출은 2단계)
+  // 포트레잇 표정: 기본 / 창고 80%↑ 진땀 / 공격 맞음 놀람 / 1위 웃음 / 폐업 = 그레이아웃 + 망연자실 / 마감 = 세피아 + 도장
+  // 스프라이트는 스토리 인물 것을 빌린다 — 없는 표정은 neutral 로 (박 반장·한 사장만 worry/shock 이 있다)
+  const faceHit = {};   // pid → 놀란 표정을 유지할 때까지의 시각
+  function faceOf(p, r) {
+    const g = p.game;
+    const expr = !r.alive ? 'worry' : Date.now() < (faceHit[p.id] || 0) ? 'shock' : r.rank === 1 && r.alive ? 'smile' : (g.usedVolume() / g.warehouse.cap) >= 0.8 ? 'worry' : 'neutral';
+    return window.Story ? Story.sprite(p.face === 'park' ? 'park' : p.face, expr) : '';
+  }
+  function myStatusLine(g) {
+    const parts = [];
+    if (g.shields) parts.push(T('multi.shieldLine', { n: g.shields }));
+    for (const m of g.capMods) parts.push(T('multi.tempLine', { icon: m.delta > 0 ? '📦' : '🔒', n: (m.delta > 0 ? '+' : '') + m.delta, d: m.until - g.totalTurn }));
+    if (g.roadblockDay === g.totalTurn) parts.push(T('multi.roadLine'));
+    if (g.freshFreezeUntil >= g.totalTurn) parts.push(T('multi.iceLine', { d: g.freshFreezeUntil - g.totalTurn + 1 }));
+    if (g.freeTruckNext) parts.push(T('multi.truckLine'));
+    if (g.focusNext) parts.push(T('multi.focusLine'));
+    for (const b of g.storage.filter(x => x.kind === 'bomb')) parts.push(T('multi.bombRow', { size: g.storageVol(b), d: b.left, c: b.perTurn }));
+    return parts;
+  }
   function renderMultiStrip() {
     const el = $('#multi-strip'); if (!el) return;
     el.hidden = !match; if (!match) return;
@@ -578,13 +601,77 @@
       const dead = !r.alive, done = r.done && r.alive;
       const fill = r.cap ? Math.min(1, r.used / r.cap) : 0, over = r.used > r.cap;
       const reps = Array.from({ length: 5 }, (_, i) => `<i class="${g.rep >= (i + 1) * g.repCap() / 5 ? 'on' : ''}"></i>`).join('');
+      const bombs = g.bombCount ? g.bombCount() : 0;
       return `<div class="mp ${p.human ? 'me' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
-        <b class="nm">${esc(p.human ? T('multi.you') : p.name)}</b><span class="rk">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : T('multi.rank', { n: r.rank })}</span>
+        <img class="face" src="${faceOf(p, r)}" alt="">
+        <span class="stamp">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : ''}</span>
+        <b class="nm">${esc(p.human ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
+        <span class="reps">${reps}</span><span class="rk">${T('multi.day', { n: r.day })}${bombs ? ' 🧨' + (bombs > 1 ? bombs : '') : ''}${g.shields ? ' 🛡' : ''}</span>
         <div class="wh ${over ? 'over' : fill >= 0.8 ? 'hot' : fill >= 0.5 ? 'mid' : ''}"><i style="width:${Math.round(fill * 100)}%"></i></div>
-        <span class="reps">${reps}</span>
-        <span class="cash ${g.cash < 0 ? 'neg' : ''}">${g.cash}c</span><span class="day">${T('multi.day', { n: r.day })}</span></div>`;
+        <span class="cash ${g.cash < 0 ? 'neg' : ''}" style="grid-column:1 / -1">${g.cash}c</span></div>`;
     }).join('');
     el.querySelectorAll('.mp').forEach(d => d.onclick = () => { SFX.click(); showOpponent(match.players[+d.dataset.id]); });
+    const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.textContent = parts.join(' · '); }
+  }
+  // ---------- 연출 (8장): 발사 궤적 · 피격 비네트 · 방패 · 폭탄 · 배너 ----------
+  const portraitEl = pid => document.querySelector(`#multi-strip .mp[data-id="${pid}"]`);
+  function centerOf(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+  // 아이콘이 from 에서 to 로 날아간다. from 이 null 이면 내 창고(화면 가운데)에서
+  function flyIcon(icon, fromPid, toPid, delay, onHit) {
+    const layer = $('#float-layer'); if (!layer) return;
+    const a = fromPid == null ? { x: window.innerWidth / 2, y: window.innerHeight * 0.36 } : centerOf(portraitEl(fromPid) || layer);
+    const tEl = portraitEl(toPid), b = tEl ? centerOf(tEl) : a;
+    const el = document.createElement('div'); el.className = 'mfly'; el.textContent = icon;
+    el.style.left = a.x + 'px'; el.style.top = a.y + 'px';
+    layer.appendChild(el);
+    setTimeout(() => { el.style.transform = `translate(${b.x - a.x}px, ${b.y - a.y}px) scale(1.4)`; el.style.opacity = '0.2'; }, 30 + (delay || 0));
+    setTimeout(() => { el.remove(); if (tEl) { tEl.classList.remove('hit'); void tEl.offsetWidth; tEl.classList.add('hit'); } if (onHit) onHit(); }, 560 + (delay || 0));
+  }
+  function shieldFx(pid) { const el = portraitEl(pid); if (!el) return; const sh = document.createElement('i'); sh.className = 'shieldbreak'; sh.textContent = '🛡'; el.appendChild(sh); setTimeout(() => sh.remove(), 700); }
+  const bannerQ = []; let bannerOn = false;
+  function banner(text, cls) {
+    bannerQ.push([text, cls]); if (bannerOn) return;
+    const next = () => { const it = bannerQ.shift(); if (!it) { bannerOn = false; return; } bannerOn = true;
+      let el = $('#mbanner'); if (!el) { el = document.createElement('div'); el.id = 'mbanner'; document.body.appendChild(el); }
+      el.className = 'show ' + (it[1] || ''); el.textContent = it[0]; SFX.levelup();
+      setTimeout(() => { el.className = ''; setTimeout(next, 250); }, 1500); };
+    next();
+  }
+  const mtName = id => (M.MULTI.TRAITS[id] || {}).name || id, traitIcon = id => (M.MULTI.TRAITS[id] || {}).icon || "";
+  const pname = pid => { const p = match && match.players.find(x => x.id === pid); return p ? (p.human ? T('multi.you') : p.name) : '?'; };
+  // 사람 판의 이벤트(내가 쏜 것·맞은 것·폭탄) + 매치 소식(봇끼리 · 봇이 나에게) → 화면
+  function multiFx(events, news) {
+    if (!match) return;
+    let k = 0;
+    for (const n of news) {
+      if (n.type === 'attack') { for (const to of n.to) flyIcon(traitIcon(n.trait), n.from, to, k * 90); k++;
+        if (n.from === 0) toastLater(T(n.focus ? 'multi.focusToast' : 'multi.fireToast', { icon: traitIcon(n.trait), name: mtName(n.trait), names: n.to.map(pname).join(' · ') }), 2200); }
+      if (n.type === 'bomb') { for (const to of n.to) flyIcon('🧨', n.from, to, k * 90, () => { if (to === 0) scene.shake(.5); }); k++;
+        if (n.from === 0) toastLater(T(n.back ? 'multi.bombBackToast' : 'multi.bombOutToast', { name: n.to.map(pname).join(' · ') }), 2000); }
+    }
+    for (const e of events) {
+      if (e.type === 'attackIn') {
+        if (e.blocked) { if (e.blocked === 'shield') shieldFx(0); toastLater(T('multi.blockToast', { how: I18n.text({ k: 'trait.blk.' + e.blocked }), from: e.fromName || '', icon: traitIcon(e.trait), name: mtName(e.trait) }), 2200); }
+        else { faceHit[0] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3);
+          toastLater(T('multi.hitToast', { from: e.fromName || '', icon: traitIcon(e.trait), name: mtName(e.trait), detail: I18n.text(e.detail || '') }), 2600); }
+      }
+      if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
+      if (e.type === 'bombIn') { SFX.thud(); scene.shake(.45); toastLater(T('multi.bombInToast', { size: e.storage.vol, days: e.storage.turns }), 2400); }
+      if (e.type === 'bombBlast') { SFX.discard(); scene.shake(.6); scene.mope(); toastLater(T('multi.bombBlastToast', { n: e.stolen }), 2600); }
+    }
+  }
+  // 상대의 폐업·마감은 매치를 보고 알아챈다 (봇은 사람의 하루 사이에 끝난다)
+  const seenState = {};
+  function multiBanners() {
+    if (!match) return;
+    for (const r of MULTI.standings(match)) {
+      const key = r.p.id, st = !r.alive ? 'dead' : r.done ? 'done' : 'play';
+      if (seenState[key] && seenState[key] !== st && st !== 'play' && !r.human) banner(st === 'dead' ? T('multi.bannerClosed', { name: r.name }) : T('multi.bannerDone', { name: r.name, cash: r.cash }), st === 'dead' ? 'bad' : 'sepia');
+      seenState[key] = st;
+    }
+    const g = game, left = MULTI.totalDays(g) - MULTI.dayOf(g);
+    if (g.phase === 'play' && g._dLast !== left) { g._dLast = left; if (left === 30 || left === 7) banner(T('multi.bannerD', { n: left }), 'gold'); else if (left === 0) banner(T('multi.bannerLast'), 'gold'); }
+    if (g.phase === 'play' && g.month >= g.rules.months && g.turn === 1 && !g._rushShown) { g._rushShown = true; banner(T('multi.bannerRush'), 'bad'); }
   }
   // 포트레잇 탭 → 그 사람 창고 요약(계약 3줄·퍽) — 관전 정보이지 조작 아님
   function showOpponent(p) {
@@ -1049,6 +1136,7 @@
     const body = `<div class="parcel pd-top" style="margin-bottom:6px"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${g.shows('customers') ? `<span class="cust">${cu.icon}</span>` : ''}<span class="nm">${esc(t.name)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${T('pd.baseReward', { n: p.reward })}</div><div class="st">${parcelStatus(p)}</div></div>
       ${g.shows('customers') ? `<div class="d">${T('company.customers')} <b>${cu.icon} ${esc(cu.name)}</b>${p.customer !== 'anon' ? ` · ${T('cust.trustLv', { n: lv })} ${T('pd.perPiece', { n: M.CUSTOMER_BONUS[lv] })}` : ''}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}</div>` : ''}
       ${p.wet || p.outdoor ? `<div class="d">${[p.wet ? T('pd.wet') : '', p.outdoor ? T('pd.outdoor') : ''].filter(Boolean).join(' · ')}</div>` : ''}
+      ${p.trait && M.MULTI.TRAITS[p.trait] ? `<div class="d" style="color:${M.MULTI.TRAITS[p.trait].kind === 'attack' ? 'var(--red)' : 'var(--gold)'}">${T('multi.traitLine', { icon: M.MULTI.TRAITS[p.trait].icon, name: esc(M.MULTI.TRAITS[p.trait].name), desc: esc(M.MULTI.TRAITS[p.trait].desc) })} <small>(${T(M.MULTI.TRAITS[p.trait].kind === 'attack' ? 'pd.traitAtk' : 'pd.traitBon')})</small></div>` : ''}
       ${attrRows}
       ${g.contracts.some(c => c && g.canHandle(c, p) && g.breakProb(c, p) === 0) || (selfOk && !g.selfBreakProb(p)) ? '' : `<div class="d" style="color:var(--orange);margin-top:6px">${g.contracts.filter(Boolean).length >= D.CONTRACT_SLOTS && optFor(g, p) ? T('pd.needOpt', { name: optFor(g, p) }) : famNames(p) ? T('pd.needFamily', { list: famNames(p) }) : T('pd.needNothing')}</div>`}
       <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('pd.contracts')}</div><div class="ttrack">${rows || `<div class="d">${T('pd.noContract')}</div>`}${g.shows('self') ? `<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">${T('pd.selfRow')} ${selfOk ? T('pd.selfCost', { cost: g.selfCost(p) }) + (g.selfBreakProb(p) ? ` <span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(g.selfBreakProb(p) * 100) })}</span>` : '') : `<span style="color:var(--dim)">${esc(selfWhy || T('pd.no'))}</span>`}</span><span class="st">${selfOk ? T('pd.ok') : '—'}</span></div>` : ''}</div>`;
@@ -1100,7 +1188,7 @@
     const render = () => {
       g.setOutdoor(pref); pref = [...g.outdoorParcels().map(p => p.id), ...g.storage.filter(s => s.outdoor).map(s => 's' + s.id)];
       const row = (p, out) => { const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], claim = Math.round(((p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))) * cu.claimMult); return `<div class="parcel ${p.overdue ? 'overdue' : ''}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${p.reward}c · ${T('re.claim', { n: claim })}${out && (a.includes('cold') || a.includes('frozen')) ? ` <b style="color:var(--red)">${T('re.outOfZone')}</b>` : ''}${out && nextWx !== 'sunny' && nextWx !== 'snow' && !a.includes('cold') && !a.includes('frozen') && !g.rules.tent ? ` <b style="color:var(--orange)">${T('re.wet')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`; };
-      const srow = s => { const K = M.STORAGE_KINDS[s.kind]; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#8c7bc0"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${T('re.storageClaim')}</div><div class="st">${T('storage.left', { n: s.left })}</div></div>`; };
+      const srow = s => { const K = M.STORAGE_KINDS[s.kind]; if (s.kind === 'bomb') return `<div class="parcel storage bomb" data-sid="${s.id}"><div class="sw" style="background:#c0553b"></div><div>${T('multi.bombRow', { size: g.storageVol(s), d: s.left, c: s.perTurn })}</div></div>`; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#8c7bc0"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${T('re.storageClaim')}</div><div class="st">${T('storage.left', { n: s.left })}</div></div>`; };
       const inside = sortByUrgency(g.parcels.filter(p => !p.outdoor)), outside = sortByUrgency(g.parcels.filter(p => p.outdoor));
       const inVol = g.usedVolume() - g.outdoorVolume(), outVol = g.outdoorVolume();
       const body = `<div class="pickinfo"><span>${T('re.inside')} <b class="${inVol > cap ? 'bad' : ''}">${inVol}/${cap}</b></span><span>${T('re.outside', { vol: outVol, pct: Math.round(g.theftProb(nextWx) * 100) })}</span><span>${T('re.nextTurn')} ${NW.icon} ${NW.name}</span></div>
@@ -1347,7 +1435,8 @@
     const ic = tileIcons(p);
     const cells = Array.from({ length: p.size }, (_, k) => `<i>${ic[k] ? `<span>${ic[k]}</span>` : ''}</i>`).join('');
     const vb = p.rush ? `<b class="vb rushb${game.rushToday(p) ? ' now' : ''}">⚡</b>` : valueTier(p) ? `<b class="vb">${valueTier(p) === 3 ? '✦' : valueTier(p) === 2 ? '◆' : '▲'}</b>` : '';
-    return `<button type="button" class="${cls}" data-id="${p.id}" style="--c:${t.css}" title="${esc(tip)}" aria-label="${esc(tip)}">${cells}${vb}</button>`;
+    const tr = p.trait && M.MULTI.TRAITS[p.trait]; const tb = tr ? `<b class="tb ${tr.kind}">${tr.icon}</b>` : '';
+    return `<button type="button" class="${cls}${tr ? ' trait' : ''}" data-id="${p.id}" style="--c:${t.css}" title="${esc(tip)}" aria-label="${esc(tip)}">${cells}${vb}${tb}</button>`;
   }
   function renderStock(container, parcels, s) {
     if (!parcels.length) { container.innerHTML = `<div id="empty">${T('hud.emptyWarehouse')}</div>`; return; }
@@ -1624,7 +1713,7 @@
     const pen = events.find(e => e.type === 'penalty');
     if (pen) { scene.shake(); scene.mope(); SFX.penalty(); floatText(T('float.rep', { n: pen.amount }), true, 50); toast(pen.reasons.map(I18n.text).join(' · '), 2600); }
     for (const e of events) if (e.type === 'settle' && match) toastLater(T('multi.settle', { cal: game.calMonth(e.month), half: T('fmt.half' + game.half(e.month)), net: (e.net >= 0 ? '+' : '') + e.net }), 2200);
-    multiAfterDay();
+    multiAfterDay(events);
     setTimeout(() => {
       scene.sync(game, { animate: true });
       if (events.some(e => e.type === 'arrive')) SFX.thud();

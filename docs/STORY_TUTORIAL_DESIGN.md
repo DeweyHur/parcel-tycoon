@@ -2863,3 +2863,7 @@ marketing: { costs: [...], parcels: 3, campaign: { days: 3, per: 4, cost: 50 } }
 
 유저: **"멀티 구현 1단계 시작"** — `docs/MULTIPLAYER_DESIGN.md` 13장 1단계(멀티 규칙 셋, 봇 3명과 로컬로). 무엇을 어떻게 했는지는 그 문서 부록 A.
 캠페인·자유 런은 규칙이 전부 `rules.*` 문 뒤에 있어 한 줄도 안 바뀐다 — unit 114 · sim · runs-ui 34 · play-ui 전부 통과.
+
+## 덧. 멀티 「난투」 2단계 (2026-09-26)
+
+유저: **"멀티 구현 2단계 시작"** — 트레잇 16장 · 이삿짐 폭탄 · 포트레잇(스토리 스프라이트 차용) · 발사/피격/방패/폭탄/배너 연출. `docs/MULTIPLAYER_DESIGN.md` 부록 B.
