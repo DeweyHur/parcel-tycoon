@@ -85,7 +85,7 @@
     constructor(cfg) {
       cfg = Object.assign({ scenario: M.DEFAULT_SCENARIO, company: 'local', perks: [] }, cfg || {});
       // 예전 세이브·기록의 시나리오 id → 새 런 (분기·반기·한 해는 같은 3월 시작이라 그대로 이어진다)
-      if (!M.SCENARIOS[cfg.scenario]) cfg.scenario = ({ quarter: 'kr_spring', halfyear: 'kr_h1', standard: 'kr_year' })[cfg.scenario] || M.DEFAULT_SCENARIO;
+      if (!M.SCENARIOS[cfg.scenario]) cfg.scenario = ({ quarter: 'kr_spring', halfyear: 'kr_spring', standard: 'kr_spring', kr_h1: 'kr_spring', kr_h2: 'kr_autumn', kr_year: 'kr_spring' })[cfg.scenario] || M.DEFAULT_SCENARIO;
       // 인수인계(대본) 런은 시드까지 고정 — 대본 밖 굴림(파손·도난·통관)도 매번 같아야 같은 환경이 재현된다
       // 캠페인 레벨: 대본 · 고정 시드 · 켜져 있는 기능 집합 (levels.js)
       this.level = cfg.level && LV ? LV.get(cfg.level) : null;
@@ -153,6 +153,7 @@
       const sc = M.SCENARIOS[c.scenario] || M.SCENARIOS[M.DEFAULT_SCENARIO];
       const co = M.COMPANIES[c.company] || M.COMPANIES.local;
       const mods = [{ months: sc.months }, sc.mods, co.mods];
+      if (c.months) mods.push({ months: c.months });   // 시뮬레이터·테스트 전용: 런 길이(사이클)를 직접 준다
       // 캠페인은 난이도 대신 장 공통 보정(levels.js BASE_MODS)을 깐다 — 예전 '수습' 난이도가 하던 일
       if (this.level && LV && LV.BASE_MODS) mods.push(LV.BASE_MODS);
       // 레벨은 시나리오 위에 얹는다 — 길이(사이클)·해·시작 달과 그 레벨만의 보정

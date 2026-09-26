@@ -244,7 +244,7 @@
   //   봄   = 캠페인(인수인계) 그 자체. 고르면 박 반장과 서장부터 다시 한다(campaign: true).
   //   여름 = 캠페인을 끝낸 창고를 그대로 물려받아 혼자 굴린다(chainFrom: 'campaign').
   //   가을 = 여름을 완주한 창고, 겨울 = 가을을 완주한 창고 — 몇 번이든 다시 할 수 있고, 매번 그 시작 판에서 출발한다.
-  //   겨울까지 넘기면 반기·한 해 같은 다른 런이 열린다.
+  //   겨울 다음은 나라별·다른 시나리오, 위클리 런이 이어 붙는다 (반기·한 해는 없앴다).
   // 무료판(BUILD.demo)은 FREE_RUNS(봄·여름)까지. 여름을 넘기면 본편 안내로 간다.
   const SPANS = { quarter: { months: 6, scoreMult: 1 }, half: { months: 12, scoreMult: 1.25 }, year: { months: 24, scoreMult: 1.5 } };
   const RUN = (country, span, startMonth, icon, unlock, extra) => Object.assign({ country, span, icon, months: SPANS[span].months, mods: { calendar: country, startMonth, scoreMult: SPANS[span].scoreMult }, unlock }, extra || {});
@@ -253,9 +253,6 @@
     kr_summer: RUN('kr', 'quarter', 6,  '☔', null, { chainFrom: 'campaign', chainNext: 'kr_autumn' }),
     kr_autumn: RUN('kr', 'quarter', 9,  '🎑', 'kr_summer_clear', { chainFrom: 'kr_summer', chainNext: 'kr_winter' }),
     kr_winter: RUN('kr', 'quarter', 12, '❄', 'kr_autumn_clear', { chainFrom: 'kr_autumn' }),
-    kr_h1:     RUN('kr', 'half',    3,  '🌱', 'kr_winter_clear'),
-    kr_h2:     RUN('kr', 'half',    9,  '🍂', 'kr_winter_clear'),
-    kr_year:   RUN('kr', 'year',    3,  '📅', 'kr_winter_clear'),
   };
   const FREE_RUNS = ['kr_spring', 'kr_summer'];
   const DEFAULT_SCENARIO = 'kr_spring';
@@ -280,8 +277,7 @@
     // 런(시나리오) 해금 — 한국 달력을 차례로 연다
     kr_summer_clear:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'kr_autumn', check: (s, p, r) => r.scenario === 'kr_summer' },
     kr_autumn_clear:{ kind: 'end', needWin: true, rewardType: 'scenario', reward: 'kr_winter', check: (s, p, r) => r.scenario === 'kr_autumn' },
-    kr_winter_clear:{ kind: 'end', needWin: true, rewardType: 'multi', reward: ['scenario:kr_h1', 'scenario:kr_h2', 'scenario:kr_year'], check: (s, p, r) => r.scenario === 'kr_winter' },
-    kr_year_clear:{ kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.scenario === 'kr_year' },
+    kr_winter_clear:{ kind: 'end', needWin: true, rewardType: 'none', check: (s, p, r) => r.scenario === 'kr_winter' },   // 나라별·다른 시나리오가 생기면 여기서 연다
     // 기록용
     cust_l3:      { kind: 'run', rewardType: 'none', check: s => (s.customerL3 || 0) >= 1 },
     storage3:     { kind: 'cum', rewardType: 'none', check: (s, p) => (p.storageDone || 0) >= 3, prog: p => [p.storageDone || 0, 3] },

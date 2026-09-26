@@ -94,14 +94,14 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('가을 완주 → 겨울 해금 + 시작 판', end.win && got.un.includes('kr_winter') && got.chain, JSON.stringify(got));
   got = await page.evaluate(() => { PT.prep.scenario = 'kr_winter'; PT.startRun(); const g = PT.game; const w = { cal: g.calMonth(1), year: g.year }; if (g.phase === 'market') g.closeMarket(); for (let c = 1; c <= g.rules.months + 1; c++) { g.turn = g.turns(); g.cash = 9000; g.feesDue = 0; g.debt = 0; g.rep = g.repCap(); g._endMonth(); if (g.phase === 'summary') { g.closeSummary(); if (g.phase === 'market') g.closeMarket(); } if (g.phase === 'win' || g.phase === 'over') break; } const got = Profile.recordRun(g, g.result); g.result.recorded = true; return { w, win: g.result.win, carry: g.result.carry, got: got.map(x => x.id), un: Profile.get().unlocked.scenarios.slice() }; });
   ok('겨울: 12월 · 같은 해에서 시작', got.w.cal === 12 && got.w.year === 2027, JSON.stringify(got.w));
-  ok('겨울 완주 → 상·하반기·한 해 해금 (겨울은 넘길 판이 없다)', got.win && got.got.includes('kr_winter_clear') && ['kr_h1', 'kr_h2', 'kr_year'].every(k => got.un.includes(k)) && got.carry === null, JSON.stringify({ got: got.got, un: got.un }));
+  ok('겨울 완주 (넘길 판 없음 · 반기·한 해 없음)', got.win && got.got.includes('kr_winter_clear') && got.un.length === 4 && got.carry === null, JSON.stringify({ got: got.got, un: got.un }));
   // 도감
   await page.evaluate(() => { PT.game = null; PT.showTitle(); }); await page.waitForTimeout(300);
   for (let i = 0; i < 10; i++) { if (await page.$('#t-codex')) break; await page.mouse.click(200, 400); await page.waitForTimeout(300); }
   await page.click('#t-codex'); await page.waitForTimeout(300);
   await page.evaluate(() => document.querySelector('.modal [data-tab="scenarios"]').click()); await page.waitForTimeout(300);
   t = await modalText(page);
-  ok('도감 런 탭에 7종', (t.match(/\(3~5월\)|\(6~8월\)|\(9~11월\)|\(12~2월\)|\(3~8월\)|\(9~2월\)|이듬해/g) || []).length >= 7, t.slice(0, 80));
+  ok('도감 런 탭에 계절 넷뿐', (t.match(/\(3~5월\)|\(6~8월\)|\(9~11월\)|\(12~2월\)/g) || []).length >= 4 && !/반기|이듬해/.test(t), t.slice(0, 80));
   await page.evaluate(() => document.querySelector('.modal [data-tab="achievements"]') && document.querySelector('.modal [data-tab="achievements"]').click()); await page.waitForTimeout(300);
   t = await modalText(page);
   ok('도감 도전과제 탭: 겨울을 넘기다 · 옛 사계절/봄을 넘기다 없음', /겨울을 넘기다/.test(t) && !/사계절/.test(t) && !/봄을 넘기다/.test(t));
@@ -117,7 +117,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.screenshot({ path: `${OUT}/runs-04-demo-select.png` });
   await clickCard(page, 'kr_autumn'); await page.waitForTimeout(300);
   t = await modalText(page);
-  ok('무료판: 가을을 누르면 본편 안내', /가을·겨울, 그리고 반기/.test(t) && /출시 준비 중/.test(t));
+  ok('무료판: 가을을 누르면 본편 안내', /가을·겨울이 이어집니다/.test(t) && /출시 준비 중/.test(t));
   await page.screenshot({ path: `${OUT}/runs-05-demo-gate.png` });
   await clickBtn(page, /닫기/); await page.waitForTimeout(300);
   await clickCard(page, 'kr_summer'); await page.waitForTimeout(200);
@@ -129,7 +129,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.screenshot({ path: `${OUT}/runs-06-demo-end.png` });
   ok('무료판: 그래도 가을 시작 판은 저장돼 있다 (본편에서 이어짐)', await page.evaluate(() => !!Profile.get().chain.kr_autumn));
   await clickBtn(page, /정식판 보기/); await page.waitForTimeout(300);
-  ok('본편 알아보기 → 안내 화면', /가을·겨울, 그리고 반기/.test(await modalText(page)));
+  ok('본편 알아보기 → 안내 화면', /가을·겨울이 이어집니다/.test(await modalText(page)));
 
   console.log(`\n에러: ${errors.length ? errors.join('\n') : '없음'}`);
   console.log(fail.length ? `\n실패 ${fail.length}건:\n${fail.join('\n')}` : `\n전부 통과 (${pass.length})`);

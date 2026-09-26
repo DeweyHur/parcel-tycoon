@@ -1321,7 +1321,7 @@
     'demo.storySub': 'story tutorial · demo covers {n} months',
     'demo.cta': 'Get the full game',
     'demo.gateTitle': 'Full game',
-    'demo.gateBody': 'Autumn, winter, plus half-year and full-year runs. Your demo progress carries over.',
+    'demo.gateBody': 'Autumn and winter continue from here. Your demo progress carries over.',
     'demo.rowMonths': 'Runs',
     'demo.rowScenarios': 'Runs',
     'demo.rowCompanies': 'Companies',
@@ -2202,18 +2202,6 @@
         "name": "Winter (Dec–Feb)",
         "desc": "Year-end volume ×1.4, Christmas and New Year off, blizzards, and the Seollal holiday in February. The tightest three months of the year"
       },
-      "kr_h1": {
-        "name": "First half (Mar–Aug)",
-        "desc": "Spring and summer back to back — from moving season through monsoon and heat. Score ×1.25"
-      },
-      "kr_h2": {
-        "name": "Second half (Sep–Feb)",
-        "desc": "Chuseok to Seollal. Both holidays and the year-end in one run. Score ×1.25"
-      },
-      "kr_year": {
-        "name": "Full year (Mar–Feb)",
-        "desc": "One lap of the Korean calendar. Customer trust grows, volume doubles, and so does spending. Score ×1.5"
-      }
     },
     "ACHIEVEMENTS": {
       "rookie": {
@@ -2414,7 +2402,7 @@
       },
       "kr_winter_clear": {
         "name": "Through the Winter",
-        "desc": "Finish Winter (Dec–Feb) → unlocks First half, Second half and Full year"
+        "desc": "Finish Winter (Dec–Feb)"
       },
       "kr_summer_clear": {
         "name": "Through Summer",
@@ -2423,10 +2411,6 @@
       "kr_autumn_clear": {
         "name": "Through Autumn",
         "desc": "Finish Autumn (Sep–Nov) → unlocks Winter"
-      },
-      "kr_year_clear": {
-        "name": "Full Lap",
-        "desc": "Finish the Full Year run"
       },
       "holiday_clear": {
         "name": "Holiday Rush",

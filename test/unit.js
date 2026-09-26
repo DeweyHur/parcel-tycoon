@@ -1,7 +1,7 @@
 // 규칙 단위 테스트: node test/unit.js  (v1.0 차량·신뢰 특성·긴장감 재설계 기준 — docs/BALANCE_DESIGN.md)
 const assert = require('assert');
 const { Game, DATA: D, META: M } = require('../www/js/game.js');
-const NG = (seed, extra) => new Game(Object.assign({ seed, scenario: 'kr_year', noHolidays: true, perks: ['skip', 'insure'] }, extra || {}));   // 기본은 한 해 런 (24사이클), 공휴일은 따로 시험한다
+const NG = (seed, extra) => new Game(Object.assign({ seed, scenario: 'kr_spring', months: 24, noHolidays: true, perks: ['skip', 'insure'] }, extra || {}));   // 기본은 한 해 런 (24사이클), 공휴일은 따로 시험한다
 let n = 0, fails = []; const t = (name, f) => { try { f(); n++; console.log('ok', name); } catch (e) { fails.push(name); console.log('FAIL', name, '—', String(e.message).split('\n')[0].slice(0, 200)); } };
 // 빈 창고·빈 입고로 시작하는 실험용 게임
 const EMPTY = (seed, extra) => { const g = NG(seed, extra); g.parcels = []; g.schedule = g.schedule.map(() => []); g.warehouse.cap = 99; g.cash = 2000; return g; };
@@ -351,8 +351,8 @@ t('평판 0 → 게임오버(아무도 안 맡긴다)', () => { const g = EMPTY(
 t('회사별 시작 상태', () => { for (const id in M.COMPANIES) { const g = new Game({ seed: 2, company: id }); assert.ok(g.cash > 0, id); assert.ok(g.contracts.filter(Boolean).length >= 2, id); } const q = new Game({ seed: 2, company: 'quick' }); assert.equal(q.selfCount(), 2); const th = new Game({ seed: 2, company: 'thrifty' }); assert.equal(th.rules.feeMult, 0.8); const po = new Game({ seed: 2, company: 'postal' }); assert.equal(po.truckFee(po.contracts[1]), 35); });
 t('런 = 나라 달력 × 시작 달 × 길이: 분기 6·반기 12·한 해 24사이클, 점수 배율, 기본은 봄', () => {
   assert.equal(new Game({ seed: 1 }).cfg.scenario, 'kr_spring');
-  assert.equal(new Game({ seed: 1, scenario: 'standard' }).cfg.scenario, 'kr_year', '옛 세이브 id 는 새 런으로'); assert.equal(new Game({ seed: 1, scenario: 'peak' }).cfg.scenario, 'kr_spring');
-  for (const [id, months, start, mult] of [['kr_spring', 6, 3, 1], ['kr_winter', 6, 12, 1], ['kr_h2', 12, 9, 1.25], ['kr_year', 24, 3, 1.5]]) { const g = new Game({ seed: 1, scenario: id }); assert.equal(g.rules.months, months, id); assert.equal(g.calMonth(1), start, id); assert.equal(g.rules.scoreMult, mult, id); assert.equal(g.rules.calendar, 'kr'); }
+  assert.equal(new Game({ seed: 1, scenario: 'standard' }).cfg.scenario, 'kr_spring', '옛 세이브 id 는 새 런으로'); assert.equal(new Game({ seed: 1, scenario: 'kr_h2' }).cfg.scenario, 'kr_autumn', '없앤 반기 런은 계절 런으로'); assert.ok(!M.SCENARIOS.kr_h1 && !M.SCENARIOS.kr_year, '반기·한 해는 없다'); assert.equal(new Game({ seed: 1, scenario: 'peak' }).cfg.scenario, 'kr_spring');
+  for (const [id, months, start, mult] of [['kr_spring', 6, 3, 1], ['kr_winter', 6, 12, 1], ['kr_autumn', 6, 9, 1]]) { const g = new Game({ seed: 1, scenario: id }); assert.equal(g.rules.months, months, id); assert.equal(g.calMonth(1), start, id); assert.equal(g.rules.scoreMult, mult, id); assert.equal(g.rules.calendar, 'kr'); }
     for (const id in M.SCENARIOS) { const u = M.SCENARIOS[id].unlock; assert.ok(!u || M.ACHIEVEMENTS[u], id + ' 해금 도전과제가 있어야 한다'); }
   assert.ok(!M.DIFFICULTIES && !M.DAILY_VARIANTS, '난이도·데일리는 없다');
 });
@@ -520,7 +520,7 @@ t('달력: 한국 3월 시작. 2026 추석(9/24~26) 앞 닷새 폭주 → 연휴
 });
 t('달력: 런의 startMonth 가 시작 달을 정하고, 해를 넘기면 yearOf 가 따라온다 (겨울 12월 → 이듬해 2월)', () => {
   const w = new Game({ seed: 1, scenario: 'kr_winter', year: 2026 }); assert.equal(w.calMonth(1), 12); assert.equal(w.yearOf(1), 2026); assert.equal(w.calMonth(3), 1); assert.equal(w.yearOf(3), 2027); assert.equal(w.calMonth(6), 2);
-  assert.equal(new Game({ seed: 1, scenario: 'kr_h2' }).calMonth(1), 9);
+  assert.equal(new Game({ seed: 1, scenario: 'kr_autumn' }).calMonth(1), 9);
   const g = NG(3); assert.equal(g.calendarMonths().length, 12); assert.equal(g.calendarMonths()[6].cal, 9);
 });
 t('달력: 1월은 인플레 한 단계를 건너뛴다, 12월은 반송 유예 -1', () => {
@@ -719,14 +719,13 @@ t('스토리: 비트 문구 키가 ko/en 에 모두 있다', () => {
   for (const id in M.ACHIEVEMENTS) assert.ok(KO.meta.ACHIEVEMENTS[id] && EN.meta.ACHIEVEMENTS[id], id);
   for (const k of ['prep.runWhenSame', 'prep.runWhenNext', 'prep.span.quarter', 'prep.span.half', 'prep.span.year']) assert.ok(KO.ui[k] && EN.ui[k], k);
 });
-t('계절 이어하기: 봄=캠페인 · 여름부터 앞 계절의 창고를 물려받는다 · 겨울 완주 → 반기·한 해', () => {
+t('계절 이어하기: 봄=캠페인 · 여름부터 앞 계절의 창고를 물려받는다 · 반기·한 해는 없다', () => {
   assert.deepEqual(M.DEFAULT_UNLOCK.scenarios, ['kr_spring', 'kr_summer']);
   assert.deepEqual(M.FREE_RUNS, ['kr_spring', 'kr_summer']);
   assert.ok(M.SCENARIOS.kr_spring.campaign);
   assert.equal(M.SCENARIOS.kr_summer.chainFrom, 'campaign'); assert.equal(M.SCENARIOS.kr_summer.chainNext, 'kr_autumn');
   assert.equal(M.SCENARIOS.kr_autumn.chainFrom, 'kr_summer'); assert.equal(M.SCENARIOS.kr_winter.chainFrom, 'kr_autumn');
-  assert.deepEqual(M.ACHIEVEMENTS.kr_winter_clear.reward, ['scenario:kr_h1', 'scenario:kr_h2', 'scenario:kr_year']);
-  for (const id of ['kr_h1', 'kr_h2', 'kr_year']) assert.equal(M.SCENARIOS[id].unlock, 'kr_winter_clear');
+  assert.equal(M.ACHIEVEMENTS.kr_winter_clear.rewardType, 'none');
   // 물려받은 판: 자금·창고·계약·고객이 그대로, 해도 그대로
   const carry = { cash: 1777, year: 2027, warehouse: { cap: 40, cold: 8, frozen: 4, xl: 0 }, contracts: [{ carrier: 'bulk0', grade: 'normal', calls: 3, enh: {} }, { carrier: 'cold0', grade: 'normal', calls: 2, enh: {} }], customers: [['anon', 0], ['mart', 1], ['ice', 0]], trust: {}, growth: {}, media: {} };
   const g = new Game({ seed: 3, scenario: 'kr_summer', carry, year: 2027 });
@@ -892,7 +891,7 @@ t('포워더(항공·철도·해상)는 무역 고객(🛃 짐을 맡기는 화�
   const g = NG(31); assert.ok(!g.hasTradeCustomer(), '동네 택배 시작 고객(큰마트·새벽·유리)엔 무역 고객이 없다');
   const w = g._carrierWeights(); assert.ok(!w.air && !w.rail && !w.sea && w.bulk && w.intl, JSON.stringify(Object.keys(w)));
   g.addCustomer('import'); assert.ok(g.hasTradeCustomer()); const w2 = g._carrierWeights(); assert.ok(w2.air && w2.rail && w2.sea);
-  const gl = new Game({ seed: 2, scenario: 'kr_year', company: 'global', noHolidays: true }); assert.ok(gl.hasTradeCustomer(), '글로벌 익스프레스는 수입상·명품관이 있어 처음부터 포워더가 열린다');
+  const gl = new Game({ seed: 2, scenario: 'kr_spring', months: 24, company: 'global', noHolidays: true }); assert.ok(gl.hasTradeCustomer(), '글로벌 익스프레스는 수입상·명품관이 있어 처음부터 포워더가 열린다');
 });
 
 console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);
