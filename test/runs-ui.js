@@ -44,7 +44,8 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   let t = await modalText(page);
   ok('런 선택: 한국 · 분기 · 봄 · 여름', /한국/.test(t) && /분기/.test(t) && /봄 \(3~5월\)/.test(t) && /여름 \(6~8월\)/.test(t));
   ok('봄·여름 카드는 캠페인의 해(2027)', (t.match(/📅2027/g) || []).length >= 2, (t.match(/📅[^📅]{0,12}/g) || []).join(' '));
-  ok('봄은 인수인계, 여름은 그 창고에서', /박 반장과 인수인계/.test(t) && /인수인계를 끝낸 창고 그대로/.test(t));
+  ok('카드에 이어하기 설명 줄이 없다', !/창고 그대로|기본 창고로|박 반장과 인수인계/.test(t));
+  ok('카드에 달별 수치 (📦 입고 배수 · 🚫 휴무)', !/3월📦/.test(t) && /6월📦×1/.test(t) && !/이사철|가정의 달/.test(t), (t.match(/[0-9]+월📦[^월]{0,30}/g) || []).slice(0, 3).join(' | '));
   ok('난이도 줄이 없다', !/수습|베테랑|정규/.test(t));
   const locked = await page.evaluate(() => [...document.querySelectorAll('#modal .card.dis')].length);
   ok('잠긴 런 카드가 없다 (가을·반기·한 해는 아직 안 보임)', locked === 0 && !/가을 \(9~11월\)/.test(t) && !/반기/.test(t) && !/한 해/.test(t), String(locked));
@@ -82,7 +83,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.click('#t-new'); await page.waitForTimeout(400);
   t = await modalText(page);
   if (!/가을 \(9~11월\)/.test(t)) console.log('    [debug] ' + t.slice(0, 200));
-  ok('가을 카드: 여름을 넘긴 창고 그대로', /가을 \(9~11월\)/.test(t) && /여름을 넘긴 창고 그대로/.test(t));
+  ok('가을 카드가 열렸다', /가을 \(9~11월\)/.test(t));
   const aut = await page.evaluate(() => { PT.prep.scenario = 'kr_autumn'; PT.prep.story = true; PT.startRun(); const g = PT.game; const c = Profile.get().chain.kr_autumn; return { cap: g.warehouse.cap, want: c.warehouse.cap, year: g.year, cal: g.calMonth(1), story: !!g.story }; });
   await page.waitForTimeout(300);
   ok('가을 런: 여름 끝 판에서 · 9월 · 같은 해', aut.cap === aut.want && aut.year === 2027 && aut.cal === 9 && !aut.story, JSON.stringify(aut));
@@ -108,15 +109,15 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
 
   // ===== 무료판 =====
   page = await open(true);
-  ok('무료판: 새 런은 잠겨 있지 않다', !/본편에서/.test(await page.evaluate(() => document.querySelector('#t-new').textContent)));
+  ok('무료판: 새 런은 잠겨 있지 않다', !/정식판/.test(await page.evaluate(() => document.querySelector('#t-new').textContent)));
   await page.click('#t-new'); await page.waitForTimeout(400);
   t = await modalText(page);
   const dis = await page.evaluate(() => [...document.querySelectorAll('#modal .card.dis')].map(c => c.dataset.id));
-  ok('무료판: 봄·여름은 열려 있고 가을·겨울은 🔒 본편에서', /여름 \(6~8월\)/.test(t) && dis.join() === 'kr_autumn,kr_winter' && /본편에서/.test(t) && !/반기/.test(t), dis.join());
+  ok('무료판: 봄·여름은 열려 있고 가을·겨울은 🔒 본편에서', /여름 \(6~8월\)/.test(t) && dis.join() === 'kr_autumn,kr_winter' && /정식판/.test(t) && !/반기/.test(t), dis.join());
   await page.screenshot({ path: `${OUT}/runs-04-demo-select.png` });
   await clickCard(page, 'kr_autumn'); await page.waitForTimeout(300);
   t = await modalText(page);
-  ok('무료판: 가을을 누르면 본편 안내', /데모판입니다/.test(t) && /봄\(인수인계\)과 여름까지/.test(t) && /출시 준비 중/.test(t));
+  ok('무료판: 가을을 누르면 본편 안내', /가을·겨울, 그리고 반기/.test(t) && /출시 준비 중/.test(t));
   await page.screenshot({ path: `${OUT}/runs-05-demo-gate.png` });
   await clickBtn(page, /닫기/); await page.waitForTimeout(300);
   await clickCard(page, 'kr_summer'); await page.waitForTimeout(200);
@@ -124,11 +125,11 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   end = await fastFinish(page);
   await page.evaluate(() => PT.showResult()); await page.waitForTimeout(600);
   t = await modalText(page);
-  ok('무료판: 여름을 넘기면 결과에 본편 안내', end.win && /여름을 넘겼습니다/.test(t) && /무료판은 여기까지/.test(t) && /본편 알아보기/.test(t), t.slice(0, 120));
+  ok('무료판: 여름을 넘기면 결과에 본편 안내', end.win && /플레이해 주셔서 감사합니다/.test(t) && /체험판은 여기까지입니다/.test(t) && /정식판 보기/.test(t), t.slice(0, 120));
   await page.screenshot({ path: `${OUT}/runs-06-demo-end.png` });
   ok('무료판: 그래도 가을 시작 판은 저장돼 있다 (본편에서 이어짐)', await page.evaluate(() => !!Profile.get().chain.kr_autumn));
-  await clickBtn(page, /본편 알아보기/); await page.waitForTimeout(300);
-  ok('본편 알아보기 → 안내 화면', /데모판입니다/.test(await modalText(page)));
+  await clickBtn(page, /정식판 보기/); await page.waitForTimeout(300);
+  ok('본편 알아보기 → 안내 화면', /가을·겨울, 그리고 반기/.test(await modalText(page)));
 
   console.log(`\n에러: ${errors.length ? errors.join('\n') : '없음'}`);
   console.log(fail.length ? `\n실패 ${fail.length}건:\n${fail.join('\n')}` : `\n전부 통과 (${pass.length})`);

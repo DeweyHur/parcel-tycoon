@@ -262,7 +262,7 @@
     'over.stress': '운영 스트레스가 한계에 도달했습니다',
     'over.rep': '평판이 바닥났습니다 — 이제 아무도 여기에 맡기지 않습니다',
     'over.bankrupt': '부채 {debt}c가 단기 차입 한도 {limit}c를 넘어 부도가 났습니다',
-    'over.win': '{cycles}사이클({months}개월)을 끝까지 굴렸습니다',
+    'over.win': '{months}개월 완주',
     'over.winStory': '인수인계 끝 — 이제 여기 사장은 자네야',
     'err.noCash': '자금이 부족합니다',
     'err.marketOnly': '마켓에서만 바꿀 수 있습니다',
@@ -1318,31 +1318,30 @@
     'stat.reset': '프로필 초기화',
     'stat.resetConfirm': '해금·도전과제·기록을 모두 지웁니다. 계속할까요?',
     'stat.resetBtn': '초기화',
-    'demo.fullOnly': '본편에서',
+    'demo.fullOnly': '정식판',
     'demo.storySub': '스토리 튜토리얼 · 데모는 {n}개월까지',
-    'demo.cta': '본편 알아보기',
-    'demo.gateTitle': '데모판입니다',
-    'demo.gateBody': '무료판은 봄(인수인계)과 여름까지입니다. 본편에서는 여름을 넘긴 그 창고로 가을(추석)과 겨울(연말·설)을 이어 가고, 겨울까지 넘기면 반기·한 해 런이 열립니다.',
-    'demo.rowMonths': '본편 런',
+    'demo.cta': '정식판 보기',
+    'demo.gateTitle': '정식판',
+    'demo.gateBody': '가을·겨울, 그리고 반기·한 해 런이 있습니다. 체험판 진행은 그대로 이어집니다.',
+    'demo.rowMonths': '런',
     'demo.rowScenarios': '런',
     'demo.rowCompanies': '회사',
     'demo.rowPerks': '퍽',
-    'demo.keepProfile': '데모에서 딴 도전과제와 기록은 그대로 이어집니다. 기록 화면의 「프로필 내보내기」로 코드를 옮기면 됩니다.',
+    'demo.keepProfile': '다른 기기로 옮길 때는 기록 화면의 「프로필 내보내기」를 쓰세요.',
     'demo.soon': '출시 준비 중입니다.',
-    'demo.resultTitle': '여름을 넘겼습니다',
-    'demo.resultHead': '무료판은 여기까지',
-    'demo.resultBody': '이 창고는 그대로 남아 있습니다. 본편에서 가을·겨울로 이어 가세요.',
+    'demo.resultTitle': '플레이해 주셔서 감사합니다!',
+    'demo.resultHead': '체험판은 여기까지입니다',
     'demo.endReason': '데모 종료 — {n}개월차까지 운영했습니다',
     'prep.springStart': '시작',
     'prep.springPick': '어느 장부터 할까요?',
-    'prep.springBody': '박 반장과 다시 합니다. 여기서 끝낸 창고가 여름의 시작 판이 됩니다.',
-    'prep.chain.kr_spring': '📖 박 반장과 인수인계 — 서장부터 다시',
-    'prep.chain.kr_summer': '🏠 인수인계를 끝낸 창고 그대로 · 이제 혼자',
-    'prep.chain.kr_autumn': '🏠 여름을 넘긴 창고 그대로',
-    'prep.chain.kr_winter': '🏠 가을을 넘긴 창고 그대로',
-    'prep.chainFresh.kr_summer': '🏠 기본 창고로 시작 (인수인계를 끝내면 그 창고로 이어진다)',
-    'prep.chainFresh.kr_autumn': '🏠 기본 창고로 시작 (여름을 넘기면 그 창고로 이어진다)',
-    'prep.chainFresh.kr_winter': '🏠 기본 창고로 시작 (가을을 넘기면 그 창고로 이어진다)',
+    'prep.mon': '{m}월',
+    'prep.legend': '📦 입고 배수 · ● 품목 비중 · 🚫 업체 휴무 · 🔺 입고 폭주',
+    'prep.lg.arr': '이 달 입고 배수',
+    'prep.lg.shift': '이 달 늘어나는 품목(비중 %p)',
+    'prep.lg.wx': '날씨 가중',
+    'prep.lg.off': '업체 휴무 — 차를 부를 수 없는 날',
+    'prep.lg.rush': '입고 폭주 — 그날 입고 배수',
+    'prep.lg.bonus': '행사 — 그 품목 개당 보상',
     'prep.springTitle': '봄 — 인수인계',
     'stat.export': '프로필 내보내기',
     'stat.import': '프로필 가져오기',
@@ -2178,19 +2177,19 @@
     "SCENARIOS": {
       "kr_spring": {
         "name": "봄 (3~5월)",
-        "desc": "박 반장과 하는 인수인계. 서장부터 다시 — 여기서 끝낸 창고가 여름으로 넘어간다"
+        "desc": "3월 이사철에 시작해 5월 가정의 달까지. 3·1절·어린이날·부처님오신날엔 업체가 쉰다. 처음 굴려 보는 석 달"
       },
       "kr_summer": {
         "name": "여름 (6~8월)",
-        "desc": "봄을 끝낸 그 창고로, 이제 혼자. 장마와 폭염에 야외 적재는 젖고 신선은 상한다. 현충일·광복절 휴무"
+        "desc": "장마와 폭염. 야외 적재는 젖고 신선은 상한다 — 냉장 없이는 못 버틴다. 현충일·광복절 휴무"
       },
       "kr_autumn": {
         "name": "가을 (9~11월)",
-        "desc": "여름을 넘긴 창고 그대로. 추석 앞 닷새는 입고 ×1.6에 기한이 하루 짧고, 연휴 사흘은 차가 안 온다. 11월 쇼핑 행사까지"
+        "desc": "추석 앞 닷새는 입고 ×1.6에 기한이 하루 짧고, 연휴 사흘은 차가 안 온다. 그 뒤 개천절·한글날, 11월 쇼핑 행사까지"
       },
       "kr_winter": {
         "name": "겨울 (12~2월)",
-        "desc": "가을을 넘긴 창고 그대로. 연말 물량 ×1.4, 성탄·신정 휴무, 폭설, 그리고 2월 설 연휴. 한 해 중 가장 빡빡한 석 달"
+        "desc": "연말 물량 ×1.4, 성탄·신정 휴무, 폭설, 그리고 2월 설 연휴. 한 해 중 가장 빡빡한 석 달"
       },
       "kr_h1": {
         "name": "상반기 (3~8월)",

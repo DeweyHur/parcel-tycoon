@@ -739,7 +739,7 @@ t('계절 이어하기: 봄=캠페인 · 여름부터 앞 계절의 창고를 �
   const w = new Game({ seed: 3, scenario: 'kr_winter' }); w._win(); assert.equal(w.result.carry, null);
 });
 t('데모: 문구 키가 ko/en 에 모두 있다', () => {
-  for (const k of ['demo.fullOnly', 'demo.cta', 'demo.gateTitle', 'demo.gateBody', 'demo.resultTitle', 'demo.resultHead', 'demo.resultBody', 'demo.soon', 'prep.springTitle', 'prep.springBody', 'prep.springPick', 'prep.springStart', 'prep.chain.kr_spring', 'prep.chain.kr_summer', 'prep.chain.kr_autumn', 'prep.chain.kr_winter', 'prep.chainFresh.kr_summer', 'prep.chainFresh.kr_autumn', 'prep.chainFresh.kr_winter',
+  for (const k of ['demo.fullOnly', 'demo.cta', 'demo.gateTitle', 'demo.gateBody', 'demo.resultTitle', 'demo.resultHead', 'demo.soon', 'prep.springTitle', 'prep.springPick', 'prep.springStart',
     'stat.export', 'stat.import', 'stat.exportHelp', 'stat.importHelp', 'stat.importOk', 'stat.importFail', 'stat.copy', 'stat.copied', 'stat.copyFail', 'stat.importBtn', 'stat.transferNote'])
     assert.ok(KO.ui[k] && EN.ui[k], k);
 });

@@ -395,19 +395,16 @@
     if (!P.unlocked.scenarios.includes(prep.scenario) || runLocked(prep.scenario)) prep.scenario = M.DEFAULT_SCENARIO;
     const card = id => {
       const s = M.SCENARIOS[id], paid = runLocked(id), un = !paid && P.unlocked.scenarios.includes(id);
-      // 계절 런은 어디서 이어지는지 한 줄 — 봄은 인수인계, 여름부터는 앞 계절을 넘긴 창고
-      const chain = paid ? '' : s.campaign ? T('prep.chain.' + id) : s.chainFrom ? T((Profile.chainStart(id) ? 'prep.chain.' : 'prep.chainFresh.') + id) : '';
       const rec = P.records[id]; const best = rec ? Math.max(0, ...Object.values(rec).map(r => r.bestScore)) : 0;
       const year = runYear(id);   // 계절 런은 이어받는 판의 해, 봄(인수인계)은 캠페인의 해
       const sm = s.mods.startMonth, em = ((sm - 1 + s.months / D.CYCLES_PER_MONTH - 1) % 12) + 1, y2 = year + Math.floor((sm - 1 + s.months / D.CYCLES_PER_MONTH - 1) / 12);
       const when = T(y2 === year ? 'prep.runWhenSame' : 'prep.runWhenNext', { y1: year, m1: sm, y2, m2: em });
       // 줄글 대신 달력 칩: 석 달이면 달마다 아이콘+이름, 그보다 길면 아이콘만 줄지어. 긴 런은 점수 배율
-      const nM = s.months / D.CYCLES_PER_MONTH, cal = M.CALENDARS[s.country] || { months: {} };
-      const mons = Array.from({ length: nM }, (_, i) => ((sm - 1 + i) % 12) + 1);
-      const chips = mons.map(mo => { const ic = (cal.months[mo] || {}).icon || ''; const lb = T('cal.' + s.country + '.' + mo + '.label'); return nM <= 3 ? `<span class="co-chip">${ic}${esc(lb)}</span>` : `<span title="${esc(lb)}">${ic}</span>`; }).join('');
+      const nM = s.months / D.CYCLES_PER_MONTH;
+      const chips = s.campaign ? '' : runMonthsHtml(id, year, nM <= 3);   // 봄은 대본(인수인계)이라 달력 수치가 판에 안 걸린다
       const mult = s.mods.scoreMult && s.mods.scoreMult !== 1 ? `<span class="co-plus">⭐×${s.mods.scoreMult}</span>` : '';
       return `<div class="card ${un ? '' : 'dis'} ${prep.scenario === id ? 'sel' : ''}" data-id="${id}"><div class="t"><span>${s.icon} ${esc(s.name)} <small style="color:var(--dim)">📅${esc(when)}</small></span><span class="price">${best ? T('fmt.pts', { n: best }) : ''}</span></div>
-        <div class="co-row${nM > 3 ? ' mons' : ''}">${chips}${mult}</div>${chain ? `<div class="d">${esc(chain)}</div>` : ''}${un ? '' : `<div class="d">${paid ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
+        ${nM <= 3 ? chips : `<div class="co-row mons">${chips}${mult}</div>`}${un ? '' : `<div class="d">${paid ? `🔒 ${T('demo.fullOnly')}` : esc(unlockText(s.unlock))}</div>`}</div>`;
     };
     // 아직 못 고르는 런은 보여 주지 않는다 (해금 조건은 도감에 있다).
     // 무료판은 본편 런(가을·겨울)을 잠근 채 보여 준다 — 뒤에 무엇이 있는지 보이게, 누르면 본편 안내로
@@ -415,7 +412,7 @@
     const countries = [...new Set(Object.keys(M.SCENARIOS).filter(avail).map(id => M.SCENARIOS[id].country))];
     const cards = countries.map(cc => {
       const cal = M.CALENDARS[cc];
-      const head = `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${cal.icon || ''} ${esc(cal.name || T('cal.' + cc + '.name'))}</div>`;
+      const head = `<div style="font-size:12px;color:var(--gold);margin:8px 0 4px">${cal.icon || ''} ${esc(cal.name || T('cal.' + cc + '.name'))}</div><div class="d runlg">${T('prep.legend')}</div>`;
       return head + Object.keys(M.SPANS).map(sp => { const ids = Object.keys(M.SCENARIOS).filter(id => avail(id) && M.SCENARIOS[id].country === cc && M.SCENARIOS[id].span === sp); return ids.length ? `<div class="d" style="font-size:11px;color:var(--dim);margin:6px 0 2px">${esc(T('prep.span.' + sp))}</div>` + ids.map(card).join('') : ''; }).join('');
     }).join('');
     const spring = !!(M.SCENARIOS[prep.scenario] || {}).campaign;
@@ -429,7 +426,7 @@
     const open = Math.min(Math.max(camp.cleared || 0, 0) + 1, LEVELS.IMPLEMENTED);
     const pick = Math.min(Math.max(sel || 1, 1), open);
     const chips = Array.from({ length: open }, (_, i) => i + 1).map(k => `<span class="chip${k === pick ? ' on' : ''}" data-ch="${k}">${T('lv.ch.' + k)}</span>`).join('');
-    const body = `<p>${T('prep.springBody')}</p><div class="chlbl">${T('prep.springPick')}</div><div class="chpick">${chips}</div>`;
+    const body = `<div class="chlbl">${T('prep.springPick')}</div><div class="chpick">${chips}</div>`;
     const m = modal(T('prep.springTitle'), body, [{ label: T('btn.back'), onClick: showScenarioSelect }, { label: T('prep.springStart'), cls: 'primary', onClick: () => {
       SFX.resume(); SFX.select();
       const P = Profile.get(); P.campaign = Object.assign({}, P.campaign, { level: pick }); Profile.save(); Store.remove(SAVE_KEY); startLevel(pick); } }]);
@@ -539,6 +536,44 @@
     withHowTo(() => { game = new Game(cfg); closeModal(); startPlay(); });
   }
 
+  // 런 카드의 달별 수치 — 계절 이름 대신 판에 실제로 걸리는 것만:
+  // 📦 입고 배수 · 색 점 + 품목 비중 이동 · 날씨 가중 · 🚫 업체 휴무일 · 🔺 입고 폭주일(배수)
+  // 공휴일은 해마다 날짜가 달라서 그 런의 해로 판을 하나 만들어 센다 (저장하지 않는다)
+  const runMonthsCache = {};
+  function runMonthStats(id, year) {
+    const key = id + '@' + year; if (runMonthsCache[key]) return runMonthsCache[key];
+    let g; try { g = new Game({ scenario: id, seed: 1, year, perks: [], insurer: 'none', prep: true }); } catch (e) { return []; }
+    const out = [];
+    for (let c = 1; c <= g.rules.months; c++) {
+      const mi = g.monthIndex(c);
+      let row = out[mi - 1];
+      if (!row) { const sm = g.seasonMods(c); row = out[mi - 1] = { cal: g.calMonth(c), arr: sm.arrivalsMult || 1, shift: sm.typeShift || {}, wx: sm.weather || {}, off: 0, rush: [] }; }
+      for (const e of g.monthEvents(c)) {
+        const n = e.turns[1] - e.turns[0] + 1;
+        if (e.noCalls) row.off += n;
+        else if (e.arrivalsMult > 1) row.rush.push({ n, x: e.arrivalsMult });
+        for (const t in e.rewardDelta || {}) row.bonus = { t, v: e.rewardDelta[t], n };
+      }
+    }
+    return (runMonthsCache[key] = out);
+  }
+  function runMonthsHtml(id, year, full) {
+    const rows = runMonthStats(id, year);
+    const WX = { rain: '🌧', heat: '🔥', snow: '❄️', storm: '🌀' };
+    const dot = t => D.PARCEL_TYPES[t] ? `<i class="tdot" style="background:${D.PARCEL_TYPES[t].css}"></i>` : '';
+    if (!full) return rows.map(r => `<span class="co-chip" title="${esc(T('prep.mon', { m: r.cal }))}">${T('prep.mon', { m: r.cal })}<b>×${r.arr}</b>${r.off ? '🚫' : ''}</span>`).join('');
+    return `<div class="runmons">` + rows.map(r => {
+      const parts = [`<span title="${esc(T('prep.lg.arr'))}">📦×${r.arr}</span>`];
+      const sh = Object.keys(r.shift).filter(t => r.shift[t] > 0 && t !== 'normal').map(t => `${dot(t)}+${r.shift[t]}`).join(' ');
+      if (sh) parts.push(`<span title="${esc(T('prep.lg.shift'))}">${sh}</span>`);
+      const wx = Object.keys(r.wx).filter(k => r.wx[k] > 1 && WX[k]).map(k => `${WX[k]}×${r.wx[k]}`).join(' ');
+      if (wx) parts.push(`<span title="${esc(T('prep.lg.wx'))}">${wx}</span>`);
+      if (r.off) parts.push(`<span title="${esc(T('prep.lg.off'))}">🚫${r.off}${esc(T('media.fx.dayUnit'))}</span>`);
+      for (const x of r.rush) parts.push(`<span title="${esc(T('prep.lg.rush'))}">🔺${x.n}${esc(T('media.fx.dayUnit'))}×${x.x}</span>`);
+      if (r.bonus) parts.push(`<span title="${esc(T('prep.lg.bonus'))}">${dot(r.bonus.t)}+${r.bonus.v}c</span>`);
+      return `<div class="rm"><b>${T('prep.mon', { m: r.cal })}</b>${parts.join('')}</div>`;
+    }).join('') + `</div>`;
+  }
   function runYear(id) {
     const sc = M.SCENARIOS[id] || {}, camp = window.LEVELS && LEVELS.LEVELS[0].year;
     if (sc.campaign && camp) return camp;
@@ -1830,7 +1865,7 @@
     const got = (r.got || []).filter(a => achShown(a.id)).map(a => `<div class="card" style="cursor:default"><div class="t">🏆 ${esc(a.name)}</div>${a.unlocks.filter(u => !(u.type === 'company' && companiesHidden())).map(u => `<div class="d" style="color:var(--green)">${T('res.unlocked', { name: esc(u.name) })}</div>`).join('')}</div>`).join('');
     // 무료판에서 여름을 넘기면 여기서 본편 안내 — 다음 계절(가을)이 본편이다. 창고는 그대로 저장돼 있다
     const sc = M.SCENARIOS[r.scenario] || {}, demoEnd = r.win && sc.chainNext && runLocked(sc.chainNext);
-    const demoNote = demoEnd ? `<div class="card gold" style="cursor:default"><div class="t">🔒 ${T('demo.resultHead')}</div><div class="d">${T('demo.resultBody')}</div></div>` : '';
+    const demoNote = demoEnd ? `<div class="card gold" style="cursor:default"><div class="t">🔒 ${T('demo.resultHead')}</div></div>` : '';
     const body = `<p style="text-align:center">${esc(I18n.text(r.reason))}</p>${demoNote}<div class="big-num">${T('fmt.pts', { n: r.score })}${rec && r.score >= rec.bestScore && r.score > 0 ? ` ${T('res.best')}` : ''}</div>${got}
       <div class="kv"><span>${T(companiesHidden() ? 'res.run' : 'res.scenarioCompany')}</span><span class="v">${esc(M.SCENARIOS[r.scenario] ? M.SCENARIOS[r.scenario].name : r.scenario)}${companiesHidden() ? '' : ` / ${esc(M.COMPANIES[r.company].name)}`}</span><span>${T('res.reached')}</span><span class="v">${T('fmt.monthTurn', { m: cycleName(r.month, r.scenario, r.level), t: r.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })}</span><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.cash')}</span><span class="v">${r.cash}c</span><span>${T('sum.rep')}</span><span class="v">${r.rep} <small>${esc(T('rep.tier.' + (r.repTier || 'unknown')))}</small></span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${(r.perks || []).map(p => (M.PERKS[p] || {}).name || p).join(', ') || T('common.none')}</span>${(r.variants || []).length ? `<span>${T('prep.variants')}</span><span class="v">${r.variants.map(v => M.DAILY_VARIANTS[v].name).join(', ')}</span>` : ''}<span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
     const again = { label: T('res.again'), cls: 'primary', onClick: () => { closeModal(); const cfg = game.cfg; game = new Game(withChain({ scenario: cfg.scenario, company: cfg.company, perks: cfg.perks, insurer: cfg.insurer, companyName: cfg.companyName, prep: true })); startPlay(); } };

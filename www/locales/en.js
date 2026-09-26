@@ -262,7 +262,7 @@
     'over.stress': 'Operating stress hit the limit',
     'over.rep': 'Your reputation ran out — nobody ships with you anymore',
     'over.bankrupt': 'Bankrupt — debt {debt}c exceeded the {limit}c short-term credit limit',
-    'over.win': 'You ran it all the way through — {cycles} cycles ({months} months)',
+    'over.win': '{months} months completed',
     'over.winStory': 'Handover done — the place is yours now',
     'err.noCash': 'Not enough cash',
     'err.marketOnly': 'Can only change in the market',
@@ -1317,31 +1317,30 @@
     'stat.reset': 'Reset profile',
     'stat.resetConfirm': 'This erases all unlocks, achievements and records. Continue?',
     'stat.resetBtn': 'Reset',
-    'demo.fullOnly': 'in the full game',
+    'demo.fullOnly': 'Full game',
     'demo.storySub': 'story tutorial · demo covers {n} months',
-    'demo.cta': 'About the full game',
-    'demo.gateTitle': 'This is the demo',
-    'demo.gateBody': 'The free version covers spring (the handover) and summer. The full game carries the same warehouse on into autumn (Chuseok) and winter (year-end and Seollal); get through winter and the half-year and full-year runs open.',
-    'demo.rowMonths': 'Full-game runs',
+    'demo.cta': 'Get the full game',
+    'demo.gateTitle': 'Full game',
+    'demo.gateBody': 'Autumn, winter, plus half-year and full-year runs. Your demo progress carries over.',
+    'demo.rowMonths': 'Runs',
     'demo.rowScenarios': 'Runs',
     'demo.rowCompanies': 'Companies',
     'demo.rowPerks': 'Perks',
-    'demo.keepProfile': 'Achievements and records from the demo carry over — copy them with "Export profile" on the records screen.',
+    'demo.keepProfile': 'Moving to another device? Use "Export profile" on the records screen.',
     'demo.soon': 'Coming soon.',
-    'demo.resultTitle': 'Summer survived',
-    'demo.resultHead': 'End of the free version',
-    'demo.resultBody': 'Your warehouse is saved. Carry it on into autumn and winter in the full game.',
+    'demo.resultTitle': 'Thanks for playing!',
+    'demo.resultHead': 'That\'s the end of the demo',
     'demo.endReason': 'Demo ends here — you ran the warehouse for {n} months',
     'prep.springStart': 'Start',
     'prep.springPick': 'Start from which chapter?',
-    'prep.springBody': 'Play it again with Foreman Park. The warehouse you finish with becomes summer\'s starting point.',
-    'prep.chain.kr_spring': '📖 The handover with Foreman Park — from the prologue',
-    'prep.chain.kr_summer': '🏠 The warehouse you took over · on your own now',
-    'prep.chain.kr_autumn': '🏠 The warehouse that got through summer',
-    'prep.chain.kr_winter': '🏠 The warehouse that got through autumn',
-    'prep.chainFresh.kr_summer': '🏠 Default warehouse (finish the handover to carry yours over)',
-    'prep.chainFresh.kr_autumn': '🏠 Default warehouse (get through summer to carry yours over)',
-    'prep.chainFresh.kr_winter': '🏠 Default warehouse (get through autumn to carry yours over)',
+    'prep.mon': 'M{m}',
+    'prep.legend': '📦 arrivals × · ● item share · 🚫 carriers closed · 🔺 arrival rush',
+    'prep.lg.arr': 'Arrivals multiplier this month',
+    'prep.lg.shift': 'Item types that grow this month (share, %p)',
+    'prep.lg.wx': 'Weather weighting',
+    'prep.lg.off': 'Carriers closed — no calls those days',
+    'prep.lg.rush': 'Arrival rush — arrivals multiplier on those days',
+    'prep.lg.bonus': 'Event — per-item reward for that type',
     'prep.springTitle': 'Spring — the handover',
     'stat.export': 'Export profile',
     'stat.import': 'Import profile',
@@ -2177,19 +2176,19 @@
     "SCENARIOS": {
       "kr_spring": {
         "name": "Spring (Mar–May)",
-        "desc": "The handover with Foreman Park, from the prologue again. The warehouse you finish with carries into summer"
+        "desc": "Start in the March moving season and run to Family Month in May. Carriers rest on Mar 1, Children's Day and Buddha's Birthday. Your first three months"
       },
       "kr_summer": {
         "name": "Summer (Jun–Aug)",
-        "desc": "The warehouse you finished spring with — on your own now. Monsoon and heatwave: outdoor stock gets wet, fresh goods spoil. Memorial Day and Liberation Day off"
+        "desc": "Monsoon and heatwave. Outdoor stock gets wet, fresh goods spoil — no surviving without cold storage. Memorial Day and Liberation Day off"
       },
       "kr_autumn": {
         "name": "Autumn (Sep–Nov)",
-        "desc": "The warehouse that made it through summer. Five days before Chuseok arrivals hit ×1.6 with deadlines one day shorter, then three holiday days with no trucks. The November sale too"
+        "desc": "Five days before Chuseok arrivals hit ×1.6 with deadlines one day shorter, then three holiday days with no trucks. Then Foundation Day, Hangul Day and the November sale"
       },
       "kr_winter": {
         "name": "Winter (Dec–Feb)",
-        "desc": "The warehouse that made it through autumn. Year-end volume ×1.4, Christmas and New Year off, blizzards, and Seollal in February. The tightest three months of the year"
+        "desc": "Year-end volume ×1.4, Christmas and New Year off, blizzards, and the Seollal holiday in February. The tightest three months of the year"
       },
       "kr_h1": {
         "name": "First half (Mar–Aug)",

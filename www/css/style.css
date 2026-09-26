@@ -999,3 +999,8 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 @keyframes campReady { 0%, 100% { box-shadow: 0 0 0 0 #ffcf5a00, 3px 3px 0 #0008; } 50% { box-shadow: 0 0 10px 2px #ffcf5a99, 3px 3px 0 #0008; } }
 .card .swap { color: var(--gold); font-size: 11px; }
 .pk-head small { color: var(--dim); font-size: 10px; margin-left: 4px; } .pk-fam .pgrid { margin-bottom: 2px; }
+/* 런 카드: 달마다 판에 걸리는 수치 한 줄 (입고 배수 · 품목 이동 · 날씨 · 휴무 · 폭주) */
+.runmons { margin-top: 3px; display: flex; flex-direction: column; gap: 1px; font-size: 11px; line-height: 1.35; }
+.runmons .rm { display: flex; flex-wrap: wrap; gap: 0 7px; align-items: center; }
+.runmons .rm b { min-width: 26px; color: var(--gold); font-weight: normal; }
+.runlg { font-size: 10px; color: var(--dim); margin: -2px 0 4px; }
