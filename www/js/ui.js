@@ -5,7 +5,7 @@
   const SAVE_KEY = 'save_v2', OPT_KEY = 'opts_v1';
   let game = null, scene = null, busy = false;
   if (typeof window !== 'undefined') Object.defineProperty(window, '__game', { get: () => game });
-  const BUILD = Object.assign({ demo: false, iap: null, store: {} }, window.BUILD || {});
+  const BUILD = Object.assign({ demo: false, iap: null, store: {}, api: '' }, window.BUILD || {});
   // 사이클 번호 → '3월 후반' (세이브 라벨·결과·기록처럼 game 이 없을 수도 있는 곳에서 쓴다)
   // sc(런 id)·lv(캠페인 장)가 있으면 그 런의 시작 달·장 위치에서 센다 — 여름 런의 1사이클은 '6월 전반'이다
   const cycleName = (c, sc, lv) => { const cy = D.CYCLES_PER_MONTH; c = c + ((lv && window.LEVELS && (LEVELS.get(lv) || {}).cycleOffset) || 0);
@@ -95,6 +95,7 @@
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
       <button class="btn gold" id="t-new">${T('title.new')}</button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).filter(achShown).length, d: Object.keys(M.ACHIEVEMENTS).filter(achShown).length })}</small></button>
+      ${BUILD.api ? `<button class="btn" id="t-rank">${T('title.rank')}</button>` : ''}
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
       <button class="btn" id="t-help">${T('title.help')}</button>
       ${optRow()}
@@ -108,6 +109,7 @@
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex(companiesHidden() ? 'carriers' : 'companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
+    const rk = m.querySelector('#t-rank'); if (rk) rk.onclick = () => { SFX.click(); showRanking(null, showTitle); };
     m.querySelector('#t-sound').onclick = () => { opts.sound = !opts.sound; SFX.setEnabled(opts.sound); saveOpts(); SFX.resume(); SFX.click(); showTitle(); };
     m.querySelector('#t-music').onclick = () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); SFX.resume(); BGM.resume(); SFX.click(); showTitle(); };
     m.querySelector('#t-lang').onclick = () => { const ids = I18n.languages().map(l => l.id); I18n.setLang(ids[(ids.indexOf(I18n.lang) + 1) % ids.length]); SFX.click(); applyStaticText(); showTitle(); };
@@ -1865,11 +1867,41 @@
     // 무료판에서 여름을 넘기면 여기서 본편 안내 — 다음 계절(가을)이 본편이다. 창고는 그대로 저장돼 있다
     const sc = M.SCENARIOS[r.scenario] || {}, demoEnd = r.win && sc.chainNext && runLocked(sc.chainNext);
     const demoNote = demoEnd ? `<div class="card gold" style="cursor:default"><div class="t">🔒 ${T('demo.resultHead')}</div></div>` : '';
-    const body = `<p style="text-align:center">${esc(I18n.text(r.reason))}</p>${demoNote}<div class="big-num">${T('fmt.pts', { n: r.score })}${rec && r.score >= rec.bestScore && r.score > 0 ? ` ${T('res.best')}` : ''}</div>${got}
+    const body = `<p style="text-align:center">${esc(I18n.text(r.reason))}</p>${demoNote}<div class="big-num">${T('fmt.pts', { n: r.score })}${rec && r.score >= rec.bestScore && r.score > 0 ? ` ${T('res.best')}` : ''}</div>${lbBoard(r.scenario) ? `<div id="res-rank" class="d" style="text-align:center;min-height:1.4em">${esc(r.rankLine || '')}</div>` : ''}${got}
       <div class="kv"><span>${T(companiesHidden() ? 'res.run' : 'res.scenarioCompany')}</span><span class="v">${esc(M.SCENARIOS[r.scenario] ? M.SCENARIOS[r.scenario].name : r.scenario)}${companiesHidden() ? '' : ` / ${esc(M.COMPANIES[r.company].name)}`}</span><span>${T('res.reached')}</span><span class="v">${T('fmt.monthTurn', { m: cycleName(r.month, r.scenario, r.level), t: r.turn , max: (game && game.turns ? game.turns() : D.TURNS_PER_MONTH) })}</span><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.cash')}</span><span class="v">${r.cash}c</span><span>${T('sum.rep')}</span><span class="v">${r.rep} <small>${esc(T('rep.tier.' + (r.repTier || 'unknown')))}</small></span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${(r.perks || []).map(p => (M.PERKS[p] || {}).name || p).join(', ') || T('common.none')}</span>${(r.variants || []).length ? `<span>${T('prep.variants')}</span><span class="v">${r.variants.map(v => M.DAILY_VARIANTS[v].name).join(', ')}</span>` : ''}<span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
     const again = { label: T('res.again'), cls: 'primary', onClick: () => { closeModal(); const cfg = game.cfg; game = new Game(withChain({ scenario: cfg.scenario, company: cfg.company, perks: cfg.perks, insurer: cfg.insurer, companyName: cfg.companyName, prep: true })); startPlay(); } };
     modal(demoEnd ? T('demo.resultTitle') : r.win ? T(r.story ? 'res.winStory' : 'res.win') : T('res.over'), body, [{ label: T('res.toTitle'), onClick: () => { closeModal(); game = null; showTitle(); } }, demoEnd ? { label: T('demo.cta'), cls: 'gold', onClick: () => showDemoGate(showResult) } : again]);
+    // 순위: 계절 런이면 한 번만 올리고, 받은 순위를 결과 화면에 한 줄로 (오프라인이면 조용히 넘어간다)
+    if (lbBoard(r.scenario) && !r.lbSent) { r.lbSent = true; const P2 = Profile.get();
+      lbCall('POST', { board: r.scenario, pid: P2.pid, name: (P2.campaign && P2.campaign.name) || T('lv.nameDefault'), score: r.score, cash: r.cash, rep: r.rep, win: !!r.win, months: r.monthsDone, seed: r.seed, v: 'v0.3' })
+        .then(d => { if (!d || !d.me) return; r.rankLine = (d.best ? T('rank.newBest') + ' · ' : '') + T('rank.res', { board: M.SCENARIOS[r.scenario].name, r: d.me.rank, n: d.total }); const el = document.getElementById('res-rank'); if (el) el.textContent = r.rankLine; }); }
   }
+  // ---------- 순위 (api/scores.js) ----------
+  // 보드 = 계절 런 하나. 봄(인수인계)은 대본이라 순위가 없다. 위클리 런이 생기면 weekly-YYYYWww 로 같은 틀에 얹는다
+  const lbBoard = id => { const s = M.SCENARIOS[id]; return !!(BUILD.api && s && !s.campaign); };
+  function lbCall(method, data) {
+    if (!BUILD.api || typeof fetch === 'undefined') return Promise.resolve(null);
+    const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null; const tm = ctl && setTimeout(() => ctl.abort(), 7000);
+    const url = BUILD.api.replace(/\/$/, '') + '/scores' + (method === 'GET' ? `?board=${encodeURIComponent(data.board)}&pid=${encodeURIComponent(data.pid || '')}` : '');
+    return fetch(url, method === 'GET' ? { signal: ctl && ctl.signal } : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal: ctl && ctl.signal })
+      .then(r => r.ok ? r.json() : null).catch(() => null).finally(() => tm && clearTimeout(tm));
+  }
+  function showRanking(board, back) {
+    const P = Profile.get(), boards = Object.keys(M.SCENARIOS).filter(lbBoard);
+    board = board || (boards.includes(prep.scenario) ? prep.scenario : boards[0]);
+    const tabs = `<div class="chpick lbtabs">${boards.map(b => `<span class="chip${b === board ? ' on' : ''}" data-b="${b}">${M.SCENARIOS[b].icon} ${esc(M.SCENARIOS[b].name.replace(/\s*\(.*\)$/, ''))}</span>`).join('')}</div>`;
+    const m = modal(T('rank.title'), tabs + `<div class="lb" id="lb-list"><div class="d">${T('rank.loading')}</div></div>`, [{ label: T('btn.close'), onClick: back || closeModal }]);
+    m.querySelectorAll('.lbtabs .chip').forEach(el => el.onclick = () => { SFX.click(); showRanking(el.dataset.b, back); });
+    lbCall('GET', { board, pid: P.pid }).then(d => {
+      const el = document.getElementById('lb-list'); if (!el) return;
+      if (!d) { el.innerHTML = `<div class="d">${T('rank.fail')}</div>`; return; }
+      if (!d.top.length) { el.innerHTML = `<div class="d">${T('rank.empty')}</div>`; return; }
+      el.innerHTML = d.top.map(x => `<div class="lbrow${x.me ? ' me' : ''}"><span>${x.rank}</span><span>${esc(x.name)}</span><span>${T('fmt.pts', { n: x.score })}</span></div>`).join('')
+        + (d.me && d.me.rank > d.top.length ? `<div class="lbrow me"><span>${d.me.rank}</span><span>${esc((P.campaign && P.campaign.name) || T('lv.nameDefault'))}</span><span>${T('fmt.pts', { n: d.me.score })}</span></div>` : '')
+        + `<div class="d" style="margin-top:6px;text-align:right">${T('rank.total', { n: d.total })}</div>`;
+    });
+  }
+
   // ---------- 데모 안내: 본편에 무엇이 더 있는지 + 어디서 사는지 ----------
   function showDemoGate(back) {
     const nCo = Object.keys(M.COMPANIES).length, nPk = Object.keys(M.PERKS).length;
@@ -2349,6 +2381,6 @@
     // 1장 스튜디오 → 2장 타이틀. 2장은 별도 화면이 아니라 showTitle() 그 자체다
     if (window.Splash) Splash.play(showTitle); else showTitle();
   }
-  window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, Profile, renderAll, saveGame, prep, startRun, showTitle, showResult };
+  window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, Profile, renderAll, saveGame, prep, startRun, showTitle, showResult, showRanking };
   init();
 })();

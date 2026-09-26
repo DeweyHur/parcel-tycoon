@@ -34,7 +34,9 @@ window.Profile = (function () {
     P.license = Object.assign({ full: false, source: 'demo' }, P.license);
     if (typeof P.splashSeen !== 'number') P.splashSeen = 0;   // 스플래시 본 횟수 (2회차부터 짧게)
     P.campaign = Object.assign({ level: 1, cleared: 0, name: '' }, P.campaign);   // 캠페인 레벨 진행 (levels.js)
-    if (!P.chain || typeof P.chain !== 'object') P.chain = {};   // 계절 이어하기: 런 id → 그 런의 시작 판 (meta.js chainFrom)
+    if (!P.chain || typeof P.chain !== 'object') P.chain = {};
+    // 순위표에서 나를 가리키는 익명 id — 계정 없이 기기(프로필)마다 하나. 내보내기 코드로 옮기면 같이 간다
+    if (!P.pid || !/^[a-z0-9]{12,40}$/.test(P.pid)) { let id = ''; for (let i = 0; i < 20; i++) id += 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]; P.pid = id; save(); }   // 계절 이어하기: 런 id → 그 런의 시작 판 (meta.js chainFrom)
     P.unlocked = Object.assign(JSON.parse(JSON.stringify(M.DEFAULT_UNLOCK)), P.unlocked);
     for (const k of ['companies', 'perks', 'scenarios']) for (const d of M.DEFAULT_UNLOCK[k]) if (!P.unlocked[k].includes(d)) P.unlocked[k].push(d);
     evaluate(null, null); // 해금 조건이 바뀐 경우(누적·메타) 기존 기록으로 즉시 반영
@@ -52,7 +54,7 @@ window.Profile = (function () {
   function setFull(source) { P.license = { full: true, source: source || 'unknown', at: Date.now() }; save(); return P.license; }
   // 프로필 이동(데모 → 본편, 모바일 → Steam): 코드 문자열로 내보내고 합친다
   function exportCode() {
-    const payload = { v: 1, license: P.license, campaign: P.campaign, chain: P.chain, unlocked: P.unlocked, achievements: P.achievements, stats: P.stats, records: P.records, recentRuns: P.recentRuns.slice(0, 20) };
+    const payload = { v: 1, pid: P.pid, license: P.license, campaign: P.campaign, chain: P.chain, unlocked: P.unlocked, achievements: P.achievements, stats: P.stats, records: P.records, recentRuns: P.recentRuns.slice(0, 20) };
     const json = JSON.stringify(payload);
     const b64 = typeof btoa !== 'undefined' ? btoa(unescape(encodeURIComponent(json))) : Buffer.from(json, 'utf8').toString('base64');
     return b64.replace(/=+$/, '');
@@ -77,6 +79,7 @@ window.Profile = (function () {
     // 캠페인·계절 진행: 이쪽이 더 앞서 있으면 그대로 둔다 (데모에서 여름까지 한 판이 본편에서 가을로 이어지게)
     if (o.campaign && (o.campaign.cleared || 0) > (P.campaign.cleared || 0)) { P.campaign = Object.assign({}, P.campaign, o.campaign); added++; }
     for (const id in o.chain || {}) if (!P.chain[id]) { P.chain[id] = o.chain[id]; added++; }
+    if (o.pid && /^[a-z0-9]{12,40}$/.test(o.pid)) P.pid = o.pid;   // 옮겨 온 쪽의 순위 기록을 이어 쓴다
     // 접근권은 내려가지 않는다(본편 빌드에서 데모 코드를 넣어도 유지)
     if (o.license && o.license.full && !hasFull()) P.license = Object.assign({}, o.license, { imported: true });
     save(); evaluate(null, null); save();

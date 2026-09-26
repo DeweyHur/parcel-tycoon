@@ -18,6 +18,15 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
     const ctx = await browser.newContext({ viewport: { width: 390, height: 800 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'ko-KR' });
     // 무료판: build.js 의 demo 플래그만 바꿔 서빙한다 (tools/build-web.py --demo 와 같은 한 줄)
     if (demo) await ctx.route(/\/js\/build\.js/, async route => { const r = await route.fetch(); const body = (await r.text()).replace('\n  demo: false,', '\n  demo: true,'); route.fulfill({ response: r, body }); });
+    // 순위 서버 흉내 (api/scores.js 와 같은 모양) — 실제 서버에는 안 나간다
+    const lb = [];
+    await ctx.route(/\/api\/scores/, async route => { const rq = route.request();
+      let board = new URL(rq.url()).searchParams.get('board'), pid = new URL(rq.url()).searchParams.get('pid'), best = false;
+      if (rq.method() === 'POST') { const d = JSON.parse(rq.postData()); board = d.board; pid = d.pid; const prev = lb.find(x => x.board === d.board && x.pid === d.pid); if (!prev || prev.score < d.score) { best = true; if (prev) prev.score = d.score; else lb.push({ board: d.board, pid: d.pid, name: d.name, score: d.score }); } }
+      const rows = [{ board, pid: 'zzzzzzzzzzzzzzzz', name: '한길택배', score: 99999 }].concat(lb.filter(x => x.board === board)).sort((a, b) => b.score - a.score);
+      const top = rows.map((x, i) => ({ rank: i + 1, name: x.name, score: x.score, me: x.pid === pid }));
+      const mi = top.findIndex(x => x.me);
+      route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ board, total: rows.length, top, me: mi < 0 ? null : { rank: mi + 1, score: top[mi].score }, best }) }); });
     const page = await ctx.newPage();
     page.on('pageerror', e => { if (!/audio/i.test(e.message)) errors.push('PAGEERROR ' + e.message); });
     page.on('console', m => { const t = m.text(); if (/\[i18n\]/.test(t)) errors.push('I18N ' + t); else if (m.type() === 'error' && !/audio|font|mp3|woff|404|Failed to load resource/i.test(t)) errors.push('CONSOLE ' + t); });
@@ -128,9 +137,18 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('무료판: 여름을 넘기면 결과에 본편 안내', end.win && /플레이해 주셔서 감사합니다/.test(t) && /체험판은 여기까지입니다/.test(t) && /정식판 보기/.test(t), t.slice(0, 120));
   await page.screenshot({ path: `${OUT}/runs-06-demo-end.png` });
   ok('무료판: 그래도 가을 시작 판은 저장돼 있다 (본편에서 이어짐)', await page.evaluate(() => !!Profile.get().chain.kr_autumn));
+  await page.waitForTimeout(500);
+  ok('결과 화면에 순위 한 줄', /여름 \(6~8월\) 2위 \/ 2명/.test(await page.evaluate(() => (document.getElementById('res-rank') || {}).textContent || '')), await page.evaluate(() => (document.getElementById('res-rank') || {}).textContent || ''));
   await clickBtn(page, /정식판 보기/); await page.waitForTimeout(300);
   ok('본편 알아보기 → 안내 화면', /가을·겨울이 이어집니다/.test(await modalText(page)));
 
+  // 타이틀 → 순위
+  await page.evaluate(() => { Store.remove('save_v2'); PT.game = null; PT.showTitle(); }); await page.waitForTimeout(300);
+  for (let i = 0; i < 10; i++) { if (await page.$('#t-rank')) break; await page.mouse.click(200, 400); await page.waitForTimeout(300); }
+  await page.click('#t-rank'); await page.waitForTimeout(800);
+  t = await modalText(page);
+  ok('순위표: 계절 탭 셋 · 1위 한길택배 · 내 줄 강조', /여름/.test(t) && /가을/.test(t) && /겨울/.test(t) && !/🌸/.test(t) && /1한길택배99999점/.test(t) && (await page.$$('#lb-list .lbrow.me')).length === 1, t.slice(0, 120));
+  await page.screenshot({ path: `${OUT}/runs-07-rank.png` });
   console.log(`\n에러: ${errors.length ? errors.join('\n') : '없음'}`);
   console.log(fail.length ? `\n실패 ${fail.length}건:\n${fail.join('\n')}` : `\n전부 통과 (${pass.length})`);
   await browser.close();

@@ -1002,3 +1002,8 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 /* 런 카드: 이 런의 특징 몇 줄 (이름 + 수치 하나) */
 .runfeat { margin-top: 3px; font-size: 11px; line-height: 1.45; color: var(--dim); }
 .runfeat b { color: var(--ink); font-weight: normal; margin-right: 4px; }
+/* 순위표 */
+.lb { margin-top: 6px; font-size: 12px; }
+.lbrow { display: grid; grid-template-columns: 30px 1fr auto; gap: 6px; padding: 3px 4px; border-bottom: 1px solid #ffffff10; }
+.lbrow span:first-child { color: var(--dim); text-align: right; }
+.lbrow.me { background: #ffd24a22; color: var(--gold); }
