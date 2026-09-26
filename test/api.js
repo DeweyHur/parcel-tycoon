@@ -16,7 +16,7 @@ const R = {
   EXPIRE: () => 1,
 };
 global.fetch = async (url, o) => { assert.ok(/\/pipeline$/.test(url)); const cmds = JSON.parse(o.body); return { ok: true, json: async () => cmds.map(([c, ...a]) => ({ result: R[c](...a) })) }; };
-const handler = require('../api/scores.js');
+const handler = require('../www/api/scores.js');
 const call = (method, url, body, ip) => new Promise(done => {
   const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(b) { done({ code: this.statusCode, body: b ? JSON.parse(b) : null, headers: this.headers }); } };
   handler({ method, url, body, headers: { 'x-forwarded-for': ip || '1.1.1.1' } }, res);

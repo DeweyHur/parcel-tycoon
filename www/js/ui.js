@@ -1886,7 +1886,7 @@
       lbCall('POST', { board: r.scenario, pid: P2.pid, name: (P2.campaign && P2.campaign.name) || T('lv.nameDefault'), score: r.score, cash: r.cash, rep: r.rep, win: !!r.win, months: r.monthsDone, seed: r.seed, v: 'v0.3' })
         .then(d => { if (!d || !d.me) return; r.rankLine = (d.best ? T('rank.newBest') + ' · ' : '') + T('rank.res', { board: M.SCENARIOS[r.scenario].name, r: d.me.rank, n: d.total }); const el = document.getElementById('res-rank'); if (el) el.textContent = r.rankLine; }); }
   }
-  // ---------- 순위 (api/scores.js) ----------
+  // ---------- 순위 (www/api/scores.js) ----------
   // 보드 = 계절 런 하나. 봄(인수인계)은 대본이라 순위가 없다. 위클리 런이 생기면 weekly-YYYYWww 로 같은 틀에 얹는다
   const lbBoard = id => { const s = M.SCENARIOS[id]; return !!(BUILD.api && s && !s.campaign); };
   function lbCall(method, data) {

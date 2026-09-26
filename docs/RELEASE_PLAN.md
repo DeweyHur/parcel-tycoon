@@ -47,11 +47,11 @@
 
 결정: **자체 서버 하나** — 웹·Android·Steam 이 같은 순위표를 본다.
 
-- `api/scores.js` (Vercel 함수) + Upstash Redis(REST). 보드 = 계절 런 하나(여름·가을·겨울), 봄(인수인계)은 대본이라 없음. 위클리 런은 `weekly-YYYYWww` 보드로 같은 틀에 얹는다.
+- `www/api/scores.js` (Vercel 함수) + Upstash Redis(REST). 보드 = 계절 런 하나(여름·가을·겨울), 봄(인수인계)은 대본이라 없음. 위클리 런은 `weekly-YYYYWww` 보드로 같은 틀에 얹는다.
 - 플레이어 = 프로필마다 익명 `pid`(계정 없음), 이름 = 캠페인에서 지은 상호. 플레이어마다 최고 기록 하나.
 - 결과 화면에 「여름 12위 / 340명」 한 줄, 타이틀 「순위」 → 계절 탭 · 상위 50 · 내 줄. 오프라인이면 조용히 숨는다. itch·앱에서도 부르도록 CORS 허용, 주소는 `BUILD.api`.
 - 조작 방지 1단계: 점수 범위·IP 당 분당 12회. **2단계(할 일)**: 게임이 시드 고정·결정적이라 행동 기록(호출·대기·구매)을 같이 보내면 서버가 다시 돌려 점수를 검증할 수 있다 — 위클리 런 전에 붙인다.
-- 켜려면: Vercel 프로젝트에 Upstash Redis(마켓플레이스)를 붙여 `KV_REST_API_URL`·`KV_REST_API_TOKEN` 이 생기게 하고, 프로젝트 Root Directory 가 저장소 루트인지 확인(`vercel.json` 이 outputDirectory `www` 를 준다). 저장소가 없으면 API 는 503, 게임은 순위만 안 보인다.
+- 켜려면: Vercel 프로젝트에 Upstash Redis(마켓플레이스)를 붙여 `KV_REST_API_URL`·`KV_REST_API_TOKEN` 이 생기게 하고, Vercel 프로젝트 Root Directory 가 `www` 라서 함수는 `www/api/` 에 둔다(저장소 최상위 `api/` 는 배포되지 않는다). 저장소가 없으면 API 는 503, 게임은 순위만 안 보인다.
 
 ## 3. 언락 구현
 

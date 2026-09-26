@@ -7,6 +7,6 @@ window.BUILD = {
   demo: false,
   iap: null,              // null | 'play' | 'ios' — 앱 내 언락 결제 경로
   store: { itch: '', play: '', steam: '' },  // 비어 있으면 "출시 예정"으로 표시
-  api: 'https://parcel-tycoon.vercel.app/api',   // 순위 서버 (api/scores.js). 비우면 순위 기능을 숨긴다
+  api: 'https://parcel-tycoon.vercel.app/api',   // 순위 서버 (www/api/scores.js). 비우면 순위 기능을 숨긴다
 };
 if (typeof module !== 'undefined') module.exports = window.BUILD;
