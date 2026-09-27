@@ -325,7 +325,7 @@
     'self.needPadVan': '완충 포장차 필요',
     'self.customsWait': '통관 대기 중',
     'market.hintSoon': '이번 보름 예보의 {short} 최대 {count}개를 실을 수 있음',
-    'mk.callShort': '⚠ 배차 부족 — 예상 약 {vol}칸, 남은 배차로 {cap}칸. 재계약으로 채우세요',
+    'mk.callShort': '⚠ 🚚 {cap}칸 / 📦 {vol}칸',
     'market.hint': '창고의 {short} {count}개 처리 가능',
     'market.facSoldOut': '시설 매진',
     'market.dealOffer': '{name} 계약 제안',
@@ -406,12 +406,13 @@
     'log.traitTruckUsed': '🚚 덤 트럭 — 이번 호출 트럭 한 대 무료',
     'log.attackIn': '{from}의 {icon} {name} 피격 — {detail}',
     'log.attackBlocked': '{from}의 {icon} {name} — {how}',
-    'log.bombIn': '🧨 이삿짐이 들어왔다 — {size}칸, {days}일 뒤 이사 (거절·출고 불가)',
-    'log.bombOut': '🧨 이사 완료 — 이삿짐이 상대에게 갔다 ({size}칸으로 커져서)',
-    'log.bombBlast': '🧨 이삿짐이 터졌다 — 넘친 짐 {n}개 도난',
+    'log.pushIn': '📦 {from}의 만차 — 택배 {n}개가 밀려 들어왔다',
+    'log.bombIn': '🧨 폭탄 도착 — {size}칸, {days}일 뒤 옆 창고로 (못 치움)',
+    'log.bombOut': '🧨 폭탄이 상대에게 갔다 ({size}칸으로 커져서)',
+    'log.bombBlast': '🧨 폭탄 폭발 — 넘친 짐 {n}개 도난',
     'why.trait': '{icon} 트레잇',
     'why.attack': '{icon} 공격',
-    'why.bombBlast': '🧨 이삿짐 폭발',
+    'why.bombBlast': '🧨 폭탄 폭발',
     'trait.d.rain': '야외 {n}개 젖음 · 기한 −1',
     'trait.d.claim': '평판 −{n}',
     'trait.d.rat': '신선 {n}개 폐기',
@@ -436,7 +437,7 @@
     'multi.introMe': '내 창고',
     'trait.blk.shield': '🛡 막음',
     'trait.blk.roof': '🏠 막음',
-    'err.bombStuck': '이삿짐은 돌려보낼 수 없습니다 — 기다리면 알아서 이사 간다',
+    'err.bombStuck': '🧨 폭탄은 못 치운다 — 며칠 뒤 옆 창고로 간다',
     'multi.hitToast': '{from} → {icon} {name}: {detail}',
     'multi.blockToast': '{how} — {from}의 {icon} {name}',
     'multi.fireToast': '{icon} {name} → {names}',
@@ -456,7 +457,7 @@
     'multi.focusLine': '🎯 다음 공격은 1위에게 ×3',
     'multi.truckLine': '🚚 다음 호출 트럭 +1 무료',
     'multi.iceLine': '🧊 신선 정지 {d}일',
-    'multi.bombRow': '🧨 이삿짐 {size}칸 · {d}일 뒤 이사 · 하루 +{c}c',
+    'multi.bombRow': '🧨 {size}칸 · {d}일',
     'multi.traitLine': '{icon} {name} — {desc}',
     'pd.traitAtk': '기한 안에 보내면 상대 전원에게',
     'pd.traitBon': '기한 안에 보내면 나에게',
@@ -2037,7 +2038,7 @@
       }
     },
     "STORAGE_KINDS": {
-      "bomb": { "name": "이삿짐 폭탄" },
+      "bomb": { "name": "폭탄" },
       "move": {
         "name": "이삿짐"
       },
@@ -2296,7 +2297,7 @@
     },
     "MULTI": {
     "TRAITS": {
-      "t_bomb": { "name": "이삿짐 폭탄", "desc": "랜덤 상대에게 이삿짐 3칸 (거절 불가, 6일 뒤 또 이사)" },
+      "t_bomb": { "name": "폭탄", "desc": "랜덤 상대 창고에 🧨 3칸 (못 치움, 6일 뒤 다음 창고로)" },
       "t_rain": { "name": "소나기", "desc": "다음 날 야외 적재 전부 젖음 · 기한 −1" },
       "t_claim": { "name": "클레임", "desc": "평판 −1" },
       "t_rat": { "name": "쥐", "desc": "신선 품목 1개 즉시 폐기" },
@@ -2310,8 +2311,17 @@
       "t_ice": { "name": "얼음", "desc": "신선 부패 정지 3일" },
       "t_pack": { "name": "압축", "desc": "창고 +3칸, 3일" },
       "t_truck": { "name": "덤 트럭", "desc": "다음 호출 트럭 +1 무료" },
-      "t_return": { "name": "되돌리기", "desc": "들고 있는 이삿짐 1개를 보낸 사람에게 반송" },
+      "t_return": { "name": "되돌리기", "desc": "내 창고의 🧨 1개를 보낸 사람에게" },
       "t_focus": { "name": "한 방", "desc": "다음 공격을 1위 한 명에게만, 효과 ×3" }
+    },
+    "THEMES": {
+      "spring": { "name": "봄날", "desc": "특별한 건 없다 — 실력 승부" },
+      "heat": { "name": "폭염", "desc": "폭염 경보 잦음 · 야외 신선 금방 상함" },
+      "monsoon": { "name": "장마", "desc": "비 오는 날 많음 · 야외 젖음" },
+      "peak": { "name": "성수기", "desc": "물량 +25%" },
+      "fresh": { "name": "신선 러시", "desc": "신선·농산물이 많이 온다" },
+      "fragile": { "name": "깨지기 쉬움", "desc": "파손주의 많음 · 파손 ×1.5" },
+      "thief": { "name": "좀도둑", "desc": "야외 도난 ×2" }
     },
     "PERKS": {
       "m_calls": { "name": "차 한 대 더", "desc": "계약마다 트럭 +1대 (지금 바로)" },
@@ -2327,7 +2337,7 @@
       "m_dodge": { "name": "잽", "desc": "받는 공격 절반은 불발" },
       "m_early": { "name": "빠른 손", "desc": "일찍 보낸 호출 평판 +1 추가" },
       "m_trait": { "name": "장전", "desc": "내 공격 25% 확률로 2번" },
-      "m_heavy": { "name": "무거운 이삿짐", "desc": "내가 보내는 🧨 이삿짐 +2칸 더 크게" },
+      "m_heavy": { "name": "큰 폭탄", "desc": "내가 보내는 🧨 +2칸 더 크게" },
       "m_sharp": { "name": "날 세우기", "desc": "내 공격 효과 ×1.5" }
     },
     "FAMILY_NAMES": { "eco": "운영", "def": "방어", "atk": "공격" },

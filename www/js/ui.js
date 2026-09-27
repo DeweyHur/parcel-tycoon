@@ -582,7 +582,9 @@
       if (p.bot || !p.human) return T('multi.strat.' + (p.strat || 'balanced'));
       return p.elo != null ? `${T('multi.rankName.' + M.MULTI.RANKS[Math.max(0, Math.min(M.MULTI.RANKS.length - 1, Math.floor((p.elo - M.MULTI.ELO_START) / M.MULTI.ELO_STEP)))])} · ${p.elo}` : ''; };
     const layer = document.createElement('div'); layer.id = 'mintro';
-    layer.innerHTML = `<div class="ttl">⚔ ${esc(T('multi.introTitle'))}</div><div class="grid">${match.players.map((p, i) => `<div class="ic ${p.id === ME() ? 'me' : ''}" style="animation-delay:${0.25 + i * 0.38}s"><img src="${window.Story ? Story.sprite(p.face === 'park' ? 'park' : p.face, p.id === ME() ? 'smile' : 'neutral') : ''}" alt=""><b>${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span>${esc(sub(p))}</span></div>`).join('')}<div class="vs">VS</div></div><div class="tap">${esc(T('multi.introTap'))}</div>`;
+    const th = game && game.cfg.mtheme && M.MULTI.THEMES[game.cfg.mtheme];
+    const themeHtml = th ? `<div class="theme"><span class="tic">${th.icon}</span><b>${esc(th.name || game.cfg.mtheme)}</b><small>${esc(th.desc || '')}</small></div>` : '';
+    layer.innerHTML = `<div class="ttl">⚔ ${esc(T('multi.introTitle'))}</div>${themeHtml}<div class="grid">${match.players.map((p, i) => `<div class="ic ${p.id === ME() ? 'me' : ''}" style="animation-delay:${0.25 + i * 0.38}s"><img src="${window.Story ? Story.sprite(p.face === 'park' ? 'park' : p.face, p.id === ME() ? 'smile' : 'neutral') : ''}" alt=""><b>${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span>${esc(sub(p))}</span></div>`).join('')}<div class="vs">VS</div></div><div class="tap">${esc(T('multi.introTap'))}</div>`;
     document.body.appendChild(layer);
     const timers = match.players.map((p, i) => setTimeout(() => { SFX.thud(); if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { /* no-op */ } }, 250 + i * 380 + 220));
     let over = false;
@@ -804,16 +806,19 @@
       if (n.type === 'attack') { for (const to of n.to) flyIcon(traitIcon(n.trait), n.from, to, k * 90); k++;
         if (n.from === ME()) mnotice(ME(), traitIcon(n.trait), n.focus ? `🎯 ${n.to.map(pname).join('·')} ×3` : T('multi.toAll'), 'me'); }
       if (n.type === 'note') { bubble(n.from, n.text); if (n.from !== ME()) mnotice(n.from, n.text, ''); }
+      if (n.type === 'push') { for (const to of n.to) flyIcon('📦', n.from, to, k * 90); k++;
+        if (n.from === ME()) mnotice(ME(), '📦', `${n.n} → ${n.to.map(pname).join('·')}`, 'me'); }
       if (n.type === 'bomb') { for (const to of n.to) flyIcon('🧨', n.from, to, k * 90, () => { if (to === ME()) scene.shake(.5); }); k++;
         if (n.from === ME()) mnotice(ME(), '🧨', T(n.back ? 'multi.bombBackToast' : 'multi.bombOutToast', { name: n.to.map(pname).join('·') }), 'me'); }
     }
     for (const e of events) {
       if (e.type === 'attackIn') {
-        if (e.blocked) { if (e.blocked === 'shield') shieldFx(ME()); mnotice(e.from, traitIcon(e.trait), T('trait.blk.' + e.blocked), 'ok'); }
+        if (e.blocked) { if (e.blocked === 'shield') shieldFx(ME()); mnotice(e.from, traitIcon(e.trait), `→ ${T('multi.you')} · ${T('trait.blk.' + e.blocked)}`, 'ok'); }
         else { faceHit[ME()] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3);
-          mnotice(e.from, traitIcon(e.trait), shortDetail(e.detail), 'bad'); }
+          mnotice(e.from, traitIcon(e.trait), `→ ${T('multi.you')} · ${shortDetail(e.detail)}`, 'bad'); }
       }
       if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
+      if (e.type === 'pushIn') { SFX.thud(); scene.shake(.2); mnotice(e.from, '📦', `+${e.n} → ${T('multi.you')}`, 'bad'); }
       if (e.type === 'bombIn') { SFX.thud(); scene.shake(.45); mnotice(e.from, '🧨', T('multi.bombInToast', { size: e.storage.vol, days: e.storage.turns }), 'bad'); }
       if (e.type === 'bombBlast') { SFX.discard(); scene.shake(.6); scene.mope(); mnotice(ME(), '🧨', T('multi.bombBlastToast', { n: e.stolen }), 'bad'); }
     }
@@ -1024,7 +1029,8 @@
     if (chain.count > 0) {
       $('#chain-title').textContent = T('chain.title');
       $('#chain-fill').style.width = Math.min(100, chain.level / chain.max * 100) + '%';
-      $('#chain-label').textContent = chain.count >= 2 ? T('chain.mult', { n: chain.count, mult: chain.mult.toFixed(2) }) : T('chain.armed');
+      // 난투: 배율이 아니라 다음 만차에 밀어낼 개수 — "⚡×2 · 📦 3 →"
+      $('#chain-label').textContent = g.rules.chainPush ? `⚡×${chain.count} · 📦 ${Math.min(chain.count, chain.max - 1)} →` : chain.count >= 2 ? T('chain.mult', { n: chain.count, mult: chain.mult.toFixed(2) }) : T('chain.armed');
       cm.className = 'chain-meter' + (chain.level >= chain.max ? ' max' : '');
     }
     const mm = $('#mission-meter');
@@ -1779,7 +1785,7 @@
     const tbtn = '';
     const gauge = `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
     const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
-    const money = `${chain.count >= 2 && game.shows('chain') ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
+    const money = `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, chain.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
     const riskLine = riskSel.length ? `<div class="riskline">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
@@ -1808,13 +1814,12 @@
     pendingCall = r;
     const showChain = game.shows('chain');       // 서장에는 연속 만차가 없다 — 축하도 하지 않는다
     if (r.chain === 1 && showChain) {
-      SFX.select(); toastLater(T('chain.start'), 1800); rewardBurst(T('chain.perfect'), 1);
+      SFX.select(); rewardBurst(r.pushed ? `📦 ${r.pushed} →` : T('chain.perfect'), 1);   // 토스트 없음 — 만차는 바가 보여 준다 (유저: "쓸데없는 노티 보이지 마"). 난투는 밀어낸 개수
     }
     if (r.chain >= 2 && showChain) {
       document.body.classList.remove('chain-hit'); void document.body.offsetWidth; document.body.classList.add('chain-hit');
       SFX.combo(r.chain);
-      toastLater(T(r.chain >= D.LOAD_CHAIN.max ? 'chain.toastMax' : 'chain.toast', { n: r.chain, bonus: r.chainBonus }), 2200);
-      rewardBurst(T(r.chain >= D.LOAD_CHAIN.max ? 'chain.max' : 'chain.count', { n: r.chain }), Math.min(3, r.chain));
+      rewardBurst(r.pushed ? `📦 ${r.pushed} →` : T(r.chain >= D.LOAD_CHAIN.max ? 'chain.max' : 'chain.count', { n: r.chain }), Math.min(3, r.chain));
       setTimeout(() => document.body.classList.remove('chain-hit'), 700);
     }
     if (r.rush && game.shows('rush')) {

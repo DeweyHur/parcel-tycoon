@@ -13,7 +13,9 @@
   const FACES = ['park', 'yeo', 'noh', 'kang', 'han', 'ahn'];   // 포트레잇: 스토리 스프라이트를 빌린다 (Story.sprite)
 
   function hash(s) { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; }
-  function mkGame(seed, name, pid) { return new Game({ multi: true, seed, scenario: SCENARIO, company: 'local', perks: [], prep: false, companyName: name, pid }); }
+  // 테마: 시드가 정한다(넷이 같다) — 폭염·성수기·장마… 시작 화면에서 알려 주고 규칙에 얹는다
+  function themeOf(seed) { const T = Object.keys((M.MULTI && M.MULTI.THEMES) || {}); return T.length ? T[(seed >>> 0) % T.length] : null; }
+  function mkGame(seed, name, pid) { return new Game({ multi: true, seed, scenario: SCENARIO, company: 'local', perks: [], prep: true, companyName: name, pid, mtheme: themeOf(seed) }); }
   function alive(g) { return g.phase !== 'over'; }
   function finished(g) { return g.phase === 'over' || g.phase === 'win'; }
   // 지난 영업일 수(장 본 날 포함) — 시계가 다르니 이게 있어야 "저 사람은 벌써 끝나간다"가 읽힌다
@@ -61,6 +63,8 @@
         match.news.push({ type: 'attack', from: e.from, to: e.to, trait: e.trait, focus: !!e.focus, remote: true }); }
       else if (e.type === 'bomb') { const t = match.players.find(p => p.id === e.to[0]); let blast = false; if (t && t.game && mine.has(t.id)) { const r = t.game.receiveBomb(Object.assign({}, e.bomb, { back: !!e.back })); blast = !!(r && r.blast); }
         match.news.push({ type: 'bomb', from: e.from, to: e.to, blast, back: !!e.back, drop: !!e.drop, remote: true }); }
+      else if (e.type === 'push') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receivePush({ n: e.n, from: e.from, fromName: e.fromName });
+        match.news.push({ type: 'push', from: e.from, to: e.to, n: e.n, remote: true }); }
       else if (e.type === 'bombFizzle') match.news.push({ type: 'bombFizzle', from: e.from });
       else if (e.type === 'note') match.news.push({ type: 'note', from: e.from, text: e.text });
     }
@@ -98,6 +102,11 @@
           }
           for (const t of tg) t.game.receiveAttack({ trait: o.trait, mult: o.mult, from: p.id, fromName: p.name });
           match.news.push({ type: 'attack', from: p.id, to: tg.map(t => t.id), trait: o.trait, focus: !!o.focus });
+        } else if (o.type === 'push') {   // 만차 밀어내기: 랜덤 상대 한 명
+          const tg = targetsOf(match, p.id); if (!tg.length) continue;
+          const t = tg[Math.floor(mrand(match) * tg.length)];
+          t.game.receivePush({ n: o.n, from: p.id, fromName: p.name });
+          match.news.push({ type: 'push', from: p.id, to: [t.id], n: o.n });
         } else if (o.type === 'bombMove') {
           let t = o.to != null ? match.players.find(x => x.id === o.to && !finished(x.game)) : null;
           const tg = targetsOf(match, p.id);
@@ -123,12 +132,12 @@
   // ----- 재실행 검증 (3단계) — 같은 cfg·같은 입력 로그면 같은 판이 나와야 한다. 서버가 종료 시 돌려 본다 -----
   // 로그 항목: wait{ids} · call{i,ids,n} · self{ids} · shop · buy{i,s,m} · close · perk{id} · atk{a} · bomb{b}
   function replay(cfg, log) {
-    const g = new Game(Object.assign({}, cfg, { multi: true, prep: false, mperks: [] }));   // 퍽은 로그(perk)로 다시 고른다 — cfg 에 남은 mperks 는 비운다
+    const g = new Game(Object.assign({}, cfg, { multi: true, mperks: [] }));   // 퍽은 로그(perk)로 다시 고른다 — cfg 에 남은 mperks 는 비운다 (준비 마켓 prep 은 cfg 그대로: 로그의 buy·close 가 재현한다)
     for (const e of log || []) {
       if (g.phase === 'over' || g.phase === 'win') break;
       if (e.t === 'wait') g.wait(e.ids); else if (e.t === 'call') g.callCarrier(e.i, e.ids, e.n || undefined); else if (e.t === 'self') g.selfShip(e.ids);
       else if (e.t === 'shop') g.openShop(); else if (e.t === 'buy') g.buy(e.i, e.s, e.m || undefined); else if (e.t === 'close') g.closeMarket();
-      else if (e.t === 'perk') g.pickPerk(e.id); else if (e.t === 'atk') g.receiveAttack(e.a); else if (e.t === 'bomb') g.receiveBomb(e.b);
+      else if (e.t === 'perk') g.pickPerk(e.id); else if (e.t === 'atk') g.receiveAttack(e.a); else if (e.t === 'bomb') g.receiveBomb(e.b); else if (e.t === 'push') g.receivePush(e.x);
       g.takeEvents();
     }
     return g;
@@ -186,6 +195,7 @@
   function toJSON(match) { return { v: match.v, seed: match.seed, started: match.started, rng: match.rng, cycleDrops: match.cycleDrops || 0, firstFinish: match.firstFinish || null, online: match.online || null, players: match.players.map(p => ({ id: p.id, name: p.name, human: p.human, remote: !!p.remote, bot: !!p.bot, face: p.face, strat: p.strat, speed: p.speed, snap: p.snap || null, game: p.game ? p.game.toJSON() : null })) }; }
   function fromJSON(o) { return { v: o.v, seed: o.seed, started: o.started, rng: o.rng || hash('route' + o.seed), cycleDrops: o.cycleDrops || 0, firstFinish: o.firstFinish || null, news: [], online: o.online ? Object.assign({ pending: [], results: {}, settled: null }, o.online) : null, players: o.players.map((p, i) => ({ face: FACES[i % FACES.length], ...p, game: p.game ? Game.fromJSON(p.game) : null })) }; }
 
-  const MULTI = { SCENARIO, FACES, replay, fingerprint, verify, noteFinish, penaltyOf, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
+  const MULTI = {
+    themeOf, SCENARIO, FACES, replay, fingerprint, verify, noteFinish, penaltyOf, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
   if (typeof module !== 'undefined') module.exports = MULTI; else root.MULTI = MULTI;
 })(typeof window !== 'undefined' ? window : globalThis);

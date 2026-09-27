@@ -325,7 +325,7 @@
     'self.needPadVan': 'Needs Padded Van',
     'self.customsWait': 'In customs',
     'market.hintSoon': 'Carries the forecast {short} (up to {count})',
-    'mk.callShort': '⚠ Not enough calls — about {vol} cells expected, remaining calls carry {cap}. Re-contract to refill',
+    'mk.callShort': '⚠ 🚚 {cap} / 📦 {vol} cells',
     'market.hint': 'Can ship {count} {short} in the warehouse',
     'market.facSoldOut': 'Facilities sold out',
     'market.dealOffer': '{name} contract offer',
@@ -405,12 +405,13 @@
     'log.traitTruckUsed': '🚚 Bonus truck — one truck free this call',
     'log.attackIn': 'Hit by {from}\'s {icon} {name} — {detail}',
     'log.attackBlocked': '{from}\'s {icon} {name} — {how}',
-    'log.bombIn': '🧨 Moving boxes arrived — {size} cells, move out in {days} days (no refusal, no shipping)',
-    'log.bombOut': '🧨 Moved out — the boxes went to a rival (now {size} cells)',
-    'log.bombBlast': '🧨 The boxes burst — {n} overflow parcels stolen',
+    'log.pushIn': '📦 {from} filled a truck — {n} parcels pushed into your depot',
+    'log.bombIn': '🧨 Bomb landed — {size} cells, hops to the next depot in {days} days (cannot be cleared)',
+    'log.bombOut': '🧨 The bomb hopped to a rival (now {size} cells)',
+    'log.bombBlast': '🧨 Bomb burst — {n} overflow parcels stolen',
     'why.trait': '{icon} trait',
     'why.attack': '{icon} attack',
-    'why.bombBlast': '🧨 box burst',
+    'why.bombBlast': '🧨 bomb burst',
     'trait.d.rain': '{n} outdoor parcels wet · deadline −1',
     'trait.d.claim': 'rep −{n}',
     'trait.d.rat': '{n} fresh parcels lost',
@@ -435,7 +436,7 @@
     'multi.introMe': 'Your depot',
     'trait.blk.shield': '🛡 blocked',
     'trait.blk.roof': '🏠 blocked',
-    'err.bombStuck': 'Moving boxes cannot be sent back — wait and they move out on their own',
+    'err.bombStuck': '🧨 A bomb cannot be cleared — it hops to the next depot in a few days',
     'multi.hitToast': '{from} → {icon} {name}: {detail}',
     'multi.blockToast': '{how} — {from}\'s {icon} {name}',
     'multi.fireToast': '{icon} {name} → {names}',
@@ -455,7 +456,7 @@
     'multi.focusLine': '🎯 Next attack hits #1 ×3',
     'multi.truckLine': '🚚 Next call: +1 free truck',
     'multi.iceLine': '🧊 Fresh frozen {d}d',
-    'multi.bombRow': '🧨 Moving boxes {size} cells · moves in {d}d · +{c}c/day',
+    'multi.bombRow': '🧨 {size} cells · {d}d',
     'multi.traitLine': '{icon} {name} — {desc}',
     'pd.traitAtk': 'Ship on time to hit every rival',
     'pd.traitBon': 'Ship on time for a bonus',
@@ -2036,7 +2037,7 @@
       }
     },
     "STORAGE_KINDS": {
-      "bomb": { "name": "Moving boxes" },
+      "bomb": { "name": "Bomb" },
       "move": {
         "name": "Household Goods"
       },
@@ -2295,7 +2296,7 @@
     },
     "MULTI": {
     "TRAITS": {
-      "t_bomb": { "name": "Moving Bomb", "desc": "3 cells of moving boxes land on a random rival (no refusal, moves again in 6 days)" },
+      "t_bomb": { "name": "Bomb", "desc": "🧨 3 cells land in a random rival depot (cannot be cleared, hops on in 6 days)" },
       "t_rain": { "name": "Shower", "desc": "Tomorrow every outdoor parcel gets wet · deadline −1" },
       "t_claim": { "name": "Complaint", "desc": "Rep −1" },
       "t_rat": { "name": "Rat", "desc": "One fresh parcel is lost at once" },
@@ -2309,8 +2310,17 @@
       "t_ice": { "name": "Ice", "desc": "Fresh parcels stop spoiling for 3 days" },
       "t_pack": { "name": "Compress", "desc": "Warehouse +3 cells for 3 days" },
       "t_truck": { "name": "Bonus Truck", "desc": "Next call: +1 free truck" },
-      "t_return": { "name": "Send Back", "desc": "Return one held moving box to its sender" },
+      "t_return": { "name": "Send Back", "desc": "One 🧨 in my depot goes back to its sender" },
       "t_focus": { "name": "Focus", "desc": "Next attack hits #1 only, ×3" }
+    },
+    "THEMES": {
+      "spring": { "name": "Spring Day", "desc": "Nothing special — pure skill" },
+      "heat": { "name": "Heatwave", "desc": "Frequent heat alerts · outdoor fresh spoils fast" },
+      "monsoon": { "name": "Monsoon", "desc": "Many rainy days · outdoor parcels get wet" },
+      "peak": { "name": "Peak Season", "desc": "Volume +25%" },
+      "fresh": { "name": "Fresh Rush", "desc": "Lots of fresh & produce" },
+      "fragile": { "name": "Handle With Care", "desc": "Many fragile parcels · breakage ×1.5" },
+      "thief": { "name": "Petty Thieves", "desc": "Outdoor theft ×2" }
     },
     "PERKS": {
       "m_calls": { "name": "One More Truck", "desc": "+1 truck per contract (right now)" },
@@ -2326,7 +2336,7 @@
       "m_dodge": { "name": "Jab", "desc": "Half of incoming attacks fizzle" },
       "m_early": { "name": "Quick Hands", "desc": "Early calls rep +1 extra" },
       "m_trait": { "name": "Reload", "desc": "Your attacks fire twice 25% of the time" },
-      "m_heavy": { "name": "Heavy Boxes", "desc": "🧨 Moving boxes you send are +2 cells bigger" },
+      "m_heavy": { "name": "Big Bomb", "desc": "🧨 you send are +2 cells bigger" },
       "m_sharp": { "name": "Sharpened", "desc": "Your attacks ×1.5" }
     },
     "FAMILY_NAMES": { "eco": "Ops", "def": "Defense", "atk": "Attack" },

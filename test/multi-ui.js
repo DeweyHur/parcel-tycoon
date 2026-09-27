@@ -23,15 +23,20 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('타이틀에 난투 버튼', !!(await page.$('#t-multi')));
   await page.screenshot({ path: `${OUT}/M-00-title.png` });
   await page.click('#t-multi'); await page.waitForTimeout(700);
-  const intro = await page.evaluate(() => ({ on: !!document.querySelector('#mintro'), cards: document.querySelectorAll('#mintro .ic').length, vs: !!document.querySelector('#mintro .vs'), me: document.querySelector('#mintro .ic.me b') && document.querySelector('#mintro .ic.me b').textContent }));
+  const intro = await page.evaluate(() => ({ on: !!document.querySelector('#mintro'), cards: document.querySelectorAll('#mintro .ic').length, vs: !!document.querySelector('#mintro .vs'), theme: !!document.querySelector('#mintro .theme'), me: document.querySelector('#mintro .ic.me b') && document.querySelector('#mintro .ic.me b').textContent }));
   await page.screenshot({ path: `${OUT}/M-00b-intro.png` });
-  ok('시작 화면: 넷 소개 카드 · VS · 나', intro.on && intro.cards === 4 && intro.vs && intro.me === '나', JSON.stringify(intro));
+  ok('시작 화면: 넷 소개 카드 · VS · 나', intro.on && intro.cards === 4 && intro.vs && intro.me === '나' && intro.theme, JSON.stringify(intro));
   await page.click('#mintro'); await page.waitForTimeout(400);
   const slam = await page.evaluate(() => ({ intro: !!document.querySelector('#mintro'), slam: document.querySelectorAll('#multi-strip .mp.slam').length }));
   ok('게임 화면으로: 시작 화면 사라지고 상대 카드가 쾅 박힌다', !slam.intro && slam.slam === 4, JSON.stringify(slam));
   await page.waitForTimeout(1200); await idle();
-  const st = await page.evaluate(() => { const g = PT.game, m = PT.match; return { multi: g.rules.multi, players: m.players.length, strip: !document.querySelector('#multi-strip').hidden, cols: document.querySelectorAll('#multi-strip .mp').length, shop: document.querySelector('#shop-btn').hidden, turn: document.querySelector('#hud-turn').textContent, c3: document.querySelector('#c3').hidden, cap: g.warehouse.cap, cash: g.cash, months: g.rules.months }; });
-  ok('난투 시작: 멀티 규칙 · 4인 · 상대 줄 4칸 · 장 보기 버튼 없음 · D+1 · 빈 슬롯 숨김', st.multi && st.players === 4 && st.strip && st.cols === 4 && st.shop && /D\+1/.test(st.turn) && st.c3, JSON.stringify(st));
+  // 시작은 준비 마켓 — 테마는 시작 화면에 있었고, 새 계약 두 장 · 시설 없음. 닫으면 D+1
+  const prep = await page.evaluate(() => ({ phase: PT.game.phase, prep: !!(PT.game.market && PT.game.market.prep), theme: PT.game.cfg.mtheme, newC: PT.game.market.items.filter(it => it.kind === 'contract' && !it.switchFrom).length, fac: PT.game.market.items.some(it => it.kind === 'fac'), title: (document.querySelector('#modal h2, #modal .title, #modal header') || {}).textContent || document.querySelector('#modal').textContent.slice(0, 20) }));
+  await page.screenshot({ path: `${OUT}/M-00c-prep.png` });
+  ok('시작 준비 마켓: 테마 · 새 계약 2 · 시설 없음', prep.phase === 'market' && prep.prep && !!prep.theme && prep.newC === 2 && !prep.fac, JSON.stringify(prep));
+  await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(600); await idle();
+  const st = await page.evaluate(() => { const g = PT.game, m = PT.match; return { multi: g.rules.multi, storyOff: !!(g.story && g.story.off), players: m.players.length, strip: !document.querySelector('#multi-strip').hidden, cols: document.querySelectorAll('#multi-strip .mp').length, shop: document.querySelector('#shop-btn').hidden, turn: document.querySelector('#hud-turn').textContent, c3: document.querySelector('#c3').hidden, cap: g.warehouse.cap, cash: g.cash, months: g.rules.months }; });
+  ok('난투 시작: 멀티 규칙 · 4인 · 상대 줄 4칸 · 장 보기 버튼 없음 · D+1 · 빈 슬롯 숨김 · 대사 꺼짐', st.multi && st.storyOff && st.players === 4 && st.strip && st.cols === 4 && st.shop && /D\+1/.test(st.turn) && st.c3, JSON.stringify(st));
   await page.screenshot({ path: `${OUT}/M-01-day1.png` });
   // 며칠 플레이: 차가 차면 부르고, 아니면 호출 없음 (봇이 따라오는지)
   const oneDay = async () => { const did = await page.evaluate(() => { const g = PT.game; if (g.perkOffer) { const c = document.querySelector('.pkcard'); if (c) c.click(); return 'perk'; } if (g.phase !== 'play') return 'skip'; const B = window.BOT; const b = B.STRATS.balanced(g); if (b) { document.querySelector('#c' + b.i).click(); return 'card'; } document.querySelector('#wait-btn').click(); return 'wait'; }); await page.waitForTimeout(150); if (did === 'card') { await page.evaluate(() => { const w = document.querySelector('#wait-btn'); if (!w.disabled) w.click(); }); } await page.waitForTimeout(400); await idle(); return did; };
@@ -44,7 +49,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.waitForTimeout(900); await idle();
   let t = await modalText();
   const cyc = await page.evaluate(() => ({ phase: PT.game.phase, shop: !!(PT.game.market && PT.game.market.shop), kinds: [...new Set((PT.game.market || { items: [] }).items.map(i => i.kind))], invest: !document.querySelector('#invest-btn').hidden || true, shopBtn: document.querySelector('#shop-btn').hidden }));
-  ok('사이클 끝 → 장: 업그레이드·강화·창고·광고·배차 충전, 새 계약·새로고침 없음, 장 보기 버튼 없음', cyc.phase === 'market' && cyc.shop && /↑/.test(t) && cyc.kinds.includes('refill') && !/새 계열|새 계약/.test(t) && !(await page.$('#mk-refresh')) && cyc.shopBtn && cyc.kinds.every(k => ['contract', 'enh', 'fac', 'refill', 'adTicket', 'media', 'mediaUp'].includes(k)), JSON.stringify(cyc) + ' ' + t.slice(0, 120).replace(/\s+/g, ' '));
+  ok('사이클 끝 → 장: 업그레이드·강화·배차 충전·새 계약 2, 새로고침 없음, 장 보기 버튼 없음', cyc.phase === 'market' && cyc.shop && /↑/.test(t) && cyc.kinds.includes('refill') && !(await page.$('#mk-refresh')) && cyc.shopBtn && cyc.kinds.every(k => ['contract', 'enh', 'fac', 'refill', 'adTicket', 'media', 'mediaUp'].includes(k)), JSON.stringify(cyc) + ' ' + t.slice(0, 120).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-03-shop.png` });
   const bought = await page.evaluate(() => { const g = PT.game; const i = g.market.items.findIndex(it => it.kind === 'enh' && it.enh === 'cap1'); return { i, fac: g.market.items.some(it => it.kind === 'fac'), card: !!document.querySelector(`#modal .card[data-i="${i}"]`) }; });
   await page.waitForTimeout(300);
@@ -55,7 +60,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   // 퍽 3택1: 평판을 상한까지 올려 등급업
   await page.evaluate(() => { const g = PT.game; g.addRep(99, null); PT.renderAll(); });
   const offer = await page.evaluate(() => ({ offer: PT.game.perkOffer, tier: PT.game.repTier, cap: PT.game.repCap(), tier0: PT.game._tier0 }));
-  ok('상한 도달 → 등급 +1 · 상한 +8 · 카드 3장', offer.offer && offer.offer.length === 3 && offer.tier >= 1 && offer.cap === 20 + 8 * offer.tier, JSON.stringify(offer));
+  ok('상한 도달 → 등급 +1 · 상한 +12 · 카드 3장', offer.offer && offer.offer.length === 3 && offer.tier >= 1 && offer.cap === 20 + 12 * offer.tier, JSON.stringify(offer));
   await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(500); await idle();   // 다음 마감에서 checkPhase 가 퍽 팝업을 띄운다
   t = await modalText();
   ok('퍽 팝업', /하나 골라/.test(t) && (await page.$$('.pkcard')).length === 3, t.slice(0, 80).replace(/\s+/g, ' '));

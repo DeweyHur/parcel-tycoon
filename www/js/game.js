@@ -57,7 +57,7 @@
     repStep: 0, perkPick: false, noRepUnlock: false,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
-    traits: false, traitRate: [0, 0], attackShare: 0.4, bombs: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, bombGrow: 0, attackMult: 1,
+    traits: false, traitRate: [0, 0], attackShare: 0.4, bombs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, bombGrow: 0, attackMult: 1,
   };
   const MULT_KEYS = ['attackMult', 'theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
   const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'storeBigDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'selfCapDelta', 'allStartTrust', 'finalRushReward', 'freeTrucksPerCycle', 'earlyRepBonus', 'returnGraceDelta', 'shieldPassive', 'dodgeProb', 'attackEcho', 'bombGrow'];
@@ -174,7 +174,7 @@
       if (c.noHolidays) mods.push({ noHolidays: true });   // 테스트·시뮬레이터: 공휴일 없이 돌리기
       for (const p of c.perks) if (M.PERKS[p]) mods.push(M.PERKS[p].mods);
       // 멀티 「난투」: 시나리오·회사 위에 멀티 규칙 셋을 덮고, 런 중에 고른 퍽(3택1)을 그 위에 얹는다
-      if (c.multi && M.MULTI) { mods.push(M.MULTI.mods); for (const p of c.mperks || []) if (M.MULTI.PERKS[p] && M.MULTI.PERKS[p].mods) mods.push(M.MULTI.PERKS[p].mods); }
+      if (c.multi && M.MULTI) { mods.push(M.MULTI.mods); if (c.mtheme && M.MULTI.THEMES && M.MULTI.THEMES[c.mtheme]) mods.push(M.MULTI.THEMES[c.mtheme].mods || {}); for (const p of c.mperks || []) if (M.MULTI.PERKS[p] && M.MULTI.PERKS[p].mods) mods.push(M.MULTI.PERKS[p].mods); }
       this.rules = mergeMods(mods);
       this.scenario = sc; this.company = co;
     }
@@ -679,7 +679,7 @@
       const R = this.rules;
       for (const m of this.capMods.slice()) if (this.totalTurn >= m.until) { this.warehouse.cap -= m.delta; this.capMods.splice(this.capMods.indexOf(m), 1); }
       if (R.shieldPassive && this.shields < R.shieldPassive) this.shields = R.shieldPassive;
-      const q = this.inbox.splice(0); for (const a of q) this._applyAttack(a);
+      const q = this.inbox.splice(0); for (const a of q) { if (a.push) this._applyPush(a); else this._applyAttack(a); }
       this._assignCold();
     }
     _applyAttack(a) {
@@ -704,6 +704,19 @@
     }
     // ----- 이삿짐 폭탄: 강제 수락 · 출고 불가 · 하루 +perDay c · 카운트 0이면 랜덤 상대에게 이사(+1칸 −1일) -----
     _bombNext(b) { const B = M.MULTI.BOMB; return { size: Math.min(B.maxSize, this.storageVol(b) + 1), days: Math.max(1, b.turns - 1), hops: (b.hops || 0) + 1, from: this.cfg.pid != null ? this.cfg.pid : null }; }
+    // 상대가 만차로 밀어 넣은 택배 — 다음 날 아침 내 창고에 n 개가 더 들어온다(일반, 1~2칸, 기한 짧게)
+    receivePush(x) {
+      if (this.phase === 'over' || this.phase === 'win') return false;
+      this._act('push', { x: { n: x.n, from: x.from == null ? null : x.from, fromName: x.fromName || '' } });
+      this.inbox.push({ push: true, n: x.n, from: x.from, fromName: x.fromName }); return true;
+    }
+    _applyPush(x) {
+      const n = Math.max(1, Math.round(x.n || 1)), ids = [];
+      for (let i = 0; i < n; i++) { const p = this._spawnParcel({ type: 'normal', size: 1 + (this.rng.next() < 0.4 ? 1 : 0), customer: 'anon' }); if (!p) continue; p.deadline = Math.min(p.deadline, 3); p.deadline0 = p.deadline0 || p.deadline; p.pushed = true; this.parcels.push(p); ids.push(p.id); }
+      this._assignCold();
+      this.say('log.pushIn', { from: x.fromName || '', n: ids.length });
+      this.emit('pushIn', { n: ids.length, from: x.from, fromName: x.fromName, ids });
+    }
     receiveBomb(b) {
       if (this.phase === 'over' || this.phase === 'win') return { ok: false };
       this._act('bomb', { b: { size: b.size, days: b.days, hops: b.hops || 0, from: b.from == null ? null : b.from, back: !!b.back } });
@@ -1540,7 +1553,7 @@
       // 준비 마켓: 1개월차 첫 턴 전에 시작 자금으로 계약·시설·보험을 갖출 수 있다 (입고 예정이 보인다)
       if (m === 1 && this.cfg.prep && !this.prepDone) {
         this.prepDone = true; this.phase = 'market';
-        this.market = { items: this._genMarketItems(this.month), bought: 0, refreshes: 0, month: 0, prep: true, freeRefresh: this.rules.freeRefresh + 1 };
+        this.market = { items: this.rules.multi ? this._shopItems() : this._genMarketItems(this.month), bought: 0, refreshes: 0, month: 0, prep: true, shop: !!this.rules.multi, freeRefresh: this.rules.multi ? 0 : this.rules.freeRefresh + 1 };
         this.say('log.prepMarket');
         return;
       }
@@ -1848,8 +1861,10 @@
       this.loadChain = chainQualified ? (this.loadChain || 0) + 1 : 0;
       const chainLevel = Math.min(this.loadChain, D.LOAD_CHAIN.max);
       const chainMult = chainLevel >= 2 ? 1 + (chainLevel - 1) * D.LOAD_CHAIN.step : 1;
-      let chainBonus = 0;
-      if (chainMult > 1) {
+      let chainBonus = 0, pushed = 0;
+      // 난투: 만차는 돈이 아니라 **밀어내기** — 연속 만차 2회째부터(1·2·3개) 상대 창고에 택배를 밀어 넣는다 (유저: "만차가 돈 올려주지 말고 일부 택배를 상대에게")
+      if (R.chainPush && chainQualified && chainLevel >= 2) { pushed = chainLevel - 1; this.outbox.push({ type: 'push', n: pushed }); this.emit('pushOut', { n: pushed }); this.stats.pushed = (this.stats.pushed || 0) + pushed; if (chainLevel >= D.LOAD_CHAIN.max) this.loadChain = 0; }   // 최대에서 밀고 나면 처음부터
+      if (chainMult > 1 && !R.chainPush) {
         const beforeChain = revenue;
         revenue = Math.round(revenue * chainMult);
         chainBonus = revenue - beforeChain;
@@ -1896,10 +1911,10 @@
       const freezeFresh = !!this.trustPerk(c.carrier, 'freezeOnCall');
       for (const p of chosen) this._fireTrait(p);
       this.say('log.call', { name: this.contractName(c), count: chosen.length, revenue, delay: delay ? MSG('log.callDelay', { delay }) : '', broken: broken ? MSG('log.callBroken', { broken }) : '', refund: refunded ? MSG('log.callRefund') : '', calls: c.calls, fee });
-      this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus });
+      this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, pushed });
       this._updateTrustStats();
       this._endTurn(false, freezeFresh);
-      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, missionUp };
+      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, pushed, missionUp };
     }
     // 직접 배송(대기 턴의 부가 행동): 고른 택배를 배송비를 내고 처리. 보상 그대로. wait()에서 호출
     selfDeliver(ids) {
@@ -2605,6 +2620,16 @@
       this.market = { items: this._shopItems(), bought: 0, refreshes: 0, month: this.month, shop: true, dayCost: true, freeRefresh: 0 };
       return { ok: true };
     }
+    // 난투 장의 새 계약: 내가 안 가진 계열에서 표준 센터 n 장(공유 시드 파생 — 넷이 같은 사이클엔 같은 매물)
+    _newContractItems(n) {
+      const R = this.rules, owned = new Set(this.contracts.filter(Boolean).map(c => FAM(c.carrier)));
+      const fams = Object.keys(this._carrierWeights()).filter(f => !owned.has(f) && D.centerFor(f, 0));
+      const seed = (this.seed ^ Math.imul(this.month + 7, 2246822519) ^ 0x27d4eb2f) >>> 0, saved = this.rng; this.rng = new Rng(seed);
+      try {
+        const pick = this.rng.shuffle(fams).slice(0, n);
+        return pick.map(f => { const k = D.centerFor(f, 0), car = D.CARRIERS[k]; return { kind: 'contract', carrier: k, grade: car.grade, price: Math.round(car.price * R.priceMult), name: car.name, sold: false, hint: null, switchFrom: null }; });
+      } finally { this.rng = saved; }
+    }
     _shopItems() {
       const R = this.rules, items = [], mult = D.PRICE_MULT[Math.min(12, this.tableMonth(this.month))] * R.itemPriceMult * R.priceMult;
       for (const c of this.contracts) {
@@ -2612,12 +2637,13 @@
         const nx = D.centersOf(FAM(c.carrier)).find(k => D.CARRIERS[k].tier === D.CARRIERS[c.carrier].tier + 1);
         if (nx) { const car = D.CARRIERS[nx]; items.push({ kind: 'contract', carrier: nx, grade: car.grade, price: Math.round(car.price * R.priceMult), name: car.name, sold: false, hint: T('market.switchHint', { name: D.CARRIERS[c.carrier].name }), switchFrom: c.id, standing: true }); }
       }
-      // 강화: 배차 한도·휴무 특약은 뜻이 없다(무제한·명절 없음). 적재 보강 · 첫 배차 무료 · 신뢰 · 속성 특약
-      for (const e of ['cap1', 'regular', 'seal', 'optFragile', 'optCold']) { const E = D.ENHANCEMENTS[e]; if (e.startsWith('opt') && !this._canFitOpt(e)) continue; items.push({ kind: 'enh', enh: e, price: Math.round(E.price * mult), name: E.name, sold: false, standing: true }); }
+      // 강화: 배차 한도·휴무 특약·첫 배차 무료는 뜻이 없다(횟수제·배차비 없음·명절 없음). 적재 보강 · 신뢰 · 속성 특약
+      for (const e of ['cap1', 'seal', 'optFragile', 'optCold']) { const E = D.ENHANCEMENTS[e]; if (e.startsWith('opt') && !this._canFitOpt(e)) continue; items.push({ kind: 'enh', enh: e, price: Math.round(E.price * mult), name: E.name, sold: false, standing: true }); }
       const facPrice = f => Math.round(D.FACILITIES[f].price * mult * R.facilityPriceMult * ((R.facilityPriceMap && R.facilityPriceMap[f]) || 1));
       const fac = f => { const F = D.FACILITIES[f]; if (this.warehouse[f] || (F.requires && !this.warehouse[F.requires])) return; items.push({ kind: 'fac', fac: f, standing: true, price: facPrice(f), name: F.name, sold: false }); };
       // 시설(창고 확장·냉장·야적)은 난투에서 팔지 않는다 — 유저: "난투에서 시설 업그레이드는 없애줘". 칸은 퍽(📦·🏕)으로만 는다
       if (!R.noFacilities) { fac(['expand1', 'expand2', 'expand3'].find(f => !this.warehouse[f]) || 'expand3'); fac(['cold1', 'cold2'].find(f => !this.warehouse[f]) || 'cold2'); fac('yard'); }
+      items.push(...this._newContractItems(2));   // 새 계약 두 장 — 빈 슬롯이 있으면 새 계열, 없어도 갈아탈 수 있게 (유저: "왜 새 계약이 안 떠")
       items.push(...this._refillItems());   // 배차 충전(가득) — 난투의 배차는 횟수다
       // 광고: 캠페인(📣)으로 물량을 끌어오는 게 난투의 조절 손잡이다 — 매체·매체 강화·광고권은 판다 (성장 투자는 없다)
       for (const it of this._adAndGrowthItems(mult)) if (['adTicket', 'media', 'mediaUp'].includes(it.kind)) items.push(it);
