@@ -1264,6 +1264,7 @@
     'call.capacity': 'Capacity <b>{cap}</b> slots',
     'call.remain': 'Left',
     'call.btn': 'Call',
+    'call.riskShort': '⚠ break {pct}% ×{n} · rep −2',
     'call.riskLine': '⚠ Break risk on {n} — {pct}% each (expected loss {loss}c). A broken parcel is discarded, stress +2',
     'call.caps': 'Abilities',
     'call.size': 'Size {min}–{max}',

@@ -1186,7 +1186,7 @@
       const callMax = Math.max(c.calls, c.maxCalls || c.calls);
       const callPips = callPipsHtml(c.calls, callMax);
       const spent = c.calls === 0 && g.shows('calls') && !spare;
-      const cells = pips(pv.cells, vcap, pv.over, pv.trucks) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
+      const cells = pips(pv.cells, vcap, R.multi ? [] : pv.over, pv.trucks) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
       // 세로 목록 한 줄: 이름 · 싣는 색 · 적재 눈금 · 순수익 · 배차 눈금. 글자는 최소로 — 자세한 건 꾹 누르면
       const callsHtml = g.offFor(c) ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') || R.unlimitedCalls ? '' : spare ? T('hud.spare') : callPips;
@@ -1822,7 +1822,7 @@
     const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
     const money = `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, D.LOAD_CHAIN.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
-    const riskLine = riskSel.length ? `<div class="riskline">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
+    const riskLine = riskSel.length ? `<div class="riskline">${game.rules.noMoney ? T('call.riskShort', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100) }) : T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
     let trust = '';
     if (game.shows('trust')) { const tg = game.trustGainPreview(c, selP); const maxed = !game.trustNext(c.carrier); trust = `<div class="trustline" title="${esc(T('call.trustHold'))}">${trustBar(game, c.carrier, maxed || !cm.sel.size ? 0 : tg.xp)}${trustLevels(game, c.carrier)}</div>`; }

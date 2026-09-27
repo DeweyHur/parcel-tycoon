@@ -940,7 +940,7 @@ const MG = (seed, extra) => new Game(Object.assign({ multi: true, seed, scenario
 t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4 · 시작 차는 작다', () => {
   const g = MG(1), R = g.rules;
   assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) < D.CARRIERS[c.carrier].cap + 1) && R.carrierCapDelta.bulk === -2, '차는 작다(배차 무제한 대신)');
-  { const big = []; for (let m = 1; m <= 6; m++) for (const t of g._sharedSchedule(m)) for (const sp of t) if (sp.size > 3) big.push(sp); assert.equal(big.length, 0, '3칸 넘는 택배는 안 온다(시작 차에 실리게)'); }
+  { const big = []; for (let m = 1; m <= 6; m++) for (const t of g._sharedSchedule(m)) for (const sp of t) if (sp.size > 3 || ((sp.type === 'fresh' || sp.type === 'frozen') && sp.size > 2)) big.push(sp); assert.equal(big.length, 0, '3칸 넘는 택배는 안 온다 · 신선·냉동은 2칸까지'); }
   assert.ok(R.multi && R.months === 6 && R.noHolidays && R.noCalendarEvents && R.noWeekend && R.unlimitedCalls && R.noCallFee && R.payNow && R.noLoan && R.noInsurance && !R.shopDay && R.autoSummary && R.repDecides);
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
   assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk', 'cold', 'fragile']);
@@ -963,6 +963,7 @@ t('멀티: 배차 무제한 — 배차비 0, 배차 눈금은 안 줄고, 두 �
   const cash = g.cash, r = g.callCarrier(si, [1, 2]);
   assert.ok(r.ok, r.msg); assert.equal(r.fee, 0); assert.equal(g.feesDue, 0); assert.equal(g.cash, cash + r.revenue); assert.equal(c.calls, calls, '배차는 안 줄어든다');
   for (let i = 0; i < 20; i++) { g.parcels.push(P(10 + i, 'normal', 2)); assert.ok(g.callCarrier(si, [10 + i]).ok, '몇 번이고 부른다 ' + i); }
+  const late = P(90, 'normal', 2, { deadline0: 4, deadline: 0, overdue: true }); g.parcels.push(late); const rep0 = g.rep; assert.equal(g.repDeltaFor([late]), 0); g.callCarrier(si, [90]); assert.ok(g.rep >= rep0, '늦게라도 실어 나르면 평판은 안 깎인다');
   assert.equal(g.simulMax(c), D.MAX_TRUCKS);
 });
 t('멀티: 사이클 끝 장 없음 · 배차 리필 · 「장 보러 간 날」(shopDay) 규칙이면 매물은 업그레이드·강화·충전·광고·새 계약 2(시설 없음), 나오는 데 하루', () => {

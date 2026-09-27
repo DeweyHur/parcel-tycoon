@@ -1265,6 +1265,7 @@
     'call.capacity': '용량 <b>{cap}</b>칸',
     'call.remain': '잔여',
     'call.btn': '호출',
+    'call.riskShort': '⚠ 파손 {pct}% ×{n} · 평판 −2',
     'call.riskLine': '⚠ 파손 위험 {n}개 — 각 {pct}% (예상 손실 {loss}c). 파손되면 폐기 + 평판 −2',
     'call.caps': '능력',
     'call.size': '크기 {min}~{max}',
