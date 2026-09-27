@@ -1155,3 +1155,10 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 .pkcard .price.no { color: var(--red, #ff6b6b); }
 .pkcard.sold { opacity: .45; }
 .pkcard:disabled { cursor: default; }
+/* 공격 재생: 쏜 사람 카드가 번쩍, 닿은 곳이 빛난다 */
+#multi-strip .mp.attacker { animation: attackerFlash .9s ease-out; z-index: 2; }
+@keyframes attackerFlash { 0% { transform: scale(1); box-shadow: none; } 25% { transform: scale(1.12); box-shadow: 0 0 0 3px var(--red, #ff6b6b), 0 0 18px rgba(255,80,80,.9); } 100% { transform: scale(1); box-shadow: none; } }
+.fx-bad { animation: fxBad 1s ease-out; }
+@keyframes fxBad { 0% { box-shadow: 0 0 0 2px var(--red, #ff6b6b); filter: brightness(1.6); } 100% { box-shadow: none; filter: none; } }
+.fx-new { animation: fxNew 1s ease-out; }
+@keyframes fxNew { 0% { box-shadow: 0 0 0 2px var(--gold, #ffd166); transform: scale(1.25); } 100% { box-shadow: none; transform: scale(1); } }

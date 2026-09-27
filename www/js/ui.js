@@ -811,17 +811,38 @@
       if (n.type === 'bomb') { for (const to of n.to) flyIcon('🧨', n.from, to, k * 90, () => { if (to === ME()) scene.shake(.5); }); k++;
         if (n.from === ME()) mnotice(ME(), '🧨', T(n.back ? 'multi.bombBackToast' : 'multi.bombOutToast', { name: n.to.map(pname).join('·') }), 'me'); }
     }
+    // 나에게 온 공격·폭탄·밀어내기는 **한 번에 하나씩** 1초 간격으로 — 누가 쐈고(포트레잇이 번쩍) 무엇이 바뀌었는지(바뀐 곳이 빛난다) 보이게 (유저)
+    const steps = [];
     for (const e of events) {
-      if (e.type === 'attackIn') {
-        if (e.blocked) { if (e.blocked === 'shield') shieldFx(ME()); mnotice(e.from, traitIcon(e.trait), `→ ${T('multi.you')} · ${T('trait.blk.' + e.blocked)}`, 'ok'); }
-        else { faceHit[ME()] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3);
-          mnotice(e.from, traitIcon(e.trait), `→ ${T('multi.you')} · ${shortDetail(e.detail)}`, 'bad'); }
-      }
+      if (e.type === 'attackIn') steps.push(e.blocked
+        ? { from: e.from, icon: traitIcon(e.trait), text: `→ ${T('multi.you')} · ${T('trait.blk.' + e.blocked)}`, cls: 'ok', run: () => { if (e.blocked === 'shield') shieldFx(ME()); SFX.select(); } }
+        : { from: e.from, icon: traitIcon(e.trait), text: `→ ${T('multi.you')} · ${shortDetail(e.detail)}`, cls: 'bad', run: () => { faceHit[ME()] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3); hitFx(e.trait); } });
+      if (e.type === 'pushIn') steps.push({ from: e.from, icon: '📦', text: `+${e.n} → ${T('multi.you')}`, cls: 'bad', run: () => { SFX.thud(); scene.shake(.2); glow(e.ids.map(id => `.ptile[data-id="${id}"]`).join(','), 'fx-new'); } });
+      if (e.type === 'bombIn') steps.push({ from: e.from, icon: '🧨', text: T('multi.bombInToast', { size: e.storage.vol, days: e.storage.turns }), cls: 'bad', run: () => { SFX.thud(); scene.shake(.45); glow('#multi-status', 'fx-bad'); } });
+      if (e.type === 'bombBlast') steps.push({ from: ME(), icon: '🧨', text: T('multi.bombBlastToast', { n: e.stolen }), cls: 'bad', run: () => { SFX.discard(); scene.shake(.6); scene.mope(); } });
       if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
-      if (e.type === 'pushIn') { SFX.thud(); scene.shake(.2); mnotice(e.from, '📦', `+${e.n} → ${T('multi.you')}`, 'bad'); }
-      if (e.type === 'bombIn') { SFX.thud(); scene.shake(.45); mnotice(e.from, '🧨', T('multi.bombInToast', { size: e.storage.vol, days: e.storage.turns }), 'bad'); }
-      if (e.type === 'bombBlast') { SFX.discard(); scene.shake(.6); scene.mope(); mnotice(ME(), '🧨', T('multi.bombBlastToast', { n: e.stolen }), 'bad'); }
     }
+    if (steps.length) playSteps(steps);
+  }
+  // 공격 효과가 닿은 곳을 잠깐 빛낸다 — ⏱ 은 택배 칩 전부, 🔒 는 상태 줄, 🚧 는 계약 줄
+  function glow(sel, cls) { document.querySelectorAll(sel).forEach(el => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 1100); }); }
+  function hitFx(trait) {
+    if (trait === 't_hurry') glow('.ptile', 'fx-bad');
+    else if (trait === 't_seal') glow('#multi-status', 'fx-bad');
+    else if (trait === 't_road') glow('#contract-strip .contract', 'fx-bad');
+  }
+  let stepQ = [], stepOn = false;
+  function playSteps(steps) {
+    stepQ.push(...steps); if (stepOn) return; stepOn = true;
+    const next = () => {
+      const st = stepQ.shift(); if (!st) { stepOn = false; return; }
+      const card = st.from != null ? portraitEl(st.from) : null;
+      if (card) { card.classList.remove('attacker'); void card.offsetWidth; card.classList.add('attacker'); setTimeout(() => card.classList.remove('attacker'), 950); }
+      if (st.from != null && st.from !== ME()) flyIcon(st.icon, st.from, ME(), 0);
+      setTimeout(() => { mnotice(st.from, st.icon, st.text, st.cls); if (st.run) st.run(); }, st.from != null && st.from !== ME() ? 520 : 0);
+      setTimeout(next, 1000);
+    };
+    next();
   }
   // 상대의 폐업·마감은 매치를 보고 알아챈다 (봇은 사람의 하루 사이에 끝난다)
   const seenState = {};
