@@ -176,7 +176,7 @@ async function route(S, m, from, ev, snaps) {
     m.cycle = ev.n; await saveMatch(S, m);
     const all = m.players.filter(p => active(snaps[p.pid])); if (!all.length) return [];
     const t = all[rndInt(all.length)];
-    return [{ type: 'bomb', from: null, to: [t.pid], drop: true, bomb: { size: M.MULTI.BOMB.size, days: M.MULTI.BOMB.days, hops: 0, from: null } }];
+    return [{ type: 'bomb', from: null, to: [t.pid], drop: true, bomb: { size: M.MULTI.BOMB.size + Math.floor((ev.n - 1) / Math.max(1, (M.MULTI.CYCLES || 6) - 1) * (M.MULTI.BOMB.late || 0)), days: M.MULTI.BOMB.days, hops: 0, from: null } }];   // 갈수록 크게
   }
   if (ev.type === 'note') return [{ type: 'note', from, to: null, text: String(ev.text || '').slice(0, 40) }];   // 관전 응원 이모지 (4단계 자리)
   return [];

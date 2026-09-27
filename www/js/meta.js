@@ -336,11 +336,12 @@
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
       unlimitedCalls: true, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true, noFacilities: true, priceMult: 1.8, noMoney: true, traitSameDay: true,
-      carrierCapDelta: { bulk: -2, cold: -1, fragile: -1 }, maxParcelSize: 3, typeMaxSize: { fresh: 2, frozen: 2 }, noLateShipPenalty: true,   // 배차 한도 없음(유저: "평판으로 바뀌니 배차 한도는 없애는 게 맞다") 대신 차가 작다 — 시작 한길 4칸 · 신선 2칸 · 파손 2칸   // 장 값은 비싸게 — 살 게 시설뿐이던 때 돈이 남아돌았다(유저). 계약·강화·충전 전부 ×1.8   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
+      carrierCapDelta: { bulk: -2, cold: -1, fragile: -1 }, maxParcelSize: 3, typeMaxSize: { fresh: 2, frozen: 2 }, noLateShipPenalty: true,
+      startFamilies: ['bulk'], contractGated: true, specialTraitMult: 2.2,   // 한길만 들고 시작 · 계약을 사야 그 특수 물품(과 트레잇)이 온다 · 특수 물품엔 트레잇 ×2.2   // 배차 한도 없음(유저: "평판으로 바뀌니 배차 한도는 없애는 게 맞다") 대신 차가 작다 — 시작 한길 4칸 · 신선 2칸 · 파손 2칸   // 장 값은 비싸게 — 살 게 시설뿐이던 때 돈이 남아돌았다(유저). 계약·강화·충전 전부 ×1.8   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 폭탄으로 돌아온다)
       repStep: 6, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
-      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.6, dayArrivalsRate: 0.01, finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 3개쯤(+만차 밀어내기). 배차 무제한이라 1.3 → 1.6(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
+      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 2.0, dayArrivalsRate: 0.01, finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 4개쯤(+만차 밀어내기). 한길만 들고 시작해 일반이 대부분이라 2.0(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
       fuelRate: 0,                                                       // (배차비가 없으니 유가도 없다 — 값은 남겨 둔다)
       repDecides: true, latePenaltyDiv: 3,                               // 승부는 잔액이 아니라 **평판**. 먼저 마감한 사람 빼고는 그때 남은 날 ÷3 만큼 평판 페널티 (유저 2026-09-26)
       capDelta: 4,                                                       // 시작 창고 +4칸 (열린 질문 4 — 후보값)
@@ -366,7 +367,7 @@
       t_focus:  { kind: 'bonus', icon: '🎯', weight: 12 },    // 다음 공격 트레잇을 1위 한 명에게만 ×3
     },
     HURRY: 2, SEAL: 6, BUZZ: 2,   // 공격 세기: 독촉 기한 −2 · 봉인 −6칸 · 입소문 평판 +2
-    BOMB: { size: 3, days: 6, perDay: 2, maxSize: 6, max: 4 },   // 3칸/6일로 시작, 이사마다 +1칸 −1일, 6칸/1일이면 다음 이사 때 터진다. 매치당 동시 4개
+    BOMB: { size: 3, days: 6, perDay: 2, maxSize: 6, max: 4, late: 2 },   // late: 판이 끝나갈수록 처음 크기 +0~2   // 3칸/6일로 시작, 이사마다 +1칸 −1일, 6칸/1일이면 다음 이사 때 터진다. 매치당 동시 4개
     SHIELD_MAX: 2, TEMP_DAYS: 3,
     // 퍽 3택1 — 평판 등급이 오를 때마다 세 계열에서 한 장씩. 장착 상한 없음, 중복 가능(중첩 수치 표기).
     // 값은 개인 런 퍽 상한(월 40~80c)을 의도적으로 넘긴다 — 석 달짜리 난투에서 퍽은 양념이 아니라 빌드다.

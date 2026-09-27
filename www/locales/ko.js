@@ -510,6 +510,7 @@
     'multi.shopTitle': '장 보러 간 날',
     'multi.shopSub': '들어온 김에 다 사고 나온다 — 나오면 하루가 간다',
     'multi.shopClose': '장 보고 나오기 · 하루',
+    'multi.pickOut': '내보낼 계약',
     'multi.repShopTitle': '평판 업! 상점 — 3장',
     'multi.perkTitle': '평판 업! 하나 골라',
     'multi.perkSub': '',

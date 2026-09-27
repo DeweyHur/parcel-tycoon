@@ -890,8 +890,16 @@
       return `<button class="btn pkcard ${fam} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><b>${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
     const body = `<div class="pkrow">${sh.items.map(card).join('')}</div>${g.rules.noMoney ? '' : `<div class="d" style="text-align:right;color:var(--gold)">${g.cash}c</div>`}`;
     const m = modal(T('multi.repShopTitle'), body, [{ label: T('btn.close'), cls: 'primary', onClick: () => { g.closeRepShop(); closeModal(); game.takeEvents(); saveGame(); renderAll(); checkPhase(); } }]);
+    // 새 계약인데 빈 슬롯이 없으면 무엇을 내보낼지 고른다 (유저: "빈 슬롯 없으면 교체를 고르게")
+    const pickReplace = (it, i) => {
+      const body = `<p style="font-size:12px;color:var(--dim)">${T('multi.pickOut')}</p>` + g.contracts.map((c, si) => c ? `<div class="card" data-s="${si}"><div class="t"><span>${esc(g.contractName(c))}${gradeBadge(c.grade)}</span></div><div class="d">${T('fmt.cells', { n: g.vehicleCap(c) })} · ${enhNames(g, c).join(' · ') || T('common.none')}</div></div>` : '').join('');
+      const mm = modal(it.name, body, [{ label: T('btn.cancel'), onClick: () => { closeModal(); showRepShop(); } }]);
+      mm.querySelectorAll('.card').forEach(el => el.onclick = () => { const r = g.buyRepShop(i, +el.dataset.s); if (!r.ok) return toast(r.msg); SFX.buy(); game.takeEvents(); scene.sync(game, { animate: true }); renderAll(); closeModal(); if (g.repShop) showRepShop(); else { saveGame(); checkPhase(); } });
+    };
     m.querySelectorAll('.pkcard').forEach(b => b.onclick = () => {
-      const it = sh.items[+b.dataset.i]; const r = g.buyRepShop(+b.dataset.i, slotFor(it)); if (!r.ok) return toast(r.msg);
+      const it = sh.items[+b.dataset.i];
+      if (it.kind === 'contract' && it.switchFrom == null && !g.contracts.some(c => !c) && g.contracts.filter(Boolean).length > 1) { closeModal(); return pickReplace(it, +b.dataset.i); }
+      const r = g.buyRepShop(+b.dataset.i, slotFor(it)); if (!r.ok) return toast(r.msg);
       SFX.buy(); if (r.perk) rewardBurst(`${M.MULTI.PERKS[r.perk].icon} ${M.MULTI.PERKS[r.perk].name}`, 2);
       game.takeEvents(); scene.sync(game, { animate: true }); renderAll(); closeModal();
       if (g.repShop) showRepShop(); else { saveGame(); checkPhase(); }   // 하나만 고르는 규칙이면 사자마자 닫힌다

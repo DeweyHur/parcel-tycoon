@@ -126,7 +126,7 @@
     match.cycleDrops = cycle;
     const tg = match.players.filter(p => !finished(p.game)); if (!tg.length) return;
     const t = tg[Math.floor(mrand(match) * tg.length)];
-    t.game.receiveBomb({ size: M.MULTI.BOMB.size, days: M.MULTI.BOMB.days, hops: 0, from: null });
+    t.game.receiveBomb({ size: M.MULTI.BOMB.size + Math.floor((cycle - 1) / Math.max(1, t.game.rules.months - 1) * (M.MULTI.BOMB.late || 0)), days: M.MULTI.BOMB.days, hops: 0, from: null });   // 사이클 투하도 갈수록 크게
     match.news.push({ type: 'bomb', from: null, to: [t.id], drop: true });
   }
   // ----- 재실행 검증 (3단계) — 같은 cfg·같은 입력 로그면 같은 판이 나와야 한다. 서버가 종료 시 돌려 본다 -----

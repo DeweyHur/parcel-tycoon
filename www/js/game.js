@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, latePenaltyDiv: 3,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, bombs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, bombGrow: 0, attackMult: 1,
@@ -192,6 +192,7 @@
         wh = { ...((cy && cy.warehouse) || (lc && lc.warehouse) || co.warehouse) };
         contracts = (cy && cy.contracts) || (lc && lc.contracts) || co.contracts;
       }
+      if (R.startFamilies) contracts = contracts.filter(s => R.startFamilies.includes(FAM(s.carrier)));   // 난투: 한길(대량)만 들고 시작 — 나머지는 평판 상점에서 (유저)
       // 앞 장을 망쳐도(확장을 못 샀어도) 그 장의 대본이 성립하도록 바닥값을 보장한다.
       // 냉장·냉동 칸도 같이 봐야 한다 — 칸만 보장하고 냉장을 안 보장하면 ❄·🧊 가 갈 데가 없다.
       if (this.level && this.level.minCap != null) wh.cap = Math.max(wh.cap, this.level.minCap);
@@ -666,7 +667,7 @@
       // 공격: 나 빼고 전원. 🎯 한 방이 걸려 있으면 1위 한 명에게 ×3
       const n = 1 + (R.attackEcho && this.rng.next() < R.attackEcho ? 1 : 0);
       for (let i = 0; i < n; i++) {
-        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1), focus: this.focusNext, size: p.trait === 't_bomb' ? M.MULTI.BOMB.size + R.bombGrow : 0 };
+        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1), focus: this.focusNext, size: p.trait === 't_bomb' ? M.MULTI.BOMB.size + R.bombGrow + this.bombProgressBonus() : 0 };
         this.outbox.push(atk); this.emit('attackOut', atk);
       }
       this.focusNext = false;
@@ -703,6 +704,8 @@
       this.emit('attackIn', { trait: a.trait, from: a.from, fromName: a.fromName, blocked, detail, mult: a.mult });
     }
     // ----- 이삿짐 폭탄: 강제 수락 · 출고 불가 · 하루 +perDay c · 카운트 0이면 랜덤 상대에게 이사(+1칸 −1일) -----
+    // 폭탄은 판이 갈수록 크게 온다 — 석 달의 진행도 × BOMB.late (3칸 → 마지막엔 5칸). 유저: "이삿짐도 점점 큰 게"
+    bombProgressBonus() { const total = this.totalDays ? this.totalDays() : 0; if (!total || !M.MULTI.BOMB.late) return 0; return Math.floor(Math.min(1, (this.totalTurn || 0) / total) * M.MULTI.BOMB.late); }
     _bombNext(b) { const B = M.MULTI.BOMB; return { size: Math.min(B.maxSize, this.storageVol(b) + 1), days: Math.max(1, b.turns - 1), hops: (b.hops || 0) + 1, from: this.cfg.pid != null ? this.cfg.pid : null }; }
     // 상대가 만차로 밀어 넣은 택배 — 다음 날 아침 내 창고에 n 개가 더 들어온다(일반, 1~2칸, 기한 짧게)
     receivePush(x) {
@@ -1585,7 +1588,7 @@
         this.say('log.prepMarket');
         return;
       }
-      if (m === 1 && this.cfg.prep === false && !this.level) this._ensureStartCaps();   // 캠페인 장은 대본이 셋업을 정한다
+      if (m === 1 && this.cfg.prep === false && !this.level && !this.rules.startFamilies) this._ensureStartCaps();   // 난투(startFamilies)는 일부러 못 받는 물품이 있다 — 계약을 사서 연다   // 캠페인 장은 대본이 셋업을 정한다
       this.phase = 'play';
       this.say('log.monthStart', { m: this.monthIndex(m), y: this.yearOf(m), cal: this.calMonth(m), half: this.half(m) });
       this._startTurn();
@@ -1639,7 +1642,7 @@
         const TR = (M.MULTI && M.MULTI.TRAITS) || {}, total = this.totalDays(), prog = total ? daysDone / total : 0;
         const rate = R.traits ? R.traitRate[0] + (R.traitRate[1] - R.traitRate[0]) * prog : 0;
         const atkW = {}, bonW = {}; for (const k in TR) (TR[k].kind === 'attack' ? atkW : bonW)[k] = TR[k].weight;
-        const gen = () => { const sp = this._genParcelSpec(ratio, m, cw); if (rate && this.rng.next() < rate) sp.trait = this.rng.weighted(this.rng.next() < R.attackShare ? atkW : bonW); return sp; };
+        const gen = () => { const sp = this._genParcelSpec(ratio, m, cw); const r = rate * (sp.type !== 'normal' ? (R.specialTraitMult || 1) : 1); if (r && this.rng.next() < r) sp.trait = this.rng.weighted(this.rng.next() < R.attackShare ? atkW : bonW); return sp; };   // 특수 물품엔 트레잇이 더 잘 붙는다(계약을 살 이유)
         const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
         for (const t of organicTurns) sched[t].push(gen());
         const extra = this._sharedExtra(m);
@@ -1755,7 +1758,9 @@
     }
     _startTurn() {
       this.turn++;
-      const specs = this.schedule[this.turn - 1] || [];
+      let specs = this.schedule[this.turn - 1] || [];
+      // 난투: 받아 주는 계약이 없는 특수 물품은 일반으로 온다(트레잇도 없이) — 계약을 사야 그 물품과 그 트레잇이 열린다 (유저)
+      const R = this.rules; if (R.contractGated) specs = specs.map(sp => { if (sp.type === 'normal') return sp; const attrs = D.PARCEL_TYPES[sp.type].attrs || []; const ok = this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: sp.type, size: sp.size, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)) && (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile'))); return ok ? sp : Object.assign({}, sp, { type: 'normal', attrs: null, trait: null, size: Math.min(sp.size, 2) }); });
       const arrived = specs.map(s => this._spawnParcel(s));
       this.parcels.push(...arrived);
       this._assignCold();
