@@ -937,12 +937,13 @@ t('포워더(항공·철도·해상)는 무역 고객(🛃 짐을 맡기는 화�
 // ----- 멀티 「난투」 (docs/MULTIPLAYER_DESIGN.md · 1단계) -----
 const MULTI = require('../www/js/multi.js'), BOT = require('../www/js/bot.js');
 const MG = (seed, extra) => new Game(Object.assign({ multi: true, seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false }, extra || {}));
-t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4', () => {
+t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4 · 시작 차는 작다', () => {
   const g = MG(1), R = g.rules;
-  assert.ok(R.multi && R.months === 6 && R.noHolidays && R.noCalendarEvents && R.noWeekend && !R.unlimitedCalls && R.noCallFee && R.payNow && R.noLoan && R.noInsurance && !R.shopDay && R.autoSummary && R.repDecides);
+  assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) < D.CARRIERS[c.carrier].cap + 1) && R.carrierCapDelta.bulk === -2, '차는 작다(배차 무제한 대신)');
+  assert.ok(R.multi && R.months === 6 && R.noHolidays && R.noCalendarEvents && R.noWeekend && R.unlimitedCalls && R.noCallFee && R.payNow && R.noLoan && R.noInsurance && !R.shopDay && R.autoSummary && R.repDecides);
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
   assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk', 'cold', 'fragile']);
-  assert.ok(g.shows('calls'), '배차는 횟수 — 눈금이 보인다'); assert.equal(g.monthEvents(1).length, 0); assert.equal(g.insurer, 'none');
+  assert.equal(g.monthEvents(1).length, 0); assert.equal(g.insurer, 'none');
 });
 t('멀티: 입고 대본은 매치 공유 — 같은 시드면 같은 짐, 평판이 달라도 같다', () => {
   const a = MG(5), b = MG(5); assert.deepEqual(a.schedule, b.schedule);
@@ -954,14 +955,14 @@ t('멀티: 물량은 일차에 비례해 오르고 마지막 보름은 마감 �
   const g = MG(2); const n = m => g._makeSchedule(m).flat().length;
   assert.ok(n(3) > n(1) && n(6) > n(5) * 1.4, `${n(1)} ${n(3)} ${n(5)} ${n(6)}`);
 });
-t('멀티: 배차는 횟수 — 배차비 0, 남은 배차만 줄고, 0이면 못 부른다(장에서 충전)', () => {
+t('멀티: 배차 무제한 — 배차비 0, 배차 눈금은 안 줄고, 두 대까지 한 번에', () => {
   const g = MG(3); g.parcels = []; g.schedule = g.schedule.map(() => []);
   const si = slot(g, 'bulk'), c = g.contracts[si]; const calls = c.calls;
   g.parcels.push(P(1, 'normal', 2), P(2, 'normal', 2));
   const cash = g.cash, r = g.callCarrier(si, [1, 2]);
-  assert.ok(r.ok, r.msg); assert.equal(r.fee, 0); assert.equal(g.feesDue, 0); assert.equal(g.cash, cash + r.revenue); assert.equal(c.calls, calls - 1);
-  c.calls = 0; g.parcels.push(P(3, 'normal', 2)); assert.ok(!g.callCarrier(si, [3]).ok);
-  g.cash = 5; assert.equal(g.truckFee(c) * 0 + g.callFee(c, 2), 0, '돈이 없어도 배차비는 없다');
+  assert.ok(r.ok, r.msg); assert.equal(r.fee, 0); assert.equal(g.feesDue, 0); assert.equal(g.cash, cash + r.revenue); assert.equal(c.calls, calls, '배차는 안 줄어든다');
+  for (let i = 0; i < 20; i++) { g.parcels.push(P(10 + i, 'normal', 2)); assert.ok(g.callCarrier(si, [10 + i]).ok, '몇 번이고 부른다 ' + i); }
+  assert.equal(g.simulMax(c), D.MAX_TRUCKS);
 });
 t('멀티: 사이클 끝 장 없음 · 배차 리필 · 「장 보러 간 날」(shopDay) 규칙이면 매물은 업그레이드·강화·충전·광고·새 계약 2(시설 없음), 나오는 데 하루', () => {
   // 사이클 끝엔 장이 없다(유저: "상점을 없애면") — 곧장 다음 보름, 배차는 다시 찬다
@@ -1019,16 +1020,17 @@ t('멀티: 트레잇은 대본에 박혀 매치 공유 · 공격 40 : 보너스 
   assert.ok(late > early && atk > 0 && bon > atk, `${early} ${late} ${atk} ${bon} / ${tot}`);
   assert.deepEqual(MG(41)._makeSchedule(4).map(t => t.map(x => x.trait)), g._makeSchedule(4).map(t => t.map(x => x.trait)));
 });
-t('멀티: 보너스 트레잇은 기한 안에 출고할 때 나에게 — 💰 ×2 · ⭐ 평판 · 🛡 방패(최대 2) · 📦 임시 칸 · 🚚 덤 트럭', () => {
+t('멀티: 보너스 트레잇은 그날 출고할 때 나에게 — ⭐ 평판 +2 · 🛡 방패(최대 2) · 📦 임시 칸 · 🚚 덤 트럭 · 안 보내면 그날 밤 사라진다', () => {
   const g = MG(42); g.parcels = []; g.schedule = g.schedule.map(() => []); const si = slot(g, 'bulk'); g.cash = 1000;
   const mk = (id, tr) => { const p = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: tr }); g.parcels.push(p); return p; };
-  const a = mk(1, 't_gold'), b = mk(2, 't_buzz'); const rep = g.rep; let r = g.callCarrier(si, [a.id, b.id]);
-  assert.ok(r.ok); assert.ok(r.revenue >= a.reward * 2 + b.reward - 5, `${r.revenue} vs ${a.reward} ${b.reward}`); assert.ok(g.rep >= rep + 1);
+  const b = mk(2, 't_buzz'); const rep = g.rep; let r = g.callCarrier(si, [b.id]);
+  assert.ok(r.ok); assert.ok(g.rep >= rep + M.MULTI.BUZZ, '⭐ 입소문 +2');
   const c = mk(3, 't_shield'), d = mk(4, 't_shield'), e = mk(5, 't_shield'); g.callCarrier(si, [c.id, d.id, e.id]); assert.equal(g.shields, 2);
   const cap = g.warehouse.cap; const f = mk(6, 't_pack'), h = mk(7, 't_truck'); g.callCarrier(si, [f.id, h.id]); assert.equal(g.warehouse.cap, cap + 3); assert.ok(g.freeTruckNext);
   const fee = g.callFee(g.contracts[si], 1); assert.equal(fee, 0, '덤 트럭이면 한 대는 공짜');
   for (let i = 0; i < 4; i++) g.wait([]); assert.equal(g.warehouse.cap, cap, '3일 뒤 임시 칸은 사라진다');
   const od = mk(8, 't_buzz'); od.overdue = true; const rep2 = g.rep; g.callCarrier(si, [od.id]); assert.ok(g.rep <= rep2, '기한을 넘긴 택배의 트레잇은 불발');
+  const left = mk(9, 't_shield'); const plain = P(99, 'normal', 1); g.parcels.push(plain); g.wait([]); assert.ok(!g.parcels.includes(left) && g.parcels.includes(plain), '안 보낸 트레잇 택배는 그날 밤 사라진다(보통 택배는 남는다)'); assert.ok(g.log.some(l => l.k === 'log.traitGone'));
 });
 t('멀티: 공격 트레잇은 outbox 로 나가고(🎯 한 방이면 ×3), 받는 쪽은 다음 날 적용 — 방패·잽·지붕이 막는다', () => {
   const g = MG(43); g.parcels = []; g.schedule = g.schedule.map(() => []); const si = slot(g, 'bulk'); g.cash = 1000;

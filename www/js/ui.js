@@ -1189,7 +1189,7 @@
       const cells = pips(pv.cells, vcap, pv.over, pv.trucks) || `<b>${T('hud.loadCells', { vol: pv.vol, cap: vcap, more: eligVol > vcap ? '+' : '' })}</b>`;
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
       // 세로 목록 한 줄: 이름 · 싣는 색 · 적재 눈금 · 순수익 · 배차 눈금. 글자는 최소로 — 자세한 건 꾹 누르면
-      const callsHtml = g.offFor(c) ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips;
+      const callsHtml = g.offFor(c) ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') || R.unlimitedCalls ? '' : spare ? T('hud.spare') : callPips;
       const netHtml = spent || !pv.n ? '<span class="per">—</span>' : R.noMoney ? (() => { const d = g.repDeltaFor(elig.filter(p => pv.ids ? pv.ids.includes(p.id) : true)); return `<span class="per ${d >= 0 ? 'good' : 'bad'}">★${d >= 0 ? '+' : ''}${d}</span>`; })() : `<span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>`;
       btn.innerHTML = `<span class="cn">${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}</span>${takesDots(g, c, true)}<span class="cl">${spent ? '' : cells}</span>${netHtml}<span class="calls ${spent ? 'zero' : ''}">${callsHtml}</span>`;
     }
