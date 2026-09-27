@@ -1091,3 +1091,6 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 #mbanner.gold { color: var(--gold, #ffd166); }
 #mbanner.sepia { filter: sepia(.6); }
 .parcel.storage.bomb { border-color: #c0553b; }
+.qwait { text-align: center; padding: 10px 0; }
+.qwait .spin { display: inline-block; font-size: 34px; animation: qspin 1.6s linear infinite; }
+@keyframes qspin { to { transform: rotate(360deg); } }

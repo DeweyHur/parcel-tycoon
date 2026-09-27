@@ -88,7 +88,7 @@
   function showTitle() {
     $('#story').hidden = true; $('#sms').hidden = true; clearStoryHl(); clearGate(); storyBusy = false;
     const save = loadSave(), P = Profile.get(), msave = loadMultiSave();
-    match = null;
+    match = null; netStop();
     // 캠페인을 아직 다 못 했으면 타이틀도 최소한만 보여 준다 — 시작 · 소리 · 언어 (levels.js)
     if ((P.campaign.cleared || 0) < LEVELS.IMPLEMENTED) return showTitleCampaign(save, P.campaign);
     const coOn = !companiesHidden();
@@ -102,6 +102,7 @@
       <button class="btn gold" id="t-new">${T('title.new')}</button>
       ${msave ? `<button class="btn cta cont" id="t-multi-cont">${T('title.multiCont')}<small class="cont-sub">⚔ D+${msave.players[0].game.totalTurn || 0}</small></button>` : ''}
       <button class="btn" id="t-multi">⚔ ${T('title.multi')}</button>
+      ${NET.enabled() ? `<button class="btn" id="t-online">🌐 ${T('title.online')}${P.multi && P.multi.rank ? ` <small style="color:var(--dim)">${esc(T('multi.rankName.' + P.multi.rank))} · ${P.multi.elo}</small>` : ''}</button>` : ''}
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).filter(achShown).length, d: Object.keys(M.ACHIEVEMENTS).filter(achShown).length })}</small></button>
       ${BUILD.api ? `<button class="btn" id="t-rank">${T('title.rank')}</button>` : ''}
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
@@ -115,7 +116,8 @@
     // 인수인계는 캠페인으로 강제된다 — 끝낸 뒤 타이틀에는 다시 보이지 않는다
     const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
     m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); if (msave) { askConfirm(T('multi.confirmNew'), () => { Store.remove(MULTI_KEY); startMulti(); }, T('title.newShort'), showTitle); return; } startMulti(); };
-    const mc = m.querySelector('#t-multi-cont'); if (mc) mc.onclick = () => { SFX.resume(); SFX.select(); match = MULTI.fromJSON(msave); game = match.players[0].game; lastRank = myRank(); closeModal(); startPlay(); };
+    const on = m.querySelector('#t-online'); if (on) on.onclick = () => { SFX.resume(); SFX.select(); if (msave) { askConfirm(T('multi.confirmNew'), () => { Store.remove(MULTI_KEY); showQueue(); }, T('title.newShort'), showTitle); return; } showQueue(); };
+    const mc = m.querySelector('#t-multi-cont'); if (mc) mc.onclick = () => { SFX.resume(); SFX.select(); match = MULTI.fromJSON(msave); game = match.players[0].game; lastRank = myRank(); closeModal(); startPlay(); if (match.online) netStart(); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex(companiesHidden() ? 'carriers' : 'companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
@@ -554,12 +556,66 @@
   // ---------- 멀티 「난투」 (docs/MULTIPLAYER_DESIGN.md · js/multi.js) ----------
   // 1단계: 봇 3명과 로컬 매치. 서버·매칭·트레잇·폭탄은 다음 단계 — 여기서는 규칙 셋(장 하루 소모·배차 무제한·즉시 결제·퍽 3택1)과 상대 줄만
   function startMulti() {
+    netStop();
     const nm = (Profile.get().campaign || {}).name || T('lv.nameDefault');
     match = MULTI.newMatch({ name: nm, botNames: T('multi.botNames').split('·') });
     game = match.players[0].game; lastRank = myRank();
     closeModal(); startPlay();
   }
-  function myRank() { if (!match) return 0; const r = MULTI.standings(match).find(x => x.human); return r ? r.rank : 0; }
+  function myRank() { if (!match) return 0; const r = MULTI.standings(match).find(x => x.p.id === ME()); return r ? r.rank : 0; }
+  // ---------- 온라인 난투 (3단계, www/api/match.js · js/net.js) ----------
+  // 큐: 2초마다 서버에 묻는다. 같은 등급 ±1 → 30초 뒤 ±2 → 60초 뒤 봇 채움(서버가 정한다). 매치가 잡히면 서버 시드로 내 판을 만든다
+  let queueTimer = null, netTimer = null, netBusy = false;
+  function showQueue() {
+    const P = Profile.get(), nm = (P.campaign || {}).name || T('lv.nameDefault'), face = MULTI.FACES[Math.floor(Math.random() * MULTI.FACES.length)];
+    const render = st => {
+      const line = !st ? T('multi.qConnecting') : st.error ? T('multi.qError') : T('multi.qWaiting', { n: st.inQueue || 1, s: st.waited || 0 });
+      const rk = st && st.rank ? `<div class="d" style="text-align:center">${esc(T('multi.rankName.' + st.rank))} · ELO ${st.elo}</div>` : '';
+      const hint = st && !st.error ? `<div class="d" style="text-align:center;color:var(--dim)">${(st.waited || 0) < st.widenAt ? T('multi.qHint1') : (st.waited || 0) < st.botsAt ? T('multi.qHint2') : T('multi.qHint3')}</div>` : '';
+      modal(T('multi.qTitle'), `<div class="qwait"><span class="spin">⚔</span><p>${line}</p>${rk}${hint}</div>`, [{ label: T('btn.cancel'), onClick: () => { stopQueue(); NET.leave(P.pid); showTitle(); } }]);
+    };
+    const stopQueue = () => { if (queueTimer) clearInterval(queueTimer); queueTimer = null; };
+    render(null);
+    const ask = async () => {
+      const st = await NET.queue(P.pid, nm, face);
+      if (!queueTimer) return;
+      if (st && st.status === 'ready') { stopQueue(); if (st.match.players.length) { P.multi = Object.assign(P.multi || {}, { elo: (st.match.players.find(x => x.pid === P.pid) || {}).elo, rank: null }); Profile.save(); } startOnline(st.match, nm); return; }
+      render(st || { error: true });
+    };
+    queueTimer = setInterval(ask, 2000); ask();
+  }
+  function startOnline(sm, nm) {
+    match = MULTI.newOnline(sm, Profile.get().pid, { name: nm });
+    game = match.players[0].game; lastRank = myRank();
+    closeModal(); startPlay(); netStart();
+  }
+  // 판 중: 하루를 넘길 때 push(내 이벤트·스냅샷) + poll, 그 사이 3초마다 poll. 사람이 끝난 뒤(결과 화면)에도 정산될 때까지 poll
+  function netStart() { netStop(); netTimer = setInterval(() => netSync(false), 3000); netSync(true); }
+  function netStop() { if (netTimer) clearInterval(netTimer); netTimer = null; }
+  async function netSync(push) {
+    if (!match || !match.online || netBusy) return; netBusy = true;
+    const on = match.online;
+    try {
+      const out = MULTI.outgoing(match);
+      if (push || out.events.length) await NET.push(on.mid, on.pid, out.events, out.snaps);
+      const res = await NET.poll(on.mid, on.pid, on.since);
+      if (res && !res.error && match && match.online === on) {
+        MULTI.applyServer(match, res);
+        const news = MULTI.takeNews(match);
+        if (news.length && game) multiFx([], news);
+        multiBanners(); renderMultiStrip(); saveGame();
+        if (on.settled && $('#modal').classList.contains('mres')) showMultiResult();
+      }
+    } finally { netBusy = false; }
+  }
+  // 끝났다: 내 결과 + 입력 로그(서버가 다시 돌려 검증) · 호스트면 봇 결과도
+  async function netFinish() {
+    const on = match.online; if (!on || on.sent) return; on.sent = true;
+    const g = game, f = MULTI.fingerprint(g);
+    await NET.finish(on.mid, on.pid, on.pid, { cash: f.cash, rep: f.rep, day: f.day, win: g.phase === 'win' }, { seed: g.seed, scenario: g.cfg.scenario, company: g.cfg.company, perks: [], companyName: g.cfg.companyName, pid: g.cfg.pid }, g.actLog);
+    if (on.host) for (const p of match.players) if (p.bot && p.game) { const bf = MULTI.fingerprint(p.game); await NET.finish(on.mid, on.pid, p.id, { cash: bf.cash, rep: bf.rep, day: bf.day, win: p.game.phase === 'win' }); }
+    netSync(true);
+  }
   // 사람이 하루를 넘겼다 → 봇도 따라오고, 순위가 바뀌었으면 토스트
   function multiAfterDay(events) {
     if (!match) return;
@@ -568,6 +624,7 @@
     MULTI.tick(match);
     multiFx(events || [], MULTI.takeNews(match));
     multiBanners();
+    if (match.online) netSync(true);
     const r = myRank();
     if (lastRank && r < lastRank) { toastLater(r === 1 ? T('multi.rankTop') : T('multi.rankToast', { n: r }), 2000); SFX.levelup(); }
     lastRank = r;
@@ -577,8 +634,7 @@
   // 스프라이트는 스토리 인물 것을 빌린다 — 없는 표정은 neutral 로 (박 반장·한 사장만 worry/shock 이 있다)
   const faceHit = {};   // pid → 놀란 표정을 유지할 때까지의 시각
   function faceOf(p, r) {
-    const g = p.game;
-    const expr = !r.alive ? 'worry' : Date.now() < (faceHit[p.id] || 0) ? 'shock' : r.rank === 1 && r.alive ? 'smile' : (g.usedVolume() / g.warehouse.cap) >= 0.8 ? 'worry' : 'neutral';
+    const expr = !r.alive ? 'worry' : Date.now() < (faceHit[p.id] || 0) ? 'shock' : r.rank === 1 && r.alive ? 'smile' : (r.used / (r.cap || 1)) >= 0.8 ? 'worry' : 'neutral';
     return window.Story ? Story.sprite(p.face === 'park' ? 'park' : p.face, expr) : '';
   }
   function myStatusLine(g) {
@@ -597,15 +653,15 @@
     el.hidden = !match; if (!match) return;
     const rows = MULTI.standings(match);
     el.innerHTML = match.players.map(p => {
-      const r = rows.find(x => x.p === p), g = p.game;
+      const r = rows.find(x => x.p === p);
       const dead = !r.alive, done = r.done && r.alive;
       const fill = r.cap ? Math.min(1, r.used / r.cap) : 0, over = r.used > r.cap;
-      const reps = Array.from({ length: 5 }, (_, i) => `<i class="${g.rep >= (i + 1) * g.repCap() / 5 ? 'on' : ''}"></i>`).join('');
-      const bombs = g.bombCount ? g.bombCount() : 0;
+      const reps = Array.from({ length: 5 }, (_, i) => `<i class="${r.rep >= (i + 1) * r.repCap / 5 ? 'on' : ''}"></i>`).join('');
+      const bombs = r.bombs, g = { cash: r.cash, shields: r.shields };
       return `<div class="mp ${p.human ? 'me' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
         <img class="face" src="${faceOf(p, r)}" alt="">
         <span class="stamp">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : ''}</span>
-        <b class="nm">${esc(p.human ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
+        <b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
         <span class="reps">${reps}</span><span class="rk">${T('multi.day', { n: r.day })}${bombs ? ' 🧨' + (bombs > 1 ? bombs : '') : ''}${g.shields ? ' 🛡' : ''}</span>
         <div class="wh ${over ? 'over' : fill >= 0.8 ? 'hot' : fill >= 0.5 ? 'mid' : ''}"><i style="width:${Math.round(fill * 100)}%"></i></div>
         <span class="cash ${g.cash < 0 ? 'neg' : ''}" style="grid-column:1 / -1">${g.cash}c</span></div>`;
@@ -614,6 +670,7 @@
     const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.textContent = parts.join(' · '); }
   }
   // ---------- 연출 (8장): 발사 궤적 · 피격 비네트 · 방패 · 폭탄 · 배너 ----------
+  const ME = () => match ? match.players[0].id : 0;
   const portraitEl = pid => document.querySelector(`#multi-strip .mp[data-id="${pid}"]`);
   function centerOf(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
   // 아이콘이 from 에서 to 로 날아간다. from 이 null 이면 내 창고(화면 가운데)에서
@@ -638,21 +695,21 @@
     next();
   }
   const mtName = id => (M.MULTI.TRAITS[id] || {}).name || id, traitIcon = id => (M.MULTI.TRAITS[id] || {}).icon || "";
-  const pname = pid => { const p = match && match.players.find(x => x.id === pid); return p ? (p.human ? T('multi.you') : p.name) : '?'; };
+  const pname = pid => { const p = match && match.players.find(x => x.id === pid); return p ? (p.id === ME() ? T('multi.you') : p.name) : '?'; };
   // 사람 판의 이벤트(내가 쏜 것·맞은 것·폭탄) + 매치 소식(봇끼리 · 봇이 나에게) → 화면
   function multiFx(events, news) {
     if (!match) return;
     let k = 0;
     for (const n of news) {
       if (n.type === 'attack') { for (const to of n.to) flyIcon(traitIcon(n.trait), n.from, to, k * 90); k++;
-        if (n.from === 0) toastLater(T(n.focus ? 'multi.focusToast' : 'multi.fireToast', { icon: traitIcon(n.trait), name: mtName(n.trait), names: n.to.map(pname).join(' · ') }), 2200); }
-      if (n.type === 'bomb') { for (const to of n.to) flyIcon('🧨', n.from, to, k * 90, () => { if (to === 0) scene.shake(.5); }); k++;
-        if (n.from === 0) toastLater(T(n.back ? 'multi.bombBackToast' : 'multi.bombOutToast', { name: n.to.map(pname).join(' · ') }), 2000); }
+        if (n.from === ME()) toastLater(T(n.focus ? 'multi.focusToast' : 'multi.fireToast', { icon: traitIcon(n.trait), name: mtName(n.trait), names: n.to.map(pname).join(' · ') }), 2200); }
+      if (n.type === 'bomb') { for (const to of n.to) flyIcon('🧨', n.from, to, k * 90, () => { if (to === ME()) scene.shake(.5); }); k++;
+        if (n.from === ME()) toastLater(T(n.back ? 'multi.bombBackToast' : 'multi.bombOutToast', { name: n.to.map(pname).join(' · ') }), 2000); }
     }
     for (const e of events) {
       if (e.type === 'attackIn') {
-        if (e.blocked) { if (e.blocked === 'shield') shieldFx(0); toastLater(T('multi.blockToast', { how: I18n.text({ k: 'trait.blk.' + e.blocked }), from: e.fromName || '', icon: traitIcon(e.trait), name: mtName(e.trait) }), 2200); }
-        else { faceHit[0] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3);
+        if (e.blocked) { if (e.blocked === 'shield') shieldFx(ME()); toastLater(T('multi.blockToast', { how: I18n.text({ k: 'trait.blk.' + e.blocked }), from: e.fromName || '', icon: traitIcon(e.trait), name: mtName(e.trait) }), 2200); }
+        else { faceHit[ME()] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3);
           toastLater(T('multi.hitToast', { from: e.fromName || '', icon: traitIcon(e.trait), name: mtName(e.trait), detail: I18n.text(e.detail || '') }), 2600); }
       }
       if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
@@ -676,6 +733,7 @@
   // 포트레잇 탭 → 그 사람 창고 요약(계약 3줄·퍽) — 관전 정보이지 조작 아님
   function showOpponent(p) {
     const g = p.game, r = MULTI.standings(match).find(x => x.p === p);
+    if (!g) { modal(`${esc(p.name)} · ${r.alive ? T('multi.rank', { n: r.rank }) : T('multi.closed')}`, `<div class="kv"><span>${T('multi.colDay')}</span><span class="v">${T('multi.day', { n: r.day })} / ${r.days}</span><span>${T('multi.colCash')}</span><span class="v">${r.cash}c</span><span>${T('multi.colRep')}</span><span class="v">${r.rep}/${r.repCap}</span><span>${T('common.warehouse')}</span><span class="v">${r.used}/${r.cap}</span></div>${r.perks.length ? `<div class="mperks">${r.perks.map(id => M.MULTI.PERKS[id] ? `<span title="${esc(M.MULTI.PERKS[id].name)}">${M.MULTI.PERKS[id].icon}</span>` : '').join('')}</div>` : ''}`, [{ label: T('btn.close'), onClick: closeModal }]); return; }
     const cs = g.contracts.filter(Boolean).map(c => `<div class="kv2"><span>${esc(g.contractName(c))}${gradeBadge(c.grade)}</span><span class="v">${T('fmt.trucks', { n: g.vehicleCap(c) })} · ${g.truckFee(c)}c</span></div>`).join('');
     const pk = g.mperks.length ? `<div class="mperks">${g.mperks.map(id => `<span title="${esc(M.MULTI.PERKS[id].name)}">${M.MULTI.PERKS[id].icon}</span>`).join('')}</div>` : `<div class="d">${T('common.none')}</div>`;
     const body = `<div class="kv"><span>${T('multi.colDay')}</span><span class="v">${T('multi.day', { n: r.day })} / ${r.days}</span><span>${T('multi.colCash')}</span><span class="v">${g.cash}c</span><span>${T('multi.colRep')}</span><span class="v">${g.rep}/${g.repCap()} · ${esc(g.repTierName())}</span><span>${T('common.warehouse')}</span><span class="v">${r.used}/${r.cap}</span></div>${cs}${pk}`;
@@ -695,16 +753,22 @@
   }
   // 결과: 순위표. 사람이 먼저 끝났으면(마감·폐업) 남은 봇을 끝까지 돌린다 (관전은 4단계)
   function showMultiResult() {
-    const r = game.result;
-    if (!r.recorded) { r.recorded = true; MULTI.finishAll(match); Store.remove(MULTI_KEY); BGM.stop(0.5); renderMultiStrip(); }
-    const rows = MULTI.standings(match), me = rows.find(x => x.human);
+    const r = game.result, on = match.online;
+    if (!r.recorded) { r.recorded = true; MULTI.finishAll(match); if (!on) Store.remove(MULTI_KEY); BGM.stop(0.5); renderMultiStrip(); if (on) netFinish(); }
+    // 온라인: 서버가 정산(모든 사람 결과 + 검증)을 마치면 그 순위표·ELO 로, 그 전엔 지금 아는 대로 + 기다리는 중
+    let rows = MULTI.standings(match), settled = on && on.settled;
+    if (settled) rows = settled.rows.map(x => { const p = match.players.find(q => q.id === x.pid) || { id: x.pid, name: x.pid }; return Object.assign({ p, name: p.name, human: p.human, alive: x.alive, done: true, day: x.day, cash: x.cash, rep: x.rep, rank: x.rank, verified: x.verified }, {}); });
+    const me = rows.find(x => x.p.id === ME());
     if (!r.fanfare) { r.fanfare = true; if (me.rank === 1) { SFX.win(); BGM.oneShot('fanfare'); } else if (!me.alive) { SFX.over(); setTimeout(() => BGM.oneShot('gameover'), 300); } else SFX.levelup(); }
     const P = Profile.get(); if (!r.profiled) { r.profiled = true; P.multi = P.multi || { played: 0, wins: 0, best: 0 }; P.multi.played++; if (me.rank === 1) P.multi.wins++; P.multi.best = Math.max(P.multi.best || 0, me.alive ? me.cash : 0); Profile.save(); }
-    const table = `<div class="mtable">${rows.map(x => `<div class="mrow ${x.human ? 'me' : ''} ${x.alive ? '' : 'dead'}"><b class="rank">${x.rank}</b><span class="nm">${esc(x.human ? T('multi.you') : x.name)}</span><span class="st">${x.alive ? T('multi.done') : T('multi.closed')} · ${T('multi.day', { n: x.day })}</span><span class="cash">${x.cash}c</span><span class="rep">★${x.rep}</span></div>`).join('')}</div>`;
+    const table = `<div class="mtable">${rows.map(x => `<div class="mrow ${x.human ? 'me' : ''} ${x.alive ? '' : 'dead'}"><b class="rank">${x.rank}</b><span class="nm">${esc(x.p.id === ME() ? T('multi.you') : x.name)}</span><span class="st">${x.alive ? T('multi.done') : T('multi.closed')} · ${T('multi.day', { n: x.day })}</span><span class="cash">${x.cash}c</span><span class="rep">★${x.rep}</span></div>`).join('')}</div>`;
     const body = `<div class="big-num">${T('multi.rank', { n: me.rank })}</div><p style="text-align:center;color:var(--dim)">${esc(I18n.text(r.reason))}</p>${table}
       <div class="kv"><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${game.mperks.map(id => M.MULTI.PERKS[id].icon).join('') || T('common.none')}</span><span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
-    modal(me.alive ? T('multi.resultWin', { rank: me.rank }) : T('multi.resultOver', { rank: me.rank }), body,
-      [{ label: T('res.toTitle'), onClick: () => { closeModal(); match = null; game = null; showTitle(); } }, { label: T('multi.again'), cls: 'primary', onClick: () => { closeModal(); startMulti(); } }]);
+    const eloLine = on ? (settled ? (settled.rated && settled.elo[on.pid] ? `<div class="d" style="text-align:center;color:var(--gold)">${T('multi.eloLine', { a: settled.elo[on.pid].before, b: settled.elo[on.pid].elo, d: (settled.elo[on.pid].delta >= 0 ? '+' : '') + settled.elo[on.pid].delta, rank: esc(T('multi.rankName.' + settled.elo[on.pid].rank)) })}</div>` : `<div class="d" style="text-align:center;color:var(--dim)">${T(settled.void ? 'multi.unverified' : 'multi.unrated')}</div>`) : `<div class="d" style="text-align:center;color:var(--dim)">${T('multi.waitingOthers')}</div>`) : '';
+    if (settled && settled.elo[on.pid]) { const P = Profile.get(); P.multi = Object.assign(P.multi || {}, { elo: settled.elo[on.pid].elo, rank: settled.elo[on.pid].rank }); Profile.save(); }
+    const m = modal(me.alive ? T('multi.resultWin', { rank: me.rank }) : T('multi.resultOver', { rank: me.rank }), eloLine + body,
+      [{ label: T('res.toTitle'), onClick: () => { closeModal(); netStop(); if (on) Store.remove(MULTI_KEY); match = null; game = null; showTitle(); } }, { label: T('multi.again'), cls: 'primary', onClick: () => { closeModal(); netStop(); if (on) { Store.remove(MULTI_KEY); showQueue(); } else startMulti(); } }]);
+    m.classList.add('mres');
   }
 
   // 런 카드: 이 런의 **특징** 몇 줄 — 이름 + 판에 걸리는 수치 하나. 세세한 달별 수치는 숨긴다.
@@ -2564,7 +2628,7 @@
       music: () => { opts.music = !opts.music; BGM.setEnabled(opts.music); saveOpts(); showMenu(); },
       story: () => { if (!g.story) g.story = { seen: [], notes: [] }; g.story.off = !g.story.off; saveGame(); showMenu(); },
       sms: () => { opts.sms = !opts.sms; saveOpts(); showMenu(); },
-      quit: () => askConfirm(T('menu.abandonConfirm'), () => { Store.remove(match ? MULTI_KEY : SAVE_KEY); game = null; match = null; showTitle(); }, T('menu.abandonBtn'), showMenu),
+      quit: () => askConfirm(T('menu.abandonConfirm'), () => { Store.remove(match ? MULTI_KEY : SAVE_KEY); netStop(); game = null; match = null; showTitle(); }, T('menu.abandonBtn'), showMenu),
     };
     m.querySelectorAll('[data-act]').forEach(b => b.onclick = () => { SFX.click(); run[b.dataset.act](); });
     m.querySelectorAll('.menu-perks .pslot.on').forEach(el => el.onclick = () => { const pk = M.PERKS[el.dataset.id]; toast(`${perkIcon(el.dataset.id)} ${pk.name} — ${pk.desc}`, 2600); });
@@ -2601,6 +2665,6 @@
     // 1장 스튜디오 → 2장 타이틀. 2장은 별도 화면이 아니라 showTitle() 그 자체다
     if (window.Splash) Splash.play(showTitle); else showTitle();
   }
-  window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, get match() { return match; }, Profile, renderAll, saveGame, prep, startRun, showTitle, showResult, showRanking, startMulti };
+  window.PT = { get game() { return game; }, get busy() { return busy; }, get scene() { return scene; }, get match() { return match; }, Profile, renderAll, saveGame, prep, startRun, showTitle, showResult, showRanking, startMulti, startOnline, showQueue, netSync };
   init();
 })();

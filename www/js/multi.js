@@ -31,18 +31,60 @@
     for (let i = 0; i < bots; i++) players.push({ id: i + 1, name: pick(), human: false, face: faces[(i + 1) % faces.length], strat: STRATS[i % STRATS.length], speed: SPEEDS[i % SPEEDS.length], acc: 0, game: mkGame(seed, null, i + 1) });
     return { v: 2, seed, players, started: Date.now(), rng: hash('route' + seed), news: [], cycleDrops: 0 };
   }
+  // ----- 온라인 매치 (3단계, www/api/match.js) -----
+  // 서버가 준 매치(시드·자리)에서 내 판을 만든다. 봇은 호스트(첫 사람)만 돌린다 — 나머지는 서버 스냅샷으로 본다
+  function newOnline(sm, mypid, o) {
+    const players = sm.players.map(p => {
+      const me = p.pid === mypid, host = sm.players[0].pid === mypid;
+      const base = { id: p.pid, name: p.name, face: p.face || 'park', human: !p.bot, remote: !me && !p.bot, bot: !!p.bot, strat: p.strat, speed: p.bot ? SPEEDS[(+p.pid.replace(/\D/g, '') || 1) % SPEEDS.length] : 1, snap: null };
+      if (me) base.game = mkGame(sm.seed, o && o.name || p.name, p.pid);
+      else if (p.bot && host) base.game = mkGame(sm.seed, null, p.pid);
+      return base;
+    });
+    // 내 자리를 맨 앞으로 (화면은 맨 왼쪽이 나)
+    players.sort((a, b) => (a.id === mypid ? -1 : 0) - (b.id === mypid ? -1 : 0));
+    return { v: 2, seed: sm.seed, players, started: Date.now(), rng: hash('route' + sm.seed), news: [], cycleDrops: 0,
+      online: { mid: sm.id, pid: mypid, host: sm.players[0].pid === mypid, since: 0, pending: [], results: {}, settled: sm.settled || null } };
+  }
+  function owned(match) { return match.players.filter(p => p.game).map(p => p.id); }
+  // 서버에서 온 이벤트를 내 판(과 호스트면 봇 판)에 적용하고 화면용 소식으로 바꾼다
+  function applyServer(match, res) {
+    const on = match.online; if (!on) return;
+    on.since = res.cursor != null ? res.cursor : on.since;
+    for (const p of match.players) if (!p.game && res.snaps && res.snaps[p.id]) p.snap = res.snaps[p.id];
+    if (res.results) on.results = res.results;
+    if (res.match && res.match.settled) on.settled = res.match.settled;
+    const mine = new Set(owned(match));
+    for (const e of res.events || []) {
+      if (e.type === 'attack') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receiveAttack({ trait: e.trait, mult: e.mult, from: e.from, fromName: e.fromName });
+        match.news.push({ type: 'attack', from: e.from, to: e.to, trait: e.trait, focus: !!e.focus, remote: true }); }
+      else if (e.type === 'bomb') { const t = match.players.find(p => p.id === e.to[0]); let blast = false; if (t && t.game && mine.has(t.id)) { const r = t.game.receiveBomb(Object.assign({}, e.bomb, { back: !!e.back })); blast = !!(r && r.blast); }
+        match.news.push({ type: 'bomb', from: e.from, to: e.to, blast, back: !!e.back, drop: !!e.drop, remote: true }); }
+      else if (e.type === 'bombFizzle') match.news.push({ type: 'bombFizzle', from: e.from });
+      else if (e.type === 'note') match.news.push({ type: 'note', from: e.from, text: e.text });
+    }
+    // 내가 쏜 것도 서버가 목적지를 붙여 돌려주면 그때 날린다 — 온라인에선 발사 연출이 한 폴링(≤3초) 늦다
+  }
+  // 서버로 보낼 묶음: 밀린 이벤트 + 내가 돌리는 판들의 스냅샷
+  function outgoing(match) {
+    const on = match.online; if (!on) return null;
+    const events = on.pending.splice(0), snaps = {};
+    for (const p of match.players) if (p.game) snaps[p.id] = snapOf(p.game);
+    return { events, snaps };
+  }
   // 봇 하루 진행. 끝난 봇은 건드리지 않는다
   function botDay(p) { const g = p.game; if (finished(g)) return false; const r = BOT.multiDay(g, p.strat); g.takeEvents(); return r; }
   // 매치 난수 (폭탄 목적지 — 서버가 정할 자리. 지금은 매치 시드에서)
   function mrand(match) { match.rng = (Math.imul(match.rng ^ (match.rng >>> 15), 0x2c1b3c6d) + 0x9e3779b9) >>> 0; return (match.rng >>> 8) / 16777216; }
-  function targetsOf(match, from) { return match.players.filter(p => p.id !== from && !finished(p.game)); }
-  function bombsInPlay(match) { return match.players.reduce((n, p) => n + p.game.bombCount(), 0); }
+  function targetsOf(match, from) { return match.players.filter(p => p.id !== from && !stateOf(p).done); }
+  function bombsInPlay(match) { return match.players.reduce((n, p) => n + stateOf(p).bombs, 0); }
   // 각 판의 outbox(공격·폭탄 이사)를 상대 인박스로. 공격은 나 빼고 전원(마감·폐업 제외), 🎯 한 방은 1위 한 명에게만.
   // 폭탄은 랜덤 상대 한 명(되돌리기는 보낸 사람) — 갈 곳이 없으면(전원 마감) 소멸. 매치당 동시 최대 BOMB.max
   function route(match) {
     for (const p of match.players) {
-      const g = p.game; if (!g.outbox.length) continue;
+      const g = p.game; if (!g || !g.outbox.length) continue;
       const out = g.outbox.splice(0);
+      if (match.online) { for (const o of out) match.online.pending.push(Object.assign({ from: p.id }, o)); continue; }   // 온라인: 서버가 목적지를 정한다 (net.js 가 보낸다)
       for (const o of out) {
         if (o.type === 'attackOut') {
           let tg = targetsOf(match, p.id);
@@ -69,6 +111,7 @@
   }
   // 매 사이클 정산마다 폭탄 하나 자동 투하 — 사람의 시계 기준 (사람이 사이클을 넘길 때)
   function cycleDrop(match, cycle) {
+    if (match.online) { if ((match.cycleDrops || 0) < cycle) { match.cycleDrops = cycle; match.online.pending.push({ from: match.players[0].id, type: 'cycle', n: cycle }); } return; }
     if ((match.cycleDrops || 0) >= cycle || bombsInPlay(match) >= M.MULTI.BOMB.max) return;
     match.cycleDrops = cycle;
     const tg = match.players.filter(p => !finished(p.game)); if (!tg.length) return;
@@ -96,7 +139,7 @@
   function tick(match) {
     const h = dayOf(match.players[0].game);
     for (const p of match.players) {
-      if (p.human) continue;
+      if (p.human || !p.game) continue;
       const target = Math.floor(h * p.speed);
       let guard = 0;
       while (dayOf(p.game) < target && !finished(p.game) && guard++ < 40) { botDay(p); route(match); }
@@ -105,19 +148,28 @@
   }
   // 사람이 끝났다(마감·폐업) → 남은 봇을 끝까지 돌린다 (관전은 4단계)
   function finishAll(match) {
-    for (const p of match.players) { if (p.human) continue; let guard = 0; while (!finished(p.game) && guard++ < 400) { botDay(p); route(match); } }
+    for (const p of match.players) { if (p.human || !p.game) continue; let guard = 0; while (!finished(p.game) && guard++ < 400) { botDay(p); route(match); } }
   }
-  function allDone(match) { return match.players.every(p => finished(p.game)); }
+  function allDone(match) { return match.players.every(p => stateOf(p).done); }
   // 순위: ① 생존자 > 폐업자 ② 생존자끼리 최종 잔액 ③ 동률이면 평판 ④ 폐업자끼리는 늦게 죽은 순
+  // 한 사람의 상태 — 내 판(game)이 있으면 거기서, 원격(온라인 상대)이면 서버 스냅샷(snap)에서
+  function stateOf(p) {
+    const g = p.game;
+    if (g) return { alive: alive(g), done: finished(g), win: g.phase === 'win', cash: g.cash, rep: g.rep, repCap: g.repCap(), day: dayOf(g), days: totalDays(g), tier: g.repTier, perks: g.mperks.slice(), cap: g.warehouse.cap, used: g.usedVolume(), shields: g.shields, bombs: g.bombCount(), phase: g.phase };
+    const s = p.snap || {}; const ph = s.phase || 'play', dead = ph === 'over' || ph === 'gone';
+    return { alive: !dead, done: ph !== 'play', win: ph === 'win', cash: s.cash || 0, rep: s.rep || 0, repCap: s.repCap || 20, day: s.day || 1, days: s.days || 78, tier: s.tier || 0, perks: s.perks || [], cap: s.cap || 28, used: s.used || 0, shields: s.shields || 0, bombs: s.bombs || 0, phase: ph, gone: ph === 'gone' };
+  }
+  // 서버에 올릴 스냅샷 (stateOf 와 같은 모양)
+  function snapOf(g) { const st = stateOf({ game: g }); return { cash: st.cash, rep: st.rep, repCap: st.repCap, day: st.day, days: st.days, used: st.used, cap: st.cap, shields: st.shields, bombs: st.bombs, phase: st.phase, tier: st.tier, perks: st.perks }; }
   function standings(match) {
-    const rows = match.players.map(p => { const g = p.game; return { p, name: p.name, human: p.human, alive: alive(g), done: finished(g), win: g.phase === 'win', cash: g.cash, rep: g.rep, day: dayOf(g), days: totalDays(g), tier: g.repTier, perks: g.mperks.slice(), usage: g.usage(), cap: g.warehouse.cap, used: g.usedVolume() }; });
+    const rows = match.players.map(p => Object.assign({ p, name: p.name, human: p.human, usage: 0 }, stateOf(p)));
     rows.sort((a, b) => (b.alive - a.alive) || (a.alive ? (b.cash - a.cash) || (b.rep - a.rep) : (b.day - a.day) || (b.cash - a.cash)));
     rows.forEach((r, i) => r.rank = i + 1);
     return rows;
   }
-  function toJSON(match) { return { v: match.v, seed: match.seed, started: match.started, rng: match.rng, cycleDrops: match.cycleDrops || 0, players: match.players.map(p => ({ id: p.id, name: p.name, human: p.human, face: p.face, strat: p.strat, speed: p.speed, game: p.game.toJSON() })) }; }
-  function fromJSON(o) { return { v: o.v, seed: o.seed, started: o.started, rng: o.rng || hash('route' + o.seed), cycleDrops: o.cycleDrops || 0, news: [], players: o.players.map((p, i) => ({ face: FACES[i % FACES.length], ...p, game: Game.fromJSON(p.game) })) }; }
+  function toJSON(match) { return { v: match.v, seed: match.seed, started: match.started, rng: match.rng, cycleDrops: match.cycleDrops || 0, online: match.online || null, players: match.players.map(p => ({ id: p.id, name: p.name, human: p.human, remote: !!p.remote, bot: !!p.bot, face: p.face, strat: p.strat, speed: p.speed, snap: p.snap || null, game: p.game ? p.game.toJSON() : null })) }; }
+  function fromJSON(o) { return { v: o.v, seed: o.seed, started: o.started, rng: o.rng || hash('route' + o.seed), cycleDrops: o.cycleDrops || 0, news: [], online: o.online ? Object.assign({ pending: [], results: {}, settled: null }, o.online) : null, players: o.players.map((p, i) => ({ face: FACES[i % FACES.length], ...p, game: p.game ? Game.fromJSON(p.game) : null })) }; }
 
-  const MULTI = { SCENARIO, FACES, replay, fingerprint, verify, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
+  const MULTI = { SCENARIO, FACES, replay, fingerprint, verify, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
   if (typeof module !== 'undefined') module.exports = MULTI; else root.MULTI = MULTI;
 })(typeof window !== 'undefined' ? window : globalThis);

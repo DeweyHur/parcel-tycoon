@@ -2,7 +2,10 @@
 const assert = require('assert');
 const { Game, DATA: D, META: M } = require('../www/js/game.js');
 const NG = (seed, extra) => new Game(Object.assign({ seed, scenario: 'kr_spring', months: 24, noHolidays: true, perks: ['skip', 'insure'] }, extra || {}));   // 기본은 한 해 런 (24사이클), 공휴일은 따로 시험한다
-let n = 0, fails = []; const t = (name, f) => { try { f(); n++; console.log('ok', name); } catch (e) { fails.push(name); console.log('FAIL', name, '—', String(e.message).split('\n')[0].slice(0, 200)); } };
+let n = 0, fails = []; const pending = [];
+const fail = (name, e) => { fails.push(name); console.log('FAIL', name, '—', String(e && e.message || e).split('\n')[0].slice(0, 200)); };
+// async 테스트(서버)는 프로미스를 모아 마지막에 기다린다
+const t = (name, f) => { try { const r = f(); if (r && typeof r.then === 'function') { pending.push(r.then(() => { n++; console.log('ok', name); }, e => fail(name, e))); return; } n++; console.log('ok', name); } catch (e) { fail(name, e); } };
 // 빈 창고·빈 입고로 시작하는 실험용 게임
 const EMPTY = (seed, extra) => { const g = NG(seed, extra); g.parcels = []; g.schedule = g.schedule.map(() => []); g.warehouse.cap = 99; g.cash = 2000; return g; };
 const P = (id, type, size, extra) => Object.assign({ id, type, size, baseSize: size, reward: D.PARCEL_TYPES[type].reward[size], deadline: D.PARCEL_TYPES[type].deadline, overdue: false, attrs: D.PARCEL_TYPES[type].attrs.slice(), age: 0, warm: 0, customs: 0, customer: 'anon', arrivalTurn: 1, inCold: false, inFrozen: false }, extra);
@@ -1059,4 +1062,94 @@ t('멀티: 매치 라우팅 — 공격은 나 빼고 전원, 폭탄은 랜덤 �
   const j = MULTI.fromJSON(JSON.parse(JSON.stringify(MULTI.toJSON(m)))); assert.equal(j.players[1].game.inbox.length, 2); assert.ok(j.players[0].face);
 });
 
-console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1);
+// ----- 멀티 3단계: 서버(www/api/match.js, 인메모리 스토어) · 재실행 검증 · ELO -----
+const API = require('../www/api/match.js');
+const PIDS = ['aaaaaaaaaaaa', 'bbbbbbbbbbbb', 'cccccccccccc', 'dddddddddddd'];
+const call = (S, d) => API.handle(S, d, 'test').then(r => r[1]);
+t('멀티: 재실행 검증 — 같은 시드·같은 입력 로그면 같은 판, 한 줄만 빠져도 다르다', () => {
+  const m = MULTI.newMatch({ seed: 77, name: 'H' }); const h = m.players[0].game; let g = 0;
+  while (!(h.phase === 'over' || h.phase === 'win') && g++ < 500) { BOT.multiDay(h, 'greedy'); h.takeEvents(); MULTI.tick(m); if (h.month > (m._c || 0)) { m._c = h.month; MULTI.cycleDrop(m, h.month); } }
+  const f = MULTI.fingerprint(h); assert.ok(h.actLog.length > 50 && h.actLog.some(e => e.t === 'atk') && h.actLog.some(e => e.t === 'perk'));
+  assert.ok(MULTI.verify(h.cfg, h.actLog, f).ok); const bad = h.actLog.slice(); bad.splice(10, 1); assert.ok(!MULTI.verify(h.cfg, bad, f).ok);
+  assert.ok(!MULTI.verify(h.cfg, h.actLog, Object.assign({}, f, { cash: f.cash + 1 })).ok, '잔액을 부풀리면 안 맞는다');
+});
+t('서버: 큐 — 넷이 모이면 매치(서버 시드·첫 사람이 호스트), 큐에서 빠지고 mp 에 매치가 걸린다', async () => {
+  const S = API.memStore();
+  for (const p of PIDS.slice(0, 3)) { const r = await call(S, { op: 'queue', pid: p, name: 'P', face: 'park' }); assert.equal(r.status, 'waiting'); }
+  const r = await call(S, { op: 'queue', pid: PIDS[3], name: 'Q', face: 'yeo' });
+  assert.equal(r.status, 'ready'); assert.equal(r.match.players.length, 4); assert.ok(r.match.players[0].host && r.match.players[0].pid === PIDS[0]); assert.ok(r.match.rated);
+  assert.equal((await call(S, { op: 'queue', pid: PIDS[1], name: 'P' })).status, 'ready', '이미 매치가 걸린 사람은 다시 그 매치');
+  assert.equal((await call(S, { op: 'status', mid: r.match.id, pid: PIDS[2] })).match.id, r.match.id);
+  assert.equal((await call(S, { op: 'status', mid: r.match.id, pid: 'zzzzzzzzzzzz' })).error, 'notin');
+});
+t('서버: 큐 — 60초 넘게 기다리면 봇으로 채운다(봇 판은 무등급), 이름은 정리한다', async () => {
+  const S = API.memStore();
+  await S.call([['HSET', 'mq', PIDS[0], JSON.stringify({ pid: PIDS[0], name: 'X<b>', face: 'park', elo: 1200, at: Math.floor(Date.now() / 1000) - 61 })]]);
+  const r = await call(S, { op: 'queue', pid: PIDS[1], name: 'Y', face: 'noh' });
+  assert.equal(r.status, 'ready'); assert.equal(r.match.players.filter(p => p.bot).length, 2); assert.ok(r.match.rated, '사람 둘이면 등급 판(봇과의 쌍만 안 센다)'); 
+  assert.ok(r.match.players.every(p => p.face));
+});
+t('서버: 중계 — 공격은 나 빼고 전원, 🎯 는 잔액 1위 한 명, 폭탄은 랜덤 한 명(상한 4), 사이클 투하는 한 번, 마감한 사람은 제외', async () => {
+  const S = API.memStore(); for (const p of PIDS) await call(S, { op: 'queue', pid: p, name: 'P', face: 'park' });
+  const mid = (await call(S, { op: 'status', mid: (await S.call([['GET', 'mp:' + PIDS[0]]]))[0], pid: PIDS[0] })).match.id;
+  const snaps = {}; PIDS.forEach((p, i) => snaps[p] = { cash: 100 * (i + 1), phase: 'play', bombs: 0 });
+  for (const p of PIDS) await call(S, { op: 'push', mid, pid: p, snaps: { [p]: snaps[p] } });
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_claim', mult: 1 }] });
+  for (const p of PIDS.slice(1)) { const r = await call(S, { op: 'poll', mid, pid: p, since: 0 }); assert.equal(r.events.filter(e => e.type === 'attack').length, 1, p); }
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_hurry', mult: 3, focus: true }] });
+  const d = await call(S, { op: 'poll', mid, pid: PIDS[3], since: 0 }), b = await call(S, { op: 'poll', mid, pid: PIDS[1], since: 0 });
+  assert.equal(d.events.filter(e => e.trait === 't_hurry').length, 1, '잔액 1위(d)에게'); assert.equal(b.events.filter(e => e.trait === 't_hurry').length, 0);
+  assert.ok(!(await call(S, { op: 'push', mid, pid: PIDS[1], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_claim' }] })).routed, '남의 이름으로는 못 쏜다');
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_bomb', size: 3 }] });
+  let bombs = 0; for (const p of PIDS) { const r = await call(S, { op: 'poll', mid, pid: p, since: 0 }); bombs += r.events.filter(e => e.type === 'bomb' && e.to && e.to[0] === p).length; }
+  assert.equal(bombs, 1, '폭탄은 한 명에게');
+  for (const p of PIDS.slice(1)) await call(S, { op: 'push', mid, pid: p, snaps: { [p]: Object.assign({}, snaps[p], { bombs: 2 }) } });   // 스냅샷상 폭탄 6개 = 상한 초과
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_bomb', size: 3 }] });
+  const all = await call(S, { op: 'poll', mid, pid: PIDS[0], since: 0 }); assert.equal(all.events.filter(e => e.type === 'bombFizzle').length, 1, '상한이면 불발');
+  for (const p of PIDS.slice(1)) await call(S, { op: 'push', mid, pid: p, snaps: { [p]: snaps[p] } });
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'cycle', n: 1 }, { from: PIDS[0], type: 'cycle', n: 1 }] });
+  assert.equal((await call(S, { op: 'poll', mid, pid: PIDS[0], since: 0 })).events.filter(e => e.drop).length + (await call(S, { op: 'poll', mid, pid: PIDS[1], since: 0 })).events.filter(e => e.drop).length + (await call(S, { op: 'poll', mid, pid: PIDS[2], since: 0 })).events.filter(e => e.drop).length + (await call(S, { op: 'poll', mid, pid: PIDS[3], since: 0 })).events.filter(e => e.drop).length, 1, '사이클 투하는 한 번');
+  await call(S, { op: 'push', mid, pid: PIDS[3], snaps: { [PIDS[3]]: { cash: 400, phase: 'win', bombs: 0 } } });
+  const c0 = (await call(S, { op: 'poll', mid, pid: PIDS[3], since: 0 })).events.length;
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_rain' }] });
+  assert.equal((await call(S, { op: 'poll', mid, pid: PIDS[3], since: 0 })).events.length, c0, '마감한 창고엔 안 간다');
+  const pc = await call(S, { op: 'poll', mid, pid: PIDS[2], since: 3 }); assert.ok(pc.cursor > 3 && pc.events.every(e => e.i > 3), '커서 뒤 것만');
+});
+t('서버: 종료 — 입력 로그를 다시 돌려 검증하고, 넷이 다 끝나면 순위·ELO(모든 쌍 1:1, K32) · 조작 기록은 무효', async () => {
+  const S = API.memStore(); for (const p of PIDS) await call(S, { op: 'queue', pid: p, name: 'P', face: 'park' });
+  const mid = (await S.call([['GET', 'mp:' + PIDS[0]]]))[0], m = (await call(S, { op: 'status', mid, pid: PIDS[0] })).match;
+  const games = {}; const cfgOf = pid => ({ multi: true, seed: m.seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false, pid });
+  for (const p of PIDS) { const g = new Game(cfgOf(p)); let k = 0; while (g.phase === 'play' || g.phase === 'market') { BOT.multiDay(g, ['greedy', 'balanced', 'saver', 'greedy'][PIDS.indexOf(p)]); g.takeEvents(); if (++k > 600) break; } games[p] = g; }
+  for (const p of PIDS.slice(0, 3)) { const g = games[p], f = MULTI.fingerprint(g); const r = await call(S, { op: 'finish', mid, pid: p, result: { cash: f.cash, rep: f.rep, day: f.day, win: g.phase === 'win' }, cfg: cfgOf(p), log: g.actLog }); assert.ok(r.verified, p); assert.equal(r.settled, null); }
+  const g4 = games[PIDS[3]], f4 = MULTI.fingerprint(g4);
+  const r4 = await call(S, { op: 'finish', mid, pid: PIDS[3], result: { cash: f4.cash, rep: f4.rep, day: f4.day, win: g4.phase === 'win' }, cfg: cfgOf(PIDS[3]), log: g4.actLog });
+  assert.ok(r4.verified && r4.settled && r4.settled.rated); const rows = r4.settled.rows; assert.deepEqual(rows.map(r => r.rank), [1, 2, 3, 4]);
+  const elo = r4.settled.elo; const sum = PIDS.reduce((a, p) => a + elo[p].delta, 0); assert.ok(Math.abs(sum) <= 2, '제로섬 근처 ' + sum);
+  assert.ok(elo[rows[0].pid].delta > 0 && elo[rows[3].pid].delta < 0); assert.equal((await call(S, { op: 'elo', pid: rows[0].pid })).games, 1);
+  assert.ok(!(await S.call([['GET', 'mp:' + PIDS[0]]]))[0], '끝나면 매치 배정이 풀린다');
+  // 조작: 잔액을 부풀린 기록 → 미검증 → 그 판은 무효
+  const S2 = API.memStore(); for (const p of PIDS) await call(S2, { op: 'queue', pid: p, name: 'P', face: 'park' });
+  const mid2 = (await S2.call([['GET', 'mp:' + PIDS[0]]]))[0], m2 = (await call(S2, { op: 'status', mid: mid2, pid: PIDS[0] })).match;
+  const cfg2 = pid => ({ multi: true, seed: m2.seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false, pid });
+  let last = null;
+  for (const p of PIDS) { const g = new Game(cfg2(p)); let k = 0; while ((g.phase === 'play' || g.phase === 'market') && ++k < 600) { BOT.multiDay(g, 'balanced'); g.takeEvents(); } const f = MULTI.fingerprint(g); last = await call(S2, { op: 'finish', mid: mid2, pid: p, result: { cash: f.cash + (p === PIDS[0] ? 9999 : 0), rep: f.rep, day: f.day, win: g.phase === 'win' }, cfg: cfg2(p), log: g.actLog }); }
+  assert.ok(last.settled && !last.settled.rated && last.settled.rows.some(r => !r.verified)); assert.equal((await call(S2, { op: 'elo', pid: PIDS[1] })).games, 0);
+});
+t('서버: 등급 이름 — 1200 견습 · 200 마다 한 칸 · 2400+ 상하차의 신', () => {
+  assert.equal(API.rankOf(1200), 'trainee'); assert.equal(API.rankOf(1399), 'trainee'); assert.equal(API.rankOf(1400), 'driver'); assert.equal(API.rankOf(2000), 'branch'); assert.equal(API.rankOf(2400), 'god'); assert.equal(API.rankOf(3000), 'god');
+});
+t('멀티: 온라인 매치 — 서버 자리로 내 판(+호스트면 봇 판), 원격은 스냅샷으로 순위, 서버 이벤트 적용·저장·복원', () => {
+  const sm = { id: 'm1', seed: 91, players: [{ pid: PIDS[0], name: 'A', face: 'park', host: true }, { pid: PIDS[1], name: 'B', face: 'yeo' }, { pid: 'bot2', name: '봇', face: 'noh', bot: true, strat: 'greedy' }, { pid: 'bot3', name: '봇2', face: 'kang', bot: true, strat: 'saver' }] };
+  const host = MULTI.newOnline(sm, PIDS[0], { name: 'A' }); assert.equal(host.players[0].id, PIDS[0]); assert.ok(host.online.host && host.players.filter(p => p.game).length === 3 && !host.players.find(p => p.id === PIDS[1]).game);
+  const guest = MULTI.newOnline(sm, PIDS[1], { name: 'B' }); assert.equal(guest.players[0].id, PIDS[1]); assert.ok(!guest.online.host && guest.players.filter(p => p.game).length === 1);
+  assert.deepEqual(MULTI.owned(host).sort(), [PIDS[0], 'bot2', 'bot3'].sort());
+  MULTI.applyServer(guest, { cursor: 2, snaps: { [PIDS[0]]: { cash: 900, rep: 30, repCap: 36, day: 20, phase: 'play', bombs: 1 }, bot2: { cash: 50, phase: 'over', day: 9 } }, events: [{ i: 1, type: 'attack', from: PIDS[0], to: [PIDS[1]], trait: 't_claim', mult: 1, fromName: 'A' }, { i: 2, type: 'bomb', from: 'bot3', to: [PIDS[1]], bomb: { size: 3, days: 6, hops: 0, from: 'bot3' } }] });
+  const g = guest.players[0].game; assert.equal(g.inbox.length, 1); assert.equal(g.bombCount(), 1); assert.equal(guest.online.since, 2);
+  const st = MULTI.standings(guest); assert.equal(st[0].p.id, PIDS[0], '스냅샷 잔액 900 이 1위'); assert.ok(!st.find(r => r.p.id === 'bot2').alive);
+  assert.equal(guest.news.length, 2);
+  g.outbox.push({ type: 'attackOut', trait: 't_rain', mult: 1 }); MULTI.route(guest); assert.equal(guest.online.pending.length, 1); assert.equal(guest.online.pending[0].from, PIDS[1]);
+  const out = MULTI.outgoing(guest); assert.equal(out.events.length, 1); assert.ok(out.snaps[PIDS[1]] && out.snaps[PIDS[1]].bombs === 1); assert.equal(guest.online.pending.length, 0);
+  const back = MULTI.fromJSON(JSON.parse(JSON.stringify(MULTI.toJSON(guest)))); assert.ok(back.online && back.online.mid === 'm1' && back.players[0].game && !back.players[1].game && back.players[1].snap.cash === 900);
+});
+
+Promise.all(pending).then(() => { console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1); });
