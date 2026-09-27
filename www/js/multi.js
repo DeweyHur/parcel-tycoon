@@ -15,7 +15,7 @@
   function hash(s) { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; }
   // 테마: 시드가 정한다(넷이 같다) — 폭염·성수기·장마… 시작 화면에서 알려 주고 규칙에 얹는다
   function themeOf(seed) { const T = Object.keys((M.MULTI && M.MULTI.THEMES) || {}); return T.length ? T[(seed >>> 0) % T.length] : null; }
-  function mkGame(seed, name, pid) { return new Game({ multi: true, seed, scenario: SCENARIO, company: 'local', perks: [], prep: true, companyName: name, pid, mtheme: themeOf(seed) }); }
+  function mkGame(seed, name, pid) { return new Game({ multi: true, seed, scenario: SCENARIO, company: 'local', perks: [], prep: false, companyName: name, pid, mtheme: themeOf(seed) }); }   // 준비 마켓도 없다(유저: "기본 상점은 없애달라고") — 시작 화면 → 곧장 D+1
   function alive(g) { return g.phase !== 'over'; }
   function finished(g) { return g.phase === 'over' || g.phase === 'win'; }
   // 지난 영업일 수(장 본 날 포함) — 시계가 다르니 이게 있어야 "저 사람은 벌써 끝나간다"가 읽힌다

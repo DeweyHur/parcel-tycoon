@@ -290,7 +290,7 @@ async function handle(S, d, ip) {
     if (!own.has(d.for || d.pid)) return [403, { error: 'notown' }];
     const pid = d.for || d.pid, r = d.result || {}, bot = pid !== d.pid;
     let verified = bot;   // 봇 결과는 호스트를 믿는다(봇 쌍은 ELO 에 안 든다). 사람은 재실행으로
-    if (!bot && d.cfg && Array.isArray(d.log)) { try { verified = MULTI.verify(Object.assign({}, d.cfg, { seed: m.seed, prep: true, mtheme: MULTI.themeOf(m.seed) }), d.log, { cash: r.cash, rep: r.rep, day: r.day, phase: r.win ? 'win' : 'over' }).ok; } catch (e) { verified = false; } }
+    if (!bot && d.cfg && Array.isArray(d.log)) { try { verified = MULTI.verify(Object.assign({}, d.cfg, { seed: m.seed, prep: false, mtheme: MULTI.themeOf(m.seed) }), d.log, { cash: r.cash, rep: r.rep, day: r.day, phase: r.win ? 'win' : 'over' }).ok; } catch (e) { verified = false; } }
     const rec = { cash: Math.round(+r.cash || 0), rep: Math.round(+r.rep || 0), day: Math.round(+r.day || 0), days: Math.round(+r.days || 78), win: !!r.win, alive: !!r.win, verified, at: now() };
     // 먼저 마감한 사람: 그 순간 남들의 일차(스냅샷)를 적어 둔다 — 나머지는 남은 날만큼 평판 페널티
     if (rec.win && !m.firstFinish) { const snaps = await snapshots(S, m); const days = {}; for (const p of m.players) if (p.pid !== pid) days[p.pid] = (snaps[p.pid] || {}).day || 1; m.firstFinish = { pid, days, at: now() }; await saveMatch(S, m); }

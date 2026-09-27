@@ -30,11 +30,8 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const slam = await page.evaluate(() => ({ intro: !!document.querySelector('#mintro'), slam: document.querySelectorAll('#multi-strip .mp.slam').length }));
   ok('게임 화면으로: 시작 화면 사라지고 상대 카드가 쾅 박힌다', !slam.intro && slam.slam === 4, JSON.stringify(slam));
   await page.waitForTimeout(1200); await idle();
-  // 시작은 준비 마켓 — 테마는 시작 화면에 있었고, 새 계약 두 장 · 시설 없음. 닫으면 D+1
-  const prep = await page.evaluate(() => ({ phase: PT.game.phase, prep: !!(PT.game.market && PT.game.market.prep), theme: PT.game.cfg.mtheme, newC: PT.game.market.items.filter(it => it.kind === 'contract' && !it.switchFrom).length, fac: PT.game.market.items.some(it => it.kind === 'fac'), title: (document.querySelector('#modal h2, #modal .title, #modal header') || {}).textContent || document.querySelector('#modal').textContent.slice(0, 20) }));
-  await page.screenshot({ path: `${OUT}/M-00c-prep.png` });
-  ok('시작 준비 마켓: 테마 · 새 계약 2 · 시설 없음', prep.phase === 'market' && prep.prep && !!prep.theme && prep.newC === 2 && !prep.fac, JSON.stringify(prep));
-  await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(600); await idle();
+  const prep = await page.evaluate(() => ({ phase: PT.game.phase, theme: PT.game.cfg.mtheme, modal: !!document.querySelector('#modal .foot, #modal .card, #modal .pkcard') }));
+  ok('준비 마켓 없이 곧장 플레이 · 테마 있음', prep.phase === 'play' && !!prep.theme && !prep.modal, JSON.stringify(prep));
   const st = await page.evaluate(() => { const g = PT.game, m = PT.match; return { multi: g.rules.multi, storyOff: !!(g.story && g.story.off), players: m.players.length, strip: !document.querySelector('#multi-strip').hidden, cols: document.querySelectorAll('#multi-strip .mp').length, shop: document.querySelector('#shop-btn').hidden, turn: document.querySelector('#hud-turn').textContent, c3: document.querySelector('#c3').hidden, cap: g.warehouse.cap, cash: g.cash, months: g.rules.months }; });
   ok('난투 시작: 멀티 규칙 · 4인 · 상대 줄 4칸 · 장 보기 버튼 없음 · D+1 · 빈 슬롯 숨김 · 대사 꺼짐', st.multi && st.storyOff && st.players === 4 && st.strip && st.cols === 4 && st.shop && /D\+1/.test(st.turn) && st.c3, JSON.stringify(st));
   await page.screenshot({ path: `${OUT}/M-01-day1.png` });
@@ -52,17 +49,19 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   // 평판 상점: 평판을 상한까지 올리면 랜덤 3장(퍽 + 매물) — 내 돈으로 산다
   await page.evaluate(() => { const g = PT.game; g.cash = 3000; g.addRep(99, null); PT.renderAll(); });
   const offer = await page.evaluate(() => ({ items: PT.game.repShop && PT.game.repShop.items.map(it => it.kind), tier: PT.game.repTier, cap: PT.game.repCap() }));
-  ok('상한 도달 → 등급 +1 · 상한 +8 · 상점 3장(퍽 포함)', offer.items && offer.items.length === 3 && offer.items.includes('perk') && offer.tier >= 1 && offer.cap === 20 + 8 * offer.tier, JSON.stringify(offer));
+  ok('상한 도달 → 등급 +1 · 상한 +6 · 상점 3장', offer.items && offer.items.length === 3 && offer.tier >= 1 && offer.cap === 20 + 6 * offer.tier, JSON.stringify(offer));
   await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(500); await idle();   // 다음 마감에서 checkPhase 가 상점을 띄운다
   let t = await modalText();
   ok('평판 상점 팝업 — 값이 붙은 카드 3장', /상점/.test(t) && (await page.$$('.pkcard')).length === 3 && /\d+c/.test(t), t.slice(0, 80).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-04-perk.png` });
-  const picked = await page.evaluate(() => { const g = PT.game; const i = g.repShop.items.findIndex(it => it.kind === 'perk'); const cash = g.cash; const b = document.querySelector(`.pkcard[data-i="${i}"]`); b.click(); return { id: g.repShop.items[i].perk, cash, after: g.cash, sold: g.repShop.items[i].sold }; }); await page.waitForTimeout(400);
-  const pk = await page.evaluate(() => ({ mperks: PT.game.mperks, shop: !!PT.game.repShop, chips: document.querySelectorAll('#mperks .pk').length, hidden: document.querySelector('#mperks').hidden, modal: !!document.querySelector('#modal .pkcard') }));
-  ok('퍽 카드 구매 → 돈 빠지고 장착 · 상점은 열린 채(더 살 수 있다) · 화면에 퍽 아이콘 칩', pk.mperks.includes(picked.id) && picked.after < picked.cash && picked.sold && pk.shop && pk.modal && !pk.hidden && pk.chips === new Set(pk.mperks).size, JSON.stringify({ picked, pk }));
-  await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(400); await idle();
-  const closed = await page.evaluate(() => ({ shop: !!PT.game.repShop, phase: PT.game.phase, modal: !!document.querySelector('#modal .pkcard') }));
-  ok('닫기 → 상점 사라지고 플레이 계속', !closed.shop && closed.phase === 'play' && !closed.modal, JSON.stringify(closed));
+  const picked = await page.evaluate(() => { const g = PT.game; const i = g.repShop.items.findIndex(it => it.kind === 'contract' && it.switchFrom != null || it.kind === 'adTicket'); const cash = g.cash; const b = document.querySelector(`.pkcard[data-i="${i}"]`); if (b) b.click(); return { i, kind: i >= 0 && g.repShop.items[i].kind, cash, after: g.cash, sold: i >= 0 && g.repShop.items[i].sold }; }); await page.waitForTimeout(400);
+  const pk = await page.evaluate(() => ({ shop: !!PT.game.repShop, modal: !!document.querySelector('#modal .pkcard') }));
+  ok('카드 구매 → 돈 빠지고 · 상점은 열린 채(더 살 수 있다)', (picked.i < 0 || (picked.after < picked.cash && picked.sold)) && pk.shop && pk.modal, JSON.stringify({ picked, pk }));
+  // 닫기 — 평판이 넘쳐 있으면(테스트는 +99) 닫자마자 다음 계단 상점이 이어진다. 다 닫으면 플레이
+  let tiers = 0; for (let k = 0; k < 20 && await page.evaluate(() => !!PT.game.repShop); k++) { tiers++; await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(250); }
+  await idle();
+  const closed = await page.evaluate(() => ({ shop: !!PT.game.repShop, phase: PT.game.phase, modal: !!document.querySelector('#modal .pkcard'), tier: PT.game.repTier, rep: PT.game.rep, cap: PT.game.repCap() }));
+  ok('닫기 → 넘친 평판만큼 계단이 이어지고, 다 닫으면 플레이 계속', tiers >= 1 && !closed.shop && closed.phase === 'play' && !closed.modal && closed.rep < closed.cap + 1, JSON.stringify(Object.assign({ tiers }, closed)));
   // ===== 2단계: 트레잇 · 공격 · 폭탄 =====
   // 내 창고에 🌧 소나기 트레잇 택배를 심고 대량으로 내보낸다 → 상대 전원에게 날아간다(outbox → 인박스)
   const fired = await page.evaluate(() => { const g = PT.game, m = PT.match; const c = g.contracts.find(x => x && /bulk/.test(x.carrier)); const si = g.contracts.indexOf(c);

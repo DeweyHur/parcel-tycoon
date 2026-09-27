@@ -1403,15 +1403,11 @@
       this.perkOffer = this._drawPerks(3);
       this.emit('repTier', { tier: this.repTier, cap: this.repCap(), customers: [], perks: this.perkOffer.slice() });
     }
-    // 평판 상점(난투): 랜덤 3장 — 퍽 카드 1~2장(값을 치른다) + 장 매물(계약 업그레이드·새 계약·강화·충전·광고권)에서 나머지. 시간은 안 간다 (유저: "일정 수준 평판 달성 시 상점, 랜덤 픽 3개, 내 돈으로 산다")
+    // 평판 상점(난투): 장 매물(계약 업그레이드·새 계약·강화·광고권)에서 랜덤 3장. 시간은 안 간다 (유저: "일정 수준 평판 달성 시 상점, 랜덤 픽 3개, 내 돈으로 산다")
     _drawRepShop() {
-      const R = this.rules, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(this.month))] * R.itemPriceMult * R.priceMult;
-      const perks = this._drawPerks(3).map(id => ({ kind: 'perk', perk: id, price: Math.round((M.MULTI.PERK_PRICE || 150) * mult), name: M.MULTI.PERKS[id].name, sold: false }));
+      // 퍽 카드는 없다(유저: "그 이상한 퍽들도 없애고 그냥 마켓 아이템들이 평판 올라가면 뜨는 거야") — 장 매물에서 랜덤 3장
       const goods = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill'));
-      const nPerk = 1 + (this.rng.next() < 0.5 ? 1 : 0);
-      const out = perks.slice(0, nPerk).concat(goods.slice(0, 3 - nPerk));
-      while (out.length < 3 && perks[out.length]) out.push(perks[out.length]);
-      return this.rng.shuffle(out);
+      return goods.slice(0, 3);
     }
     buyRepShop(i, target) {
       const sh = this.repShop; if (!sh) return { ok: false, msg: T('err.cannotCallNow') };

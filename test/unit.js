@@ -981,27 +981,23 @@ t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary)도 장도
   let n = 0; while (g.month === 1 && g.phase === 'play' && n++ < 30) { g.schedule = g.schedule.map(() => []); g.wait([]); }
   assert.equal(g.phase, 'play'); assert.equal(g.month, 2); assert.equal(g.debt, 0); assert.ok(g.cash < 0, '마이너스는 마이너스대로'); assert.ok(g.events.some(e => e.type === 'settle'));
 });
-t('멀티: 평판 사다리 — 상한에 닿으면 상한 +8 · 등급 +1 · 평판 상점 3장(퍽 1~2 + 매물) · 돈으로 사고 닫는다 · 세이브에 남는다', () => {
+t('멀티: 평판 사다리 — 상한에 닿으면 상한 +6 · 등급 +1 · 평판 상점 3장(장 매물만, 퍽 없음) · 돈으로 사고 닫는다', () => {
   const g = MG(9); const cap0 = g.repCap(); g.cash = 5000; g.addRep(99);
-  assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + 8); assert.equal(g.rep, cap0); assert.ok(g.repShop && g.repShop.items.length === 3 && !g.perkOffer);
-  const perks = g.repShop.items.filter(it => it.kind === 'perk'); assert.ok(perks.length >= 1 && perks.length <= 2, '퍽 카드 1~2장'); assert.ok(g.repShop.items.every(it => it.kind !== 'fac' && it.kind !== 'refill'), '시설·충전은 없다');
-  assert.ok(perks.every(it => it.price > 0 && (M.MULTI.PERKS[it.perk].phase || 1) <= M.MULTI.PHASE));
+  assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + 6); assert.equal(g.rep, cap0); assert.ok(g.repShop && g.repShop.items.length === 3 && !g.perkOffer);
+  assert.ok(g.repShop.items.every(it => ['contract', 'enh', 'adTicket', 'media', 'mediaUp'].includes(it.kind)), '퍽·시설·충전은 없다');
   g.addRep(99); assert.equal(g.repTier, 1, '상점이 떠 있는 동안은 또 오르지 않는다');
-  const pi = g.repShop.items.indexOf(perks[0]), cash = g.cash, cap = g.warehouse.cap, mc = g.contracts[0].maxCalls;
-  assert.ok(g.buyRepShop(pi, null).ok); assert.equal(g.cash, cash - perks[0].price); assert.ok(perks[0].sold); assert.deepEqual(g.mperks, [perks[0].perk]);
-  if (perks[0].perk === 'm_space') assert.equal(g.warehouse.cap, cap + 4); if (perks[0].perk === 'm_calls') assert.equal(g.contracts[0].maxCalls, mc + 1);
-  assert.ok(!g.buyRepShop(pi, null).ok, '판 카드는 다시 못 산다');
-  const good = g.repShop.items.find(it => it.kind === 'enh'); if (good) { const opt = D.ENHANCEMENTS[good.enh].kind === 'opt'; const s = g.contracts.findIndex(c => c && (opt ? g.optFits(good.enh, c) : g.enhUsed(c) < g.enhSlots(c))); const before = g.cash; assert.ok(g.buyRepShop(g.repShop.items.indexOf(good), s).ok); assert.ok(g.cash < before); assert.ok(g.actLog.filter(e => e.t === 'buy').length === 0, '상점 구매는 rbuy 로만 적힌다'); }
-  assert.ok(g.closeRepShop()); assert.ok(g.actLog.some(e => e.t === 'rbuy') && g.actLog.some(e => e.t === 'rclose'));
+  const it0 = g.repShop.items.find(it => it.kind === 'enh' && D.ENHANCEMENTS[it.enh].kind !== 'opt') || g.repShop.items.find(it => it.kind === 'contract' && it.switchFrom != null);
+  if (it0) { const i = g.repShop.items.indexOf(it0), cash = g.cash; const s = it0.kind === 'contract' ? g.contracts.findIndex(c => c && c.id === it0.switchFrom) : g.contracts.findIndex(c => c && g.enhUsed(c) < g.enhSlots(c));
+    assert.ok(g.buyRepShop(i, s).ok); assert.ok(g.cash < cash); assert.ok(it0.sold); assert.ok(!g.buyRepShop(i, s).ok, '판 카드는 다시 못 산다'); assert.equal(g.actLog.filter(e => e.t === 'buy').length, 0, '상점 구매는 rbuy 로만 적힌다'); }
+  assert.ok(g.closeRepShop()); assert.ok(g.actLog.some(e => e.t === 'rclose'));
   assert.equal(g.repTier, 2, '상점 동안 넘친 평판은 닫자마자 다음 계단'); assert.ok(g.repShop, '다음 상점'); g.closeRepShop(); assert.equal(g.repShop, null);
-  const s2 = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.ok(s2.rules.multi && s2.repCap() === g.repCap() && s2.mperks.length === g.mperks.length, '세이브를 열어도 퍽·멀티 규칙이 돌아온다');
+  const s2 = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.ok(s2.rules.multi && s2.repCap() === g.repCap(), '세이브를 열어도 멀티 규칙이 돌아온다');
 });
 t('멀티: 매치 — 봇 3명이 각자 시계로 따라오고, 순위는 생존 → 평판 → 잔액, 저장·복원', () => {
   const m = MULTI.newMatch({ seed: 21, name: '나', botNames: ['가', '나', '다'] });
   assert.equal(m.players.length, 4); assert.ok(m.players[0].human && m.players[0].game.rules.multi);
-  assert.equal(m.players[0].game.phase, 'market'); assert.ok(m.players[0].game.market.prep && m.players[0].game.cfg.mtheme, '시작은 준비 마켓 · 테마는 시드가 정한다');
+  assert.equal(m.players[0].game.phase, 'play'); assert.ok(m.players[0].game.cfg.mtheme, '준비 마켓 없이 곧장 · 테마는 시드가 정한다');
   assert.ok(m.players.every(p => p.game.cfg.mtheme === m.players[0].game.cfg.mtheme), '넷이 같은 테마');
-  BOT.multiDay(m.players[0].game, 'balanced'); MULTI.tick(m);   // 준비 마켓 닫기(하루 아님)
   for (let i = 0; i < 10; i++) { BOT.multiDay(m.players[0].game, 'balanced'); MULTI.tick(m); }
   const days = m.players.map(p => MULTI.dayOf(p.game)); assert.equal(days[0], 11, '첫날이 D+1'); assert.ok(days[1] >= 12 && days[2] === 11 && days[3] === 9, days.join(','));
   const j = JSON.parse(JSON.stringify(MULTI.toJSON(m))), m2 = MULTI.fromJSON(j);
@@ -1126,7 +1122,7 @@ t('서버: 중계 — 공격은 나 빼고 전원, 🎯 는 잔액 1위 한 명,
 t('서버: 종료 — 입력 로그를 다시 돌려 검증하고, 넷이 다 끝나면 순위·ELO(모든 쌍 1:1, K32) · 조작 기록은 무효', async () => {
   const S = API.memStore(); for (const p of PIDS) await call(S, { op: 'queue', pid: p, name: 'P', face: 'park' });
   const mid = (await S.call([['GET', 'mp:' + PIDS[0]]]))[0], m = (await call(S, { op: 'status', mid, pid: PIDS[0] })).match;
-  const games = {}; const cfgOf = pid => ({ multi: true, seed: m.seed, scenario: 'kr_summer', company: 'local', perks: [], prep: true, mtheme: MULTI.themeOf(m.seed), pid });
+  const games = {}; const cfgOf = pid => ({ multi: true, seed: m.seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false, mtheme: MULTI.themeOf(m.seed), pid });
   for (const p of PIDS) { const g = new Game(cfgOf(p)); let k = 0; while (g.phase === 'play' || g.phase === 'market') { BOT.multiDay(g, ['greedy', 'balanced', 'saver', 'greedy'][PIDS.indexOf(p)]); g.takeEvents(); if (++k > 600) break; } games[p] = g; }
   for (const p of PIDS.slice(0, 3)) { const g = games[p], f = MULTI.fingerprint(g); const r = await call(S, { op: 'finish', mid, pid: p, result: { cash: f.cash, rep: f.rep, day: f.day, win: g.phase === 'win' }, cfg: cfgOf(p), log: g.actLog }); assert.ok(r.verified, p); assert.equal(r.settled, null); }
   const g4 = games[PIDS[3]], f4 = MULTI.fingerprint(g4);
@@ -1178,7 +1174,7 @@ t('서버: 친구 초대 — 코드 6자 방, 혼자면 시작 불가, 친구가
 t('서버: ELO 보드 — 등급 판이 정산되면 올라가고, 내 자리도 준다', async () => {
   const S = API.memStore(); for (const p of PIDS) await call(S, { op: 'queue', pid: p, name: 'P' + p[0], face: 'park' });
   const mid = (await S.call([['GET', 'mp:' + PIDS[0]]]))[0], m = (await call(S, { op: 'status', mid, pid: PIDS[0] })).match;
-  const cfgOf = pid => ({ multi: true, seed: m.seed, scenario: 'kr_summer', company: 'local', perks: [], prep: true, mtheme: MULTI.themeOf(m.seed), pid });
+  const cfgOf = pid => ({ multi: true, seed: m.seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false, mtheme: MULTI.themeOf(m.seed), pid });
   for (const p of PIDS) { const g = new Game(cfgOf(p)); let k = 0; while ((g.phase === 'play' || g.phase === 'market') && ++k < 600) { BOT.multiDay(g, 'balanced'); g.takeEvents(); } const f = MULTI.fingerprint(g); await call(S, { op: 'finish', mid, pid: p, result: { cash: f.cash, rep: f.rep, day: f.day, win: g.phase === 'win' }, cfg: cfgOf(p), log: g.actLog }); }
   const b = await call(S, { op: 'board', pid: PIDS[1] }); assert.equal(b.total, 4); assert.equal(b.top[0].rank, 1); assert.ok(b.top[0].elo >= b.top[3].elo); assert.ok(b.me && b.me.rank >= 1 && b.top.some(r => r.me));
   assert.equal((await call(S, { op: 'board', pid: 'zzzzzzzzzzzz' })).me, null);
