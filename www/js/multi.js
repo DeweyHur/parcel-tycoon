@@ -36,7 +36,8 @@
   function newOnline(sm, mypid, o) {
     const players = sm.players.map(p => {
       const me = p.pid === mypid, host = sm.players[0].pid === mypid;
-      const base = { id: p.pid, name: p.name, face: p.face || 'park', human: !p.bot, remote: !me && !p.bot, bot: !!p.bot, strat: p.strat, speed: p.bot ? SPEEDS[(+p.pid.replace(/\D/g, '') || 1) % SPEEDS.length] : 1, snap: null };
+      const bn = o && o.botNames; const name = p.bot && bn && bn.length ? bn[(p.nid || 0) % bn.length] : p.name;   // 봇 이름은 내 언어로
+      const base = { id: p.pid, name, face: p.face || 'park', human: !p.bot, remote: !me && !p.bot, bot: !!p.bot, strat: p.strat, speed: p.bot ? SPEEDS[(+p.pid.replace(/\D/g, '') || 1) % SPEEDS.length] : 1, snap: null };
       if (me) base.game = mkGame(sm.seed, o && o.name || p.name, p.pid);
       else if (p.bot && host) base.game = mkGame(sm.seed, null, p.pid);
       return base;
@@ -137,18 +138,20 @@
   function takeNews(match) { return (match.news || (match.news = [])).splice(0); }
   // 사람이 하루를 넘겼다 → 봇들도 제 속도로 따라온다 (누적 소수점: 1.15 면 스무 날에 세 번 이틀)
   function tick(match) {
+    noteFinish(match);
     const h = dayOf(match.players[0].game);
     for (const p of match.players) {
       if (p.human || !p.game) continue;
       const target = Math.floor(h * p.speed);
       let guard = 0;
-      while (dayOf(p.game) < target && !finished(p.game) && guard++ < 40) { botDay(p); route(match); }
+      while (dayOf(p.game) < target && !finished(p.game) && guard++ < 40) { botDay(p); route(match); noteFinish(match); }
     }
-    route(match);
+    route(match); noteFinish(match);
   }
   // 사람이 끝났다(마감·폐업) → 남은 봇을 끝까지 돌린다 (관전은 4단계)
   function finishAll(match) {
-    for (const p of match.players) { if (p.human || !p.game) continue; let guard = 0; while (!finished(p.game) && guard++ < 400) { botDay(p); route(match); } }
+    noteFinish(match);
+    for (const p of match.players) { if (p.human || !p.game) continue; let guard = 0; while (!finished(p.game) && guard++ < 400) { botDay(p); route(match); noteFinish(match); } }
   }
   function allDone(match) { return match.players.every(p => stateOf(p).done); }
   // 순위: ① 생존자 > 폐업자 ② 생존자끼리 최종 잔액 ③ 동률이면 평판 ④ 폐업자끼리는 늦게 죽은 순
@@ -161,15 +164,28 @@
   }
   // 서버에 올릴 스냅샷 (stateOf 와 같은 모양)
   function snapOf(g) { const st = stateOf({ game: g }); return { cash: st.cash, rep: st.rep, repCap: st.repCap, day: st.day, days: st.days, used: st.used, cap: st.cap, shields: st.shields, bombs: st.bombs, phase: st.phase, tier: st.tier, perks: st.perks }; }
+  // 먼저 마감한 사람이 나오면 그 순간 남들의 일차를 적어 둔다 — 남은 날 ÷ latePenaltyDiv 만큼 평판 페널티(1등 제외). 승부는 평판
+  function noteFinish(match) {
+    if (match.firstFinish) return;
+    const w = match.players.find(p => stateOf(p).win); if (!w) return;
+    const days = {}; for (const p of match.players) if (p.id !== w.id) days[p.id] = stateOf(p).day;
+    match.firstFinish = { id: w.id, days, at: Date.now() };
+  }
+  function penaltyOf(match, p, st) {
+    const ff = match.firstFinish; if (!ff || ff.id === p.id || ff.days[p.id] == null) return 0;
+    const div = (p.game && p.game.rules.latePenaltyDiv) || M.MULTI.mods.latePenaltyDiv || 3;
+    return Math.max(0, Math.ceil((st.days - ff.days[p.id]) / div));
+  }
   function standings(match) {
-    const rows = match.players.map(p => Object.assign({ p, name: p.name, human: p.human, usage: 0 }, stateOf(p)));
-    rows.sort((a, b) => (b.alive - a.alive) || (a.alive ? (b.cash - a.cash) || (b.rep - a.rep) : (b.day - a.day) || (b.cash - a.cash)));
+    const rows = match.players.map(p => { const st = stateOf(p); const pen = penaltyOf(match, p, st); return Object.assign({ p, name: p.name, human: p.human, usage: 0, penalty: pen, repFinal: Math.max(0, st.rep - pen) }, st); });
+    // 순위: 생존 > 최종 평판(페널티 뒤) > 잔액 · 폐업자끼리는 늦게 죽은 순
+    rows.sort((a, b) => (b.alive - a.alive) || (a.alive ? (b.repFinal - a.repFinal) || (b.cash - a.cash) : (b.day - a.day) || (b.cash - a.cash)));
     rows.forEach((r, i) => r.rank = i + 1);
     return rows;
   }
-  function toJSON(match) { return { v: match.v, seed: match.seed, started: match.started, rng: match.rng, cycleDrops: match.cycleDrops || 0, online: match.online || null, players: match.players.map(p => ({ id: p.id, name: p.name, human: p.human, remote: !!p.remote, bot: !!p.bot, face: p.face, strat: p.strat, speed: p.speed, snap: p.snap || null, game: p.game ? p.game.toJSON() : null })) }; }
-  function fromJSON(o) { return { v: o.v, seed: o.seed, started: o.started, rng: o.rng || hash('route' + o.seed), cycleDrops: o.cycleDrops || 0, news: [], online: o.online ? Object.assign({ pending: [], results: {}, settled: null }, o.online) : null, players: o.players.map((p, i) => ({ face: FACES[i % FACES.length], ...p, game: p.game ? Game.fromJSON(p.game) : null })) }; }
+  function toJSON(match) { return { v: match.v, seed: match.seed, started: match.started, rng: match.rng, cycleDrops: match.cycleDrops || 0, firstFinish: match.firstFinish || null, online: match.online || null, players: match.players.map(p => ({ id: p.id, name: p.name, human: p.human, remote: !!p.remote, bot: !!p.bot, face: p.face, strat: p.strat, speed: p.speed, snap: p.snap || null, game: p.game ? p.game.toJSON() : null })) }; }
+  function fromJSON(o) { return { v: o.v, seed: o.seed, started: o.started, rng: o.rng || hash('route' + o.seed), cycleDrops: o.cycleDrops || 0, firstFinish: o.firstFinish || null, news: [], online: o.online ? Object.assign({ pending: [], results: {}, settled: null }, o.online) : null, players: o.players.map((p, i) => ({ face: FACES[i % FACES.length], ...p, game: p.game ? Game.fromJSON(p.game) : null })) }; }
 
-  const MULTI = { SCENARIO, FACES, replay, fingerprint, verify, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
+  const MULTI = { SCENARIO, FACES, replay, fingerprint, verify, noteFinish, penaltyOf, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
   if (typeof module !== 'undefined') module.exports = MULTI; else root.MULTI = MULTI;
 })(typeof window !== 'undefined' ? window : globalThis);

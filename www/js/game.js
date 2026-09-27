@@ -52,7 +52,7 @@
     feeMult: 1, feeFixed: null, feeDelta: 0,
     cycleOffset: 0, noRepEnd: false, gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, customerClaimMult: {}, noHolidays: false,
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
-    multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, payNow: false, noLoan: false,
+    multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, latePenaltyDiv: 3,
     shopDay: false, noCycleMarket: false, autoSummary: false,
     repStep: 0, perkPick: false, noRepUnlock: false,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
@@ -1116,7 +1116,7 @@
       return Math.max(0, Math.round(fee));
     }
     // 이 호출의 배차비 (월 첫 배차 무료 강화 반영)
-    callFee(c, trucks) { const free = (this.regularFreeLeft(c) > 0 ? 1 : 0) + (this.freeTruckNext ? 1 : 0); const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut;
+    callFee(c, trucks) { if (this.rules.noCallFee) return 0;   /* 난투: 배차는 횟수로만 */ const free = (this.regularFreeLeft(c) > 0 ? 1 : 0) + (this.freeTruckNext ? 1 : 0); const cut = ((this.growth && this.growth.automation) || 0) * D.GROWTH.automation.feeCut;
       return Math.round(Math.max(0, trucks - free) * this.truckFee(c) * Math.max(0.7, 1 - cut)); }
     // 택배는 쪼개지지 않는다 — 2칸짜리 하나가 두 차에 나뉘어 실릴 수는 없다(유저가 잡은 버그: 7칸 차에 2칸짜리 넷을 6+2 가 아니라 7+1 로 그리고 있었다).
     // 큰 것부터 먼저 들어가는 자리에(first-fit decreasing) 담아 차 대수와 차별 적재를 정한다. 부피 합 ÷ 칸수 는 하한일 뿐이다.
@@ -2599,6 +2599,7 @@
       fac(['expand1', 'expand2', 'expand3'].find(f => !this.warehouse[f]) || 'expand3');
       fac(['cold1', 'cold2'].find(f => !this.warehouse[f]) || 'cold2');
       fac('yard');
+      items.push(...this._refillItems());   // 배차 충전(가득) — 난투의 배차는 횟수다
       // 광고: 캠페인(📣)으로 물량을 끌어오는 게 난투의 조절 손잡이다 — 매체·매체 강화·광고권은 판다 (성장 투자는 없다)
       for (const it of this._adAndGrowthItems(mult)) if (['adTicket', 'media', 'mediaUp'].includes(it.kind)) items.push(it);
       return items;

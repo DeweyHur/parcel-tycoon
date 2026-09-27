@@ -127,6 +127,8 @@ function urgency(g) {
     const idx = pred => items.findIndex(it => !it.sold && pred(it));
     const bySlotDelivered = () => { let slot = -1, max = -1; g.contracts.forEach((c, s) => { if (c && (c.delivered || 0) > max) { max = c.delivered || 0; slot = s; } }); return slot; };
     const perDay = g.parcelsPerDay ? g.parcelsPerDay() : 3;
+    // 0) 배차 충전: 절반 이하로 남은 계약은 가득 (0대는 무조건)
+    for (let k = 0; k < 4; k++) { const rf = items.map((it, i) => ({ it, i })).filter(x => !x.it.sold && x.it.kind === 'refill').map(x => ({ ...x, c: g.contracts.find(c => c && c.id === x.it.contractId) })).filter(x => x.c && (x.c.calls === 0 || x.c.calls <= x.c.maxCalls * 0.5) && g.cash - x.it.price >= 60); if (!rf.length) break; rf.sort((a, b) => a.c.calls - b.c.calls); if (!g.buy(rf[0].i, null).ok) break; }
     // 1) 창고
     if (g.warehouse.cap < perDay * 1.6 * 4) { const i = idx(it => it.kind === 'fac' && it.fac && /^expand/.test(it.fac) && can(it.price)); if (i >= 0) g.buy(i, null); }
     // 2) 주력 계약 업그레이드 (같은 슬롯으로 갈아타기)

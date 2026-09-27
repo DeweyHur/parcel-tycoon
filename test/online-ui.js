@@ -73,6 +73,37 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   await A.screenshot({ path: `${OUT}/O-04-result.png` });
   const eloA = await A.evaluate(() => (Profile.get().multi || {}).elo), eloB = await B.evaluate(() => (Profile.get().multi || {}).elo);
   ok('프로필 ELO 그대로 1200', eloA === 1200 && eloB === 1200, `${eloA} ${eloB}`);
+  // ===== 4단계: 친구 초대 방 · 응원 이모지 · 등급 순위 =====
+  for (const pg of [A, B]) { await pg.evaluate(() => [...document.querySelectorAll('#modal .btn')].find(b => /타이틀로/.test(b.textContent)).click()); await pg.waitForTimeout(600); }
+  ok('타이틀에 친구와 버튼', !!(await A.$('#t-invite')));
+  await A.click('#t-invite'); await A.waitForTimeout(400); await A.click('#inv-make'); await A.waitForTimeout(1200);
+  const code = await A.evaluate(() => (document.querySelector('#inv-code-big') || {}).textContent);
+  ok('A 방 생성: 코드 6자 · 시작 버튼 비활성(혼자)', /^[A-Z2-9]{6}$/.test(code || '') && await A.evaluate(() => !![...document.querySelectorAll('#modal .foot .btn')].find(b => /시작/.test(b.textContent) && b.disabled)), code);
+  await A.screenshot({ path: `${OUT}/O-05-room.png` });
+  await B.click('#t-invite'); await B.waitForTimeout(400); await B.click('#inv-join'); await B.fill('#inv-code', code.toLowerCase()); await B.click('#inv-go'); await B.waitForTimeout(2600);
+  const roomB = await modalText(B), roomA = await modalText(A);
+  ok('B 코드로 입장(소문자도) · 둘 다 명단에 둘 · B 는 방장 대기', /에이창고/.test(roomB) && /방장이 시작/.test(roomB) && /비창고/.test(roomA), roomA.replace(/\s+/g, ' ').slice(0, 100));
+  await A.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].find(b => /시작/.test(b.textContent)).click()); await A.waitForTimeout(2000); await B.waitForTimeout(2500);
+  const inv = await A.evaluate(() => ({ online: !!(PT.match && PT.match.online), bots: PT.match && PT.match.players.filter(p => p.bot).map(p => p.name), n: PT.match && PT.match.players.length }));
+  const invB = await B.evaluate(() => ({ online: !!(PT.match && PT.match.online), host: PT.match && PT.match.online.host, mid: PT.match && PT.match.online.mid }));
+  const midA = await A.evaluate(() => PT.match.online.mid);
+  ok('초대 매치 시작: 둘 다 같은 매치 · 봇 2(이름은 한국어 이름표)', inv.online && invB.online && inv.n === 4 && invB.mid === midA && inv.bots.length === 2 && inv.bots.every(n => /^[가-힣]+$/.test(n)), JSON.stringify({ inv, invB }));
+  // B 끝내고 응원 → A 포트레잇에 말풍선 + 토스트
+  await finishVia(B); await B.waitForTimeout(1200);
+  await B.evaluate(() => document.querySelector('[data-cheer="🔥"]').click()); await B.waitForTimeout(1200);
+  await A.evaluate(() => PT.netSync(false)); await A.waitForTimeout(700);
+  const cheered = await A.evaluate(() => ({ bubble: !!document.querySelector('#multi-strip .bubble'), toast: document.querySelector('#toast').textContent }));
+  ok('응원: B 의 🔥 가 A 화면 포트레잇 말풍선·토스트로', cheered.bubble || /🔥/.test(cheered.toast), JSON.stringify(cheered));
+  await A.screenshot({ path: `${OUT}/O-06-cheer.png` });
+  await finishVia(A); await A.waitForTimeout(7000);
+  const tInv = await modalText(A);
+  ok('초대 판 결과: 등급 변동 없음(봇/초대 판)', /등급 변동 없음/.test(tInv), tInv.slice(0, 120).replace(/\s+/g, ' '));
+  // 등급 순위 보드 (앞 판은 무효라 비어 있을 수 있다 → 빈 안내 또는 표)
+  await A.evaluate(() => [...document.querySelectorAll('#modal .btn')].find(b => /타이틀로/.test(b.textContent)).click()); await A.waitForTimeout(500);
+  await A.click('#t-online'); await A.waitForTimeout(600); await A.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].find(b => /등급 순위/.test(b.textContent)).click()); await A.waitForTimeout(1200);
+  const tb = await modalText(A);
+  ok('등급 순위 화면', /등급 순위/.test(tb) && (/아직 등급 판/.test(tb) || /견습|정규/.test(tb)), tb.slice(0, 60).replace(/\s+/g, ' '));
+  await A.screenshot({ path: `${OUT}/O-07-board.png` });
   ok('콘솔 에러 0', errors.length === 0, errors.slice(0, 5).join(' | '));
   console.log(`\n${pass.length} ok, ${fail.length} fail`);
   await browser.close(); process.exit(fail.length ? 1 : 0);

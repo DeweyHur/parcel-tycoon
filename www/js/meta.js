@@ -335,12 +335,13 @@
       multi: true,
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
-      unlimitedCalls: true, payNow: true, noLoan: true, noBankrupt: true,   // 배차 무제한 · 즉시 결제 · 어음 없음. 잔액 마이너스면 호출을 못 해 물량으로 죽는다
+      unlimitedCalls: false, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true,   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
       shopDay: false, noCycleMarket: false, autoSummary: true,           // 장은 보름에 한 번, 정산 뒤에(개인 런 마켓 자리 — 유저: 하루 소모 대신 사이클 끝에). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」(하루 소모) 실험용으로 남겨 둔다
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 폭탄으로 돌아온다)
       repStep: 8, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +8 · 퍽 3택1 (문서는 +5 — 봇 판에서 13번 올라 8로. 석 달에 7~9번). 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
       sharedSchedule: true, fixedCustLevel: 2, dayArrivalsRate: 0.03, finalRushMult: 1.8,   // 입고 대본은 매치 공유 · 일차에 비례해 오른다(문서 0.025) · 마지막 보름 「마감 폭주」(문서 ×1.5). 봇 판(test/multi-sim.js)으로 올렸다
-      fuelRate: 0.01,                                                    // 배차비 유가: 하루 +1% (78일이면 +78%) — 후반 잔액이 그냥 쌓이지 않게
+      fuelRate: 0,                                                       // (배차비가 없으니 유가도 없다 — 값은 남겨 둔다)
+      repDecides: true, latePenaltyDiv: 3,                               // 승부는 잔액이 아니라 **평판**. 먼저 마감한 사람 빼고는 그때 남은 날 ÷3 만큼 평판 페널티 (유저 2026-09-26)
       capDelta: 4,                                                       // 시작 창고 +4칸 (열린 질문 4 — 후보값)
       marketMaxBuy: 0, upcomingTurns: 2,
       // 2단계: 트레잇·이삿짐 폭탄 (3장·4장). 입고의 15%→35%(일차 비례)에 트레잇, 공격 40 : 보너스 60

@@ -19,7 +19,7 @@ const STRATS = ['balanced', 'greedy', 'saver'];
 
 // ----- 저장소: Upstash REST 파이프라인, 없으면 인메모리(테스트·로컬) -----
 function memStore() {
-  const H = new Map(), K = new Map(), L = new Map(), X = new Map();
+  const H = new Map(), K = new Map(), L = new Map(), X = new Map(), Z = new Map();
   const live = k => { const e = X.get(k); if (e && e < Date.now()) { K.delete(k); H.delete(k); L.delete(k); X.delete(k); } };
   const one = c => {
     const [cmd, k, ...a] = c; live(k);
@@ -37,6 +37,12 @@ function memStore() {
       case 'LLEN': return (L.get(k) || []).length;
       case 'INCR': { const v = (+(K.get(k) || 0)) + 1; K.set(k, String(v)); return v; }
       case 'EXPIRE': { if (a[1] === 'NX' && X.has(k)) return 0; X.set(k, Date.now() + a[0] * 1000); return 1; }
+      case 'ZADD': { const z = Z.get(k) || new Map(); z.set(a[1], +a[0]); Z.set(k, z); return 1; }
+      case 'ZCARD': return (Z.get(k) || new Map()).size;
+      case 'ZSCORE': { const z = Z.get(k); return z && z.has(a[0]) ? String(z.get(a[0])) : null; }
+      case 'ZREVRANK': { const z = Z.get(k); if (!z || !z.has(a[0])) return null; return [...z.entries()].sort((x, y) => y[1] - x[1]).findIndex(e => e[0] === a[0]); }
+      case 'ZREVRANGE': { const z = Z.get(k) || new Map(); const rows = [...z.entries()].sort((x, y) => y[1] - x[1]).slice(+a[0], +a[1] + 1); return a[2] === 'WITHSCORES' ? rows.flatMap(e => [e[0], String(e[1])]) : rows.map(e => e[0]); }
+      case 'HMGET': { const h = H.get(k); return a.map(f => h && h.has(f) ? h.get(f) : null); }
       default: throw new Error('mem: ' + cmd);
     }
   };
@@ -85,6 +91,31 @@ async function getElo(S, pid) { const r = J((await S.call([['GET', 'elo:' + pid]
 async function loadMatch(S, mid) { return J((await S.call([['GET', 'm:' + mid]]))[0]); }
 async function saveMatch(S, m) { await S.call([['SET', 'm:' + m.id, JSON.stringify(m), 'EX', TTL]]); }
 
+const shuffled = a => a.slice().sort(() => Math.random() - 0.5);
+// 봇 자리. nid = 이름 번호 — 클라이언트가 자기 언어의 이름표(multi.botNames)에서 고른다. name 은 서버 로그·폴백용
+function mkBot(i, faces) { const nid = Math.floor(Math.random() * BOT_NAMES.length); return { pid: 'bot' + i, name: BOT_NAMES[nid], nid, face: faces[i % faces.length] || 'rep', elo: ELO_START, bot: true, strat: STRATS[i % STRATS.length] }; }
+async function createMatch(S, humans, opts) {
+  const t = now();
+  const players = humans.map((x, i) => ({ pid: x.pid, name: x.name, face: x.face, elo: x.elo, bot: false, host: i === 0 }));
+  const faces = MULTI.FACES.filter(f => !players.some(p => p.face === f));
+  for (let i = players.length; i < PLAYERS; i++) players.push(mkBot(i, faces));
+  const m = Object.assign({ id: mkId(), seed: rndInt(2147483647), players, created: t, rated: players.filter(p => !p.bot).length >= 2, cycle: 0 }, opts || {});
+  await saveMatch(S, m);
+  await S.call(humans.map(x => ['SET', 'mp:' + x.pid, m.id, 'EX', TTL]));
+  return m;
+}
+// ----- 친구 초대 방 (4단계) -----
+// 방 = 해시 inv:CODE (pid → 손님 json). 호스트가 만들고(코드 6자), 친구가 코드로 들어오고, 호스트가 시작하면 남은 자리는 봇. ELO 미반영(rated:false)
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function mkCode() { let c = ''; for (let i = 0; i < 6; i++) c += CODE_CHARS[rndInt(CODE_CHARS.length)]; return c; }
+const validCode = c => typeof c === 'string' && /^[A-Z2-9]{6}$/.test(c);
+async function roomOf(S, code) { const h = hashAll((await S.call([['HGETALL', 'inv:' + code]]))[0]); const list = Object.values(h).map(J).filter(Boolean).sort((a, b) => a.at - b.at); return list.length ? list : null; }
+async function roomView(S, code, pid) {
+  const started = (await S.call([['GET', 'invm:' + code]]))[0];
+  if (started) { const m = await loadMatch(S, started); if (m && m.players.some(p => p.pid === pid)) return { status: 'ready', match: m, code }; }
+  const room = await roomOf(S, code); if (!room) return { status: 'gone', code };
+  return { status: 'room', code, host: room[0].pid, players: room.map(x => ({ pid: x.pid, name: x.name, face: x.face, me: x.pid === pid })), max: PLAYERS };
+}
 // ----- 매칭 큐 -----
 // 큐는 해시 mq: pid → { pid, name, face, elo, at }. 폴링(queue op)마다 짝을 맞춰 본다 — 서버리스엔 타이머가 없다
 async function matchmake(S) {
@@ -96,13 +127,8 @@ async function matchmake(S) {
   if (group.length < PLAYERS && waited < WAIT_BOTS) return null;
   // 상위 등급(팀장 이상)에서는 봇 없이 사람만 — 넷이 안 모이면 계속 기다린다
   if (group.length < PLAYERS && head.elo >= ELO_START + BAND * 3) return null;
-  const players = group.map((x, i) => ({ pid: x.pid, name: x.name, face: x.face, elo: x.elo, bot: false, host: i === 0 }));
-  const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5), faces = MULTI.FACES.filter(f => !players.some(p => p.face === f));
-  for (let i = players.length; i < PLAYERS; i++) players.push({ pid: 'bot' + i, name: names[i], face: faces[i % faces.length] || 'rep', elo: ELO_START, bot: true, strat: STRATS[i % STRATS.length] });
-  const m = { id: mkId(), seed: rndInt(2147483647), players, created: t, rated: players.filter(p => !p.bot).length >= 2, cycle: 0 };
-  await saveMatch(S, m);
-  await S.call(group.map(x => ['HDEL', 'mq', x.pid]).concat(group.map(x => ['SET', 'mp:' + x.pid, m.id, 'EX', TTL])));
-  return m;
+  await S.call(group.map(x => ['HDEL', 'mq', x.pid]));
+  return createMatch(S, group);
 }
 
 // ----- 중계 -----
@@ -153,9 +179,13 @@ async function route(S, m, from, ev, snaps) {
 
 // ----- ELO -----
 // 순위: 생존 > 잔액 > 평판 > 늦게 죽은 순. 사람끼리 모든 쌍을 1:1 로. 봇 쌍·미검증 판은 안 센다
+// 승부는 **평판**: 생존 > 최종 평판 > 잔액. 먼저 마감한 사람(m.firstFinish) 빼고는 그때 남은 날 ÷ latePenaltyDiv 만큼 평판 페널티
 function rankRows(m, results) {
-  const rows = m.players.map(p => Object.assign({ pid: p.pid, bot: p.bot }, results[p.pid] || { cash: -1e9, rep: 0, day: 0, win: false, alive: false }));
-  rows.sort((a, b) => ((b.alive ? 1 : 0) - (a.alive ? 1 : 0)) || (a.alive ? (b.cash - a.cash) || (b.rep - a.rep) : (b.day - a.day) || (b.cash - a.cash)));
+  const div = M.MULTI.mods.latePenaltyDiv || 3, ff = m.firstFinish;
+  const rows = m.players.map(p => { const r = Object.assign({ pid: p.pid, bot: p.bot }, results[p.pid] || { cash: -1e9, rep: 0, day: 0, days: 78, win: false, alive: false });
+    const pen = ff && ff.pid !== p.pid && ff.days[p.pid] != null ? Math.max(0, Math.ceil(((r.days || 78) - ff.days[p.pid]) / div)) : 0;
+    return Object.assign(r, { penalty: pen, repFinal: Math.max(0, (r.rep || 0) - pen) }); });
+  rows.sort((a, b) => ((b.alive ? 1 : 0) - (a.alive ? 1 : 0)) || (a.alive ? (b.repFinal - a.repFinal) || (b.cash - a.cash) : (b.day - a.day) || (b.cash - a.cash)));
   rows.forEach((r, i) => r.rank = i + 1);
   return rows;
 }
@@ -172,9 +202,9 @@ async function settleElo(S, m, results) {
     delta[a.pid] += ka * (sa - ea); delta[b.pid] += kb * ((1 - sa) - (1 - ea));
   }
   const cmds = [];
-  for (const h of humans) { const r = ratings[h.pid]; const nx = { elo: Math.max(100, Math.round(r.elo + (rated ? delta[h.pid] : 0))), games: r.games + (rated ? 1 : 0), wins: r.wins + (rated && h.rank === 1 ? 1 : 0), name: (m.players.find(p => p.pid === h.pid) || {}).name }; ratings[h.pid] = Object.assign(nx, { before: r.elo, delta: rated ? Math.round(delta[h.pid]) : 0, rank: rankOf(nx.elo) }); cmds.push(['SET', 'elo:' + h.pid, JSON.stringify({ elo: nx.elo, games: nx.games, wins: nx.wins, name: nx.name })]); }
+  for (const h of humans) { const r = ratings[h.pid]; const nx = { elo: Math.max(100, Math.round(r.elo + (rated ? delta[h.pid] : 0))), games: r.games + (rated ? 1 : 0), wins: r.wins + (rated && h.rank === 1 ? 1 : 0), name: (m.players.find(p => p.pid === h.pid) || {}).name }; ratings[h.pid] = Object.assign(nx, { before: r.elo, delta: rated ? Math.round(delta[h.pid]) : 0, rank: rankOf(nx.elo) }); cmds.push(['SET', 'elo:' + h.pid, JSON.stringify({ elo: nx.elo, games: nx.games, wins: nx.wins, name: nx.name })]); if (rated) cmds.push(['ZADD', 'elob', nx.elo, h.pid], ['HSET', 'elobm', h.pid, JSON.stringify({ name: nx.name, games: nx.games, wins: nx.wins })]); }
   if (cmds.length) await S.call(cmds);
-  m.settled = { rated, void: !!unverified, rows: rows.map(r => ({ pid: r.pid, rank: r.rank, cash: r.cash, rep: r.rep, day: r.day, alive: r.alive, verified: !!(results[r.pid] || {}).verified })), elo: ratings }; await saveMatch(S, m);
+  m.settled = { rated, void: !!unverified, first: m.firstFinish ? m.firstFinish.pid : null, rows: rows.map(r => ({ pid: r.pid, rank: r.rank, cash: r.cash, rep: r.rep, repFinal: r.repFinal, penalty: r.penalty, day: r.day, alive: r.alive, verified: !!(results[r.pid] || {}).verified })), elo: ratings }; await saveMatch(S, m);
   return m.settled;
 }
 
@@ -195,6 +225,40 @@ async function handle(S, d, ip) {
     return [200, { status: 'waiting', waited: now() - entry.at, inQueue: qn, widenAt: WAIT_WIDEN, botsAt: WAIT_BOTS, elo, rank: rankOf(elo) }];
   }
   if (op === 'leave') { if (!validPid(d.pid)) return [400, { error: 'pid' }]; await S.call([['HDEL', 'mq', d.pid]]); return [200, { ok: true }]; }
+  if (op === 'board') {   // 등급 순위: ELO 상위 20 + 내 자리
+    const [flat, count, rank, mine] = await S.call([['ZREVRANGE', 'elob', 0, 19, 'WITHSCORES'], ['ZCARD', 'elob'], ['ZREVRANK', 'elob', d.pid || '-'], ['ZSCORE', 'elob', d.pid || '-']]);
+    const ids = [], scores = []; for (let i = 0; i < (flat || []).length; i += 2) { ids.push(flat[i]); scores.push(+flat[i + 1]); }
+    const metas = ids.length ? (await S.call([['HMGET', 'elobm', ...ids]]))[0] : [];
+    const top = ids.map((id, i) => { const mm = J(metas[i]) || {}; return { rank: i + 1, name: mm.name || '???', elo: scores[i], tier: rankOf(scores[i]), games: mm.games || 0, wins: mm.wins || 0, me: id === d.pid }; });
+    return [200, { total: count || 0, top, me: rank == null ? null : { rank: rank + 1, elo: +mine, tier: rankOf(+mine) } }];
+  }
+  if (op === 'invite') {   // 방 만들기
+    if (!validPid(d.pid)) return [400, { error: 'pid' }];
+    const code = mkCode(), entry = { pid: d.pid, name: cleanName(d.name), face: MULTI.FACES.includes(d.face) ? d.face : 'park', elo: (await getElo(S, d.pid)).elo, at: now() };
+    await S.call([['HSET', 'inv:' + code, d.pid, JSON.stringify(entry)], ['EXPIRE', 'inv:' + code, 3600]]);
+    return [200, await roomView(S, code, d.pid)];
+  }
+  if (op === 'join') {
+    if (!validPid(d.pid) || !validCode(d.code)) return [400, { error: 'code' }];
+    const room = await roomOf(S, d.code); if (!room) return [404, { error: 'noroom' }];
+    if ((await S.call([['GET', 'invm:' + d.code]]))[0]) return [409, { error: 'started' }];
+    if (room.length >= PLAYERS && !room.some(x => x.pid === d.pid)) return [409, { error: 'full' }];
+    const entry = { pid: d.pid, name: cleanName(d.name), face: MULTI.FACES.includes(d.face) ? d.face : 'park', elo: (await getElo(S, d.pid)).elo, at: room.find(x => x.pid === d.pid) ? room.find(x => x.pid === d.pid).at : now() };
+    await S.call([['HSET', 'inv:' + d.code, d.pid, JSON.stringify(entry)]]);
+    return [200, await roomView(S, d.code, d.pid)];
+  }
+  if (op === 'room') { if (!validPid(d.pid) || !validCode(d.code)) return [400, { error: 'code' }]; return [200, await roomView(S, d.code, d.pid)]; }
+  if (op === 'roomLeave') { if (!validPid(d.pid) || !validCode(d.code)) return [400, { error: 'code' }]; const room = await roomOf(S, d.code); if (room && room[0].pid === d.pid) await S.call([['DEL', 'inv:' + d.code]]); else await S.call([['HDEL', 'inv:' + d.code, d.pid]]); return [200, { ok: true }]; }
+  if (op === 'roomStart') {   // 호스트만. 사람 2명 이상, 남은 자리는 봇. 초대 매치는 ELO 미반영
+    if (!validPid(d.pid) || !validCode(d.code)) return [400, { error: 'code' }];
+    const room = await roomOf(S, d.code); if (!room) return [404, { error: 'noroom' }];
+    if (room[0].pid !== d.pid) return [403, { error: 'nothost' }];
+    if (room.length < 2) return [409, { error: 'alone' }];
+    const already = (await S.call([['GET', 'invm:' + d.code]]))[0]; if (already) return [200, await roomView(S, d.code, d.pid)];
+    const m = await createMatch(S, room.slice(0, PLAYERS), { rated: false, invite: d.code });
+    await S.call([['SET', 'invm:' + d.code, m.id, 'EX', TTL]]);
+    return [200, { status: 'ready', match: m, code: d.code }];
+  }
   if (!d.mid || typeof d.mid !== 'string' || !validPid(d.pid)) return [400, { error: 'shape' }];
   const m = await loadMatch(S, d.mid); if (!m) return [404, { error: 'match' }];
   const me = m.players.find(p => p.pid === d.pid); if (!me) return [403, { error: 'notin' }];
@@ -222,7 +286,9 @@ async function handle(S, d, ip) {
     const pid = d.for || d.pid, r = d.result || {}, bot = pid !== d.pid;
     let verified = bot;   // 봇 결과는 호스트를 믿는다(봇 쌍은 ELO 에 안 든다). 사람은 재실행으로
     if (!bot && d.cfg && Array.isArray(d.log)) { try { verified = MULTI.verify(Object.assign({}, d.cfg, { seed: m.seed }), d.log, { cash: r.cash, rep: r.rep, day: r.day, phase: r.win ? 'win' : 'over' }).ok; } catch (e) { verified = false; } }
-    const rec = { cash: Math.round(+r.cash || 0), rep: Math.round(+r.rep || 0), day: Math.round(+r.day || 0), win: !!r.win, alive: !!r.win, verified, at: now() };
+    const rec = { cash: Math.round(+r.cash || 0), rep: Math.round(+r.rep || 0), day: Math.round(+r.day || 0), days: Math.round(+r.days || 78), win: !!r.win, alive: !!r.win, verified, at: now() };
+    // 먼저 마감한 사람: 그 순간 남들의 일차(스냅샷)를 적어 둔다 — 나머지는 남은 날만큼 평판 페널티
+    if (rec.win && !m.firstFinish) { const snaps = await snapshots(S, m); const days = {}; for (const p of m.players) if (p.pid !== pid) days[p.pid] = (snaps[p.pid] || {}).day || 1; m.firstFinish = { pid, days, at: now() }; await saveMatch(S, m); }
     await S.call([['HSET', 'mf:' + m.id, pid, JSON.stringify(rec)], ['EXPIRE', 'mf:' + m.id, TTL], ['HSET', 'ms:' + m.id, pid, JSON.stringify(Object.assign({ cash: rec.cash, rep: rec.rep, day: rec.day, phase: rec.win ? 'win' : 'over', bombs: 0, at: now() }))]]);
     const results = hashAll((await S.call([['HGETALL', 'mf:' + m.id]]))[0]); for (const k in results) results[k] = J(results[k]);
     const humans = m.players.filter(p => !p.bot);

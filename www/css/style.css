@@ -1094,3 +1094,9 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 .qwait { text-align: center; padding: 10px 0; }
 .qwait .spin { display: inline-block; font-size: 34px; animation: qspin 1.6s linear infinite; }
 @keyframes qspin { to { transform: rotate(360deg); } }
+.trow { display: flex; gap: 6px; }
+.trow .btn { flex: 1; min-width: 0; }
+.cheer { display: flex; gap: 6px; justify-content: center; margin: 6px 0; }
+.cheer .btn { font-size: 18px; padding: 4px 8px; }
+#multi-strip .mp .bubble { position: absolute; right: 2px; top: -14px; font-size: 16px; font-style: normal; background: #fff; color: #000; border: 2px solid #000; padding: 0 4px; animation: bubblepop 2.4s ease-out both; z-index: 6; }
+@keyframes bubblepop { 0% { transform: scale(.4); opacity: 0; } 12% { transform: scale(1.1); opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }

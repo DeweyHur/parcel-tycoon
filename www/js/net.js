@@ -22,6 +22,12 @@
     push: (mid, pid, events, snaps) => call('push', { mid, pid, events, snaps }),
     poll: (mid, pid, since) => call('poll', { mid, pid, since }),
     finish: (mid, pid, forPid, result, cfg, log) => call('finish', { mid, pid, for: forPid, result, cfg, log }, 20000),
+    board: pid => call('board', { pid }),
+    invite: (pid, name, face) => call('invite', { pid, name, face }),
+    join: (pid, name, face, code) => call('join', { pid, name, face, code }),
+    room: (pid, code) => call('room', { pid, code }),
+    roomLeave: (pid, code) => call('roomLeave', { pid, code }),
+    roomStart: (pid, code) => call('roomStart', { pid, code }),
     call,
   };
   if (typeof module !== 'undefined') module.exports = NET; else root.NET = NET;
