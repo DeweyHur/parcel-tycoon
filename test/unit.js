@@ -940,6 +940,7 @@ const MG = (seed, extra) => new Game(Object.assign({ multi: true, seed, scenario
 t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4 · 시작 차는 작다', () => {
   const g = MG(1), R = g.rules;
   assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) < D.CARRIERS[c.carrier].cap + 1) && R.carrierCapDelta.bulk === -2, '차는 작다(배차 무제한 대신)');
+  { const big = []; for (let m = 1; m <= 6; m++) for (const t of g._sharedSchedule(m)) for (const sp of t) if (sp.size > 3) big.push(sp); assert.equal(big.length, 0, '3칸 넘는 택배는 안 온다(시작 차에 실리게)'); }
   assert.ok(R.multi && R.months === 6 && R.noHolidays && R.noCalendarEvents && R.noWeekend && R.unlimitedCalls && R.noCallFee && R.payNow && R.noLoan && R.noInsurance && !R.shopDay && R.autoSummary && R.repDecides);
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
   assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk', 'cold', 'fragile']);
