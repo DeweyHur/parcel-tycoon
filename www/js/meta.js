@@ -335,7 +335,7 @@
       multi: true,
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
-      unlimitedCalls: false, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true, noFacilities: true, priceMult: 1.8,   // 장 값은 비싸게 — 살 게 시설뿐이던 때 돈이 남아돌았다(유저). 계약·강화·충전 전부 ×1.8   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
+      unlimitedCalls: false, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true, noFacilities: true, priceMult: 1.8, noMoney: true, traitSameDay: true,   // 장 값은 비싸게 — 살 게 시설뿐이던 때 돈이 남아돌았다(유저). 계약·강화·충전 전부 ×1.8   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 폭탄으로 돌아온다)
       repStep: 6, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
@@ -350,25 +350,21 @@
     // 택배 트레잇 — 기한 안에 출고하면 발동, 반송·폐기면 불발. 공격은 나 빼고 전원(살아 있고 마감 안 한 상대)에게, 보너스는 나에게.
     // 원칙: 한 방은 반나절 손해를 넘지 않는다 — 죽이는 건 공격이 아니라 물량. 이름·설명은 locales meta.MULTI.TRAITS[id]
     TRAITS: {
-      // 공격 (weight = 등장 비중)
-      t_bomb:   { kind: 'attack', icon: '🧨', weight: 10 },   // 이삿짐 폭탄 → BOMB
-      t_rain:   { kind: 'attack', icon: '🌧', weight: 14 },   // 다음 날 야외 적재 전부 젖음(기한 −1)
-      t_claim:  { kind: 'attack', icon: '📞', weight: 14 },   // 평판 −1
-      t_rat:    { kind: 'attack', icon: '🐭', weight: 12 },   // 신선 품목 1개 즉시 폐기
-      t_hurry:  { kind: 'attack', icon: '⏱', weight: 12 },   // 창고 안 모든 택배 기한 −1
-      t_road:   { kind: 'attack', icon: '🚧', weight: 12 },   // 다음 날 호출 불가
-      t_refund: { kind: 'attack', icon: '💸', weight: 13 },   // 반송 1건 강제(평판 −1)
-      t_seal:   { kind: 'attack', icon: '🔒', weight: 13 },   // 창고 상한 −3칸, 3일
+      // 공격 — 넷뿐, 하나하나 세게 (유저: "신선 −1 같은 소소한 어택보다 강렬한 어택 · 정보가 너무 많은 게 안 좋다")
+      t_bomb:   { kind: 'attack', icon: '🧨', weight: 30 },   // 폭탄(3칸, 못 치움, 옆 창고로) → BOMB
+      t_hurry:  { kind: 'attack', icon: '⏱', weight: 25 },   // 창고 안 모든 택배 기한 −HURRY
+      t_road:   { kind: 'attack', icon: '🚧', weight: 20 },   // 다음 날 호출 불가
+      t_seal:   { kind: 'attack', icon: '🔒', weight: 25 },   // 창고 상한 −SEAL 칸, 3일
       // 보너스
-      t_gold:   { kind: 'bonus', icon: '💰', weight: 16 },    // 이 택배 보수 ×2
-      t_buzz:   { kind: 'bonus', icon: '⭐', weight: 14 },    // 평판 +1
-      t_shield: { kind: 'bonus', icon: '🛡', weight: 14 },    // 다음 공격 1회 무효(최대 2겹)
+      t_buzz:   { kind: 'bonus', icon: '⭐', weight: 18 },    // 평판 +BUZZ
+      t_shield: { kind: 'bonus', icon: '🛡', weight: 16 },    // 다음 공격 1회 무효(최대 2겹)
       t_ice:    { kind: 'bonus', icon: '🧊', weight: 12 },    // 신선 부패 정지 3일
-      t_pack:   { kind: 'bonus', icon: '📦', weight: 12 },    // 창고 +3칸, 3일
-      t_truck:  { kind: 'bonus', icon: '🚚', weight: 12 },    // 다음 호출 트럭 +1 무료
-      t_return: { kind: 'bonus', icon: '🔄', weight: 10 },    // 들고 있는 폭탄 1개를 보낸 사람에게 반송
-      t_focus:  { kind: 'bonus', icon: '🎯', weight: 10 },    // 다음 공격 트레잇을 1위 한 명에게만 ×3
+      t_pack:   { kind: 'bonus', icon: '📦', weight: 14 },    // 창고 +3칸, 3일
+      t_truck:  { kind: 'bonus', icon: '🚚', weight: 14 },    // 다음 호출 트럭 +1
+      t_return: { kind: 'bonus', icon: '🔄', weight: 12 },    // 들고 있는 폭탄 1개를 보낸 사람에게 반송
+      t_focus:  { kind: 'bonus', icon: '🎯', weight: 12 },    // 다음 공격 트레잇을 1위 한 명에게만 ×3
     },
+    HURRY: 2, SEAL: 6, BUZZ: 2,   // 공격 세기: 독촉 기한 −2 · 봉인 −6칸 · 입소문 평판 +2
     BOMB: { size: 3, days: 6, perDay: 2, maxSize: 6, max: 4 },   // 3칸/6일로 시작, 이사마다 +1칸 −1일, 6칸/1일이면 다음 이사 때 터진다. 매치당 동시 4개
     SHIELD_MAX: 2, TEMP_DAYS: 3,
     // 퍽 3택1 — 평판 등급이 오를 때마다 세 계열에서 한 장씩. 장착 상한 없음, 중복 가능(중첩 수치 표기).

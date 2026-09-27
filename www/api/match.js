@@ -151,7 +151,7 @@ async function route(S, m, from, ev, snaps) {
   const out = [];
   if (ev.type === 'attackOut') {
     let tg = others;
-    if (ev.focus) { const top = others.slice().sort((a, b) => (snaps[b.pid].cash || 0) - (snaps[a.pid].cash || 0))[0]; tg = top ? [top] : []; }
+    if (ev.focus) { const top = others.slice().sort((a, b) => ((snaps[b.pid].rep || 0) - (snaps[a.pid].rep || 0)) || ((snaps[b.pid].cash || 0) - (snaps[a.pid].cash || 0)))[0]; tg = top ? [top] : []; }   // 🎯 는 평판 1위(승부가 평판이라)
     if (ev.trait === 't_bomb') {
       if (bombs >= M.MULTI.BOMB.max || !tg.length) return [{ type: 'bombFizzle', from, to: null }];
       const t = tg[rndInt(tg.length)];

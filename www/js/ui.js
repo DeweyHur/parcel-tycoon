@@ -887,13 +887,14 @@
       else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}` : ''; }
       else if (it.kind === 'adTicket') { const A = D.AD_MEDIA[it.media]; icon = A ? A.icon : '📣'; name = it.name || T('media.ticket', { name: T('media.' + it.media) }); desc = T('media.ticketOnce'); fam = 'fam-atk'; }
       else { icon = '🎁'; name = it.name || it.kind; }
-      return `<button class="btn pkcard ${fam} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><b>${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em></button>`; };
-    const body = `<div class="pkrow">${sh.items.map(card).join('')}</div><div class="d" style="text-align:right;color:var(--gold)">${g.cash}c</div>`;
+      return `<button class="btn pkcard ${fam} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><b>${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
+    const body = `<div class="pkrow">${sh.items.map(card).join('')}</div>${g.rules.noMoney ? '' : `<div class="d" style="text-align:right;color:var(--gold)">${g.cash}c</div>`}`;
     const m = modal(T('multi.repShopTitle'), body, [{ label: T('btn.close'), cls: 'primary', onClick: () => { g.closeRepShop(); closeModal(); game.takeEvents(); saveGame(); renderAll(); checkPhase(); } }]);
     m.querySelectorAll('.pkcard').forEach(b => b.onclick = () => {
       const it = sh.items[+b.dataset.i]; const r = g.buyRepShop(+b.dataset.i, slotFor(it)); if (!r.ok) return toast(r.msg);
       SFX.buy(); if (r.perk) rewardBurst(`${M.MULTI.PERKS[r.perk].icon} ${M.MULTI.PERKS[r.perk].name}`, 2);
-      game.takeEvents(); scene.sync(game, { animate: true }); renderAll(); closeModal(); showRepShop();
+      game.takeEvents(); scene.sync(game, { animate: true }); renderAll(); closeModal();
+      if (g.repShop) showRepShop(); else { saveGame(); checkPhase(); }   // 하나만 고르는 규칙이면 사자마자 닫힌다
     });
   }
   // 결과: 순위표. 사람이 먼저 끝났으면(마감·폐업) 남은 봇을 끝까지 돌린다 (관전은 4단계)
@@ -1107,7 +1108,7 @@
     $('#hud-cash-lbl').textContent = inPlay && !R.multi ? T('hud.cashLbl') : T('hud.cash');
     // 난투: 돈은 점수가 아니다 — 자금 칸은 접고, 장·캠페인 살 때 필요한 잔액만 작게
     $('#hud-cash-box').hidden = !!R.multi;
-    const due = $('#hud-due'); if (due && R.multi) { due.textContent = `${g.cash}c`; due.hidden = false; }
+    const due = $('#hud-due'); if (due && R.multi) { due.textContent = ''; due.hidden = true; }
     else if (due && !inPlay) { due.textContent = g.debt ? T('hud.debt', { n: pj.loan }) : ''; due.hidden = false; }
     else if (due) { const parts = [T('hud.cashNow', { n: g.cash })]; if (pj.pending) parts.push(T('hud.pending', { n: pj.pending })); if (pj.stock) parts.push(T('hud.stock', { n: pj.stock })); if (g.feesDue) parts.push(T('hud.feesDue', { n: g.feesDue })); parts.push(T('hud.opCostDue', { n: pj.opCost + pj.premium })); if (inst) parts.push(T('hud.instalment', { n: inst })); if (g.debt) parts.push(T('hud.debt', { n: pj.loan })); due.innerHTML = parts.join(' · ') + (pj.total < 0 && g.turn >= 5 ? ` · <span style="color:var(--orange)">${T('hud.loanWarn')}</span>` : ''); due.hidden = !hudDueOpen; }
     // 자금 분해(현금·재고·운영비·보험)는 매 턴 볼 필요가 없다 — 기본은 접고, 자금 칸을 누르면 펼친다.
@@ -1189,7 +1190,7 @@
       const bar = cells.startsWith('<span class="pips"') ? '' : `<div class="lg"><i class="${pv.fill >= 0.8 ? 'good' : ''}" style="width:${Math.min(100, pv.fill * 100)}%"></i></div>`;
       // 세로 목록 한 줄: 이름 · 싣는 색 · 적재 눈금 · 순수익 · 배차 눈금. 글자는 최소로 — 자세한 건 꾹 누르면
       const callsHtml = g.offFor(c) ? `<span class="off">${T('hud.off')}</span>` : !g.shows('calls') ? '' : spare ? T('hud.spare') : callPips;
-      const netHtml = spent || !pv.n ? '<span class="per">—</span>' : `<span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>`;
+      const netHtml = spent || !pv.n ? '<span class="per">—</span>' : R.noMoney ? (() => { const d = g.repDeltaFor(elig.filter(p => pv.ids ? pv.ids.includes(p.id) : true)); return `<span class="per ${d >= 0 ? 'good' : 'bad'}">★${d >= 0 ? '+' : ''}${d}</span>`; })() : `<span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>`;
       btn.innerHTML = `<span class="cn">${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}</span>${takesDots(g, c, true)}<span class="cl">${spent ? '' : cells}</span>${netHtml}<span class="calls ${spent ? 'zero' : ''}">${callsHtml}</span>`;
     }
     const sc = $('#cself');
@@ -1532,7 +1533,7 @@
       const sorted = elig.slice().sort((a, b) => urgencyOf(a) - urgencyOf(b) || (b.overdue - a.overdue));
       const r = g.autoPick(c, sorted, pickTrucks(g, c));
       const pv = pack(elig.filter(p => r.ids.includes(p.id)), g.callFee(c, r.trucks || 1));
-      return Object.assign(pv, { trucks: r.trucks || 1, fill: pv.vol / (vcap * (r.trucks || 1)) });
+      return Object.assign(pv, { trucks: r.trucks || 1, fill: pv.vol / (vcap * (r.trucks || 1)), ids: r.ids });
     } catch (e) {
       const take = []; let vol = 0;
       for (const p of elig) { if (vol + p.size > vcap) continue; vol += p.size; take.push(p); }
@@ -1613,7 +1614,7 @@
     const cls = (p.overdue ? ' overdue' : '') + ((a.includes('cold') && !p.inCold) || (a.includes('frozen') && !p.inFrozen) ? ' rot' : '') + (s && s.sel.has(p.id) ? ' sel' : '') + (s && !s.elig.has(p.id) ? ' dis' : '') + (s && s.risk && s.risk.has(p.id) ? ' risk' : '') + (leadOn() ? '' : ' nolead') + ` value-${valueTier(p)}`;
     const cu = M.CUSTOMERS[p.customer || 'anon'];
     const lead = leadOn() ? `<div class="lead" title="${esc(cu.name)}">${cu.icon}</div>` : '';
-    return `<div class="parcel${cls}" data-id="${p.id}">${lead}<div>${noDue || p.noDeadline ? '' : urgDot(p)}${valueBadge(p)}${attrIcons(a)} ${cellBoxes([p])} · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p, noDue)}</div></div>`;
+    return `<div class="parcel${cls}" data-id="${p.id}">${lead}<div>${noDue || p.noDeadline ? '' : urgDot(p)}${valueBadge(p)}${attrIcons(a)} ${cellBoxes([p])}${game.rules.noMoney ? '' : ` · ${(p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))}c`}${s && s.risk && s.risk.has(p.id) ? ` <b style="color:var(--orange)">${T('call.riskTag')}</b>` : ''}</div><div class="st">${parcelStatus(p, noDue)}</div></div>`;
   }
   // 재고는 "뭘 먼저 보내야 하나"로 읽힌다 — 기한이 줄 머리, 그 줄에 상자가 늘어선다.
   // 상자 테두리로 보여 줄 '위험' — 기한·초과·통관은 줄 머리가 들고 간다.
@@ -1674,7 +1675,7 @@
       // 같은 종류끼리 붙여 놓아야 색 덩어리로 읽힌다
       const tiles = ps.slice().sort((x, y) => (x.type < y.type ? -1 : x.type > y.type ? 1 : 0) || y.size - x.size).map(p => parcelTile(p, s)).join('');
       const money = ps.reduce((n, x) => n + Math.round((x.reward != null ? x.reward : game.baseReward(x.type, x.baseSize)) * game.rushMult(x)), 0);
-      return `<div class="prow ${b.cls}${head ? '' : ' nohead'}">${head ? `<div class="pl"><i class="urg ${b.dot}"></i><span>${b.label}</span></div>` : ''}<div class="pt">${tiles}</div><div class="pm">${money}c</div></div>`;
+      return `<div class="prow ${b.cls}${head ? '' : ' nohead'}">${head ? `<div class="pl"><i class="urg ${b.dot}"></i><span>${b.label}</span></div>` : ''}<div class="pt">${tiles}</div><div class="pm">${game.rules.noMoney ? '' : money + 'c'}</div></div>`;
     }).join('');
   }
 
@@ -1815,9 +1816,11 @@
     const shells = Array.from({ length: trucks }, (_, ti) => { const cargoCells = cargoOf(ti); const cells = Array.from({ length: vcap }, (_, ci) => { const cargo = cargoCells[ci]; return `<i class="truck-cell ${cargo ? 'filled' : ''}"${cargo ? ` style="background:${cargo.color}" title="${esc(cargo.name)}"` : ''}></i>`; }).join(''); return `<div class="truck-shell"><div class="truck-cells" style="--cols:${Math.min(6, vcap)}">${cells}</div></div>`; }).join('');
     const ko = I18n.lang === 'ko', net = income - callFee;
     const tbtn = '';
-    const gauge = `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
+    // 난투(noMoney): 수익·비용·순수익 대신 평판 한 줄 — 돈은 없다, 평판만 (유저: "배차비 순수익 이런 거 다 없애고 평판 관리만")
+    const repD = game.rules.noMoney ? game.repDeltaFor(selP) : 0;
+    const gauge = game.rules.noMoney ? `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip net">★<b>${repD >= 0 ? '+' : ''}${repD}</b></span></div></div>` : `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
     const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
-    const money = `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, chain.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
+    const money = `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, D.LOAD_CHAIN.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
     const riskLine = riskSel.length ? `<div class="riskline">${T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
@@ -1828,7 +1831,7 @@
     { const tl = head.querySelector('.trustline'); if (tl) bindHold(tl, () => showContractDetail(c)); }
     head.hidden = false; foot.hidden = true; foot.innerHTML = '';
     // 호출은 아래 큰 버튼이 맡는다 — 카드를 누른 차 이름과 순수익·대수를 그 버튼에 적는다
-    pickAction = { label: `${car.badge || '🚚'} ${T('call.btn')} · ${esc(car.short || game.contractName(c))}`, sub: cm.sel.size ? `${T('call.net')} ${net >= 0 ? '+' : ''}${net}c · ${T('fmt.trucks', { n: trucks })} · ${vol}/${cap}` : T('call.pickNone'), on: cm.sel.size ? () => { const ids = [...cm.sel]; cm.auto = true; doCall(i, ids, trucks); } : null };
+    pickAction = { label: `${car.badge || '🚚'} ${T('call.btn')} · ${esc(car.short || game.contractName(c))}`, sub: cm.sel.size ? `${game.rules.noMoney ? `★${repD >= 0 ? '+' : ''}${repD}` : `${T('call.net')} ${net >= 0 ? '+' : ''}${net}c`} · ${T('fmt.trucks', { n: trucks })} · ${vol}/${cap}` : T('call.pickNone'), on: cm.sel.size ? () => { const ids = [...cm.sel]; cm.auto = true; doCall(i, ids, trucks); } : null };
     lastCallCtx = { kind: 'modal', modal: 'call', sel: cm.sel.size, elig: elig.length, slot: i, trucks, vol, risk: riskSel.length };
     callCtxChanged();
   }

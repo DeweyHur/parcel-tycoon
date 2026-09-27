@@ -51,15 +51,15 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   const snapB = await B.evaluate(pid => { const a = PT.match.players.find(p => p.id === pid); const bots = PT.match.players.filter(p => p.bot); return { aSnap: a && a.snap && a.snap.day, botSnap: bots.map(p => p.snap && p.snap.day), strip: document.querySelector('#multi-strip').textContent.replace(/\s+/g, ' ') }; }, pidA);
   ok('B 화면: A 와 봇들이 스냅샷으로 보인다(일차)', snapB.aSnap >= 5 && snapB.botSnap.every(d => d >= 4), JSON.stringify(snapB));
   await B.screenshot({ path: `${OUT}/O-02-guest.png` });
-  // A 가 📞 클레임 트레잇 택배를 내보낸다 → 서버가 B·봇들에게 → B 는 다음 날 맞는다
-  await A.evaluate(() => { const g = PT.game; g.focusNext = false; const c = g.contracts.find(x => x && /bulk/.test(x.carrier)); const si = g.contracts.indexOf(c); c.calls = Math.max(c.calls, 1); g.parcels = g.parcels.filter(p => p.type !== 'normal'); const P = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: 't_claim' }); g.parcels.push(P); g._assignCold(); PT.renderAll(); document.querySelector('#c' + si).click(); });
+  // A 가 ⏱ 독촉 트레잇 택배를 내보낸다 → 서버가 B·봇들에게 → B 는 다음 날 맞는다
+  await A.evaluate(() => { const g = PT.game; g.focusNext = false; const c = g.contracts.find(x => x && /bulk/.test(x.carrier)); const si = g.contracts.indexOf(c); c.calls = Math.max(c.calls, 1); g.parcels = g.parcels.filter(p => p.type !== 'normal'); const P = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: 't_hurry' }); g.parcels.push(P); g._assignCold(); PT.renderAll(); document.querySelector('#c' + si).click(); });
   await A.waitForTimeout(200); await A.evaluate(() => { const w = document.querySelector('#wait-btn'); if (!w.disabled) w.click(); }); await A.waitForTimeout(800); await idle(A);
   await B.waitForTimeout(4000);
   const inB = await B.evaluate(() => ({ inbox: PT.game.inbox.map(a => a.trait + '<' + a.fromName), news: PT.game.log.filter(l => l.k === 'log.attackIn').length }));
   const repB = await B.evaluate(() => PT.game.rep);
   await oneDay(B);
-  const hitB = await B.evaluate(rep0 => ({ rep: PT.game.rep, rep0, hit: PT.game.log.some(l => (l.k === 'log.attackIn' || l.k === 'log.attackBlocked') && l.p.icon === '📞' && l.p.from === '에이창고') }), repB);
-  ok('공격 중계: A 의 📞 가 B 인박스로 → B 다음 날 적용(맞거나 막거나)', inB.inbox.some(x => x.startsWith('t_claim<')) && hitB.hit, JSON.stringify({ inB, hitB }));
+  const hitB = await B.evaluate(rep0 => ({ rep: PT.game.rep, rep0, hit: PT.game.log.some(l => (l.k === 'log.attackIn' || l.k === 'log.attackBlocked') && l.p.icon === '⏱' && l.p.from === '에이창고') }), repB);
+  ok('공격 중계: A 의 ⏱ 가 B 인박스로 → B 다음 날 적용(맞거나 막거나)', hitB.hit, JSON.stringify({ inB, hitB }));
   await B.screenshot({ path: `${OUT}/O-03-hit.png` });
   // 끝까지: B 먼저(기다리는 중), A 나중(호스트가 봇 결과도) → 정산 · ELO
   const finishVia = async page => { await page.evaluate(() => { const g = PT.game; let guard = 0; while ((g.phase === 'play' || g.phase === 'market') && !(g.month === g.rules.months && g.turn === g.turns()) && guard++ < 400) { if (g.perkOffer) window.BOT.pickPerkBot(g); window.BOT.multiDay(g, 'balanced'); } if (g.perkOffer) window.BOT.pickPerkBot(g); PT.renderAll(); }); await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(1500); await idle(page); };

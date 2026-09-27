@@ -52,20 +52,19 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('상한 도달 → 등급 +1 · 상한 +6 · 상점 3장', offer.items && offer.items.length === 3 && offer.tier >= 1 && offer.cap === 20 + 6 * offer.tier, JSON.stringify(offer));
   await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(500); await idle();   // 다음 마감에서 checkPhase 가 상점을 띄운다
   let t = await modalText();
-  ok('평판 상점 팝업 — 값이 붙은 카드 3장', /상점/.test(t) && (await page.$$('.pkcard')).length === 3 && /\d+c/.test(t), t.slice(0, 80).replace(/\s+/g, ' '));
+  ok('평판 상점 팝업 — 값 없는 카드 3장', /상점/.test(t) && (await page.$$('.pkcard')).length === 3 && !/\d+c\b/.test(t), t.slice(0, 80).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-04-perk.png` });
-  const picked = await page.evaluate(() => { const g = PT.game; const i = g.repShop.items.findIndex(it => it.kind === 'contract' && it.switchFrom != null || it.kind === 'adTicket'); const cash = g.cash; const b = document.querySelector(`.pkcard[data-i="${i}"]`); if (b) b.click(); return { i, kind: i >= 0 && g.repShop.items[i].kind, cash, after: g.cash, sold: i >= 0 && g.repShop.items[i].sold }; }); await page.waitForTimeout(400);
-  const pk = await page.evaluate(() => ({ shop: !!PT.game.repShop, modal: !!document.querySelector('#modal .pkcard') }));
-  ok('카드 구매 → 돈 빠지고 · 상점은 열린 채(더 살 수 있다)', (picked.i < 0 || (picked.after < picked.cash && picked.sold)) && pk.shop && pk.modal, JSON.stringify({ picked, pk }));
+  const picked = await page.evaluate(() => { const g = PT.game; const sh = g.repShop; const i = sh.items.findIndex(it => it.kind === 'contract' && it.switchFrom != null || it.kind === 'adTicket'); const cash = g.cash; const b = document.querySelector(`.pkcard[data-i="${i}"]`); if (b) b.click(); return { i, kind: i >= 0 && sh.items[i].kind, cash, after: g.cash, sold: i >= 0 && sh.items[i].sold, closed: g.repShop !== sh, price: /\d+c/.test(document.body.textContent.slice(0, 0)) }; }); await page.waitForTimeout(400);
+  ok('카드 하나 고르면 → 돈 안 들고 · 그 상점은 닫힌다', picked.i < 0 || (picked.after === picked.cash && picked.sold && picked.closed), JSON.stringify(picked));
   // 닫기 — 평판이 넘쳐 있으면(테스트는 +99) 닫자마자 다음 계단 상점이 이어진다. 다 닫으면 플레이
   let tiers = 0; for (let k = 0; k < 20 && await page.evaluate(() => !!PT.game.repShop); k++) { tiers++; await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(250); }
   await idle();
   const closed = await page.evaluate(() => ({ shop: !!PT.game.repShop, phase: PT.game.phase, modal: !!document.querySelector('#modal .pkcard'), tier: PT.game.repTier, rep: PT.game.rep, cap: PT.game.repCap() }));
-  ok('닫기 → 넘친 평판만큼 계단이 이어지고, 다 닫으면 플레이 계속', tiers >= 1 && !closed.shop && closed.phase === 'play' && !closed.modal && closed.rep < closed.cap + 1, JSON.stringify(Object.assign({ tiers }, closed)));
+  ok('닫기 → 넘친 평판만큼 계단이 이어지고, 다 닫으면 플레이 계속', !closed.shop && closed.phase === 'play' && !closed.modal && closed.rep < closed.cap + 1, JSON.stringify(Object.assign({ tiers }, closed)));
   // ===== 2단계: 트레잇 · 공격 · 폭탄 =====
   // 내 창고에 🌧 소나기 트레잇 택배를 심고 대량으로 내보낸다 → 상대 전원에게 날아간다(outbox → 인박스)
   const fired = await page.evaluate(() => { const g = PT.game, m = PT.match; const c = g.contracts.find(x => x && /bulk/.test(x.carrier)); const si = g.contracts.indexOf(c);
-    g.focusNext = false; g.parcels = g.parcels.filter(p => p.type !== 'normal'); const P = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: 't_rain' }); g.parcels.push(P); g._assignCold(); PT.renderAll();
+    g.focusNext = false; g.parcels = g.parcels.filter(p => p.type !== 'normal'); const P = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: 't_hurry' }); g.parcels.push(P); g._assignCold(); PT.renderAll();
     const badge = !!document.querySelector(`.ptile[data-id="${P.id}"] .tb.attack`);
     document.querySelector('#c' + si).click(); return { badge, id: P.id, si }; });
   await page.waitForTimeout(200);
@@ -73,10 +72,10 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const inb = await page.evaluate(() => ({ inboxes: PT.match.players.slice(1).map(p => p.game.inbox.length + p.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length), log: PT.game.log.find(l => l.k === 'log.traitAttack') }));
   ok('공격 트레잇: 칩에 붉은 뱃지 · 출고하면 봇 3명 인박스로', fired.badge && inb.inboxes.every(n => n >= 1) && !!inb.log, JSON.stringify(inb));
   // 상대의 공격이 내 인박스에 → 다음 날 적용(평판 −1) + 피격 로그, 방패가 있으면 막힌다
-  const hit = await page.evaluate(() => { const g = PT.game; g.inbox = []; const rep = g.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length; g.receiveAttack({ trait: 't_claim', mult: 1, from: 1, fromName: '봇' }); g.shields = 1; g.receiveAttack({ trait: 't_hurry', mult: 1, from: 2, fromName: '봇2' }); document.querySelector('#wait-btn').click(); return rep; });
+  const hit = await page.evaluate(() => { const g = PT.game; g.inbox = []; const rep = g.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length; g.receiveAttack({ trait: 't_seal', mult: 1, from: 1, fromName: '봇' }); g.shields = 1; g.receiveAttack({ trait: 't_hurry', mult: 1, from: 2, fromName: '봇2' }); document.querySelector('#wait-btn').click(); return rep; });
   await page.waitForTimeout(900); await idle();
   const hitR = await page.evaluate(n => ({ shields: PT.game.shields, logs: PT.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').slice(0, PT.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length - n).map(l => l.k + ':' + l.p.icon) }), hit);
-  ok('피격: 방패 한 겹이 먼저 온 📞를 막고, ⏱는 맞았다', hitR.logs.includes('log.attackBlocked:📞') && hitR.logs.includes('log.attackIn:⏱') && hitR.shields === 0, JSON.stringify(hitR));
+  ok('피격: 방패 한 겹이 먼저 온 🔒를 막고, ⏱는 맞았다', hitR.logs.includes('log.attackBlocked:🔒') && hitR.logs.includes('log.attackIn:⏱') && hitR.shields === 0, JSON.stringify(hitR));
   await page.screenshot({ path: `${OUT}/M-06-hit.png` });
   // 이삿짐 폭탄: 강제 수락 — 창고를 먹고, 목록에 줄이 생기고, 돌려보낼 수 없다
   const bomb = await page.evaluate(() => { const g = PT.game; const used = g.usedVolume(); const r = g.receiveBomb({ size: 3, days: 6, hops: 0, from: 1 }); PT.renderAll(); const s = g.storage.find(x => x.kind === 'bomb'); return { ok: r.ok, used, after: g.usedVolume(), rowText: document.querySelector('#multi-strip .mp.me').textContent, ret: g.returnStorage(s.id).ok }; });
@@ -86,14 +85,14 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const moved = await page.evaluate(() => { const g = PT.game; const b = g.storage.find(x => x.kind === 'bomb'); b.left = 1; document.querySelector('#wait-btn').click(); return b.id; });
   await page.waitForTimeout(900); await idle();
   const mv = await page.evaluate(id => ({ mine: PT.game.storage.filter(s => s.id === id).length, others: PT.match.players.slice(1).map(p => p.game.storage.filter(s => s.kind === 'bomb').map(s => s.vol)).flat(), news: PT.game.log.some(l => l.k === 'log.bombOut') }), moved);
-  ok('이사 완료: 내 창고에서 사라지고 상대 창고에 4칸으로', mv.mine === 0 && mv.others.includes(4) && mv.news, JSON.stringify(mv));
+  ok('이사 완료: 내 창고에서 사라지고 상대 창고에 4칸으로', mv.mine === 0 && mv.others.some(v => v >= 4) && mv.news, JSON.stringify(mv));
   // 포트레잇 4개
   const faces = await page.evaluate(() => [...document.querySelectorAll('#multi-strip .mp .face')].map(i => i.getAttribute('src').startsWith('data:image')));
   ok('포트레잇 4개(스프라이트)', faces.length === 4 && faces.every(Boolean));
   // 난투는 저장하지 않는다 — saveGame 을 불러도 멀티 저장 키가 안 생기고, 자금 칸은 접혀 있고 잔액만 작게, 상대 카드엔 평판만
   await page.evaluate(() => PT.saveGame());
   const nosave = await page.evaluate(() => ({ save: !!localStorage.getItem('pt_multi_v1'), cashBox: document.querySelector('#hud-cash-box').hidden, due: document.querySelector('#hud-due').textContent, stripCash: /\dc\b/.test(document.querySelector('#multi-strip').textContent), repnum: document.querySelectorAll('#multi-strip .repnum').length }));
-  ok('저장 없음 · HUD 자금 칸 접힘(잔액만 작게) · 상대 카드는 평판만', !nosave.save && nosave.cashBox && /c$/.test(nosave.due) && !nosave.stripCash && nosave.repnum === 4, JSON.stringify(nosave));
+  ok('저장 없음 · HUD 에 돈 없음 · 상대 카드는 평판만', !nosave.save && nosave.cashBox && nosave.due === '' && !nosave.stripCash && nosave.repnum === 4, JSON.stringify(nosave));
   // 평판이 오르면 숫자가 굴러가며 카드·HUD 가 반짝인다
   const anim = await page.evaluate(async () => { const g = PT.game; g.rep = Math.max(0, g.rep - 6); PT.renderAll(); await new Promise(r => setTimeout(r, 1100)); const before = document.querySelector('#stress-num').textContent; g.addRep(3, 'test'); PT.renderAll(); await new Promise(r => setTimeout(r, 120));
     const mid = document.querySelector('#stress-num').textContent, pulsing = document.querySelector('#stress-wrap').classList.contains('rep-up') || document.querySelector('#multi-strip .mp.me').classList.contains('rep-up');

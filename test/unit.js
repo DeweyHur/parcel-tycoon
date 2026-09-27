@@ -981,16 +981,17 @@ t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary)도 장도
   let n = 0; while (g.month === 1 && g.phase === 'play' && n++ < 30) { g.schedule = g.schedule.map(() => []); g.wait([]); }
   assert.equal(g.phase, 'play'); assert.equal(g.month, 2); assert.equal(g.debt, 0); assert.ok(g.cash < 0, '마이너스는 마이너스대로'); assert.ok(g.events.some(e => e.type === 'settle'));
 });
-t('멀티: 평판 사다리 — 상한에 닿으면 상한 +6 · 등급 +1 · 평판 상점 3장(장 매물만, 퍽 없음) · 돈으로 사고 닫는다', () => {
-  const g = MG(9); const cap0 = g.repCap(); g.cash = 5000; g.addRep(99);
+t('멀티: 평판 사다리 — 상한에 닿으면 상한 +6 · 등급 +1 · 평판 상점 3장(장 매물만, 값 없음) · 하나 고르면 닫힌다', () => {
+  const g = MG(9); const cap0 = g.repCap(); g.cash = 0; g.addRep(99);
   assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + 6); assert.equal(g.rep, cap0); assert.ok(g.repShop && g.repShop.items.length === 3 && !g.perkOffer);
-  assert.ok(g.repShop.items.every(it => ['contract', 'enh', 'adTicket', 'media', 'mediaUp'].includes(it.kind)), '퍽·시설·충전은 없다');
+  assert.ok(g.repShop.items.every(it => ['contract', 'enh', 'adTicket', 'media', 'mediaUp'].includes(it.kind) && it.price === 0), '퍽·시설·충전은 없고 값도 없다(돈 없는 규칙)');
   g.addRep(99); assert.equal(g.repTier, 1, '상점이 떠 있는 동안은 또 오르지 않는다');
-  const it0 = g.repShop.items.find(it => it.kind === 'enh' && D.ENHANCEMENTS[it.enh].kind !== 'opt') || g.repShop.items.find(it => it.kind === 'contract' && it.switchFrom != null);
-  if (it0) { const i = g.repShop.items.indexOf(it0), cash = g.cash; const s = it0.kind === 'contract' ? g.contracts.findIndex(c => c && c.id === it0.switchFrom) : g.contracts.findIndex(c => c && g.enhUsed(c) < g.enhSlots(c));
-    assert.ok(g.buyRepShop(i, s).ok); assert.ok(g.cash < cash); assert.ok(it0.sold); assert.ok(!g.buyRepShop(i, s).ok, '판 카드는 다시 못 산다'); assert.equal(g.actLog.filter(e => e.t === 'buy').length, 0, '상점 구매는 rbuy 로만 적힌다'); }
-  assert.ok(g.closeRepShop()); assert.ok(g.actLog.some(e => e.t === 'rclose'));
-  assert.equal(g.repTier, 2, '상점 동안 넘친 평판은 닫자마자 다음 계단'); assert.ok(g.repShop, '다음 상점'); g.closeRepShop(); assert.equal(g.repShop, null);
+  const sh = g.repShop; const it0 = sh.items.find(it => it.kind === 'enh' && D.ENHANCEMENTS[it.enh].kind !== 'opt') || sh.items.find(it => it.kind === 'contract' && it.switchFrom != null) || sh.items.find(it => it.kind === 'adTicket');
+  assert.ok(it0, '고를 수 있는 카드'); const i = sh.items.indexOf(it0);
+  const slot = it0.kind === 'contract' ? g.contracts.findIndex(c => c && c.id === it0.switchFrom) : it0.kind === 'enh' ? g.contracts.findIndex(c => c && g.enhUsed(c) < g.enhSlots(c)) : null;
+  assert.ok(g.buyRepShop(i, slot).ok); assert.ok(it0.sold); assert.equal(g.cash, 0, '돈은 안 든다');
+  assert.ok(g.repShop !== sh, '하나 고르면 그 상점은 닫힌다'); assert.equal(g.actLog.filter(e => e.t === 'buy').length, 0, '상점 구매는 rbuy 로만 적힌다'); assert.equal(g.actLog.filter(e => e.t === 'rclose').length, 0, '자동 닫힘은 로그에 없다');
+  assert.equal(g.repTier, 2, '상점 동안 넘친 평판은 닫자마자 다음 계단'); assert.ok(g.repShop, '다음 상점'); assert.ok(g.closeRepShop()); assert.equal(g.repShop, null); assert.ok(g.actLog.some(e => e.t === 'rclose'), '손으로 닫으면 적힌다');
   const s2 = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.ok(s2.rules.multi && s2.repCap() === g.repCap(), '세이브를 열어도 멀티 규칙이 돌아온다');
 });
 t('멀티: 매치 — 봇 3명이 각자 시계로 따라오고, 순위는 생존 → 평판 → 잔액, 저장·복원', () => {
@@ -1031,16 +1032,16 @@ t('멀티: 보너스 트레잇은 기한 안에 출고할 때 나에게 — 💰
 });
 t('멀티: 공격 트레잇은 outbox 로 나가고(🎯 한 방이면 ×3), 받는 쪽은 다음 날 적용 — 방패·잽·지붕이 막는다', () => {
   const g = MG(43); g.parcels = []; g.schedule = g.schedule.map(() => []); const si = slot(g, 'bulk'); g.cash = 1000;
-  const p = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: 't_claim' }); g.parcels.push(p); g.focusNext = true;
-  g.callCarrier(si, [p.id]); assert.equal(g.outbox.length, 1); assert.equal(g.outbox[0].trait, 't_claim'); assert.equal(g.outbox[0].mult, 3); assert.ok(g.outbox[0].focus); assert.ok(!g.focusNext);
+  const p = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: 't_hurry' }); g.parcels.push(p); g.focusNext = true;
+  g.callCarrier(si, [p.id]); assert.equal(g.outbox.length, 1); assert.equal(g.outbox[0].trait, 't_hurry'); assert.equal(g.outbox[0].mult, 3); assert.ok(g.outbox[0].focus); assert.ok(!g.focusNext);
   const v = MG(44); v.schedule = v.schedule.map(() => []); const rep = v.rep;
-  v.receiveAttack({ trait: 't_claim', mult: 1, from: 9, fromName: 'X' }); assert.equal(v.rep, rep, '큐에만 쌓인다'); v.wait([]); assert.equal(v.rep, rep - 1); assert.ok(v.log.some(l => l.k === 'log.attackIn'));
+  const cap0 = v.warehouse.cap; v.receiveAttack({ trait: 't_seal', mult: 1, from: 9, fromName: 'X' }); assert.equal(v.warehouse.cap, cap0, '큐에만 쌓인다'); v.wait([]); assert.equal(v.warehouse.cap, cap0 - M.MULTI.SEAL); assert.ok(v.log.some(l => l.k === 'log.attackIn')); for (let i = 0; i < 3; i++) v.wait([]);
   v.shields = 1; v.receiveAttack({ trait: 't_hurry', mult: 1, from: 9 }); v.wait([]); assert.equal(v.shields, 0); assert.ok(v.log[0].k === 'log.attackBlocked' || v.log.some(l => l.k === 'log.attackBlocked'));
-  v.parcels.push(P(1, 'normal', 1, { deadline: 4, outdoor: true, arrivalTurn: 1 })); v.receiveAttack({ trait: 't_hurry', mult: 2, from: 9 }); v.wait([]); assert.ok(v.parcels[0].deadline <= 1, '×2 면 기한 −2 (+하루 경과)');
+  v.parcels.push(P(1, 'normal', 1, { deadline: 4, outdoor: true, arrivalTurn: 1 })); v.receiveAttack({ trait: 't_hurry', mult: 2, from: 9 }); v.wait([]); assert.ok(v.parcels[0].deadline <= 0, '×2 면 기한 −4 (+하루 경과)');
   v.receiveAttack({ trait: 't_road', mult: 1, from: 9 }); v.wait([]); assert.ok(v.offFor(v.contracts[0]) && !v.canCall(v.contracts[0]), '🚧 오늘 호출 불가'); v.wait([]); assert.ok(!v.offFor(v.contracts[0]));
-  const cap = v.warehouse.cap; v.receiveAttack({ trait: 't_seal', mult: 1, from: 9 }); v.wait([]); assert.equal(v.warehouse.cap, cap - 3); for (let i = 0; i < 3; i++) v.wait([]); assert.equal(v.warehouse.cap, cap);
-  const w = MG(45, { mperks: ['m_roof'] }); w.schedule = w.schedule.map(() => []); w.receiveAttack({ trait: 't_rain', mult: 1, from: 9 }); w.wait([]); assert.ok(w.log.some(l => l.k === 'log.attackBlocked' && l.p.how.k === 'trait.blk.roof'));
-  assert.ok(!MG(46).receiveAttack.call(Object.assign(Object.create(Game.prototype), MG(46), { phase: 'win' }), { trait: 't_claim' }), '마감한 창고엔 못 넣는다');
+  const cap = v.warehouse.cap; v.receiveAttack({ trait: 't_seal', mult: 1, from: 9 }); v.wait([]); assert.equal(v.warehouse.cap, cap - M.MULTI.SEAL); for (let i = 0; i < 3; i++) v.wait([]); assert.equal(v.warehouse.cap, cap);
+  const w = MG(45, { mperks: ['m_dodge'] }); w.rules.dodgeProb = 1; w.schedule = w.schedule.map(() => []); w.receiveAttack({ trait: 't_hurry', mult: 1, from: 9 }); w.wait([]); assert.ok(w.log.some(l => l.k === 'log.attackBlocked' && l.p.how.k === 'trait.blk.dodge'));
+  assert.ok(!MG(46).receiveAttack.call(Object.assign(Object.create(Game.prototype), MG(46), { phase: 'win' }), { trait: 't_hurry' }), '마감한 창고엔 못 넣는다');
 });
 t('멀티: 이삿짐 폭탄 — 강제 수락(자리를 먹고 하루 +2c) · 출고 불가 · 0일이면 +1칸 −1일로 이사 · 6칸/1일은 도착하는 순간 터진다', () => {
   const g = MG(47); g.parcels = []; g.schedule = g.schedule.map(() => []);
@@ -1056,9 +1057,9 @@ t('멀티: 이삿짐 폭탄 — 강제 수락(자리를 먹고 하루 +2c) · �
 });
 t('멀티: 매치 라우팅 — 공격은 나 빼고 전원, 폭탄은 랜덤 한 명, 마감·폐업한 사람에겐 안 간다, 동시 폭탄 상한', () => {
   const m = MULTI.newMatch({ seed: 51, name: 'H' }); const [h, a, b, c] = m.players.map(p => p.game);
-  h.outbox.push({ type: 'attackOut', trait: 't_claim', mult: 1 }); MULTI.route(m);
+  h.outbox.push({ type: 'attackOut', trait: 't_hurry', mult: 1 }); MULTI.route(m);
   assert.deepEqual([a, b, c].map(g => g.inbox.length), [1, 1, 1]); assert.equal(h.inbox.length, 0);
-  c.phase = 'win'; h.outbox.push({ type: 'attackOut', trait: 't_rain', mult: 1 }); MULTI.route(m); assert.deepEqual([a, b, c].map(g => g.inbox.length), [2, 2, 1]);
+  c.phase = 'win'; h.outbox.push({ type: 'attackOut', trait: 't_road', mult: 1 }); MULTI.route(m); assert.deepEqual([a, b, c].map(g => g.inbox.length), [2, 2, 1]);
   h.outbox.push({ type: 'attackOut', trait: 't_bomb', mult: 1, size: 3 }); MULTI.route(m); assert.equal(a.bombCount() + b.bombCount(), 1); assert.equal(c.bombCount(), 0);
   for (let i = 0; i < 6; i++) { h.outbox.push({ type: 'attackOut', trait: 't_bomb', mult: 1, size: 3 }); MULTI.route(m); }
   assert.ok(a.bombCount() + b.bombCount() + h.bombCount() <= M.MULTI.BOMB.max, '동시 폭탄은 4개까지');
@@ -1073,7 +1074,7 @@ const call = (S, d) => API.handle(S, d, 'test').then(r => r[1]);
 t('멀티: 재실행 검증 — 같은 시드·같은 입력 로그면 같은 판, 한 줄만 빠져도 다르다', () => {
   const m = MULTI.newMatch({ seed: 77, name: 'H' }); const h = m.players[0].game; let g = 0;
   while (!(h.phase === 'over' || h.phase === 'win') && g++ < 500) { BOT.multiDay(h, 'greedy'); h.takeEvents(); MULTI.tick(m); if (h.month > (m._c || 0)) { m._c = h.month; MULTI.cycleDrop(m, h.month); } }
-  const f = MULTI.fingerprint(h); assert.ok(h.actLog.length > 50 && h.actLog.some(e => e.t === 'atk') && h.actLog.some(e => e.t === 'rbuy') && h.actLog.some(e => e.t === 'rclose'));
+  const f = MULTI.fingerprint(h); assert.ok(h.actLog.length > 50 && h.actLog.some(e => e.t === 'atk') && h.actLog.some(e => e.t === 'rbuy'));
   assert.ok(MULTI.verify(h.cfg, h.actLog, f).ok); const bad = h.actLog.slice(); bad.splice(bad.findIndex(e => e.t === 'wait'), 1); assert.ok(!MULTI.verify(h.cfg, bad, f).ok);
   assert.ok(!MULTI.verify(h.cfg, h.actLog, Object.assign({}, f, { cash: f.cash + 1 })).ok, '잔액을 부풀리면 안 맞는다');
 });
@@ -1093,17 +1094,17 @@ t('서버: 큐 — 60초 넘게 기다리면 봇으로 채운다(봇 판은 무�
   assert.equal(r.status, 'ready'); assert.equal(r.match.players.filter(p => p.bot).length, 2); assert.ok(r.match.rated, '사람 둘이면 등급 판(봇과의 쌍만 안 센다)'); 
   assert.ok(r.match.players.every(p => p.face));
 });
-t('서버: 중계 — 공격은 나 빼고 전원, 🎯 는 잔액 1위 한 명, 폭탄은 랜덤 한 명(상한 4), 사이클 투하는 한 번, 마감한 사람은 제외', async () => {
+t('서버: 중계 — 공격은 나 빼고 전원, 🎯 는 평판 1위 한 명, 폭탄은 랜덤 한 명(상한 4), 사이클 투하는 한 번, 마감한 사람은 제외', async () => {
   const S = API.memStore(); for (const p of PIDS) await call(S, { op: 'queue', pid: p, name: 'P', face: 'park' });
   const mid = (await call(S, { op: 'status', mid: (await S.call([['GET', 'mp:' + PIDS[0]]]))[0], pid: PIDS[0] })).match.id;
-  const snaps = {}; PIDS.forEach((p, i) => snaps[p] = { cash: 100 * (i + 1), phase: 'play', bombs: 0 });
+  const snaps = {}; PIDS.forEach((p, i) => snaps[p] = { cash: 100 * (i + 1), rep: 10 + i, phase: 'play', bombs: 0 });
   for (const p of PIDS) await call(S, { op: 'push', mid, pid: p, snaps: { [p]: snaps[p] } });
-  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_claim', mult: 1 }] });
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_hurry', mult: 1 }] });
   for (const p of PIDS.slice(1)) { const r = await call(S, { op: 'poll', mid, pid: p, since: 0 }); assert.equal(r.events.filter(e => e.type === 'attack').length, 1, p); }
-  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_hurry', mult: 3, focus: true }] });
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_seal', mult: 3, focus: true }] });
   const d = await call(S, { op: 'poll', mid, pid: PIDS[3], since: 0 }), b = await call(S, { op: 'poll', mid, pid: PIDS[1], since: 0 });
-  assert.equal(d.events.filter(e => e.trait === 't_hurry').length, 1, '잔액 1위(d)에게'); assert.equal(b.events.filter(e => e.trait === 't_hurry').length, 0);
-  assert.ok(!(await call(S, { op: 'push', mid, pid: PIDS[1], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_claim' }] })).routed, '남의 이름으로는 못 쏜다');
+  assert.equal(d.events.filter(e => e.trait === 't_seal').length, 1, '평판 1위(d)에게'); assert.equal(b.events.filter(e => e.trait === 't_seal').length, 0);
+  assert.ok(!(await call(S, { op: 'push', mid, pid: PIDS[1], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_hurry' }] })).routed, '남의 이름으로는 못 쏜다');
   await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_bomb', size: 3 }] });
   let bombs = 0; for (const p of PIDS) { const r = await call(S, { op: 'poll', mid, pid: p, since: 0 }); bombs += r.events.filter(e => e.type === 'bomb' && e.to && e.to[0] === p).length; }
   assert.equal(bombs, 1, '폭탄은 한 명에게');
@@ -1147,7 +1148,7 @@ t('멀티: 온라인 매치 — 서버 자리로 내 판(+호스트면 봇 판),
   const host = MULTI.newOnline(sm, PIDS[0], { name: 'A' }); assert.equal(host.players[0].id, PIDS[0]); assert.ok(host.online.host && host.players.filter(p => p.game).length === 3 && !host.players.find(p => p.id === PIDS[1]).game);
   const guest = MULTI.newOnline(sm, PIDS[1], { name: 'B' }); assert.equal(guest.players[0].id, PIDS[1]); assert.ok(!guest.online.host && guest.players.filter(p => p.game).length === 1);
   assert.deepEqual(MULTI.owned(host).sort(), [PIDS[0], 'bot2', 'bot3'].sort());
-  MULTI.applyServer(guest, { cursor: 2, snaps: { [PIDS[0]]: { cash: 900, rep: 30, repCap: 36, day: 20, phase: 'play', bombs: 1 }, bot2: { cash: 50, phase: 'over', day: 9 } }, events: [{ i: 1, type: 'attack', from: PIDS[0], to: [PIDS[1]], trait: 't_claim', mult: 1, fromName: 'A' }, { i: 2, type: 'bomb', from: 'bot3', to: [PIDS[1]], bomb: { size: 3, days: 6, hops: 0, from: 'bot3' } }] });
+  MULTI.applyServer(guest, { cursor: 2, snaps: { [PIDS[0]]: { cash: 900, rep: 30, repCap: 36, day: 20, phase: 'play', bombs: 1 }, bot2: { cash: 50, phase: 'over', day: 9 } }, events: [{ i: 1, type: 'attack', from: PIDS[0], to: [PIDS[1]], trait: 't_hurry', mult: 1, fromName: 'A' }, { i: 2, type: 'bomb', from: 'bot3', to: [PIDS[1]], bomb: { size: 3, days: 6, hops: 0, from: 'bot3' } }] });
   const g = guest.players[0].game; assert.equal(g.inbox.length, 1); assert.equal(g.bombCount(), 1); assert.equal(guest.online.since, 2);
   const st = MULTI.standings(guest); assert.equal(st[0].p.id, PIDS[0], '스냅샷 잔액 900 이 1위'); assert.ok(!st.find(r => r.p.id === 'bot2').alive);
   assert.equal(guest.news.length, 2);

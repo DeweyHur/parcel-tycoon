@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, latePenaltyDiv: 3,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, bombs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, bombGrow: 0, attackMult: 1,
@@ -652,7 +652,7 @@
       const tr = p.trait && this.traitDef(p.trait); if (!tr || p.overdue) return;
       const R = this.rules;
       if (tr.kind === 'bonus') {
-        if (p.trait === 't_buzz') this.addRep(1, MSG('why.trait', { icon: tr.icon }));
+        if (p.trait === 't_buzz') this.addRep(M.MULTI.BUZZ || 1, MSG('why.trait', { icon: tr.icon }));
         else if (p.trait === 't_shield') this.shields = Math.min(M.MULTI.SHIELD_MAX, this.shields + 1);
         else if (p.trait === 't_ice') this.freshFreezeUntil = this.totalTurn + M.MULTI.TEMP_DAYS;
         else if (p.trait === 't_pack') this._capMod(3, M.MULTI.TEMP_DAYS, 't_pack');
@@ -694,10 +694,10 @@
         if (a.trait === 't_rain') { let n = 0; for (const p of this.outdoorParcels()) { if (!p.wet) { p.wet = true; n++; } p.deadline = Math.max(0, p.deadline - k); } detail = MSG('trait.d.rain', { n }); }
         else if (a.trait === 't_claim') { this.addRep(-k, MSG('why.attack', { icon: tr.icon })); detail = MSG('trait.d.claim', { n: k }); }
         else if (a.trait === 't_rat') { let n = 0; for (const p of this.parcels.filter(x => this._attrs(x).includes('cold')).slice(0, k)) { this._discardParcel(p, MSG('why.attack', { icon: tr.icon }), 1, 'discard'); n++; } detail = MSG('trait.d.rat', { n }); }
-        else if (a.trait === 't_hurry') { for (const p of this.parcels) p.deadline = Math.max(0, p.deadline - k); detail = MSG('trait.d.hurry', { n: k }); }
+        else if (a.trait === 't_hurry') { const d = (M.MULTI.HURRY || 1) * k; for (const p of this.parcels) p.deadline = Math.max(0, p.deadline - d); detail = MSG('trait.d.hurry', { n: d }); }
         else if (a.trait === 't_road') { this.roadblockDay = this.totalTurn; detail = MSG('trait.d.road'); }
         else if (a.trait === 't_refund') { const ps = this.parcels.slice().sort((x, y) => x.arrivalTurn - y.arrivalTurn).slice(0, k); for (const p of ps) this._discardParcel(p, MSG('why.attack', { icon: tr.icon }), 1, 'returned'); detail = MSG('trait.d.refund', { n: ps.length }); }
-        else if (a.trait === 't_seal') { this._capMod(-3 * k, M.MULTI.TEMP_DAYS, 't_seal'); detail = MSG('trait.d.seal', { n: 3 * k, d: M.MULTI.TEMP_DAYS }); }
+        else if (a.trait === 't_seal') { const n = (M.MULTI.SEAL || 3) * k; this._capMod(-n, M.MULTI.TEMP_DAYS, 't_seal'); detail = MSG('trait.d.seal', { n, d: M.MULTI.TEMP_DAYS }); }
       }
       this.say(blocked ? 'log.attackBlocked' : 'log.attackIn', { icon: tr.icon, name: tr.name, from: a.fromName || '', detail, how: blocked ? MSG('trait.blk.' + blocked) : '' });
       this.emit('attackIn', { trait: a.trait, from: a.from, fromName: a.fromName, blocked, detail, mult: a.mult });
@@ -1405,24 +1405,25 @@
     }
     // 평판 상점(난투): 장 매물(계약 업그레이드·새 계약·강화·광고권)에서 랜덤 3장. 시간은 안 간다 (유저: "일정 수준 평판 달성 시 상점, 랜덤 픽 3개, 내 돈으로 산다")
     _drawRepShop() {
-      // 퍽 카드는 없다(유저: "그 이상한 퍽들도 없애고 그냥 마켓 아이템들이 평판 올라가면 뜨는 거야") — 장 매물에서 랜덤 3장
-      const goods = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill'));
-      return goods.slice(0, 3);
+      // 퍽 카드는 없다(유저: "그 이상한 퍽들도 없애고 그냥 마켓 아이템들이 평판 올라가면 뜨는 거야") — 장 매물에서 랜덤 3장. 돈이 없는 규칙이면 값 0 · 하나만 고른다
+      const goods = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill')).slice(0, 3);
+      if (this.rules.noMoney) for (const it of goods) it.price = 0;
+      return goods;
     }
     buyRepShop(i, target) {
       const sh = this.repShop; if (!sh) return { ok: false, msg: T('err.cannotCallNow') };
       const it = sh.items[i]; if (!it || it.sold) return { ok: false, msg: T('err.sold') };
       if (this.cash < (it.kind === 'perk' ? it.price : this.contractPrice ? (it.kind === 'contract' ? this.contractPrice(it) : it.price) : it.price)) return { ok: false, msg: T('err.noCash') };
       this._act('rbuy', { i, s: target == null ? null : target });
-      if (it.kind === 'perk') { this.cash -= it.price; this.run.spent += it.price; it.sold = true; sh.bought++; this._applyPerk(it.perk); return { ok: true, perk: it.perk }; }
+      if (it.kind === 'perk') { this.cash -= it.price; this.run.spent += it.price; it.sold = true; sh.bought++; this._applyPerk(it.perk); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, perk: it.perk }; }
       // 장 매물은 buy() 로 — 잠깐 상점을 마켓으로 세워 두고 판다(로그는 rbuy 하나)
       const saved = { market: this.market, phase: this.phase };
       this.market = { items: sh.items, bought: 0, refreshes: 0, month: this.month, shop: true, rep: true, freeRefresh: 0 }; this.phase = 'market';
       let r; try { r = this.buy(i, target); } finally { this.market = saved.market; this.phase = saved.phase; }
-      if (r && r.ok) sh.bought++;
+      if (r && r.ok) { sh.bought++; if (this.rules.noMoney) this.closeRepShop(true); }   // 자동 닫힘은 rbuy 에 딸린 것 — 로그엔 안 적는다(재실행이 두 번 닫지 않게)   // 평판 상점은 하나만 고른다(유저)
       return r;
     }
-    closeRepShop() { if (!this.repShop) return false; this._act('rclose'); this.repShop = null; this.emit('repShopClosed', {}); if (this.rep >= this.repCap()) this._repLadderUp(); return true; }   // 상점 사이에 넘친 평판은 닫자마자 다음 계단
+    closeRepShop(auto) { if (!this.repShop) return false; if (!auto) this._act('rclose'); this.repShop = null; this.emit('repShopClosed', {}); if (this.rep >= this.repCap()) this._repLadderUp(); return true; }   // 상점 사이에 넘친 평판은 닫자마자 다음 계단
     _applyPerk(id) {
       const pk = M.MULTI.PERKS[id];
       this.mperks.push(id); (this.cfg.mperks = this.cfg.mperks || []).push(id);
@@ -1831,7 +1832,7 @@
       if (R.payNow) this.cash -= fee; else this.feesDue += fee;
       this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
       if (this.regularFreeLeft(c) > 0) c.freeUsed = (c.freeUsed || 0) + 1;
-      if (this.freeTruckNext) { this.freeTruckNext = false; this.say('log.traitTruckUsed'); }
+      if (this.freeTruckNext && !R.noCallFee) { this.freeTruckNext = false; this.say('log.traitTruckUsed'); }
       const fill = volume / (vcap * trucks);
       if (fill >= 0.8) this.stats.fullTrucks++;
 
@@ -1918,6 +1919,7 @@
       let refunded = false;
       if (useSpare) { this.monthStats.spareUsed = true; this.say('log.spareCall'); c.calls = Math.max(0, c.calls - (trucks - 1)); }
       else if (unlimited) { /* 무제한 */ }
+      else if (R.noCallFee && this.freeTruckNext) { this.freeTruckNext = false; this.say('log.traitTruckUsed'); c.calls -= Math.max(0, trucks - 1); }   // 🚚 덤 트럭(난투): 배차비가 없으니 배차 한 대를 안 쓴다
       else if (R.bundleRefund && chosen.length >= R.bundleRefund && !this.monthStats.bundleUsed) { this.monthStats.bundleUsed = true; refunded = true; c.calls -= Math.max(0, trucks - 1); }
       else c.calls -= trucks;
       c.successCalls++; c.totalCalls++; c.delivered += chosen.length;
@@ -1950,7 +1952,7 @@
       if (!chosen.length) return { ok: false, msg: T('err.nothingSelf') };
       if (chosen.length > this.selfCount()) return { ok: false, msg: T('err.selfLimit', { n: this.selfCount() }) };
       const cost = chosen.reduce((s, p) => s + this.selfCost(p), 0);
-      if (R.payNow && this.cash < cost) return { ok: false, msg: T('err.noCashFee', { fee: cost, cash: this.cash }) };
+      if (R.payNow && !R.noMoney && this.cash < cost) return { ok: false, msg: T('err.noCashFee', { fee: cost, cash: this.cash }) };
       if (R.payNow) this.cash -= cost; else this.feesDue += cost;
       this.monthStats.spent += cost; this.run.spent += cost; this.monthStats.selfCost = (this.monthStats.selfCost || 0) + cost;
       let revenue = 0, broken = 0;
@@ -2037,6 +2039,8 @@
       const usageBefore = this.usage();
       let pen = 0; const reasons = [];
       const discard = [], returned = [];
+      // 난투: 트레잇 택배는 그날 안 보내면 사라진다(벌점 없음) — 유저: "트레잇 붙은 물품은 무조건 그날 배송 안 하면 사라지는 게 낫다"
+      if (R.traitSameDay) { const gone = this.parcels.filter(p => p.trait && !p.pushed); if (gone.length) { this.parcels = this.parcels.filter(p => !gone.includes(p)); this.say('log.traitGone', { n: gone.length }); this.emit('traitGone', { n: gone.length, ids: gone.map(p => p.id) }); } }
       const heat = this.isHeatTurn(), wx = this.weatherNow(), snow = wx === 'snow', wet = (wx === 'rain' || wx === 'storm') && !R.tent;
       for (const p of this.parcels) {
         p.age++;
