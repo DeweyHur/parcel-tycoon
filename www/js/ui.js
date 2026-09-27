@@ -864,6 +864,38 @@
       game.takeEvents(); scene.sync(game, { animate: true }); saveGame(); renderAll(); checkPhase();
     });
   }
+  // 평판 상점(난투): 평판 상한에 닿으면 랜덤 3장 — 퍽·계약·강화·광고권을 내 돈으로. 여러 장 사도 되고, 닫으면 끝(시간은 안 간다)
+  // 슬롯은 자동으로 고른다(업그레이드는 그 계약, 새 계약은 빈 슬롯 → 제일 덜 나른 슬롯, 강화는 제일 많이 나른 계약) — 대화 없이 (유저: "스피드감")
+  function showRepShop() {
+    const g = game, sh = g.repShop; if (!sh) return;
+    if (!sh.shown) { sh.shown = true; BGM.stinger('fanfare', 0.8); }
+    const now = id => { const cs = g.contracts.filter(Boolean);
+      if (id === 'm_calls') return cs.map(c => `${c.maxCalls}→${c.maxCalls + 1}`).join(' · ');
+      if (id === 'm_refill') return `${cs.reduce((a, c) => a + c.calls, 0)}→${cs.reduce((a, c) => a + c.maxCalls, 0)}`;
+      if (id === 'm_space') return `${g.warehouse.cap}→${g.warehouse.cap + 4}`;
+      if (id === 'm_shield') return `🛡 ${g.shields}→${Math.max(g.shields, 1)}`;
+      return ''; };
+    const slotFor = it => {
+      if (it.kind === 'contract') { if (it.switchFrom != null) return g.contracts.findIndex(c => c && c.id === it.switchFrom); const e = g.contracts.findIndex(c => !c); if (e >= 0) return e; let s = -1, min = Infinity; g.contracts.forEach((c, i) => { if (c && (c.delivered || 0) < min) { min = c.delivered || 0; s = i; } }); return s; }
+      if (it.kind === 'enh') { const opt = D.ENHANCEMENTS[it.enh].kind === 'opt'; let s = -1, max = -1; g.contracts.forEach((c, i) => { if (c && (opt ? g.optFits(it.enh, c) : g.enhUsed(c) < g.enhSlots(c)) && (c.delivered || 0) > max) { max = c.delivered || 0; s = i; } }); return s; }
+      return null; };
+    const card = (it, i) => {
+      const price = it.kind === 'contract' ? g.contractPrice(it) : it.price, can = !it.sold && g.cash >= price;
+      let icon, name, desc = '', fam = '', nw = '';
+      if (it.kind === 'perk') { const pk = M.MULTI.PERKS[it.perk]; icon = pk.icon; name = pk.name; desc = pk.desc; fam = 'fam-' + pk.family; nw = now(it.perk); }
+      else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier]; const from = it.switchFrom != null && g.contracts.find(c => c && c.id === it.switchFrom); icon = it.switchFrom != null ? '⬆' : '📄'; name = car.name; desc = `${from ? esc(D.CARRIERS[from.carrier].name) + ' → ' : ''}🚚 ${car.trucks}대 · ${car.cap}칸 ${(car.caps || []).map(a => D.ATTRS[a] ? D.ATTRS[a].icon : '').join('')}`; fam = 'fam-eco'; }
+      else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}` : ''; }
+      else if (it.kind === 'adTicket') { const A = D.AD_MEDIA[it.media]; icon = A ? A.icon : '📣'; name = it.name || T('media.ticket', { name: T('media.' + it.media) }); desc = T('media.ticketOnce'); fam = 'fam-atk'; }
+      else { icon = '🎁'; name = it.name || it.kind; }
+      return `<button class="btn pkcard ${fam} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><b>${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em></button>`; };
+    const body = `<div class="pkrow">${sh.items.map(card).join('')}</div><div class="d" style="text-align:right;color:var(--gold)">${g.cash}c</div>`;
+    const m = modal(T('multi.repShopTitle'), body, [{ label: T('btn.close'), cls: 'primary', onClick: () => { g.closeRepShop(); closeModal(); game.takeEvents(); saveGame(); renderAll(); checkPhase(); } }]);
+    m.querySelectorAll('.pkcard').forEach(b => b.onclick = () => {
+      const it = sh.items[+b.dataset.i]; const r = g.buyRepShop(+b.dataset.i, slotFor(it)); if (!r.ok) return toast(r.msg);
+      SFX.buy(); if (r.perk) rewardBurst(`${M.MULTI.PERKS[r.perk].icon} ${M.MULTI.PERKS[r.perk].name}`, 2);
+      game.takeEvents(); scene.sync(game, { animate: true }); renderAll(); closeModal(); showRepShop();
+    });
+  }
   // 결과: 순위표. 사람이 먼저 끝났으면(마감·폐업) 남은 봇을 끝까지 돌린다 (관전은 4단계)
   function showMultiResult() {
     const r = game.result, on = match.online;
@@ -1914,6 +1946,7 @@
   }
   function checkPhase() {
     if (game.phase !== 'play') clearGate();
+    if (game.phase === 'play' && game.repShop) return showRepShop();     // 난투: 평판 상한 → 랜덤 3장 상점 (시간은 안 간다)
     if (game.phase === 'play' && game.perkOffer) return showPerkPick();   // 멀티: 등급업 → 퍽 3택1 (시간은 안 간다)
     if (game.phase === 'weekend') {
       // 고를 것이 '휴식' 하나뿐이면 카드를 띄울 이유가 없다 — 읽을 것만 늘고 누를 것은 하나다.

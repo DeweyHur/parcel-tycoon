@@ -508,6 +508,7 @@
     'multi.shopTitle': 'Shopping day',
     'multi.shopSub': 'Buy everything in one go — leaving costs a day',
     'multi.shopClose': 'Leave shop · 1 day',
+    'multi.repShopTitle': 'Rep up! Shop — 3 cards',
     'multi.perkTitle': 'Rep up! Pick one',
     'multi.perkSub': '',
     'multi.perkStack': '×{n}',

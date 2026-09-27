@@ -1151,3 +1151,7 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 .pkcard .now { display: block; text-decoration: none; font-size: 12px; color: #fff; background: rgba(255,255,255,.08); padding: 1px 6px; margin-top: 3px; }
 #mintro .theme { display: flex; align-items: center; gap: 8px; background: rgba(15,14,26,.9); border: 3px solid var(--red, #ff6b6b); box-shadow: 4px 4px 0 #000; padding: 6px 14px; animation: stampIn .35s .15s cubic-bezier(.2,1.5,.4,1) backwards; max-width: 92vw; }
 #mintro .theme .tic { font-size: 26px; } #mintro .theme b { font-size: 18px; color: var(--gold, #ffd166); } #mintro .theme small { font-size: 11px; color: var(--dim, #aaa); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pkcard .price { display: block; font-style: normal; font-size: 14px; color: var(--gold, #ffd166); margin-top: 4px; }
+.pkcard .price.no { color: var(--red, #ff6b6b); }
+.pkcard.sold { opacity: .45; }
+.pkcard:disabled { cursor: default; }

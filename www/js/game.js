@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, latePenaltyDiv: 3,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, bombs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, bombGrow: 0, attackMult: 1,
@@ -107,7 +107,7 @@
       this._buildRules();
       this.phase = 'play';           // play | summary | market | over | win
       this.perks = cfg.perks.slice();
-      this.mperks = (cfg.mperks || []).slice(); this.perkOffer = null;   // 멀티: 평판 등급업마다 3택1로 고른 퍽 · 지금 떠 있는 카드 3장
+      this.mperks = (cfg.mperks || []).slice(); this.perkOffer = null; this.repShop = null;   // 난투: 평판 상한에 닿으면 3장 랜덤 상점(repShop) — 퍽·계약·강화를 돈으로   // 멀티: 평판 등급업마다 3택1로 고른 퍽 · 지금 떠 있는 카드 3장
       // 멀티 2단계: 상대에게서 온 공격 큐(다음 날로 넘길 때 적용) · 나가는 것(공격·폭탄 이사, multi.js 가 라우팅) · 방패 · 임시 칸 · 한 방 · 덤 트럭
       this.actLog = [];   // 멀티 3단계: 입력 로그 — 서버가 같은 시드로 다시 돌려 검증한다 (MULTI.replay)
       this.inbox = []; this.outbox = []; this.shields = 0; this.capMods = []; this.focusNext = false; this.freeTruckNext = false; this.freshFreezeUntil = 0; this.roadblockDay = 0;
@@ -1182,13 +1182,14 @@
     // 특약을 붙인 계약은 그 속성도 '받는 것'에 들어간다. caps 만 넓히고 need 를 그대로 두면
     // 전문 계열(냉장·파손·냉동·통관)은 특약을 붙여도 그 물건을 거절한다 — 특약이 아무 쓸모가 없어진다.
     // 이 특약을 붙일 수 있는 계약이 하나라도 있는가
-    _canFitOpt(key) {
-      const e = D.ENHANCEMENTS[key]; if (!e || e.kind !== 'opt') return false;
-      return this.contracts.some(c => { if (!c) return false;   // 칸이 차 있어도 교체로 끼울 수 있다
-        const car = D.CARRIERS[c.carrier];
-        if (car.onlyPlain || car.caps.includes(e.attr)) return false;
-        if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return false;
-        return true; });
+    _canFitOpt(key) { return this.contracts.some(c => this.optFits(key, c)); }
+    // 이 특약을 이 계약에 붙일 수 있나 (칸이 차 있어도 교체로 끼울 수 있다)
+    optFits(key, c) {
+      const e = D.ENHANCEMENTS[key]; if (!e || e.kind !== 'opt' || !c) return false;
+      const car = D.CARRIERS[c.carrier];
+      if (car.onlyPlain || car.caps.includes(e.attr)) return false;
+      if (e.maxSizeMax && car.sizeMax > e.maxSizeMax) return false;
+      return true;
     }
     contractNeed(c) { const car = D.CARRIERS[c.carrier]; if (!car.need) return null; const need = car.need.slice();
       for (const o of this.contractOpts(c)) { const a = D.ENHANCEMENTS[o].attr; if (!need.includes(a)) need.push(a); } return need; }
@@ -1392,14 +1393,52 @@
       const d = this.rep - before;
       if (d) this.emit('rep', { delta: d, why, rep: this.rep });
       // 멀티: 상한에 닿는 순간 등급이 오른다(정산을 기다리지 않는다) → 상한 +step, 퍽 카드 3장. 팝업은 시간을 안 쓴다
-      if (this.rules.perkPick && d > 0 && this.rep >= this.repCap() && !this.perkOffer) this._repLadderUp();
+      if (this.rules.perkPick && d > 0 && this.rep >= this.repCap() && !this.perkOffer && !this.repShop) this._repLadderUp();
       return d;
     }
     _repLadderUp() {
       this.repTier++;
       this.say('log.repTierUp', { name: this.repTierName(), cap: this.repCap() });
+      if (this.rules.repShop) { this.repShop = { items: this._drawRepShop(), bought: 0 }; this.emit('repTier', { tier: this.repTier, cap: this.repCap(), customers: [], shop: this.repShop.items.length }); return; }
       this.perkOffer = this._drawPerks(3);
       this.emit('repTier', { tier: this.repTier, cap: this.repCap(), customers: [], perks: this.perkOffer.slice() });
+    }
+    // 평판 상점(난투): 랜덤 3장 — 퍽 카드 1~2장(값을 치른다) + 장 매물(계약 업그레이드·새 계약·강화·충전·광고권)에서 나머지. 시간은 안 간다 (유저: "일정 수준 평판 달성 시 상점, 랜덤 픽 3개, 내 돈으로 산다")
+    _drawRepShop() {
+      const R = this.rules, mult = D.PRICE_MULT[Math.min(12, this.tableMonth(this.month))] * R.itemPriceMult * R.priceMult;
+      const perks = this._drawPerks(3).map(id => ({ kind: 'perk', perk: id, price: Math.round((M.MULTI.PERK_PRICE || 150) * mult), name: M.MULTI.PERKS[id].name, sold: false }));
+      const goods = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill'));
+      const nPerk = 1 + (this.rng.next() < 0.5 ? 1 : 0);
+      const out = perks.slice(0, nPerk).concat(goods.slice(0, 3 - nPerk));
+      while (out.length < 3 && perks[out.length]) out.push(perks[out.length]);
+      return this.rng.shuffle(out);
+    }
+    buyRepShop(i, target) {
+      const sh = this.repShop; if (!sh) return { ok: false, msg: T('err.cannotCallNow') };
+      const it = sh.items[i]; if (!it || it.sold) return { ok: false, msg: T('err.sold') };
+      if (this.cash < (it.kind === 'perk' ? it.price : this.contractPrice ? (it.kind === 'contract' ? this.contractPrice(it) : it.price) : it.price)) return { ok: false, msg: T('err.noCash') };
+      this._act('rbuy', { i, s: target == null ? null : target });
+      if (it.kind === 'perk') { this.cash -= it.price; this.run.spent += it.price; it.sold = true; sh.bought++; this._applyPerk(it.perk); return { ok: true, perk: it.perk }; }
+      // 장 매물은 buy() 로 — 잠깐 상점을 마켓으로 세워 두고 판다(로그는 rbuy 하나)
+      const saved = { market: this.market, phase: this.phase };
+      this.market = { items: sh.items, bought: 0, refreshes: 0, month: this.month, shop: true, rep: true, freeRefresh: 0 }; this.phase = 'market';
+      let r; try { r = this.buy(i, target); } finally { this.market = saved.market; this.phase = saved.phase; }
+      if (r && r.ok) sh.bought++;
+      return r;
+    }
+    closeRepShop() { if (!this.repShop) return false; this._act('rclose'); this.repShop = null; this.emit('repShopClosed', {}); if (this.rep >= this.repCap()) this._repLadderUp(); return true; }   // 상점 사이에 넘친 평판은 닫자마자 다음 계단
+    _applyPerk(id) {
+      const pk = M.MULTI.PERKS[id];
+      this.mperks.push(id); (this.cfg.mperks = this.cfg.mperks || []).push(id);
+      this._buildRules();
+      if (pk.now) {
+        if (pk.now.cap) { this.warehouse.cap += pk.now.cap; this._assignCold(); }
+        if (pk.now.cash) { this.cash += pk.now.cash; this.run.revenue += pk.now.cash; }
+        if (pk.now.calls) for (const c of this.contracts) if (c) { c.maxCalls += pk.now.calls; c.calls += pk.now.calls; }   // 있는 계약도 바로 +1(새 계약은 callsDelta 로)
+        if (pk.now.refill) for (const c of this.contracts) if (c) c.calls = c.maxCalls;                                   // 지금 전부 가득
+      }
+      this.say('log.perkPicked', { name: pk.name, icon: pk.icon });
+      this.emit('perkPicked', { perk: id });
     }
     // 퍽 카드 뽑기: 계열(💰🛡⚔)에서 하나씩. 지금 구현 단계에서 실제로 작동하는 카드만(phase). 계열에 남은 카드가 없으면 다른 계열에서 채운다
     _drawPerks(n) {
@@ -1415,18 +1454,8 @@
     pickPerk(id) {
       if (!this.perkOffer || !this.perkOffer.includes(id)) return { ok: false, msg: T('err.cannotCallNow') };
       this._act('perk', { id });
-      const pk = M.MULTI.PERKS[id];
-      this.mperks.push(id); (this.cfg.mperks = this.cfg.mperks || []).push(id);
-      this._buildRules();
-      if (pk.now) {
-        if (pk.now.cap) { this.warehouse.cap += pk.now.cap; this._assignCold(); }
-        if (pk.now.cash) { this.cash += pk.now.cash; this.run.revenue += pk.now.cash; }
-        if (pk.now.calls) for (const c of this.contracts) if (c) { c.maxCalls += pk.now.calls; c.calls += pk.now.calls; }   // 있는 계약도 바로 +1(새 계약은 callsDelta 로)
-        if (pk.now.refill) for (const c of this.contracts) if (c) c.calls = c.maxCalls;                                   // 지금 전부 가득
-      }
       this.perkOffer = null;
-      this.say('log.perkPicked', { name: pk.name, icon: pk.icon });
-      this.emit('perkPicked', { perk: id });
+      this._applyPerk(id);
       return { ok: true, perk: id };
     }
     // 평판이 낮으면 개인 고객이 안 맡긴다 — 상한까지 채우면 1.0배(기준), 바닥이면 0.55배
@@ -1539,6 +1568,7 @@
       this.monthStats = { repStart: this.rep, revenue: 0, spent: 0, calls: 0, delivered: 0, waits: 0, penalty: 0, discarded: 0, overdue: 0, returned: 0, stolen: 0, broken: 0, claims: 0, firstContractBought: false, spareUsed: false, bundleUsed: false, cashStart: this.cash, missionEarned: 0, missionRank: 0, missionBonus: 0, missionTarget: 1 };
       // 월 배차 한도 리셋 (계약은 만료되지 않는다 — 마켓은 업그레이드·새 업체용)
       // v1.5: 배차는 소모품 — 월초 리셋 없음. 마켓의 '가득 충전'으로만 채운다
+      if (R.cycleRefill && m > 1) for (const c of this.contracts) if (c) c.calls = c.maxCalls;   // 난투: 장이 없으니 보름마다 배차가 다시 찬다
       for (const c of this.contracts) if (c) { c.successCalls = 0; c.freeUsed = 0; }
       this.monthStats.insClaims = 0; this.monthStats.covered = 0; this.monthStats.premium = 0; this.monthStats.storageIncome = 0; this.monthStats.fees = 0;
       const heatN = R.heatAlerts + (this.seasonMods(m).heatAlerts || 0);
@@ -2508,7 +2538,7 @@
     }
     buy(itemIdx, target, mode) {
       if (this.phase !== 'market') return { ok: false, msg: T('err.notMarket') };
-      this._act('buy', { i: itemIdx, s: target, m: mode || null });
+      if (!(this.market && this.market.rep)) this._act('buy', { i: itemIdx, s: target, m: mode || null });   // 평판 상점은 rbuy 로 이미 적었다
       const R = this.rules, it = this.market.items[itemIdx];
       if (!it || it.sold) return { ok: false, msg: T('err.sold') };
       if (it.kind === 'deal') { const r = this.signDeal(it.customer, it.cycles, it.renew); if (!r.ok) return { ok: false, msg: T('err.deal.' + r.reason, { n: M.CUSTOMER_SLOTS }) }; it.sold = true; return { ok: true, deal: true }; }   // 서명은 공짜, 구매 한도와 무관

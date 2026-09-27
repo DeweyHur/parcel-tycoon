@@ -963,10 +963,10 @@ t('멀티: 배차는 횟수 — 배차비 0, 남은 배차만 줄고, 0이면 �
   c.calls = 0; g.parcels.push(P(3, 'normal', 2)); assert.ok(!g.callCarrier(si, [3]).ok);
   g.cash = 5; assert.equal(g.truckFee(c) * 0 + g.callFee(c, 2), 0, '돈이 없어도 배차비는 없다');
 });
-t('멀티: 장 — 보름에 한 번(정산 뒤), 매물은 업그레이드·강화·충전·광고뿐(시설 없음). 「장 보러 간 날」(shopDay) 규칙이면 나오는 데 하루', () => {
-  const c = MG(7); c.parcels = []; c.schedule = c.schedule.map(() => []); let n = 0; while (c.month === 1 && c.phase === 'play' && n++ < 30) { c.schedule = c.schedule.map(() => []); c.wait([]); }
-  assert.equal(c.phase, 'market'); assert.ok(c.market.shop && !c.market.dayCost); assert.ok(c.market.items.every(it => ['contract', 'enh', 'fac', 'adTicket', 'media', 'mediaUp', 'refill'].includes(it.kind)));
-  assert.ok(c.closeMarket()); assert.equal(c.month, 2); assert.equal(c.phase, 'play');
+t('멀티: 사이클 끝 장 없음 · 배차 리필 · 「장 보러 간 날」(shopDay) 규칙이면 매물은 업그레이드·강화·충전·광고·새 계약 2(시설 없음), 나오는 데 하루', () => {
+  // 사이클 끝엔 장이 없다(유저: "상점을 없애면") — 곧장 다음 보름, 배차는 다시 찬다
+  const c = MG(7); c.parcels = []; c.schedule = c.schedule.map(() => []); c.contracts[0].calls = 0; let n = 0; while (c.month === 1 && c.phase === 'play' && n++ < 30) { c.schedule = c.schedule.map(() => []); c.wait([]); }
+  assert.equal(c.phase, 'play'); assert.equal(c.month, 2); assert.equal(c.contracts[0].calls, c.contracts[0].maxCalls, '보름마다 배차 리필');
   const g = MG(7, { }); g.rules.shopDay = true; g.cash = 2000; const day = g.totalTurn, turn = g.turn;
   assert.ok(g.openShop().ok && g.phase === 'market' && g.market.shop && g.market.dayCost);
   const kinds = new Set(g.market.items.filter(it => !['adTicket', 'media', 'mediaUp', 'refill'].includes(it.kind)).map(it => it.kind)); assert.deepEqual([...kinds].sort(), ['contract', 'enh'], '시설은 안 판다(유저)');
@@ -976,22 +976,25 @@ t('멀티: 장 — 보름에 한 번(정산 뒤), 매물은 업그레이드·강
   assert.ok(g.closeMarket()); assert.equal(g.phase, 'play'); assert.equal(g.totalTurn, day + 1); assert.equal(g.turn, turn + 1); assert.equal(g.stats.shopDays, 1);
   assert.ok(!g.openShop.call(Object.assign(Object.create(Game.prototype), g, { phase: 'market' })).ok);
 });
-t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary) 없이 곧장 장(마켓), 어음·차입 없음', () => {
+t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary)도 장도 없이 곧장 다음 보름, 어음·차입 없음', () => {
   const g = MG(8); g.parcels = []; g.schedule = g.schedule.map(() => []); g.cash = -50;
   let n = 0; while (g.month === 1 && g.phase === 'play' && n++ < 30) { g.schedule = g.schedule.map(() => []); g.wait([]); }
-  assert.equal(g.phase, 'market'); g.closeMarket(); assert.equal(g.phase, 'play'); assert.equal(g.month, 2); assert.equal(g.debt, 0); assert.ok(g.cash < 0, '마이너스는 마이너스대로'); assert.ok(g.events.some(e => e.type === 'settle'));
+  assert.equal(g.phase, 'play'); assert.equal(g.month, 2); assert.equal(g.debt, 0); assert.ok(g.cash < 0, '마이너스는 마이너스대로'); assert.ok(g.events.some(e => e.type === 'settle'));
 });
-t('멀티: 평판 사다리 — 상한에 닿으면 상한 +12 · 등급 +1 · 퍽 카드 3장(계열 셋) · 고르면 규칙에 얹힌다', () => {
-  const g = MG(9); const cap0 = g.repCap(); g.addRep(99);
-  assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + 12); assert.equal(g.rep, cap0); assert.ok(g.perkOffer && g.perkOffer.length === 3);
-  assert.equal(new Set(g.perkOffer.map(k => M.MULTI.PERKS[k].family)).size, 3, '세 계열에서 하나씩');
-  assert.ok(g.perkOffer.every(k => (M.MULTI.PERKS[k].phase || 1) <= M.MULTI.PHASE), '아직 안 되는 단계의 카드는 안 뜬다');
-  assert.ok(!g.pickPerk('m_shield').ok, '카드에 없는 퍽은 못 고른다');
-  g.addRep(99); assert.equal(g.repTier, 1, '카드가 떠 있는 동안은 또 오르지 않는다');
-  g.perkOffer = ['m_calls', 'm_space', 'm_early']; const cap = g.warehouse.cap, mc = g.contracts[0].maxCalls;
-  assert.ok(g.pickPerk('m_space').ok); assert.equal(g.warehouse.cap, cap + 4); assert.equal(g.perkOffer, null); assert.deepEqual(g.mperks, ['m_space']);
-  g.perkOffer = ['m_calls']; g.pickPerk('m_calls'); assert.equal(g.contracts[0].maxCalls, mc + 1); assert.equal(g._makeContract('bulk0').maxCalls, g.rules.callsDelta + Math.max(1, Math.round(D.CARRIERS.bulk0.trucks * (g.rules.callsMult || 1)))); assert.deepEqual(g.cfg.mperks, ['m_space', 'm_calls']);
-  const s = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.ok(s.rules.callsDelta === 1 && s.rules.multi && s.repCap() === cap0 + 12, '세이브를 열어도 퍽·멀티 규칙이 돌아온다');
+t('멀티: 평판 사다리 — 상한에 닿으면 상한 +8 · 등급 +1 · 평판 상점 3장(퍽 1~2 + 매물) · 돈으로 사고 닫는다 · 세이브에 남는다', () => {
+  const g = MG(9); const cap0 = g.repCap(); g.cash = 5000; g.addRep(99);
+  assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + 8); assert.equal(g.rep, cap0); assert.ok(g.repShop && g.repShop.items.length === 3 && !g.perkOffer);
+  const perks = g.repShop.items.filter(it => it.kind === 'perk'); assert.ok(perks.length >= 1 && perks.length <= 2, '퍽 카드 1~2장'); assert.ok(g.repShop.items.every(it => it.kind !== 'fac' && it.kind !== 'refill'), '시설·충전은 없다');
+  assert.ok(perks.every(it => it.price > 0 && (M.MULTI.PERKS[it.perk].phase || 1) <= M.MULTI.PHASE));
+  g.addRep(99); assert.equal(g.repTier, 1, '상점이 떠 있는 동안은 또 오르지 않는다');
+  const pi = g.repShop.items.indexOf(perks[0]), cash = g.cash, cap = g.warehouse.cap, mc = g.contracts[0].maxCalls;
+  assert.ok(g.buyRepShop(pi, null).ok); assert.equal(g.cash, cash - perks[0].price); assert.ok(perks[0].sold); assert.deepEqual(g.mperks, [perks[0].perk]);
+  if (perks[0].perk === 'm_space') assert.equal(g.warehouse.cap, cap + 4); if (perks[0].perk === 'm_calls') assert.equal(g.contracts[0].maxCalls, mc + 1);
+  assert.ok(!g.buyRepShop(pi, null).ok, '판 카드는 다시 못 산다');
+  const good = g.repShop.items.find(it => it.kind === 'enh'); if (good) { const opt = D.ENHANCEMENTS[good.enh].kind === 'opt'; const s = g.contracts.findIndex(c => c && (opt ? g.optFits(good.enh, c) : g.enhUsed(c) < g.enhSlots(c))); const before = g.cash; assert.ok(g.buyRepShop(g.repShop.items.indexOf(good), s).ok); assert.ok(g.cash < before); assert.ok(g.actLog.filter(e => e.t === 'buy').length === 0, '상점 구매는 rbuy 로만 적힌다'); }
+  assert.ok(g.closeRepShop()); assert.ok(g.actLog.some(e => e.t === 'rbuy') && g.actLog.some(e => e.t === 'rclose'));
+  assert.equal(g.repTier, 2, '상점 동안 넘친 평판은 닫자마자 다음 계단'); assert.ok(g.repShop, '다음 상점'); g.closeRepShop(); assert.equal(g.repShop, null);
+  const s2 = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.ok(s2.rules.multi && s2.repCap() === g.repCap() && s2.mperks.length === g.mperks.length, '세이브를 열어도 퍽·멀티 규칙이 돌아온다');
 });
 t('멀티: 매치 — 봇 3명이 각자 시계로 따라오고, 순위는 생존 → 평판 → 잔액, 저장·복원', () => {
   const m = MULTI.newMatch({ seed: 21, name: '나', botNames: ['가', '나', '다'] });
@@ -1074,7 +1077,7 @@ const call = (S, d) => API.handle(S, d, 'test').then(r => r[1]);
 t('멀티: 재실행 검증 — 같은 시드·같은 입력 로그면 같은 판, 한 줄만 빠져도 다르다', () => {
   const m = MULTI.newMatch({ seed: 77, name: 'H' }); const h = m.players[0].game; let g = 0;
   while (!(h.phase === 'over' || h.phase === 'win') && g++ < 500) { BOT.multiDay(h, 'greedy'); h.takeEvents(); MULTI.tick(m); if (h.month > (m._c || 0)) { m._c = h.month; MULTI.cycleDrop(m, h.month); } }
-  const f = MULTI.fingerprint(h); assert.ok(h.actLog.length > 50 && h.actLog.some(e => e.t === 'atk') && h.actLog.some(e => e.t === 'perk'));
+  const f = MULTI.fingerprint(h); assert.ok(h.actLog.length > 50 && h.actLog.some(e => e.t === 'atk') && h.actLog.some(e => e.t === 'rbuy') && h.actLog.some(e => e.t === 'rclose'));
   assert.ok(MULTI.verify(h.cfg, h.actLog, f).ok); const bad = h.actLog.slice(); bad.splice(bad.findIndex(e => e.t === 'wait'), 1); assert.ok(!MULTI.verify(h.cfg, bad, f).ok);
   assert.ok(!MULTI.verify(h.cfg, h.actLog, Object.assign({}, f, { cash: f.cash + 1 })).ok, '잔액을 부풀리면 안 맞는다');
 });

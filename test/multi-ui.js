@@ -44,30 +44,25 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const d8 = await page.evaluate(() => { const g = PT.game, m = PT.match; return { day: g.totalTurn, bots: m.players.slice(1).map(p => p.game.totalTurn), strip: document.querySelector('#multi-strip').textContent, fees: g.feesDue, save: !!localStorage.getItem('pt_multi_v1'), single: !!localStorage.getItem('pt_save_v2') }; });
   ok('8일 뒤: 봇들도 각자 시계로 따라옴 · 배차비 즉시 결제(후불 0) · 저장 없음', d8.day >= 8 && d8.bots.every(b => b >= 5) && d8.fees === 0 && !d8.save && !d8.single, JSON.stringify(d8));
   await page.screenshot({ path: `${OUT}/M-02-day8.png` });
-  // 장은 보름에 한 번: 사이클 마지막 날을 넘기면 정산 팝업 없이 곧장 장(마켓)이 뜬다 — 업그레이드·강화·창고·광고만
-  await page.evaluate(() => { const g = PT.game; g.cash = 900; g.turn = g.turns(); g.parcels = []; g.schedule = g.schedule.map(() => []); PT.renderAll(); document.querySelector('#wait-btn').click(); });
+  // 사이클 끝: 장 없이 곧장 다음 보름, 배차는 다시 찬다 (유저: "상점을 없애면")
+  await page.evaluate(() => { const g = PT.game; g.cash = 900; g.turn = g.turns(); g.parcels = []; g.schedule = g.schedule.map(() => []); g.contracts[0].calls = 0; PT.renderAll(); document.querySelector('#wait-btn').click(); });
   await page.waitForTimeout(900); await idle();
+  const cyc = await page.evaluate(() => ({ phase: PT.game.phase, month: PT.game.month, calls: PT.game.contracts[0].calls, max: PT.game.contracts[0].maxCalls, market: !!(PT.game.market && document.querySelector('#modal')), modal: (document.querySelector('#modal') || {}).textContent }));
+  ok('사이클 끝 → 장 없이 다음 보름 · 배차 리필', cyc.phase === 'play' && cyc.month === 2 && cyc.calls === cyc.max && !cyc.market, JSON.stringify(cyc).slice(0, 200));
+  // 평판 상점: 평판을 상한까지 올리면 랜덤 3장(퍽 + 매물) — 내 돈으로 산다
+  await page.evaluate(() => { const g = PT.game; g.cash = 3000; g.addRep(99, null); PT.renderAll(); });
+  const offer = await page.evaluate(() => ({ items: PT.game.repShop && PT.game.repShop.items.map(it => it.kind), tier: PT.game.repTier, cap: PT.game.repCap() }));
+  ok('상한 도달 → 등급 +1 · 상한 +8 · 상점 3장(퍽 포함)', offer.items && offer.items.length === 3 && offer.items.includes('perk') && offer.tier >= 1 && offer.cap === 20 + 8 * offer.tier, JSON.stringify(offer));
+  await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(500); await idle();   // 다음 마감에서 checkPhase 가 상점을 띄운다
   let t = await modalText();
-  const cyc = await page.evaluate(() => ({ phase: PT.game.phase, shop: !!(PT.game.market && PT.game.market.shop), kinds: [...new Set((PT.game.market || { items: [] }).items.map(i => i.kind))], invest: !document.querySelector('#invest-btn').hidden || true, shopBtn: document.querySelector('#shop-btn').hidden }));
-  ok('사이클 끝 → 장: 업그레이드·강화·배차 충전·새 계약 2, 새로고침 없음, 장 보기 버튼 없음', cyc.phase === 'market' && cyc.shop && /↑/.test(t) && cyc.kinds.includes('refill') && !(await page.$('#mk-refresh')) && cyc.shopBtn && cyc.kinds.every(k => ['contract', 'enh', 'fac', 'refill', 'adTicket', 'media', 'mediaUp'].includes(k)), JSON.stringify(cyc) + ' ' + t.slice(0, 120).replace(/\s+/g, ' '));
-  await page.screenshot({ path: `${OUT}/M-03-shop.png` });
-  const bought = await page.evaluate(() => { const g = PT.game; const i = g.market.items.findIndex(it => it.kind === 'enh' && it.enh === 'cap1'); return { i, fac: g.market.items.some(it => it.kind === 'fac'), card: !!document.querySelector(`#modal .card[data-i="${i}"]`) }; });
-  await page.waitForTimeout(300);
-  ok('장에 시설(확장·냉장·야적) 없음 · 강화 카드는 있다', bought.i >= 0 && bought.card && !bought.fac, JSON.stringify(bought));
-  await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(600); await idle();
-  const after = await page.evaluate(() => ({ month: PT.game.month, phase: PT.game.phase }));
-  ok('장을 닫으면 다음 사이클', after.month === 2 && after.phase === 'play', JSON.stringify(after));
-  // 퍽 3택1: 평판을 상한까지 올려 등급업
-  await page.evaluate(() => { const g = PT.game; g.addRep(99, null); PT.renderAll(); });
-  const offer = await page.evaluate(() => ({ offer: PT.game.perkOffer, tier: PT.game.repTier, cap: PT.game.repCap(), tier0: PT.game._tier0 }));
-  ok('상한 도달 → 등급 +1 · 상한 +12 · 카드 3장', offer.offer && offer.offer.length === 3 && offer.tier >= 1 && offer.cap === 20 + 12 * offer.tier, JSON.stringify(offer));
-  await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(500); await idle();   // 다음 마감에서 checkPhase 가 퍽 팝업을 띄운다
-  t = await modalText();
-  ok('퍽 팝업', /하나 골라/.test(t) && (await page.$$('.pkcard')).length === 3, t.slice(0, 80).replace(/\s+/g, ' '));
+  ok('평판 상점 팝업 — 값이 붙은 카드 3장', /상점/.test(t) && (await page.$$('.pkcard')).length === 3 && /\d+c/.test(t), t.slice(0, 80).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-04-perk.png` });
-  const picked = await page.evaluate(() => { const b = document.querySelector('.pkcard'); const id = b.dataset.id; b.click(); return id; }); await page.waitForTimeout(400);
-  const pk = await page.evaluate(() => ({ mperks: PT.game.mperks, offer: PT.game.perkOffer, chips: document.querySelectorAll('#mperks .pk').length, hidden: document.querySelector('#mperks').hidden }));
-  ok('퍽 선택 → 장착 · 카드 닫힘 · 화면에 퍽 아이콘 칩', pk.mperks.includes(picked) && !pk.offer && !pk.hidden && pk.chips === new Set(pk.mperks).size, JSON.stringify(pk));
+  const picked = await page.evaluate(() => { const g = PT.game; const i = g.repShop.items.findIndex(it => it.kind === 'perk'); const cash = g.cash; const b = document.querySelector(`.pkcard[data-i="${i}"]`); b.click(); return { id: g.repShop.items[i].perk, cash, after: g.cash, sold: g.repShop.items[i].sold }; }); await page.waitForTimeout(400);
+  const pk = await page.evaluate(() => ({ mperks: PT.game.mperks, shop: !!PT.game.repShop, chips: document.querySelectorAll('#mperks .pk').length, hidden: document.querySelector('#mperks').hidden, modal: !!document.querySelector('#modal .pkcard') }));
+  ok('퍽 카드 구매 → 돈 빠지고 장착 · 상점은 열린 채(더 살 수 있다) · 화면에 퍽 아이콘 칩', pk.mperks.includes(picked.id) && picked.after < picked.cash && picked.sold && pk.shop && pk.modal && !pk.hidden && pk.chips === new Set(pk.mperks).size, JSON.stringify({ picked, pk }));
+  await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(400); await idle();
+  const closed = await page.evaluate(() => ({ shop: !!PT.game.repShop, phase: PT.game.phase, modal: !!document.querySelector('#modal .pkcard') }));
+  ok('닫기 → 상점 사라지고 플레이 계속', !closed.shop && closed.phase === 'play' && !closed.modal, JSON.stringify(closed));
   // ===== 2단계: 트레잇 · 공격 · 폭탄 =====
   // 내 창고에 🌧 소나기 트레잇 택배를 심고 대량으로 내보낸다 → 상대 전원에게 날아간다(outbox → 인박스)
   const fired = await page.evaluate(() => { const g = PT.game, m = PT.match; const c = g.contracts.find(x => x && /bulk/.test(x.carrier)); const si = g.contracts.indexOf(c);

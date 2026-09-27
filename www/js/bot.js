@@ -148,10 +148,28 @@ function urgency(g) {
     const id = pref.find(k => g.perkOffer.includes(k)) || g.perkOffer[0];
     return g.pickPerk(id);
   }
-  // 멀티 봇 하루: 퍽이 떠 있으면 고르고, 장을 볼 날이면 장을 보고(하루 소모), 아니면 호출/대기. 반환: 진행했으면 true
+  // 평판 상점(랜덤 3장): 퍽은 선호순, 매물은 살 수 있는 것부터 — 예비금은 남긴다
+  function repShopBot(g) {
+    const sh = g.repShop; if (!sh) return;
+    const pref = ['m_calls', 'm_space', 'm_shield', 'm_clean', 'm_refill', 'm_dodge', 'm_upgrade', 'm_yard', 'm_sharp', 'm_trait', 'm_heavy', 'm_roof', 'm_grace', 'm_early', 'm_rush'];
+    const reserve = botReserve(g);
+    const order = sh.items.map((it, i) => ({ it, i })).sort((a, b) => (a.it.kind === 'perk' ? pref.indexOf(a.it.perk) : 50 + a.i) - (b.it.kind === 'perk' ? pref.indexOf(b.it.perk) : 50 + b.i));
+    for (const { it, i } of order) {
+      if (it.sold) continue;
+      const price = it.kind === 'contract' ? g.contractPrice(it) : it.price;
+      if (g.cash - price < reserve) continue;
+      let s = null;
+      if (it.kind === 'contract') { s = it.switchFrom != null ? g.contracts.findIndex(c => c && c.id === it.switchFrom) : g.contracts.findIndex(c => !c); if (s < 0) continue; }
+      else if (it.kind === 'enh') { const opt = D.ENHANCEMENTS[it.enh].kind === 'opt'; s = g.contracts.findIndex(c => c && (opt ? g.optFits(it.enh, c) : g.enhUsed(c) < g.enhSlots(c))); if (s < 0) continue; }
+      g.buyRepShop(i, s);
+    }
+    g.closeRepShop();
+  }
+  // 멀티 봇 하루: 퍽/평판 상점이 떠 있으면 처리하고, 장을 볼 날이면 장을 보고(하루 소모), 아니면 호출/대기. 반환: 진행했으면 true
   function multiDay(g, strat) {
-    if (g.phase === 'market') { shopBot(g); g.closeMarket(); return true; }   // 사이클 끝 장(보름에 한 번)
+    if (g.phase === 'market') { shopBot(g); g.closeMarket(); return true; }   // 준비 마켓(시작) · 사이클 끝 장(있는 규칙이면)
     if (g.phase !== 'play') return false;
+    if (g.repShop) repShopBot(g);
     if (g.perkOffer) pickPerkBot(g);
     if (g.offer) g.declineOffer();
     const wish = shopWish(g);
@@ -165,6 +183,7 @@ function urgency(g) {
     return true;
   }
 
-  const BOT = { urgency, nextVolume, pickBest, STRATS, marketBot, shopWish, shopBot, pickPerkBot, multiDay };
+  const BOT = {
+    repShopBot, urgency, nextVolume, pickBest, STRATS, marketBot, shopWish, shopBot, pickPerkBot, multiDay };
   if (typeof module !== 'undefined') module.exports = BOT; else root.BOT = BOT;
 })(typeof window !== 'undefined' ? window : globalThis);
