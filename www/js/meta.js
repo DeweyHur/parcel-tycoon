@@ -335,7 +335,7 @@
       multi: true,
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
-      unlimitedCalls: false, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true,   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
+      unlimitedCalls: false, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true,   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
       shopDay: false, noCycleMarket: false, autoSummary: true,           // 장은 보름에 한 번, 정산 뒤에(개인 런 마켓 자리 — 유저: 하루 소모 대신 사이클 끝에). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」(하루 소모) 실험용으로 남겨 둔다
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 폭탄으로 돌아온다)
       repStep: 8, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +8 · 퍽 3택1 (문서는 +5 — 봇 판에서 13번 올라 8로. 석 달에 7~9번). 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)

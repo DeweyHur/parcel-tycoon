@@ -65,6 +65,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   ok('B 결과: 기다리는 중 (A 가 아직)', /난투/.test(t) && /기다리는 중/.test(t), t.slice(0, 80).replace(/\s+/g, ' '));
   await finishVia(A); await A.waitForTimeout(2500); await B.waitForTimeout(4000);
   const tA = await modalText(A), tB = await modalText(B);
+  if (process.env.DBG) console.log('DBG A', JSON.stringify(await A.evaluate(() => ({ phase: PT.game.phase, rep: PT.game.rep, day: PT.game.totalTurn, reason: PT.game.result && PT.game.result.reason, perk: !!PT.game.perkOffer, modal: document.querySelector('#modal') && document.querySelector('#modal').textContent.slice(0, 80), }))), 'ERRS', JSON.stringify(errors));
   const fin = await S.call([['HGETALL', 'mf:' + (await S.call([['GET', 'mp:' + pidA]]))[0]]]);
   const mid = await A.evaluate(() => PT.match.online.mid); const results = Object.fromEntries((await S.call([['HGETALL', 'mf:' + mid]]))[0].reduce((a, v, i, arr) => (i % 2 === 0 ? a.concat([[v, JSON.parse(arr[i + 1])]]) : a), []));
   // A 는 테스트가 택배를 몰래 심었으니(로그에 없는 행동) 재실행이 안 맞아야 한다 — 그게 검증이다. B 는 통과

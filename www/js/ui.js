@@ -3,6 +3,8 @@
   const D = window.DATA, M = window.META, I18n = window.I18n, T = I18n.t;
   const $ = s => document.querySelector(s);
   const SAVE_KEY = 'save_v2', OPT_KEY = 'opts_v1', MULTI_KEY = 'multi_v1';
+  const hudRep = { g: null, v: null };          // HUD 평판이 마지막으로 보여 준 값(굴러가는 숫자용)
+  const stripRep = { m: null, v: {} };          // 상대 줄 카드별 마지막 평판
   let game = null, scene = null, busy = false;
   // 멀티 「난투」: 진행 중인 매치(사람 + 봇 3). game 은 언제나 사람 판(players[0].game). 개인 런과 저장 키가 다르다
   let match = null, lastRank = 0;
@@ -22,10 +24,10 @@
 
   function saveOpts() { Store.set(OPT_KEY, opts); }
   function saveGame() {
-    if (match) { if (game && game.phase !== 'over' && game.phase !== 'win') Store.set(MULTI_KEY, MULTI.toJSON(match)); else Store.remove(MULTI_KEY); return; }
+    // 난투는 저장하지 않는다 — 한 판은 한자리에서 끝낸다(이어하기 없음). 옛 저장은 지운다
+    if (match) { Store.remove(MULTI_KEY); return; }
     if (game && game.phase !== 'over' && game.phase !== 'win') Store.set(SAVE_KEY, game.toJSON()); else Store.remove(SAVE_KEY); }
   function loadSave() { const s = Store.get(SAVE_KEY); return s && s.cfg ? s : null; }
-  function loadMultiSave() { const s = Store.get(MULTI_KEY); return s && s.players ? s : null; }
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   function ptype(p) { return D.PARCEL_TYPES[p.type]; }
   function today() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -42,6 +44,16 @@
     el.style.left = xPct + '%'; el.style.top = '45%'; el.style.transform = 'translateX(-50%)';
     $('#float-layer').appendChild(el); setTimeout(() => el.remove(), 1300);
   }
+  // 숫자가 한 번에 바뀌지 않고 굴러간다 — 평판처럼 '점수'인 숫자는 변하는 순간이 보여야 산다
+  const tweens = new WeakMap();
+  function animNum(el, from, to, fmt, ms) {
+    if (!el) return; const prev = tweens.get(el); if (prev) cancelAnimationFrame(prev);
+    if (from == null || from === to || typeof requestAnimationFrame === 'undefined') { el.textContent = fmt(to); return; }
+    const t0 = performance.now(), dur = ms || Math.min(900, 350 + Math.abs(to - from) * 60);
+    const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(Math.round(from + (to - from) * e)); if (k < 1) tweens.set(el, requestAnimationFrame(step)); else tweens.delete(el); };
+    tweens.set(el, requestAnimationFrame(step));
+  }
+  function pulse(el, cls) { if (!el) return; el.classList.remove('rep-up', 'rep-down'); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 900); }
   function rewardBurst(label, tier = 1) {
     const layer = $('#float-layer'); if (!layer) return;
     const n = 10 + tier * 3, burst = document.createElement('div'); burst.className = `reward-burst tier-${tier}`;
@@ -87,7 +99,7 @@
   const storySeen = P => !!((P.story && P.story.seen) || ((P.campaign && P.campaign.cleared) || 0) >= LEVELS.IMPLEMENTED);
   function showTitle() {
     $('#story').hidden = true; $('#sms').hidden = true; clearStoryHl(); clearGate(); storyBusy = false;
-    const save = loadSave(), P = Profile.get(), msave = loadMultiSave();
+    const save = loadSave(), P = Profile.get(); Store.remove(MULTI_KEY);
     match = null; netStop(); stopRoom();
     // 캠페인을 아직 다 못 했으면 타이틀도 최소한만 보여 준다 — 시작 · 소리 · 언어 (levels.js)
     if ((P.campaign.cleared || 0) < LEVELS.IMPLEMENTED) return showTitleCampaign(save, P.campaign);
@@ -100,7 +112,6 @@
         return `<button class="btn cta cont" id="t-continue">${T('title.continue')}<small class="cont-sub">${where}</small></button>`; })() : ''}
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
       <button class="btn gold" id="t-new">${T('title.new')}</button>
-      ${msave ? `<button class="btn cta cont" id="t-multi-cont">${T('title.multiCont')}<small class="cont-sub">⚔ D+${msave.players[0].game.totalTurn || 0}</small></button>` : ''}
       <button class="btn" id="t-multi">⚔ ${T('title.multi')}</button>
       ${NET.enabled() ? `<div class="trow"><button class="btn" id="t-online">🌐 ${T('title.online')}${P.multi && P.multi.rank ? ` <small style="color:var(--dim)">${esc(T('multi.rankName.' + P.multi.rank))} · ${P.multi.elo}</small>` : ''}</button><button class="btn" id="t-invite">👥 ${T('title.invite')}</button></div>` : ''}
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).filter(achShown).length, d: Object.keys(M.ACHIEVEMENTS).filter(achShown).length })}</small></button>
@@ -115,10 +126,9 @@
     m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort'), showTitle); return; }   /* 취소하면 타이틀로 — closeModal 만 하면 뒤에 판이 없어 까만 화면이 남았다 */ showScenarioSelect(); };
     // 인수인계는 캠페인으로 강제된다 — 끝낸 뒤 타이틀에는 다시 보이지 않는다
     const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
-    m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); if (msave) { askConfirm(T('multi.confirmNew'), () => { Store.remove(MULTI_KEY); startMulti(); }, T('title.newShort'), showTitle); return; } startMulti(); };
-    const iv = m.querySelector('#t-invite'); if (iv) iv.onclick = () => { SFX.resume(); SFX.select(); if (msave) { askConfirm(T('multi.confirmNew'), () => { Store.remove(MULTI_KEY); showInvite(); }, T('title.newShort'), showTitle); return; } showInvite(); };
-    const on = m.querySelector('#t-online'); if (on) on.onclick = () => { SFX.resume(); SFX.select(); if (msave) { askConfirm(T('multi.confirmNew'), () => { Store.remove(MULTI_KEY); showQueue(); }, T('title.newShort'), showTitle); return; } showQueue(); };
-    const mc = m.querySelector('#t-multi-cont'); if (mc) mc.onclick = () => { SFX.resume(); SFX.select(); match = MULTI.fromJSON(msave); game = match.players[0].game; lastRank = myRank(); closeModal(); startPlay(); if (match.online) netStart(); };
+    m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); startMulti(); };
+    const iv = m.querySelector('#t-invite'); if (iv) iv.onclick = () => { SFX.resume(); SFX.select(); showInvite(); };
+    const on = m.querySelector('#t-online'); if (on) on.onclick = () => { SFX.resume(); SFX.select(); showQueue(); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex(companiesHidden() ? 'carriers' : 'companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
@@ -627,7 +637,10 @@
   // ----- 관전 응원 (마감·폐업한 뒤, 남은 사람들에게 이모지 하나) -----
   const CHEERS = ['👍', '🔥', '😂', '💀', '🧨'];
   function sendCheer(t) { if (!match || !match.online) return; match.online.pending.push({ from: match.online.pid, type: 'note', text: t }); netSync(true); }
-  function bubble(pid, text) { const el = portraitEl(pid); if (!el) return; const b = document.createElement('i'); b.className = 'bubble'; b.textContent = text; el.appendChild(b); setTimeout(() => b.remove(), 2400); }
+  // 말풍선은 카드가 다시 그려져도 살아 있어야 한다 — 남은 시간 동안은 renderMultiStrip 이 다시 붙인다
+  const bubbles = {};
+  function bubble(pid, text) { bubbles[pid] = { text, until: Date.now() + 2400 }; drawBubbles(); setTimeout(drawBubbles, 2450); }
+  function drawBubbles() { const now = Date.now(); for (const pid in bubbles) { const el = portraitEl(pid), b = bubbles[pid]; if (!el) continue; let i = el.querySelector('.bubble'); if (b.until <= now) { if (i) i.remove(); delete bubbles[pid]; continue; } if (!i) { i = document.createElement('i'); i.className = 'bubble'; el.appendChild(i); } i.textContent = b.text; } }
   function startOnline(sm, nm) {
     match = MULTI.newOnline(sm, Profile.get().pid, { name: nm, botNames: T('multi.botNames').split('·') });
     game = match.players[0].game; lastRank = myRank();
@@ -708,9 +721,15 @@
         <b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
         <span class="reps">${reps}</span><span class="rk">${T('multi.day', { n: r.day })}${bombs ? ' 🧨' + (bombs > 1 ? bombs : '') : ''}${g.shields ? ' 🛡' : ''}</span>
         <div class="wh ${over ? 'over' : fill >= 0.8 ? 'hot' : fill >= 0.5 ? 'mid' : ''}"><i style="width:${Math.round(fill * 100)}%"></i></div>
-        <span class="cash ${g.cash < 0 ? 'neg' : ''}" style="grid-column:1 / -1">★${r.repFinal != null ? r.repFinal : r.rep}${r.penalty ? `<small style="color:var(--red)">−${r.penalty}</small>` : ''} <small style="color:var(--dim)">${g.cash}c</small></span></div>`;
+        <span class="repline" style="grid-column:1 / -1">★<b class="repnum">${r.repFinal != null ? r.repFinal : r.rep}</b>${r.penalty ? `<small style="color:var(--red)">−${r.penalty}</small>` : ''}</span></div>`;
     }).join('');
     el.querySelectorAll('.mp').forEach(d => d.onclick = () => { SFX.click(); showOpponent(match.players[+d.dataset.id]); });
+    // 평판 숫자는 굴러간다 — 카드가 통째로 다시 그려져도 직전 값에서 이어서
+    if (stripRep.m !== match) { stripRep.m = match; stripRep.v = {}; }
+    for (const p of match.players) { const r = rows.find(x => x.p === p), v = r.repFinal != null ? r.repFinal : r.rep, was = stripRep.v[p.id], card = portraitEl(p.id);
+      if (was != null && was !== v) { pulse(card, v > was ? 'rep-up' : 'rep-down'); animNum(card && card.querySelector('.repnum'), was, v, x => String(x)); }
+      stripRep.v[p.id] = v; }
+    drawBubbles();
     const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.textContent = parts.join(' · '); }
   }
   // ---------- 연출 (8장): 발사 궤적 · 피격 비네트 · 방패 · 폭탄 · 배너 ----------
@@ -805,10 +824,10 @@
     if (settled) rows = settled.rows.map(x => { const p = match.players.find(q => q.id === x.pid) || { id: x.pid, name: x.pid }; return Object.assign({ p, name: p.name, human: p.human, alive: x.alive, done: true, day: x.day, cash: x.cash, rep: x.rep, repFinal: x.repFinal != null ? x.repFinal : x.rep, penalty: x.penalty || 0, rank: x.rank, verified: x.verified }, {}); });
     const me = rows.find(x => x.p.id === ME());
     if (!r.fanfare) { r.fanfare = true; if (me.rank === 1) { SFX.win(); BGM.oneShot('fanfare'); } else if (!me.alive) { SFX.over(); setTimeout(() => BGM.oneShot('gameover'), 300); } else SFX.levelup(); }
-    const P = Profile.get(); if (!r.profiled) { r.profiled = true; P.multi = P.multi || { played: 0, wins: 0, best: 0 }; P.multi.played++; if (me.rank === 1) P.multi.wins++; P.multi.best = Math.max(P.multi.best || 0, me.alive ? me.cash : 0); Profile.save(); }
-    const table = `<div class="mtable">${rows.map(x => `<div class="mrow ${x.human ? 'me' : ''} ${x.alive ? '' : 'dead'}"><b class="rank">${x.rank}</b><span class="nm">${esc(x.p.id === ME() ? T('multi.you') : x.name)}</span><span class="st">${x.alive ? T('multi.done') : T('multi.closed')} · ${T('multi.day', { n: x.day })}</span><span class="rep" style="font-weight:bold">★${x.repFinal != null ? x.repFinal : x.rep}${x.penalty ? `<small style="color:var(--red)"> −${x.penalty}</small>` : ''}</span><span class="cash" style="font-weight:normal;color:var(--dim)">${x.cash}c</span></div>`).join('')}</div>${(match.firstFinish || (settled && settled.first)) ? `<div class="d" style="text-align:center;color:var(--dim)">${T('multi.firstNote', { name: esc(pname(match.firstFinish ? match.firstFinish.id : settled.first)) })}</div>` : ''}`;
+    const P = Profile.get(); if (!r.profiled) { r.profiled = true; P.multi = P.multi || { played: 0, wins: 0, best: 0 }; P.multi.played++; if (me.rank === 1) P.multi.wins++; P.multi.best = Math.max(P.multi.best || 0, me.alive ? (me.repFinal != null ? me.repFinal : me.rep) : 0); Profile.save(); }
+    const table = `<div class="mtable">${rows.map(x => `<div class="mrow ${x.human ? 'me' : ''} ${x.alive ? '' : 'dead'}"><b class="rank">${x.rank}</b><span class="nm">${esc(x.p.id === ME() ? T('multi.you') : x.name)}</span><span class="st">${x.alive ? T('multi.done') : T('multi.closed')} · ${T('multi.day', { n: x.day })}</span><span class="rep" style="font-weight:bold;font-size:16px">★${x.repFinal != null ? x.repFinal : x.rep}${x.penalty ? `<small style="color:var(--red);font-size:11px"> −${x.penalty}</small>` : ''}</span></div>`).join('')}</div>${(match.firstFinish || (settled && settled.first)) ? `<div class="d" style="text-align:center;color:var(--dim)">${T('multi.firstNote', { name: esc(pname(match.firstFinish ? match.firstFinish.id : settled.first)) })}</div>` : ''}`;
     const body = `<div class="big-num">${T('multi.rank', { n: me.rank })}</div><p style="text-align:center;color:var(--dim)">${esc(I18n.text(r.reason))}</p>${table}
-      <div class="kv"><span>${T('res.revenue')}</span><span class="v">${r.revenue}c</span><span>${T('res.spent')}</span><span class="v">${r.spent}c</span><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${game.mperks.map(id => M.MULTI.PERKS[id].icon).join('') || T('common.none')}</span><span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
+      <div class="kv"><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${game.mperks.map(id => M.MULTI.PERKS[id].icon).join('') || T('common.none')}</span><span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
     const cheer = on && !settled ? `<div class="cheer">${CHEERS.map(c => `<button class="btn small" data-cheer="${c}">${c}</button>`).join('')}</div>` : '';
     const eloLine = on ? (settled ? (settled.rated && settled.elo[on.pid] ? `<div class="d" style="text-align:center;color:var(--gold)">${T('multi.eloLine', { a: settled.elo[on.pid].before, b: settled.elo[on.pid].elo, d: (settled.elo[on.pid].delta >= 0 ? '+' : '') + settled.elo[on.pid].delta, rank: esc(T('multi.rankName.' + settled.elo[on.pid].rank)) })}</div>` : `<div class="d" style="text-align:center;color:var(--dim)">${T(settled.void ? 'multi.unverified' : 'multi.unrated')}</div>`) : `<div class="d" style="text-align:center;color:var(--dim)">${T('multi.waitingOthers')}</div>`) : '';
     if (settled && settled.elo[on.pid]) { const P = Profile.get(); P.multi = Object.assign(P.multi || {}, { elo: settled.elo[on.pid].elo, rank: settled.elo[on.pid].rank }); Profile.save(); }
@@ -1004,13 +1023,20 @@
     // 멀티: 어음이 없으니 예상이 아니라 지금 잔액 그대로 — 보이는 숫자가 곧 점수다
     hc.textContent = inPlay && !R.multi ? pj.total : g.cash; hc.style.color = (inPlay && !R.multi ? pj.total : g.cash) < 0 ? 'var(--red)' : '';
     $('#hud-cash-lbl').textContent = inPlay && !R.multi ? T('hud.cashLbl') : T('hud.cash');
-    const due = $('#hud-due'); if (due && !inPlay) { due.textContent = g.debt ? T('hud.debt', { n: pj.loan }) : ''; due.hidden = false; }
+    // 난투: 돈은 점수가 아니다 — 자금 칸은 접고, 장·캠페인 살 때 필요한 잔액만 작게
+    $('#hud-cash-box').hidden = !!R.multi;
+    const due = $('#hud-due'); if (due && R.multi) { due.textContent = `${g.cash}c`; due.hidden = false; }
+    else if (due && !inPlay) { due.textContent = g.debt ? T('hud.debt', { n: pj.loan }) : ''; due.hidden = false; }
     else if (due) { const parts = [T('hud.cashNow', { n: g.cash })]; if (pj.pending) parts.push(T('hud.pending', { n: pj.pending })); if (pj.stock) parts.push(T('hud.stock', { n: pj.stock })); if (g.feesDue) parts.push(T('hud.feesDue', { n: g.feesDue })); parts.push(T('hud.opCostDue', { n: pj.opCost + pj.premium })); if (inst) parts.push(T('hud.instalment', { n: inst })); if (g.debt) parts.push(T('hud.debt', { n: pj.loan })); due.innerHTML = parts.join(' · ') + (pj.total < 0 && g.turn >= 5 ? ` · <span style="color:var(--orange)">${T('hud.loanWarn')}</span>` : ''); due.hidden = !hudDueOpen; }
     // 자금 분해(현금·재고·운영비·보험)는 매 턴 볼 필요가 없다 — 기본은 접고, 자금 칸을 누르면 펼친다.
     $('#hud-more').textContent = hudDueOpen ? '▴' : '▾';
     // 평판: 높을수록 좋다. 게이지가 비면 아무도 안 맡긴다 = 런 종료
     const rcap = g.repCap(), ratio = rcap ? g.rep / rcap : 1;
-    $('#stress-num').textContent = `${g.rep}/${rcap}`;
+    // 평판은 굴러가며 바뀐다(+ 반짝). 판이 바뀌면 이전 값은 잊는다
+    if (hudRep.g !== g) { hudRep.g = g; hudRep.v = null; }
+    const repEl = $('#stress-num');
+    if (hudRep.v != null && hudRep.v !== g.rep) { pulse($('#stress-wrap'), g.rep > hudRep.v ? 'rep-up' : 'rep-down'); if (R.multi) floatText(`★${g.rep > hudRep.v ? '+' : ''}${g.rep - hudRep.v}`, g.rep < hudRep.v, 78); }
+    animNum(repEl, hudRep.v, g.rep, v => `${v}/${rcap}`); hudRep.v = g.rep;
     // 등급 이름은 1단계를 넘겼을 때만 (그 전엔 지표 이름만 보여 HUD 한 줄을 지킨다)
     $('#stress-label').textContent = g.repTier > 0 ? g.repTierName() : T('hud.rep');
     const gauge = $('#stress-gauge'); gauge.querySelector('i').style.width = Math.max(0, Math.min(100, ratio * 100)) + '%';

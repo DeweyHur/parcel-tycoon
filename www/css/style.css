@@ -1038,7 +1038,16 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 #multi-strip .mp .day { display: none; }
 #multi-strip .mp .reps { white-space: nowrap; }
 #multi-strip .mp > span, #multi-strip .mp > b { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
-#multi-strip .mp .cash { font-size: 10px; }
+#multi-strip .mp .repline { font-size: 12px; color: var(--gold, #f2c14e); }
+#multi-strip .mp .repline .repnum { font-size: 14px; }
+/* 평판이 바뀌는 순간 — 숫자가 굴러가는 동안 카드/HUD 가 반짝 */
+@keyframes repUp { 0% { transform: scale(1); } 30% { transform: scale(1.18); filter: brightness(1.6) drop-shadow(0 0 6px rgba(242,193,78,.9)); } 100% { transform: scale(1); } }
+@keyframes repDown { 0% { transform: translateX(0); } 20% { transform: translateX(-3px); filter: brightness(1.3) drop-shadow(0 0 6px rgba(230,80,80,.9)); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 100% { transform: translateX(0); } }
+.rep-up { animation: repUp .8s ease-out; }
+.rep-down { animation: repDown .6s ease-out; }
+.rep-up .repnum, .rep-up #stress-num { color: #fff; }
+.rep-down .repnum, .rep-down #stress-num { color: var(--red, #e65050); }
+#stress-wrap .gauge i { transition: width .7s ease-out; }
 #multi-strip .mp.top .rk { color: var(--gold, #f2c14e); }
 #multi-strip .mp.dead { filter: grayscale(1); opacity: .55; }
 #multi-strip .mp.done { filter: sepia(.8); }
@@ -1065,12 +1074,12 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 .pkcard.fam-def { border-color: var(--blue, #5aa9e6); }
 .pkcard.fam-atk { border-color: var(--red, #e0524f); }
 .mtable { margin: 8px 0; }
-.mrow { display: grid; grid-template-columns: 22px 1fr auto auto auto; gap: 6px; align-items: center; padding: 5px 6px; border-bottom: 1px solid var(--line, #3a3860); font-size: 12px; }
+.mrow { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 6px; align-items: center; padding: 5px 6px; border-bottom: 1px solid var(--line, #3a3860); font-size: 12px; }
 .mrow.me { background: rgba(242,193,78,.12); }
 .mrow.dead { color: var(--dim, #aaa); }
 .mrow .rank { font-size: 14px; color: var(--gold, #f2c14e); }
 .mrow .st { font-size: 10px; color: var(--dim, #aaa); }
-.mrow .cash { font-weight: bold; }
+.mrow .rep { color: var(--gold, #f2c14e); }
 .kv2 { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px dashed var(--line, #3a3860); }
 .mperks { font-size: 20px; margin-top: 6px; }
 #hud-perks sub { font-size: 8px; }

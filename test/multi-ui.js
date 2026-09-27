@@ -30,7 +30,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const oneDay = async () => { const did = await page.evaluate(() => { const g = PT.game; if (g.phase !== 'play' || g.perkOffer) return 'skip'; const B = window.BOT; const b = B.STRATS.balanced(g); if (b) { document.querySelector('#c' + b.i).click(); return 'card'; } document.querySelector('#wait-btn').click(); return 'wait'; }); await page.waitForTimeout(150); if (did === 'card') { await page.evaluate(() => { const w = document.querySelector('#wait-btn'); if (!w.disabled) w.click(); }); } await page.waitForTimeout(400); await idle(); return did; };
   for (let i = 0; i < 8; i++) await oneDay();
   const d8 = await page.evaluate(() => { const g = PT.game, m = PT.match; return { day: g.totalTurn, bots: m.players.slice(1).map(p => p.game.totalTurn), strip: document.querySelector('#multi-strip').textContent, fees: g.feesDue, save: !!localStorage.getItem('pt_multi_v1'), single: !!localStorage.getItem('pt_save_v2') }; });
-  ok('8일 뒤: 봇들도 각자 시계로 따라옴 · 배차비 즉시 결제(후불 0) · 멀티 저장 키만', d8.day >= 8 && d8.bots.every(b => b >= 5) && d8.fees === 0 && d8.save && !d8.single, JSON.stringify(d8));
+  ok('8일 뒤: 봇들도 각자 시계로 따라옴 · 배차비 즉시 결제(후불 0) · 저장 없음', d8.day >= 8 && d8.bots.every(b => b >= 5) && d8.fees === 0 && !d8.save && !d8.single, JSON.stringify(d8));
   await page.screenshot({ path: `${OUT}/M-02-day8.png` });
   // 장은 보름에 한 번: 사이클 마지막 날을 넘기면 정산 팝업 없이 곧장 장(마켓)이 뜬다 — 업그레이드·강화·창고·광고만
   await page.evaluate(() => { const g = PT.game; g.cash = 900; g.turn = g.turns(); g.parcels = []; g.schedule = g.schedule.map(() => []); PT.renderAll(); document.querySelector('#wait-btn').click(); });
@@ -84,20 +84,20 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   // 포트레잇 4개
   const faces = await page.evaluate(() => [...document.querySelectorAll('#multi-strip .mp .face')].map(i => i.getAttribute('src').startsWith('data:image')));
   ok('포트레잇 4개(스프라이트)', faces.length === 4 && faces.every(Boolean));
-  // 저장 → 새로고침 → 이어하기
+  // 난투는 저장하지 않는다 — saveGame 을 불러도 멀티 저장 키가 안 생기고, 자금 칸은 접혀 있고 잔액만 작게, 상대 카드엔 평판만
   await page.evaluate(() => PT.saveGame());
-  const saved = await page.evaluate(() => ({ day: PT.game.totalTurn, cash: PT.game.cash, bots: PT.match.players.slice(1).map(p => p.game.totalTurn) }));
-  await page.reload(); await page.waitForTimeout(800);
-  for (let i = 0; i < 10; i++) { if (await page.$('#t-multi-cont')) break; await page.mouse.click(200, 400); await page.waitForTimeout(300); }
-  ok('타이틀에 난투 이어하기', !!(await page.$('#t-multi-cont')));
-  await page.click('#t-multi-cont'); await page.waitForTimeout(800); await idle();
-  const cont = await page.evaluate(() => ({ day: PT.game.totalTurn, cash: PT.game.cash, bots: PT.match.players.slice(1).map(p => p.game.totalTurn), multi: PT.game.rules.multi, mperks: PT.game.mperks }));
-  ok('이어하기: 사람·봇 판 그대로', cont.day === saved.day && cont.cash === saved.cash && JSON.stringify(cont.bots) === JSON.stringify(saved.bots) && cont.multi && cont.mperks.length === 1, JSON.stringify({ saved, cont }));
+  const nosave = await page.evaluate(() => ({ save: !!localStorage.getItem('pt_multi_v1'), cashBox: document.querySelector('#hud-cash-box').hidden, due: document.querySelector('#hud-due').textContent, stripCash: /\dc\b/.test(document.querySelector('#multi-strip').textContent), repnum: document.querySelectorAll('#multi-strip .repnum').length }));
+  ok('저장 없음 · HUD 자금 칸 접힘(잔액만 작게) · 상대 카드는 평판만', !nosave.save && nosave.cashBox && /c$/.test(nosave.due) && !nosave.stripCash && nosave.repnum === 4, JSON.stringify(nosave));
+  // 평판이 오르면 숫자가 굴러가며 카드·HUD 가 반짝인다
+  const anim = await page.evaluate(async () => { const g = PT.game; const before = document.querySelector('#stress-num').textContent; g.addRep(3, 'test'); PT.renderAll(); await new Promise(r => setTimeout(r, 120));
+    const mid = document.querySelector('#stress-num').textContent, pulsing = document.querySelector('#stress-wrap').classList.contains('rep-up') || document.querySelector('#multi-strip .mp.me').classList.contains('rep-up');
+    await new Promise(r => setTimeout(r, 1000)); return { before, mid, after: document.querySelector('#stress-num').textContent, pulsing, card: document.querySelector('#multi-strip .mp.me .repnum').textContent, rep: g.rep }; });
+  ok('평판 +3: 숫자가 굴러감(중간값) · 반짝 · 끝값 일치', anim.pulsing && anim.mid !== anim.after && anim.after.startsWith(anim.rep + '/') && +anim.card === anim.rep, JSON.stringify(anim));
   // 끝까지: 사람은 빨리 감기(호출·대기 봇으로), 결과 = 순위표
   await page.evaluate(() => { const g = PT.game; let guard = 0; while ((g.phase === 'play' || g.phase === 'market') && !(g.month === g.rules.months && g.turn === g.turns()) && guard++ < 300) { if (g.perkOffer) window.BOT.pickPerkBot(g); window.BOT.multiDay(g, 'balanced'); } if (g.perkOffer) window.BOT.pickPerkBot(g); });
   await page.evaluate(() => { PT.renderAll(); }); await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(1500); await idle();
   t = await modalText();
-  const res = await page.evaluate(() => ({ phase: PT.game.phase, reason: PT.game.result && PT.game.result.reason, rep: PT.game.rep, day: PT.game.totalTurn, rows: document.querySelectorAll('.mrow').length, allDone: PT.match.players.every(p => p.game.phase === 'win' || p.game.phase === 'over'), save: !!localStorage.getItem('pt_multi_v1'), multi: (Profile.get().multi || {}).played }));
+  const res = await page.evaluate(() => ({ phase: PT.game.phase, reason: PT.game.result && PT.game.result.reason, rep: PT.game.rep, day: PT.game.totalTurn, rows: document.querySelectorAll('.mrow').length, allDone: PT.match.players.every(p => p.game.phase === 'win' || p.game.phase === 'over'), save: !!localStorage.getItem('pt_multi_v1'), multi: (Profile.get().multi || {}).played, best: (Profile.get().multi || {}).best }));
   ok('결과: 순위표 4줄 · 봇 전부 완주 · 저장 삭제 · 프로필 기록', /난투/.test(t) && res.rows === 4 && res.allDone && !res.save && res.multi === 1, JSON.stringify(res) + ' ' + t.slice(0, 60).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-05-result.png` });
   ok('콘솔 에러 0', errors.length === 0, errors.slice(0, 5).join(' | '));
