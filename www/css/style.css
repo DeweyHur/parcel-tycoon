@@ -1037,6 +1037,8 @@ table.cmp td.up { color: var(--green); } table.cmp td.down { color: var(--red); 
 #multi-strip .mp.me { border-color: var(--gold, #f2c14e); }
 #multi-strip .mp .day { display: none; }
 #multi-strip .mp .reps { white-space: nowrap; }
+#multi-strip .mp > span, #multi-strip .mp > b { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+#multi-strip .mp .cash { font-size: 10px; }
 #multi-strip .mp.top .rk { color: var(--gold, #f2c14e); }
 #multi-strip .mp.dead { filter: grayscale(1); opacity: .55; }
 #multi-strip .mp.done { filter: sepia(.8); }

@@ -336,7 +336,7 @@
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
       unlimitedCalls: true, payNow: true, noLoan: true, noBankrupt: true,   // 배차 무제한 · 즉시 결제 · 어음 없음. 잔액 마이너스면 호출을 못 해 물량으로 죽는다
-      shopDay: true, noCycleMarket: true, autoSummary: true,             // 마켓 = 「장 보러 간 날」(하루 소모). 정산은 자동, 팝업 없이 로그 한 줄
+      shopDay: false, noCycleMarket: false, autoSummary: true,           // 장은 보름에 한 번, 정산 뒤에(개인 런 마켓 자리 — 유저: 하루 소모 대신 사이클 끝에). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」(하루 소모) 실험용으로 남겨 둔다
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 폭탄으로 돌아온다)
       repStep: 8, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +8 · 퍽 3택1 (문서는 +5 — 봇 판에서 13번 올라 8로. 석 달에 7~9번). 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
       sharedSchedule: true, fixedCustLevel: 2, dayArrivalsRate: 0.03, finalRushMult: 1.8,   // 입고 대본은 매치 공유 · 일차에 비례해 오른다(문서 0.025) · 마지막 보름 「마감 폭주」(문서 ×1.5). 봇 판(test/multi-sim.js)으로 올렸다

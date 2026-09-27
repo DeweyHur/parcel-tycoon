@@ -145,12 +145,13 @@ function urgency(g) {
   }
   // 멀티 봇 하루: 퍽이 떠 있으면 고르고, 장을 볼 날이면 장을 보고(하루 소모), 아니면 호출/대기. 반환: 진행했으면 true
   function multiDay(g, strat) {
+    if (g.phase === 'market') { shopBot(g); g.closeMarket(); return true; }   // 사이클 끝 장(보름에 한 번)
     if (g.phase !== 'play') return false;
     if (g.perkOffer) pickPerkBot(g);
     if (g.offer) g.declineOffer();
     const wish = shopWish(g);
     const urgent = g.parcels.some(p => p.deadline <= 1 || p.overdue || ((p.attrs || []).includes('cold') && !p.inCold));
-    if (wish && !urgent && g.usage() < 0.6 && g.month < g.rules.months) { g.openShop(); shopBot(g); g.closeMarket(); return true; }
+    if (g.rules.shopDay && wish && !urgent && g.usage() < 0.6 && g.month < g.rules.months) { g.openShop(); shopBot(g); g.closeMarket(); return true; }   // 「장 보러 간 날」 규칙일 때만
     const b = STRATS[strat || 'balanced'](g);
     if (b) { const r = g.callCarrier(b.i, b.ids, b.trucks); if (r.ok) return true; }
     const se = g.selfEligible().sort((a, b) => a.deadline - b.deadline).slice(0, g.selfCount());

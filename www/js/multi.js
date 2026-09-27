@@ -76,6 +76,21 @@
     t.game.receiveBomb({ size: M.MULTI.BOMB.size, days: M.MULTI.BOMB.days, hops: 0, from: null });
     match.news.push({ type: 'bomb', from: null, to: [t.id], drop: true });
   }
+  // ----- 재실행 검증 (3단계) — 같은 cfg·같은 입력 로그면 같은 판이 나와야 한다. 서버가 종료 시 돌려 본다 -----
+  // 로그 항목: wait{ids} · call{i,ids,n} · self{ids} · shop · buy{i,s,m} · close · perk{id} · atk{a} · bomb{b}
+  function replay(cfg, log) {
+    const g = new Game(Object.assign({}, cfg, { multi: true, prep: false, mperks: [] }));   // 퍽은 로그(perk)로 다시 고른다 — cfg 에 남은 mperks 는 비운다
+    for (const e of log || []) {
+      if (g.phase === 'over' || g.phase === 'win') break;
+      if (e.t === 'wait') g.wait(e.ids); else if (e.t === 'call') g.callCarrier(e.i, e.ids, e.n || undefined); else if (e.t === 'self') g.selfShip(e.ids);
+      else if (e.t === 'shop') g.openShop(); else if (e.t === 'buy') g.buy(e.i, e.s, e.m || undefined); else if (e.t === 'close') g.closeMarket();
+      else if (e.t === 'perk') g.pickPerk(e.id); else if (e.t === 'atk') g.receiveAttack(e.a); else if (e.t === 'bomb') g.receiveBomb(e.b);
+      g.takeEvents();
+    }
+    return g;
+  }
+  function fingerprint(g) { return { cash: g.cash, rep: g.rep, day: dayOf(g), phase: g.phase, tier: g.repTier, delivered: g.run.delivered }; }
+  function verify(cfg, log, claimed) { const g = replay(cfg, log), f = fingerprint(g); return { ok: f.cash === claimed.cash && f.rep === claimed.rep && f.day === claimed.day && (claimed.phase == null || f.phase === claimed.phase), got: f }; }
   function takeNews(match) { return (match.news || (match.news = [])).splice(0); }
   // 사람이 하루를 넘겼다 → 봇들도 제 속도로 따라온다 (누적 소수점: 1.15 면 스무 날에 세 번 이틀)
   function tick(match) {
@@ -103,6 +118,6 @@
   function toJSON(match) { return { v: match.v, seed: match.seed, started: match.started, rng: match.rng, cycleDrops: match.cycleDrops || 0, players: match.players.map(p => ({ id: p.id, name: p.name, human: p.human, face: p.face, strat: p.strat, speed: p.speed, game: p.game.toJSON() })) }; }
   function fromJSON(o) { return { v: o.v, seed: o.seed, started: o.started, rng: o.rng || hash('route' + o.seed), cycleDrops: o.cycleDrops || 0, news: [], players: o.players.map((p, i) => ({ face: FACES[i % FACES.length], ...p, game: Game.fromJSON(p.game) })) }; }
 
-  const MULTI = { SCENARIO, FACES, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
+  const MULTI = { SCENARIO, FACES, replay, fingerprint, verify, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
   if (typeof module !== 'undefined') module.exports = MULTI; else root.MULTI = MULTI;
 })(typeof window !== 'undefined' ? window : globalThis);

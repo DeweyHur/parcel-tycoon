@@ -109,6 +109,7 @@
       this.perks = cfg.perks.slice();
       this.mperks = (cfg.mperks || []).slice(); this.perkOffer = null;   // 멀티: 평판 등급업마다 3택1로 고른 퍽 · 지금 떠 있는 카드 3장
       // 멀티 2단계: 상대에게서 온 공격 큐(다음 날로 넘길 때 적용) · 나가는 것(공격·폭탄 이사, multi.js 가 라우팅) · 방패 · 임시 칸 · 한 방 · 덤 트럭
+      this.actLog = [];   // 멀티 3단계: 입력 로그 — 서버가 같은 시드로 다시 돌려 검증한다 (MULTI.replay)
       this.inbox = []; this.outbox = []; this.shields = 0; this.capMods = []; this.focusNext = false; this.freeTruckNext = false; this.freshFreezeUntil = 0; this.roadblockDay = 0;
       this.month = 0; this.turn = 0;
       // 런의 해. 시나리오(rules.year)나 cfg 가 지정하면 그 해, 아니면 시작한 해를 찍어 세이브에 고정한다.
@@ -643,6 +644,7 @@
     }
 
     // ----- 멀티 2단계: 트레잇 · 공격 인박스 · 이삿짐 폭탄 (docs/MULTIPLAYER_DESIGN.md 3·4장) -----
+    _act(t, a) { if (this.rules.multi) this.actLog.push(Object.assign({ t }, a || {})); }
     traitDef(id) { return (M.MULTI && M.MULTI.TRAITS && M.MULTI.TRAITS[id]) || null; }
     // 기한 안에 출고된 택배의 트레잇 발동. 보너스는 나에게 지금, 공격은 outbox 로 — multi.js 가 상대 인박스에 넣는다
     _fireTrait(p) {
@@ -671,7 +673,7 @@
     }
     _capMod(delta, days, why) { this.capMods.push({ delta, until: this.totalTurn + days, why }); this.warehouse.cap += delta; this._assignCold(); }
     // 상대가 보낸 공격 — 큐에 쌓였다가 내가 다음 날로 넘길 때 적용된다. 마감·폐업한 창고에는 못 넣는다
-    receiveAttack(a) { if (this.phase === 'over' || this.phase === 'win') return false; this.inbox.push(a); return true; }
+    receiveAttack(a) { if (this.phase === 'over' || this.phase === 'win') return false; this._act('atk', { a: { trait: a.trait, mult: a.mult, from: a.from, fromName: a.fromName } }); this.inbox.push(a); return true; }
     _multiDay() {
       const R = this.rules;
       for (const m of this.capMods.slice()) if (this.totalTurn >= m.until) { this.warehouse.cap -= m.delta; this.capMods.splice(this.capMods.indexOf(m), 1); }
@@ -703,6 +705,7 @@
     _bombNext(b) { const B = M.MULTI.BOMB; return { size: Math.min(B.maxSize, this.storageVol(b) + 1), days: Math.max(1, b.turns - 1), hops: (b.hops || 0) + 1, from: this.cfg.pid != null ? this.cfg.pid : null }; }
     receiveBomb(b) {
       if (this.phase === 'over' || this.phase === 'win') return { ok: false };
+      this._act('bomb', { b: { size: b.size, days: b.days, hops: b.hops || 0, from: b.from == null ? null : b.from, back: !!b.back } });
       const B = M.MULTI.BOMB;
       if (b.size >= B.maxSize && b.days <= 1 && b.hops > 0) {   // 다 커진 폭탄은 도착하는 순간 터진다 — 초과분 도난 판정 1회, 그 뒤 소멸
         const over = Math.max(0, this.usedVolume() + b.size - this.warehouse.cap); let stolen = 0, vol = 0;
@@ -965,6 +968,7 @@
     selfTripsLeft() { return Math.max(0, this.selfTrips() - ((this.monthStats && this.monthStats.selfTrips) || 0)) + ((this.weekendBonus && this.weekendBonus.self) || 0); }
     // 직접 배송: 영업일을 넘기지 않는다 (긴급처럼). 보름 횟수를 하나 쓴다
     selfShip(ids) {
+      this._act('self', { ids: (ids || []).slice() });
       if (this.phase !== 'play') return { ok: false, msg: T('err.cannotShipNow') };
       if (this.selfTripsLeft() <= 0) return { ok: false, msg: T('err.selfTrips') };
       const r = this.selfDeliver(ids);
@@ -1060,7 +1064,8 @@
       if (p.used) return { ok: false, reason: 'used' };
       if (p.active) return { ok: false, reason: 'active', left: p.activeLeft };
       // 광고비도 배차비처럼 후불 — 정산에서 빠진다. 월중에 잔고가 바닥이어도 창고가 비면 광고를 걸 수 있어야 한다
-      this.feesDue += p.cost; this.monthStats.spent += p.cost; this.run.spent += p.cost;
+      if (this.rules.payNow) this.cash -= p.cost; else this.feesDue += p.cost;
+      this.monthStats.spent += p.cost; this.run.spent += p.cost;
       const roll = this._campaignRoll(p.id);   // 눈금을 쓰기 전에 굴린다 — 미리보기와 같은 '몇 번째' 씨앗
       this.campaignCycle = this.month;
       if (!this.mediaRuns || this.mediaRuns.m !== this.month) this.mediaRuns = { m: this.month, used: {} };
@@ -1395,6 +1400,7 @@
     // 3택1: 고른 퍽을 얹고 규칙을 다시 짠다. 즉시 효과(now: 칸·현금)는 여기서 한 번 적용
     pickPerk(id) {
       if (!this.perkOffer || !this.perkOffer.includes(id)) return { ok: false, msg: T('err.cannotCallNow') };
+      this._act('perk', { id });
       const pk = M.MULTI.PERKS[id];
       this.mperks.push(id); (this.cfg.mperks = this.cfg.mperks || []).push(id);
       this._buildRules();
@@ -1731,6 +1737,7 @@
 
     // 대기: 턴을 넘긴다. selfIds를 주면 그 택배를 직접 배송(배송비 지불, 보상 그대로)하고 넘긴다
     wait(selfIds) {
+      if (this.phase === 'play') this._act('wait', { ids: (selfIds || []).slice() });
       if (this.phase !== 'play') return false;
       // 창고가 (거의) 빈 채로 하루를 넘긴 날 — 캠페인을 소개할 때를 잰다. 4분의 1도 안 찬 날은 비어 노는 날이다
       if (this.usedVolume() <= this.warehouse.cap * 0.25) this.emptyDays = (this.emptyDays || 0) + 1;
@@ -1748,6 +1755,7 @@
 
     callCarrier(slotIdx, pickIds, trucksArg) {
       if (this.phase !== 'play') return { ok: false, msg: T('err.cannotCallNow') };
+      this._act('call', { i: slotIdx, ids: (pickIds || []).slice(), n: trucksArg || 0 });
       const c = this.contracts[slotIdx], R = this.rules;
       if (!c) return { ok: false, msg: T('err.emptySlot') };
       if (this.offFor(c)) return { ok: false, msg: T('err.holidayOff') };
@@ -2171,6 +2179,8 @@
     // ----- market -----
     _openMarket() {
       this.phase = 'market';
+      // 멀티: 사이클 끝 마켓도 「장」이다 — 업그레이드·강화·창고·광고만 (새 계약·배차·매물 새로고침 없음)
+      if (this.rules.multi) { this.market = { items: this._shopItems(), bought: 0, refreshes: 0, month: this.month, shop: true, freeRefresh: 0 }; return; }
       this.market = { items: this._genMarketItems(this.month + 1), bought: 0, refreshes: 0, month: this.month, freeRefresh: this.rules.freeRefresh };
       this.say('log.marketOpen', { cal: this.calMonth(), half: this.half(), max: this.rules.marketMaxBuy });
     }
@@ -2470,6 +2480,7 @@
     }
     buy(itemIdx, target, mode) {
       if (this.phase !== 'market') return { ok: false, msg: T('err.notMarket') };
+      this._act('buy', { i: itemIdx, s: target, m: mode || null });
       const R = this.rules, it = this.market.items[itemIdx];
       if (!it || it.sold) return { ok: false, msg: T('err.sold') };
       if (it.kind === 'deal') { const r = this.signDeal(it.customer, it.cycles, it.renew); if (!r.ok) return { ok: false, msg: T('err.deal.' + r.reason, { n: M.CUSTOMER_SLOTS }) }; it.sold = true; return { ok: true, deal: true }; }   // 서명은 공짜, 구매 한도와 무관
@@ -2568,9 +2579,10 @@
     // 매물은 보유 계약의 다음 등급 센터(갈아타기) · 강화 · 창고 확장·냉장·마당만 — 새 계약·배차 항목·매물 새로고침 없음
     openShop() {
       if (this.phase !== 'play') return { ok: false, msg: T('err.notPlay') };
+      this._act('shop');
       if (!this.rules.shopDay) return { ok: false, msg: T('err.notMarket') };
       this.phase = 'market';
-      this.market = { items: this._shopItems(), bought: 0, refreshes: 0, month: this.month, shop: true, freeRefresh: 0 };
+      this.market = { items: this._shopItems(), bought: 0, refreshes: 0, month: this.month, shop: true, dayCost: true, freeRefresh: 0 };
       return { ok: true };
     }
     _shopItems() {
@@ -2587,11 +2599,14 @@
       fac(['expand1', 'expand2', 'expand3'].find(f => !this.warehouse[f]) || 'expand3');
       fac(['cold1', 'cold2'].find(f => !this.warehouse[f]) || 'cold2');
       fac('yard');
+      // 광고: 캠페인(📣)으로 물량을 끌어오는 게 난투의 조절 손잡이다 — 매체·매체 강화·광고권은 판다 (성장 투자는 없다)
+      for (const it of this._adAndGrowthItems(mult)) if (['adTicket', 'media', 'mediaUp'].includes(it.kind)) items.push(it);
       return items;
     }
     closeMarket() {
       if (this.phase !== 'market') return false;
-      const prep = this.market.prep, shop = this.market.shop;
+      this._act('close');
+      const prep = this.market.prep, shop = this.market.shop && this.market.dayCost;
       this.market = null;
       if (shop) {   // 장 보러 간 날: 하루가 간다 — 대기와 같은 마감(입고·기한·정산 그대로), 배송만 없다
         this.phase = 'play'; this.stats.shopDays = (this.stats.shopDays || 0) + 1; this.monthStats.waits++; this.run.waits++; this.stats.waits++;

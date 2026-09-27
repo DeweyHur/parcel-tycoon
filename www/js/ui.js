@@ -101,7 +101,7 @@
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
       <button class="btn gold" id="t-new">${T('title.new')}</button>
       ${msave ? `<button class="btn cta cont" id="t-multi-cont">${T('title.multiCont')}<small class="cont-sub">⚔ D+${msave.players[0].game.totalTurn || 0}</small></button>` : ''}
-      <button class="btn" id="t-multi">⚔ ${T('title.multi')} <small style="color:var(--dim)">${T('title.multiSub')}</small></button>
+      <button class="btn" id="t-multi">⚔ ${T('title.multi')}</button>
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).filter(achShown).length, d: Object.keys(M.ACHIEVEMENTS).filter(achShown).length })}</small></button>
       ${BUILD.api ? `<button class="btn" id="t-rank">${T('title.rank')}</button>` : ''}
       <button class="btn" id="t-rec">${T('title.records')} <small style="color:var(--dim)">${T('title.recordsSub', { best: P.stats.bestScore, w: P.stats.clears, l: P.stats.runs - P.stats.clears })}</small></button>
@@ -870,7 +870,7 @@
     const g = game, R = g.rules;
     // 재고는 늘 펼쳐져 있다 — 상자 격자가 곧 창고이고, 차를 부르면 그대로 고르는 판이 된다
     const pk = ensurePick();
-    $('#invest-btn').hidden = !(g.shows('invest') && g.campaignOpen()) || R.multi;   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다 (멀티엔 홍보가 없다)
+    $('#invest-btn').hidden = !(g.shows('invest') && g.campaignOpen());   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다
     // 돌고 있는 캠페인은 버튼에 매체 아이콘 + 남은 날(물량이 아직 들어오는 날 수)로 — 📰2 📻3
     { const act = (g.campaignRuns || []).filter(r => r.m === g.month && r.end > g.turn), ib = $('#invest-btn');
       ib.classList.toggle('active', act.length > 0);
@@ -995,7 +995,7 @@
     if (f.overdue) warn.push(T('wait.overdue', { n: f.overdue })); if (f.spoil) warn.push(T('wait.spoil', { n: f.spoil })); if (f.frozenOver) warn.push(T('wait.frozenOver', { n: f.frozenOver }));
     wb.className = 'btn primary' + (f.used > f.cap || f.spoil || f.frozenOver ? ' danger' : '');
     // 오늘 영업을 마치면 받게 될 다음 입고 — 매 턴 가장 중요한 결정을 흐리거나 자르지 않는다.
-    const restsNext = g.isWeekendAfter(g.turn) && !g.shows('weekendChoice');   // 마감하면 그대로 쉬는 날로 넘어간다
+    const restsNext = !R.noWeekend && g.isWeekendAfter(g.turn) && !g.shows('weekendChoice');   // 마감하면 그대로 쉬는 날로 넘어간다
     wb.innerHTML = `${restsNext ? T('wait.btnRest') : T('wait.btnPlain')}<small>${f.monthEnd ? T('hud.monthEnd') : T('wait.next', { used: f.used, cap: f.cap, over: f.used > f.cap ? T('wait.over') : '' })}${warn.length ? ` <b class="wrisk">${warn.join(' · ')}</b>` : ''}</small>`;
     renderCoach();
   }
@@ -1906,7 +1906,8 @@
       const lastCycle = mk.month >= game.rules.months;
       // 멀티 장(shop): 나오면 하루가 간다 — 대기와 같은 마감 연출(afterTurn)로
       const shopClose = () => { closeModal(); game.closeMarket(); busy = true; renderAll(); const evs = game.takeEvents(); saveGame(); SFX.wait(); setTimeout(() => afterTurn(evs), 250); };
-      const m = modal(mk.shop ? T('multi.shopTitle') : mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), (mk.shop ? `<div class="d" style="text-align:center;margin-bottom:6px">${T('multi.shopSub')}</div>` : '') + body, [{ label: mk.shop ? T('multi.shopClose') : lastCycle ? T('mk.endChapter') : T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: mk.shop ? shopClose : () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], { html: `<b class="mk-cash"${game.cash < 0 ? ' style="color:var(--red)"' : ''}>${game.cash}</b>c` });   // 가격 배율 대신 자금 — HUD 자금과 같은 색 — 살 수 있는지가 먼저다
+      const dayShop = mk.shop && mk.dayCost;
+      const m = modal(dayShop ? T('multi.shopTitle') : mk.prep ? T('mk.prepTitle') : T('mk.title', { n: game.cycleLabel(mk.month) }), (dayShop ? `<div class="d" style="text-align:center;margin-bottom:6px">${T('multi.shopSub')}</div>` : '') + body, [{ label: dayShop ? T('multi.shopClose') : lastCycle ? T('mk.endChapter') : T('mk.startMonth', { n: game.cycleLabel(mk.month + 1) }), cls: 'primary', onClick: dayShop ? shopClose : () => { closeModal(); game.closeMarket(); game.takeEvents(); scene.sync(game, { animate: true }); SFX.thud(); saveGame(); renderAll(); if (game.strikeCarrier) toast(T('toast.strike', { name: D.CARRIERS[game.strikeCarrier].name }), 3000); checkPhase(); if (game.phase === 'play') { storyCheck({ kind: game.month === 1 && game.turn === 1 ? 'start' : 'turn' }); showSms(); } } }], { html: `<b class="mk-cash"${game.cash < 0 ? ' style="color:var(--red)"' : ''}>${game.cash}</b>c` });   // 가격 배율 대신 자금 — HUD 자금과 같은 색 — 살 수 있는지가 먼저다
       const rb = m.querySelector('#mk-refresh'); if (rb) rb.onclick = () => { const r = game.refreshMarket(); if (r.ok) { SFX.buy(); render(); } else toast(r.msg); };
       storyCheck({ kind: 'market', bought: mk.bought, fcOpen: true });   // 렌더마다 — 충전을 누르면 다음 안내로 이어진다
       const bind = (sel, fn) => { const el = m.querySelector(sel); if (el) el.onclick = fn; };

@@ -23,8 +23,8 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('타이틀에 난투 버튼', !!(await page.$('#t-multi')));
   await page.screenshot({ path: `${OUT}/M-00-title.png` });
   await page.click('#t-multi'); await page.waitForTimeout(800); await idle();
-  const st = await page.evaluate(() => { const g = PT.game, m = PT.match; return { multi: g.rules.multi, players: m.players.length, strip: !document.querySelector('#multi-strip').hidden, cols: document.querySelectorAll('#multi-strip .mp').length, shop: !document.querySelector('#shop-btn').hidden, turn: document.querySelector('#hud-turn').textContent, c3: document.querySelector('#c3').hidden, cap: g.warehouse.cap, cash: g.cash, months: g.rules.months }; });
-  ok('난투 시작: 멀티 규칙 · 4인 · 상대 줄 4칸 · 장 보기 버튼 · D+1 · 빈 슬롯 숨김', st.multi && st.players === 4 && st.strip && st.cols === 4 && st.shop && /D\+1/.test(st.turn) && st.c3, JSON.stringify(st));
+  const st = await page.evaluate(() => { const g = PT.game, m = PT.match; return { multi: g.rules.multi, players: m.players.length, strip: !document.querySelector('#multi-strip').hidden, cols: document.querySelectorAll('#multi-strip .mp').length, shop: document.querySelector('#shop-btn').hidden, turn: document.querySelector('#hud-turn').textContent, c3: document.querySelector('#c3').hidden, cap: g.warehouse.cap, cash: g.cash, months: g.rules.months }; });
+  ok('난투 시작: 멀티 규칙 · 4인 · 상대 줄 4칸 · 장 보기 버튼 없음 · D+1 · 빈 슬롯 숨김', st.multi && st.players === 4 && st.strip && st.cols === 4 && st.shop && /D\+1/.test(st.turn) && st.c3, JSON.stringify(st));
   await page.screenshot({ path: `${OUT}/M-01-day1.png` });
   // 며칠 플레이: 차가 차면 부르고, 아니면 호출 없음 (봇이 따라오는지)
   const oneDay = async () => { const did = await page.evaluate(() => { const g = PT.game; if (g.phase !== 'play' || g.perkOffer) return 'skip'; const B = window.BOT; const b = B.STRATS.balanced(g); if (b) { document.querySelector('#c' + b.i).click(); return 'card'; } document.querySelector('#wait-btn').click(); return 'wait'; }); await page.waitForTimeout(150); if (did === 'card') { await page.evaluate(() => { const w = document.querySelector('#wait-btn'); if (!w.disabled) w.click(); }); } await page.waitForTimeout(400); await idle(); return did; };
@@ -32,19 +32,19 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const d8 = await page.evaluate(() => { const g = PT.game, m = PT.match; return { day: g.totalTurn, bots: m.players.slice(1).map(p => p.game.totalTurn), strip: document.querySelector('#multi-strip').textContent, fees: g.feesDue, save: !!localStorage.getItem('pt_multi_v1'), single: !!localStorage.getItem('pt_save_v2') }; });
   ok('8일 뒤: 봇들도 각자 시계로 따라옴 · 배차비 즉시 결제(후불 0) · 멀티 저장 키만', d8.day >= 8 && d8.bots.every(b => b >= 5) && d8.fees === 0 && d8.save && !d8.single, JSON.stringify(d8));
   await page.screenshot({ path: `${OUT}/M-02-day8.png` });
-  // 장 보기: 하루가 간다
-  await page.evaluate(() => { PT.game.cash = 900; PT.renderAll(); });
-  const before = await page.evaluate(() => PT.game.totalTurn);
-  await page.click('#shop-btn'); await page.waitForTimeout(500);
+  // 장은 보름에 한 번: 사이클 마지막 날을 넘기면 정산 팝업 없이 곧장 장(마켓)이 뜬다 — 업그레이드·강화·창고·광고만
+  await page.evaluate(() => { const g = PT.game; g.cash = 900; g.turn = g.turns(); g.parcels = []; g.schedule = g.schedule.map(() => []); PT.renderAll(); document.querySelector('#wait-btn').click(); });
+  await page.waitForTimeout(900); await idle();
   let t = await modalText();
-  ok('장 화면: 제목·업그레이드·강화·창고, 충전·새 계약·새로고침 없음', /장 보러 간 날/.test(t) && /↑/.test(t) && !/충전/.test(t) && !/새 계열|새 계약/.test(t) && !(await page.$('#mk-refresh')), t.slice(0, 160).replace(/\s+/g, ' '));
+  const cyc = await page.evaluate(() => ({ phase: PT.game.phase, shop: !!(PT.game.market && PT.game.market.shop), kinds: [...new Set((PT.game.market || { items: [] }).items.map(i => i.kind))], invest: !document.querySelector('#invest-btn').hidden || true, shopBtn: document.querySelector('#shop-btn').hidden }));
+  ok('사이클 끝 → 장: 업그레이드·강화·창고·광고, 충전·새 계약·새로고침 없음, 장 보기 버튼 없음', cyc.phase === 'market' && cyc.shop && /↑/.test(t) && !/충전/.test(t) && !/새 계열|새 계약/.test(t) && !(await page.$('#mk-refresh')) && cyc.shopBtn && cyc.kinds.every(k => ['contract', 'enh', 'fac', 'adTicket', 'media', 'mediaUp'].includes(k)), JSON.stringify(cyc) + ' ' + t.slice(0, 120).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-03-shop.png` });
   const bought = await page.evaluate(() => { const g = PT.game; const i = g.market.items.findIndex(it => it.kind === 'fac' && it.fac === 'expand1'); const cap = g.warehouse.cap; const el = document.querySelector(`#modal .card[data-i="${i}"]`); el.click(); return { cap, after: PT.game.warehouse.cap, cash: PT.game.cash }; });
   await page.waitForTimeout(300);
   ok('장에서 창고 확장 즉시 결제 · 칸 증가', bought.after > bought.cap && bought.cash < 900, JSON.stringify(bought));
-  await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].find(b => /장 보고 나오기/.test(b.textContent)).click()); await page.waitForTimeout(600); await idle();
-  const after = await page.evaluate(() => ({ day: PT.game.totalTurn, phase: PT.game.phase, shopDays: PT.game.stats.shopDays }));
-  ok('장에서 나오면 하루가 간다', after.day === before + 1 && after.phase === 'play' && after.shopDays === 1, JSON.stringify(after));
+  await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(600); await idle();
+  const after = await page.evaluate(() => ({ month: PT.game.month, phase: PT.game.phase }));
+  ok('장을 닫으면 다음 사이클', after.month === 2 && after.phase === 'play', JSON.stringify(after));
   // 퍽 3택1: 평판을 상한까지 올려 등급업
   await page.evaluate(() => { const g = PT.game; g.addRep(99, null); PT.renderAll(); });
   const offer = await page.evaluate(() => ({ offer: PT.game.perkOffer, tier: PT.game.repTier, cap: PT.game.repCap() }));
@@ -67,7 +67,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const inb = await page.evaluate(() => ({ inboxes: PT.match.players.slice(1).map(p => p.game.inbox.length + p.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length), log: PT.game.log.find(l => l.k === 'log.traitAttack') }));
   ok('공격 트레잇: 칩에 붉은 뱃지 · 출고하면 봇 3명 인박스로', fired.badge && inb.inboxes.every(n => n >= 1) && !!inb.log, JSON.stringify(inb));
   // 상대의 공격이 내 인박스에 → 다음 날 적용(평판 −1) + 피격 로그, 방패가 있으면 막힌다
-  const hit = await page.evaluate(() => { const g = PT.game; const rep = g.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length; g.receiveAttack({ trait: 't_claim', mult: 1, from: 1, fromName: '봇' }); g.shields = 1; g.receiveAttack({ trait: 't_hurry', mult: 1, from: 2, fromName: '봇2' }); document.querySelector('#wait-btn').click(); return rep; });
+  const hit = await page.evaluate(() => { const g = PT.game; g.inbox = []; const rep = g.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length; g.receiveAttack({ trait: 't_claim', mult: 1, from: 1, fromName: '봇' }); g.shields = 1; g.receiveAttack({ trait: 't_hurry', mult: 1, from: 2, fromName: '봇2' }); document.querySelector('#wait-btn').click(); return rep; });
   await page.waitForTimeout(900); await idle();
   const hitR = await page.evaluate(n => ({ shields: PT.game.shields, logs: PT.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').slice(0, PT.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length - n).map(l => l.k + ':' + l.p.icon) }), hit);
   ok('피격: 방패 한 겹이 먼저 온 📞를 막고, ⏱는 맞았다', hitR.logs.includes('log.attackBlocked:📞') && hitR.logs.includes('log.attackIn:⏱') && hitR.shields === 0, JSON.stringify(hitR));
@@ -94,7 +94,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const cont = await page.evaluate(() => ({ day: PT.game.totalTurn, cash: PT.game.cash, bots: PT.match.players.slice(1).map(p => p.game.totalTurn), multi: PT.game.rules.multi, mperks: PT.game.mperks }));
   ok('이어하기: 사람·봇 판 그대로', cont.day === saved.day && cont.cash === saved.cash && JSON.stringify(cont.bots) === JSON.stringify(saved.bots) && cont.multi && cont.mperks.length === 1, JSON.stringify({ saved, cont }));
   // 끝까지: 사람은 빨리 감기(호출·대기 봇으로), 결과 = 순위표
-  await page.evaluate(() => { const g = PT.game; let guard = 0; while (g.phase === 'play' && !(g.month === g.rules.months && g.turn === g.turns()) && guard++ < 200) { if (g.perkOffer) window.BOT.pickPerkBot(g); window.BOT.multiDay(g, 'balanced'); } if (g.perkOffer) window.BOT.pickPerkBot(g); });
+  await page.evaluate(() => { const g = PT.game; let guard = 0; while ((g.phase === 'play' || g.phase === 'market') && !(g.month === g.rules.months && g.turn === g.turns()) && guard++ < 300) { if (g.perkOffer) window.BOT.pickPerkBot(g); window.BOT.multiDay(g, 'balanced'); } if (g.perkOffer) window.BOT.pickPerkBot(g); });
   await page.evaluate(() => { PT.renderAll(); }); await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(1500); await idle();
   t = await modalText();
   const res = await page.evaluate(() => ({ phase: PT.game.phase, rows: document.querySelectorAll('.mrow').length, allDone: PT.match.players.every(p => p.game.phase === 'win' || p.game.phase === 'over'), save: !!localStorage.getItem('pt_multi_v1'), multi: (Profile.get().multi || {}).played }));
