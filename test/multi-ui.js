@@ -22,13 +22,20 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const modalText = () => page.evaluate(() => (document.querySelector('#modal') || {}).textContent || '');
   ok('타이틀에 난투 버튼', !!(await page.$('#t-multi')));
   await page.screenshot({ path: `${OUT}/M-00-title.png` });
-  await page.click('#t-multi'); await page.waitForTimeout(800); await idle();
+  await page.click('#t-multi'); await page.waitForTimeout(700);
+  const intro = await page.evaluate(() => ({ on: !!document.querySelector('#mintro'), cards: document.querySelectorAll('#mintro .ic').length, vs: !!document.querySelector('#mintro .vs'), me: document.querySelector('#mintro .ic.me b') && document.querySelector('#mintro .ic.me b').textContent }));
+  await page.screenshot({ path: `${OUT}/M-00b-intro.png` });
+  ok('시작 화면: 넷 소개 카드 · VS · 나', intro.on && intro.cards === 4 && intro.vs && intro.me === '나', JSON.stringify(intro));
+  await page.click('#mintro'); await page.waitForTimeout(400);
+  const slam = await page.evaluate(() => ({ intro: !!document.querySelector('#mintro'), slam: document.querySelectorAll('#multi-strip .mp.slam').length }));
+  ok('게임 화면으로: 시작 화면 사라지고 상대 카드가 쾅 박힌다', !slam.intro && slam.slam === 4, JSON.stringify(slam));
+  await page.waitForTimeout(1200); await idle();
   const st = await page.evaluate(() => { const g = PT.game, m = PT.match; return { multi: g.rules.multi, players: m.players.length, strip: !document.querySelector('#multi-strip').hidden, cols: document.querySelectorAll('#multi-strip .mp').length, shop: document.querySelector('#shop-btn').hidden, turn: document.querySelector('#hud-turn').textContent, c3: document.querySelector('#c3').hidden, cap: g.warehouse.cap, cash: g.cash, months: g.rules.months }; });
   ok('난투 시작: 멀티 규칙 · 4인 · 상대 줄 4칸 · 장 보기 버튼 없음 · D+1 · 빈 슬롯 숨김', st.multi && st.players === 4 && st.strip && st.cols === 4 && st.shop && /D\+1/.test(st.turn) && st.c3, JSON.stringify(st));
   await page.screenshot({ path: `${OUT}/M-01-day1.png` });
   // 며칠 플레이: 차가 차면 부르고, 아니면 호출 없음 (봇이 따라오는지)
-  const oneDay = async () => { const did = await page.evaluate(() => { const g = PT.game; if (g.phase !== 'play' || g.perkOffer) return 'skip'; const B = window.BOT; const b = B.STRATS.balanced(g); if (b) { document.querySelector('#c' + b.i).click(); return 'card'; } document.querySelector('#wait-btn').click(); return 'wait'; }); await page.waitForTimeout(150); if (did === 'card') { await page.evaluate(() => { const w = document.querySelector('#wait-btn'); if (!w.disabled) w.click(); }); } await page.waitForTimeout(400); await idle(); return did; };
-  for (let i = 0; i < 8; i++) await oneDay();
+  const oneDay = async () => { const did = await page.evaluate(() => { const g = PT.game; if (g.perkOffer) { const c = document.querySelector('.pkcard'); if (c) c.click(); return 'perk'; } if (g.phase !== 'play') return 'skip'; const B = window.BOT; const b = B.STRATS.balanced(g); if (b) { document.querySelector('#c' + b.i).click(); return 'card'; } document.querySelector('#wait-btn').click(); return 'wait'; }); await page.waitForTimeout(150); if (did === 'card') { await page.evaluate(() => { const w = document.querySelector('#wait-btn'); if (!w.disabled) w.click(); }); } await page.waitForTimeout(400); await idle(); return did; };
+  for (let i = 0; i < 14; i++) { if (await page.evaluate(() => PT.game.totalTurn) >= 9) break; await oneDay(); }
   const d8 = await page.evaluate(() => { const g = PT.game, m = PT.match; return { day: g.totalTurn, bots: m.players.slice(1).map(p => p.game.totalTurn), strip: document.querySelector('#multi-strip').textContent, fees: g.feesDue, save: !!localStorage.getItem('pt_multi_v1'), single: !!localStorage.getItem('pt_save_v2') }; });
   ok('8일 뒤: 봇들도 각자 시계로 따라옴 · 배차비 즉시 결제(후불 0) · 저장 없음', d8.day >= 8 && d8.bots.every(b => b >= 5) && d8.fees === 0 && !d8.save && !d8.single, JSON.stringify(d8));
   await page.screenshot({ path: `${OUT}/M-02-day8.png` });
@@ -39,23 +46,23 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const cyc = await page.evaluate(() => ({ phase: PT.game.phase, shop: !!(PT.game.market && PT.game.market.shop), kinds: [...new Set((PT.game.market || { items: [] }).items.map(i => i.kind))], invest: !document.querySelector('#invest-btn').hidden || true, shopBtn: document.querySelector('#shop-btn').hidden }));
   ok('사이클 끝 → 장: 업그레이드·강화·창고·광고·배차 충전, 새 계약·새로고침 없음, 장 보기 버튼 없음', cyc.phase === 'market' && cyc.shop && /↑/.test(t) && cyc.kinds.includes('refill') && !/새 계열|새 계약/.test(t) && !(await page.$('#mk-refresh')) && cyc.shopBtn && cyc.kinds.every(k => ['contract', 'enh', 'fac', 'refill', 'adTicket', 'media', 'mediaUp'].includes(k)), JSON.stringify(cyc) + ' ' + t.slice(0, 120).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-03-shop.png` });
-  const bought = await page.evaluate(() => { const g = PT.game; const i = g.market.items.findIndex(it => it.kind === 'fac' && it.fac === 'expand1'); const cap = g.warehouse.cap; const el = document.querySelector(`#modal .card[data-i="${i}"]`); el.click(); return { cap, after: PT.game.warehouse.cap, cash: PT.game.cash }; });
+  const bought = await page.evaluate(() => { const g = PT.game; const i = g.market.items.findIndex(it => it.kind === 'enh' && it.enh === 'cap1'); return { i, fac: g.market.items.some(it => it.kind === 'fac'), card: !!document.querySelector(`#modal .card[data-i="${i}"]`) }; });
   await page.waitForTimeout(300);
-  ok('장에서 창고 확장 즉시 결제 · 칸 증가', bought.after > bought.cap && bought.cash < 900, JSON.stringify(bought));
+  ok('장에 시설(확장·냉장·야적) 없음 · 강화 카드는 있다', bought.i >= 0 && bought.card && !bought.fac, JSON.stringify(bought));
   await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(600); await idle();
   const after = await page.evaluate(() => ({ month: PT.game.month, phase: PT.game.phase }));
   ok('장을 닫으면 다음 사이클', after.month === 2 && after.phase === 'play', JSON.stringify(after));
   // 퍽 3택1: 평판을 상한까지 올려 등급업
   await page.evaluate(() => { const g = PT.game; g.addRep(99, null); PT.renderAll(); });
-  const offer = await page.evaluate(() => ({ offer: PT.game.perkOffer, tier: PT.game.repTier, cap: PT.game.repCap() }));
-  ok('상한 도달 → 등급 +1 · 상한 +8 · 카드 3장', offer.offer && offer.offer.length === 3 && offer.tier === 1 && offer.cap === 28, JSON.stringify(offer));
+  const offer = await page.evaluate(() => ({ offer: PT.game.perkOffer, tier: PT.game.repTier, cap: PT.game.repCap(), tier0: PT.game._tier0 }));
+  ok('상한 도달 → 등급 +1 · 상한 +8 · 카드 3장', offer.offer && offer.offer.length === 3 && offer.tier >= 1 && offer.cap === 20 + 8 * offer.tier, JSON.stringify(offer));
   await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(500); await idle();   // 다음 마감에서 checkPhase 가 퍽 팝업을 띄운다
   t = await modalText();
-  ok('퍽 팝업', /퍽 하나/.test(t) && (await page.$$('.pkcard')).length === 3, t.slice(0, 80).replace(/\s+/g, ' '));
+  ok('퍽 팝업', /하나 골라/.test(t) && (await page.$$('.pkcard')).length === 3, t.slice(0, 80).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-04-perk.png` });
   const picked = await page.evaluate(() => { const b = document.querySelector('.pkcard'); const id = b.dataset.id; b.click(); return id; }); await page.waitForTimeout(400);
-  const pk = await page.evaluate(() => ({ mperks: PT.game.mperks, offer: PT.game.perkOffer, hud: document.querySelector('#hud-perks').textContent }));
-  ok('퍽 선택 → 장착 · 카드 닫힘 · HUD 아이콘', pk.mperks[0] === picked && !pk.offer && pk.hud.length > 0, JSON.stringify(pk));
+  const pk = await page.evaluate(() => ({ mperks: PT.game.mperks, offer: PT.game.perkOffer, chips: document.querySelectorAll('#mperks .pk').length, hidden: document.querySelector('#mperks').hidden }));
+  ok('퍽 선택 → 장착 · 카드 닫힘 · 화면에 퍽 아이콘 칩', pk.mperks.includes(picked) && !pk.offer && !pk.hidden && pk.chips === new Set(pk.mperks).size, JSON.stringify(pk));
   // ===== 2단계: 트레잇 · 공격 · 폭탄 =====
   // 내 창고에 🌧 소나기 트레잇 택배를 심고 대량으로 내보낸다 → 상대 전원에게 날아간다(outbox → 인박스)
   const fired = await page.evaluate(() => { const g = PT.game, m = PT.match; const c = g.contracts.find(x => x && /bulk/.test(x.carrier)); const si = g.contracts.indexOf(c);
@@ -89,7 +96,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const nosave = await page.evaluate(() => ({ save: !!localStorage.getItem('pt_multi_v1'), cashBox: document.querySelector('#hud-cash-box').hidden, due: document.querySelector('#hud-due').textContent, stripCash: /\dc\b/.test(document.querySelector('#multi-strip').textContent), repnum: document.querySelectorAll('#multi-strip .repnum').length }));
   ok('저장 없음 · HUD 자금 칸 접힘(잔액만 작게) · 상대 카드는 평판만', !nosave.save && nosave.cashBox && /c$/.test(nosave.due) && !nosave.stripCash && nosave.repnum === 4, JSON.stringify(nosave));
   // 평판이 오르면 숫자가 굴러가며 카드·HUD 가 반짝인다
-  const anim = await page.evaluate(async () => { const g = PT.game; const before = document.querySelector('#stress-num').textContent; g.addRep(3, 'test'); PT.renderAll(); await new Promise(r => setTimeout(r, 120));
+  const anim = await page.evaluate(async () => { const g = PT.game; g.rep = Math.max(0, g.rep - 6); PT.renderAll(); await new Promise(r => setTimeout(r, 1100)); const before = document.querySelector('#stress-num').textContent; g.addRep(3, 'test'); PT.renderAll(); await new Promise(r => setTimeout(r, 120));
     const mid = document.querySelector('#stress-num').textContent, pulsing = document.querySelector('#stress-wrap').classList.contains('rep-up') || document.querySelector('#multi-strip .mp.me').classList.contains('rep-up');
     await new Promise(r => setTimeout(r, 1000)); return { before, mid, after: document.querySelector('#stress-num').textContent, pulsing, card: document.querySelector('#multi-strip .mp.me .repnum').textContent, rep: g.rep }; });
   ok('평판 +3: 숫자가 굴러감(중간값) · 반짝 · 끝값 일치', anim.pulsing && anim.mid !== anim.after && anim.after.startsWith(anim.rep + '/') && +anim.card === anim.rep, JSON.stringify(anim));

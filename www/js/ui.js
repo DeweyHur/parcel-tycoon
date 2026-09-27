@@ -5,6 +5,7 @@
   const SAVE_KEY = 'save_v2', OPT_KEY = 'opts_v1', MULTI_KEY = 'multi_v1';
   const hudRep = { g: null, v: null };          // HUD 평판이 마지막으로 보여 준 값(굴러가는 숫자용)
   const stripRep = { m: null, v: {} };          // 상대 줄 카드별 마지막 평판
+  let stripSlam = 0;                            // 이 시각까지는 상대 줄 카드가 '쾅' 박히는 중
   let game = null, scene = null, busy = false;
   // 멀티 「난투」: 진행 중인 매치(사람 + 봇 3). game 은 언제나 사람 판(players[0].game). 개인 런과 저장 키가 다르다
   let match = null, lastRank = 0;
@@ -571,7 +572,27 @@
     const nm = (Profile.get().campaign || {}).name || T('lv.nameDefault');
     match = MULTI.newMatch({ name: nm, botNames: T('multi.botNames').split('·') });
     game = match.players[0].game; lastRank = myRank();
-    closeModal(); startPlay();
+    closeModal(); showMatchIntro(() => { startPlay(); slamStrip(); });
+  }
+  // 난투 시작 화면: 누구와 붙는지 한 번 — 카드가 하나씩 쾅 찍히고, 누르면(또는 잠시 뒤) 게임 화면으로 (유저: "상대가 누구고 소개하는 거")
+  function showMatchIntro(done) {
+    const old = document.getElementById('mintro'); if (old) old.remove();
+    const on = match.online, P = Profile.get();
+    const sub = p => { if (p.id === ME()) return on && P.multi && P.multi.rank != null ? T('multi.rankName.' + P.multi.rank) : T('multi.introMe');
+      if (p.bot || !p.human) return T('multi.strat.' + (p.strat || 'balanced'));
+      return p.elo != null ? `${T('multi.rankName.' + M.MULTI.RANKS[Math.max(0, Math.min(M.MULTI.RANKS.length - 1, Math.floor((p.elo - M.MULTI.ELO_START) / M.MULTI.ELO_STEP)))])} · ${p.elo}` : ''; };
+    const layer = document.createElement('div'); layer.id = 'mintro';
+    layer.innerHTML = `<div class="ttl">⚔ ${esc(T('multi.introTitle'))}</div><div class="grid">${match.players.map((p, i) => `<div class="ic ${p.id === ME() ? 'me' : ''}" style="animation-delay:${0.25 + i * 0.38}s"><img src="${window.Story ? Story.sprite(p.face === 'park' ? 'park' : p.face, p.id === ME() ? 'smile' : 'neutral') : ''}" alt=""><b>${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span>${esc(sub(p))}</span></div>`).join('')}<div class="vs">VS</div></div><div class="tap">${esc(T('multi.introTap'))}</div>`;
+    document.body.appendChild(layer);
+    const timers = match.players.map((p, i) => setTimeout(() => { SFX.thud(); if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { /* no-op */ } }, 250 + i * 380 + 220));
+    let over = false;
+    const go = () => { if (over) return; over = true; timers.forEach(clearTimeout); layer.classList.add('out'); setTimeout(() => layer.remove(), 280); done(); };
+    layer.onclick = go; timers.push(setTimeout(go, 250 + match.players.length * 380 + 1800));
+  }
+  // 게임 화면으로 넘어오면 상대 줄 카드가 하나씩 쾅 박힌다 — 효과음·진동을 카드 도착에 맞춘다
+  function slamStrip() {
+    const n = match ? match.players.length : 0; stripSlam = Date.now() + n * 180 + 600; renderMultiStrip();
+    for (let i = 0; i < n; i++) setTimeout(() => { SFX.thud(); const c = portraitEl(match.players[i].id); if (c) { c.classList.add('hit'); setTimeout(() => c.classList.remove('hit'), 400); } if (scene && scene.shake) scene.shake(.12); }, i * 180 + 300);
   }
   function myRank() { if (!match) return 0; const r = MULTI.standings(match).find(x => x.p.id === ME()); return r ? r.rank : 0; }
   // ---------- 온라인 난투 (3단계, www/api/match.js · js/net.js) ----------
@@ -644,7 +665,7 @@
   function startOnline(sm, nm) {
     match = MULTI.newOnline(sm, Profile.get().pid, { name: nm, botNames: T('multi.botNames').split('·') });
     game = match.players[0].game; lastRank = myRank();
-    closeModal(); startPlay(); netStart();
+    closeModal(); netStart(); showMatchIntro(() => { startPlay(); slamStrip(); });
   }
   // 판 중: 하루를 넘길 때 push(내 이벤트·스냅샷) + poll, 그 사이 3초마다 poll. 사람이 끝난 뒤(결과 화면)에도 정산될 때까지 poll
   function netStart() { netStop(); netTimer = setInterval(() => netSync(false), 3000); netSync(true); }
@@ -730,6 +751,12 @@
       if (was != null && was !== v) { pulse(card, v > was ? 'rep-up' : 'rep-down'); animNum(card && card.querySelector('.repnum'), was, v, x => String(x)); }
       stripRep.v[p.id] = v; }
     drawBubbles();
+    // 시작 직후엔 카드가 하나씩 제자리에 쾅 박힌다 (효과음은 slamStrip 이 맞춰 낸다)
+    if (stripSlam && Date.now() < stripSlam) el.querySelectorAll('.mp').forEach((d, i) => { d.classList.add('slam'); d.style.animationDelay = (i * 0.18) + 's'; });
+    // 내가 장착한 퍽 — 아이콘으로 늘 보인다 (유저: "장착한 퍽들은 화면에 아이콘으로")
+    const pkEl = $('#mperks'); if (pkEl) { const ids = game.mperks || []; pkEl.hidden = !ids.length;
+      pkEl.innerHTML = [...new Set(ids)].map(id => { const pk = M.MULTI.PERKS[id]; const n = ids.filter(x => x === id).length; return `<a class="pk ${pk.family}" data-mperk="${id}">${pk.icon}${n > 1 ? `<small>×${n}</small>` : ''}</a>`; }).join('');
+      pkEl.querySelectorAll('[data-mperk]').forEach(a => a.onclick = () => { const pk = M.MULTI.PERKS[a.dataset.mperk]; SFX.click(); toast(`${pk.icon} ${pk.name} — ${pk.desc}`, 2400); }); }
     const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.textContent = parts.join(' · '); }
   }
   // ---------- 연출 (8장): 발사 궤적 · 피격 비네트 · 방패 · 폭탄 · 배너 ----------
@@ -759,26 +786,36 @@
   }
   const mtName = id => (M.MULTI.TRAITS[id] || {}).name || id, traitIcon = id => (M.MULTI.TRAITS[id] || {}).icon || "";
   const pname = pid => { const p = match && match.players.find(x => x.id === pid); return p ? (p.id === ME() ? T('multi.you') : p.name) : '?'; };
+  // 난투 알림은 한 줄이다 — [얼굴] **이름** 아이콘 짧은 말. 설명은 안 붙인다 (유저: "정신없어", "줄바꿈 안 되게 짧게", "아이콘으로")
+  function mnotice(pid, icon, text, cls) {
+    const box = $('#mnotes'); if (!box) return;
+    const p = match && match.players.find(x => x.id === pid);
+    const el = document.createElement('div'); el.className = 'mnote ' + (cls || '');
+    el.innerHTML = `${p && window.Story ? `<img src="${Story.sprite(p.face === 'park' ? 'park' : p.face, 'neutral')}" alt="">` : ''}${p ? `<b class="nm">${esc(pid === ME() ? T('multi.you') : p.name)}</b>` : ''}<i class="ic">${icon}</i>${text ? `<span>${esc(text)}</span>` : ''}`;
+    box.appendChild(el); while (box.children.length > 3) box.firstChild.remove();
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 2200);
+  }
+  const shortDetail = d => d && d.k ? I18n.text({ k: d.k.replace('trait.d.', 'trait.s.'), p: d.p }) : '';
   // 사람 판의 이벤트(내가 쏜 것·맞은 것·폭탄) + 매치 소식(봇끼리 · 봇이 나에게) → 화면
   function multiFx(events, news) {
     if (!match) return;
     let k = 0;
     for (const n of news) {
       if (n.type === 'attack') { for (const to of n.to) flyIcon(traitIcon(n.trait), n.from, to, k * 90); k++;
-        if (n.from === ME()) toastLater(T(n.focus ? 'multi.focusToast' : 'multi.fireToast', { icon: traitIcon(n.trait), name: mtName(n.trait), names: n.to.map(pname).join(' · ') }), 2200); }
-      if (n.type === 'note') { bubble(n.from, n.text); if (n.from !== ME()) toastLater(`${pname(n.from)}: ${n.text}`, 1600); }
+        if (n.from === ME()) mnotice(ME(), traitIcon(n.trait), n.focus ? `🎯 ${n.to.map(pname).join('·')} ×3` : T('multi.toAll'), 'me'); }
+      if (n.type === 'note') { bubble(n.from, n.text); if (n.from !== ME()) mnotice(n.from, n.text, ''); }
       if (n.type === 'bomb') { for (const to of n.to) flyIcon('🧨', n.from, to, k * 90, () => { if (to === ME()) scene.shake(.5); }); k++;
-        if (n.from === ME()) toastLater(T(n.back ? 'multi.bombBackToast' : 'multi.bombOutToast', { name: n.to.map(pname).join(' · ') }), 2000); }
+        if (n.from === ME()) mnotice(ME(), '🧨', T(n.back ? 'multi.bombBackToast' : 'multi.bombOutToast', { name: n.to.map(pname).join('·') }), 'me'); }
     }
     for (const e of events) {
       if (e.type === 'attackIn') {
-        if (e.blocked) { if (e.blocked === 'shield') shieldFx(ME()); toastLater(T('multi.blockToast', { how: I18n.text({ k: 'trait.blk.' + e.blocked }), from: e.fromName || '', icon: traitIcon(e.trait), name: mtName(e.trait) }), 2200); }
+        if (e.blocked) { if (e.blocked === 'shield') shieldFx(ME()); mnotice(e.from, traitIcon(e.trait), T('trait.blk.' + e.blocked), 'ok'); }
         else { faceHit[ME()] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3);
-          toastLater(T('multi.hitToast', { from: e.fromName || '', icon: traitIcon(e.trait), name: mtName(e.trait), detail: I18n.text(e.detail || '') }), 2600); }
+          mnotice(e.from, traitIcon(e.trait), shortDetail(e.detail), 'bad'); }
       }
       if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
-      if (e.type === 'bombIn') { SFX.thud(); scene.shake(.45); toastLater(T('multi.bombInToast', { size: e.storage.vol, days: e.storage.turns }), 2400); }
-      if (e.type === 'bombBlast') { SFX.discard(); scene.shake(.6); scene.mope(); toastLater(T('multi.bombBlastToast', { n: e.stolen }), 2600); }
+      if (e.type === 'bombIn') { SFX.thud(); scene.shake(.45); mnotice(e.from, '🧨', T('multi.bombInToast', { size: e.storage.vol, days: e.storage.turns }), 'bad'); }
+      if (e.type === 'bombBlast') { SFX.discard(); scene.shake(.6); scene.mope(); mnotice(ME(), '🧨', T('multi.bombBlastToast', { n: e.stolen }), 'bad'); }
     }
   }
   // 상대의 폐업·마감은 매치를 보고 알아챈다 (봇은 사람의 하루 사이에 끝난다)
@@ -807,8 +844,15 @@
   function showPerkPick() {
     const g = game, offer = g.perkOffer; if (!offer) return;
     BGM.stinger('fanfare', 0.8);
-    const cards = offer.map(id => { const pk = M.MULTI.PERKS[id], n = g.mperks.filter(x => x === id).length; return `<button class="btn pkcard fam-${pk.family}" data-id="${id}"><span class="ic">${pk.icon}</span><b>${esc(pk.name)}</b><small>${esc(pk.desc)}</small><em>${esc(M.MULTI.FAMILY_NAMES[pk.family])}${n ? ' ' + T('multi.perkStack', { n: n + 1 }) : ''}</em></button>`; }).join('');
-    const m = modal(T('multi.perkTitle', { n: g.repTier }), `<div class="d" style="text-align:center">${T('multi.perkSub')}</div><div class="pkrow">${cards}</div>`, null);
+    // 카드엔 지금 내 판의 숫자로 — "배차 5→6" 처럼 (유저: "퍽들이 직관적이지 않아, 실제 영향을 주는 게 뭔지 모르겠어")
+    const now = id => { const cs = g.contracts.filter(Boolean);
+      if (id === 'm_calls') return cs.map(c => `${c.maxCalls}→${c.maxCalls + 1}`).join(' · ');
+      if (id === 'm_refill') return `${cs.reduce((a, c) => a + c.calls, 0)}→${cs.reduce((a, c) => a + c.maxCalls, 0)}`;
+      if (id === 'm_space') return `${g.warehouse.cap}→${g.warehouse.cap + 4}`;
+      if (id === 'm_shield') return `🛡 ${g.shields}→${Math.max(g.shields, 1)}`;
+      return ''; };
+    const cards = offer.map(id => { const pk = M.MULTI.PERKS[id], n = g.mperks.filter(x => x === id).length, nw = now(id); return `<button class="btn pkcard fam-${pk.family}" data-id="${id}"><span class="ic">${pk.icon}</span><b>${esc(pk.name)}</b><small>${esc(pk.desc)}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}<em>${esc(M.MULTI.FAMILY_NAMES[pk.family])}${n ? ' ' + T('multi.perkStack', { n: n + 1 }) : ''}</em></button>`; }).join('');
+    const m = modal(T('multi.perkTitle', { n: g.repTier }), `<div class="pkrow">${cards}</div>`, null);
     m.querySelectorAll('.pkcard').forEach(b => b.onclick = () => {
       const r = g.pickPerk(b.dataset.id); if (!r.ok) return toast(r.msg);
       SFX.buy(); closeModal(); rewardBurst(`${M.MULTI.PERKS[r.perk].icon} ${M.MULTI.PERKS[r.perk].name}`, 2);
@@ -1424,13 +1468,13 @@
   }
   function pips(cells, cap, over, trucks) {
     // 칸이 많은 차(대형·통관 12~16칸)도 숫자 대신 칸으로 — 다섯 칸마다 틈을 두어 센다. 합이 길면 눈금을 가늘게(dense)
-    const total = cap * (trucks || 1), dense = total > 16;
-    let h = '';
-    for (let i = 0; i < total; i++) { const k = i % cap; if (i && k === 0) h += '<i class="gap"></i>'; else if (cap > PIP_MAX && k && k % 5 === 0) h += '<i class="g5"></i>'; h += cells[i] ? `<i class="on" style="background:${cells[i]}"></i>` : '<i></i>'; }
-    h += '<b class="cab"></b>';   // 트럭 앞머리 — 계약 목록에서만 보인다
-    // 넘치는 칸은 많아야 여섯까지만 그린다 — 그 이상은 눈금이 아니라 벽이 된다
-    if (over.length) { h += '<i class="gap"></i>'; over.slice(0, 6).forEach((css, i) => { h += `<i class="over${over.length > 6 && i === 5 ? ' more' : ''}" style="background:${css}"></i>`; }); }
-    return `<span class="pips${dense ? ' dense' : ''}">${h}</span>`;
+    // 두 대 이상이면 한 대가 한 줄 — 납작해져도 전부 보인다 (유저: "보낼 수 있는 양이 잘리네, 특히 트럭 두 대일 때")
+    const n = trucks || 1, dense = cap > 16 || (n === 1 && cap * n > 16);
+    const overH = over.length ? '<i class="gap"></i>' + over.slice(0, 6).map((css, i) => `<i class="over${over.length > 6 && i === 5 ? ' more' : ''}" style="background:${css}"></i>`).join('') : '';   // 넘치는 칸은 여섯까지만
+    const row = t => { let h = ''; for (let k = 0; k < cap; k++) { const i = t * cap + k; if (cap > PIP_MAX && k && k % 5 === 0) h += '<i class="g5"></i>'; h += cells[i] ? `<i class="on" style="background:${cells[i]}"></i>` : '<i></i>'; }
+      return h + '<b class="cab"></b>' + (t === n - 1 ? overH : ''); };   // 트럭 앞머리 — 계약 목록에서만 보인다
+    if (n === 1) return `<span class="pips${dense ? ' dense' : ''}">${row(0)}</span>`;
+    return `<span class="pips multi${dense ? ' dense' : ''}">${Array.from({ length: n }, (_, t) => `<span class="row">${row(t)}</span>`).join('')}</span>`;
   }
   // 계약 카드용 한 대 적재 미리보기 (호출 팝업의 '급한 순 자동 선택'과 같은 규칙)
   // 지금 한 대 부르면 얼마를 받고 얼마를 내는가. '개당 Nc' 는 버는 돈으로 읽혀서(유저 지적)
@@ -1573,7 +1617,7 @@
     const ic = tileIcons(p);
     const cells = Array.from({ length: p.size }, (_, k) => `<i>${ic[k] ? `<span>${ic[k]}</span>` : ''}</i>`).join('');
     const vb = p.rush ? `<b class="vb rushb${game.rushToday(p) ? ' now' : ''}">⚡</b>` : valueTier(p) ? `<b class="vb">${valueTier(p) === 3 ? '✦' : valueTier(p) === 2 ? '◆' : '▲'}</b>` : '';
-    const tr = p.trait && M.MULTI.TRAITS[p.trait]; const tb = tr ? `<b class="tb ${tr.kind}">${tr.icon}</b>` : '';
+    const tr = p.trait && M.MULTI.TRAITS[p.trait]; const tb = tr ? `<b class="tb ${tr.kind}" title="${esc(tr.name)}">${tr.kind === 'attack' ? '⚔' : ''}${tr.icon}</b>` : '';
     return `<button type="button" class="${cls}${tr ? ' trait' : ''}" data-id="${p.id}" style="--c:${t.css}" title="${esc(tip)}" aria-label="${esc(tip)}">${cells}${vb}${tb}</button>`;
   }
   function renderStock(container, parcels, s) {
@@ -2639,7 +2683,7 @@
     const dots = more.length ? `<span class="takes">${more.map(t => `<i style="background:${D.PARCEL_TYPES[t].css}" title="${esc(D.PARCEL_TYPES[t].name)}"></i>`).join('')}</span>↑` : '';
     // 지금 집행하면 어느 날 몇 건 — 위의 내일·모레 줄과 같은 말로 (플레이 중에만. 마켓에선 며칠에 걸치는지만)
     // 플레이 중이면 대시보드 예보 칩을 그대로 가져와 이 캠페인이 더할 짐을 깜빡인다. 마켓에선 건수·일수만
-    const g = game, roll = g && g.phase === 'play' && g.media && g.media[id] ? g._campaignRoll(id) : null;
+    const g = game, roll = g && g.phase === 'play' && g.ownedMedia().includes(id) ? g._campaignRoll(id) : null;   // 광고권(난투)도 내일·모레 칩으로 — 유저: "내일 모레 변화량 아는 게 더 좋았는데"
     const dayName = d => d === 1 ? T('hud.tomorrow') : d === 2 ? T('hud.dayAfter') : T('media.fx.dayN', { n: d });
     const chips = roll && roll.length ? (() => {
       const last = Math.max(2, ...roll.map(x => x.day));

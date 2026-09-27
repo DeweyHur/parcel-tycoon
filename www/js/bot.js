@@ -131,17 +131,20 @@ function urgency(g) {
     for (let k = 0; k < 4; k++) { const rf = items.map((it, i) => ({ it, i })).filter(x => !x.it.sold && x.it.kind === 'refill').map(x => ({ ...x, c: g.contracts.find(c => c && c.id === x.it.contractId) })).filter(x => x.c && (x.c.calls === 0 || x.c.calls <= x.c.maxCalls * 0.5) && g.cash - x.it.price >= 60); if (!rf.length) break; rf.sort((a, b) => a.c.calls - b.c.calls); if (!g.buy(rf[0].i, null).ok) break; }
     // 1) 창고
     if (g.warehouse.cap < perDay * 1.6 * 4) { const i = idx(it => it.kind === 'fac' && it.fac && /^expand/.test(it.fac) && can(it.price)); if (i >= 0) g.buy(i, null); }
-    // 2) 주력 계약 업그레이드 (같은 슬롯으로 갈아타기)
-    { const s = bySlotDelivered(); const c = g.contracts[s]; if (c) { const i = idx(it => it.kind === 'contract' && it.switchFrom === c.id && can(g.contractPrice(it))); if (i >= 0) g.buy(i, s); } }
-    // 3) 적재 보강 → 첫 배차 무료
-    for (const e of ['cap1', 'regular']) { const i = idx(it => it.kind === 'enh' && it.enh === e && g.cash - it.price >= reserve + 150); if (i >= 0) { const s = bySlotDelivered(); if (s >= 0) g.buy(i, s); } }
+    // 2) 계약 업그레이드 — 많이 나른 슬롯부터, 살 수 있는 만큼 전부 (같은 슬롯으로 갈아타기). 돈을 쥐고 죽는 봇이 제일 약하다
+    const slots = g.contracts.map((c, s) => ({ c, s })).filter(x => x.c).sort((a, b) => (b.c.delivered || 0) - (a.c.delivered || 0));
+    for (const { c, s } of slots) { const i = idx(it => it.kind === 'contract' && it.switchFrom === c.id && can(g.contractPrice(it))); if (i >= 0) g.buy(i, s); }
+    // 3) 적재 보강 → 첫 배차 무료 — 슬롯마다
+    for (const e of ['cap1', 'regular']) for (const { s } of slots) { const i = idx(it => it.kind === 'enh' && it.enh === e && g.cash - it.price >= reserve + 150 && g.enhUsed(g.contracts[s]) < g.enhSlots(g.contracts[s])); if (i >= 0) g.buy(i, s); }
+    // 1b) 돈이 남아돌면 창고도 한 단계 더
+    { const i = idx(it => it.kind === 'fac' && it.fac && /^expand/.test(it.fac) && g.cash - it.price >= reserve + it.price); if (i >= 0) g.buy(i, null); }
     // 4) 신선이 많이 오면 냉장
     { const cold = g.parcels.filter(p => (p.attrs || []).includes('cold')).length; if (cold >= 4) { const i = idx(it => it.kind === 'fac' && /^cold/.test(it.fac || '') && g.cash - it.price >= reserve + 100); if (i >= 0) g.buy(i, null); } }
   }
   // 퍽 3택1: 경제 우선, 없으면 첫 장
   function pickPerkBot(g) {
     const MP = (M.MULTI && M.MULTI.PERKS) || {};
-    const pref = ['m_cash', 'm_space', 'm_shield', 'm_reward', 'm_fee', 'm_regular', 'm_dodge', 'm_upgrade', 'm_yard', 'm_sharp', 'm_trait', 'm_heavy', 'm_roof', 'm_grace', 'm_early', 'm_rush'];
+    const pref = ['m_calls', 'm_space', 'm_shield', 'm_clean', 'm_refill', 'm_dodge', 'm_upgrade', 'm_yard', 'm_sharp', 'm_trait', 'm_heavy', 'm_roof', 'm_grace', 'm_early', 'm_rush'];
     const id = pref.find(k => g.perkOffer.includes(k)) || g.perkOffer[0];
     return g.pickPerk(id);
   }

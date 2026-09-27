@@ -37,7 +37,7 @@
     const players = sm.players.map(p => {
       const me = p.pid === mypid, host = sm.players[0].pid === mypid;
       const bn = o && o.botNames; const name = p.bot && bn && bn.length ? bn[(p.nid || 0) % bn.length] : p.name;   // 봇 이름은 내 언어로
-      const base = { id: p.pid, name, face: p.face || 'park', human: !p.bot, remote: !me && !p.bot, bot: !!p.bot, strat: p.strat, speed: p.bot ? SPEEDS[(+p.pid.replace(/\D/g, '') || 1) % SPEEDS.length] : 1, snap: null };
+      const base = { id: p.pid, name, face: p.face || 'park', human: !p.bot, remote: !me && !p.bot, bot: !!p.bot, strat: p.strat, elo: p.elo, speed: p.bot ? SPEEDS[(+p.pid.replace(/\D/g, '') || 1) % SPEEDS.length] : 1, snap: null };
       if (me) base.game = mkGame(sm.seed, o && o.name || p.name, p.pid);
       else if (p.bot && host) base.game = mkGame(sm.seed, null, p.pid);
       return base;

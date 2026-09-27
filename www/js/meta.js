@@ -335,11 +335,11 @@
       multi: true,
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
-      unlimitedCalls: false, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true,   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
+      unlimitedCalls: false, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true, noFacilities: true,   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
       shopDay: false, noCycleMarket: false, autoSummary: true,           // 장은 보름에 한 번, 정산 뒤에(개인 런 마켓 자리 — 유저: 하루 소모 대신 사이클 끝에). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」(하루 소모) 실험용으로 남겨 둔다
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 폭탄으로 돌아온다)
       repStep: 8, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +8 · 퍽 3택1 (문서는 +5 — 봇 판에서 13번 올라 8로. 석 달에 7~9번). 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
-      sharedSchedule: true, fixedCustLevel: 2, dayArrivalsRate: 0.03, finalRushMult: 1.8,   // 입고 대본은 매치 공유 · 일차에 비례해 오른다(문서 0.025) · 마지막 보름 「마감 폭주」(문서 ×1.5). 봇 판(test/multi-sim.js)으로 올렸다
+      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 2.1, dayArrivalsRate: 0.01, finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날부터 하루 4개쯤(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
       fuelRate: 0,                                                       // (배차비가 없으니 유가도 없다 — 값은 남겨 둔다)
       repDecides: true, latePenaltyDiv: 3,                               // 승부는 잔액이 아니라 **평판**. 먼저 마감한 사람 빼고는 그때 남은 날 ÷3 만큼 평판 페널티 (유저 2026-09-26)
       capDelta: 4,                                                       // 시작 창고 +4칸 (열린 질문 4 — 후보값)
@@ -376,13 +376,12 @@
     // phase: 그 퍽이 실제로 작동하는 구현 단계. 지금 단계보다 뒤인 카드는 뽑기 풀에 안 들어간다(효과 없는 카드를 고르게 하지 않는다).
     // 이름·설명은 locales meta.MULTI_PERKS[id]
     PERKS: {
-      // 💰 경제
-      m_fee:      { family: 'eco', icon: '⛽', phase: 1, mods: { feeMult: 0.85 } },
-      m_reward:   { family: 'eco', icon: '💵', phase: 1, mods: { revenueMult: 1.1 } },
+      // 🚚 운영 — 돈이 점수가 아니니(배차비 없음·평판 승부) 배차 횟수와 평판으로 (옛 경제 퍽: 배차비·보수·현금은 뺐다)
+      m_calls:    { family: 'eco', icon: '🚚', phase: 1, mods: { callsDelta: 1 }, now: { calls: 1 } },
+      m_clean:    { family: 'eco', icon: '🧹', phase: 1, mods: { cleanRepBonus: 2 } },
       m_upgrade:  { family: 'eco', icon: '🏷', phase: 1, mods: { contractPriceMult: 0.8, itemPriceMult: 0.8, facilityPriceMult: 0.8 } },
-      m_rush:     { family: 'eco', icon: '🏁', phase: 1, mods: { finalRushReward: 0.2 } },
-      m_cash:     { family: 'eco', icon: '💰', phase: 1, now: { cash: 300 } },
-      m_regular:  { family: 'eco', icon: '🎫', phase: 1, mods: { freeTrucksPerCycle: 1 } },
+      m_rush:     { family: 'eco', icon: '🏁', phase: 1, mods: { rushRepBonus: 1 } },
+      m_refill:   { family: 'eco', icon: '🔋', phase: 1, now: { refill: true } },
       // 🛡 방어
       m_space:    { family: 'def', icon: '📦', phase: 1, now: { cap: 4 } },
       m_yard:     { family: 'def', icon: '⛺', phase: 1, mods: { overflowGrace: 2 } },

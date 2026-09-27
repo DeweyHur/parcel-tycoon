@@ -50,13 +50,13 @@
     noBankrupt: false, noDeadlineCycles: 0, storageOfferProb: 0.12, storageMax: 2, storageFeeMult: 1, storageAnon: false,
     // 4단계: 난이도·시나리오 고객 규칙
     feeMult: 1, feeFixed: null, feeDelta: 0,
-    cycleOffset: 0, noRepEnd: false, gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, customerClaimMult: {}, noHolidays: false,
+    cycleOffset: 0, noRepEnd: false, noFacilities: false, gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, customerClaimMult: {}, noHolidays: false,
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, latePenaltyDiv: 3,
     shopDay: false, noCycleMarket: false, autoSummary: false,
     repStep: 0, perkPick: false, noRepUnlock: false,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
-    finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, returnGraceDelta: 0,
+    finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, bombs: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, bombGrow: 0, attackMult: 1,
   };
   const MULT_KEYS = ['attackMult', 'theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
@@ -139,6 +139,7 @@
       this.heatTurns = [];
       // 창고장 안내(스토리 모드) 진행 상태 — 본 비트 id. 장이 넘어가도 이어진다: 박 반장이 같은 말을 두 번 하지 않는다
       this.story = cfg.story ? { seen: ((cfg.carry && cfg.carry.seen) || []).slice(), notes: ((cfg.carry && cfg.carry.notes) || []).slice() } : null;
+      if (this.rules.multi) this.story = { seen: [], notes: [], off: true };   // 난투엔 대사가 없다 — 담당자 인사(greet)·비트 전부 (유저: "말 없애달라 했는데 난투에서는")
       this.trust = {}; // 업체별 신뢰도 경험치 (런 내 유지)
       for (const k of Object.keys(D.CARRIERS)) this.trust[k] = (famVal(this.rules.carrierStartTrust, k) || 0) + this.rules.allStartTrust;
       const cyTrust = cfg.carry && cfg.carry.trust;
@@ -444,7 +445,7 @@
       const sf = this._scriptForecast(m); if (sf) return sf;
       const R = this.rules;
       const organic = Math.min(this.turns(m), D.GROWTH.organicArrivals);
-      const extra = Math.round(this._extraArrivals(Math.min(m, 6)) * D.ARRIVALS_SCALE * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult * (this.bizMode() ? M.DEAL.anonShare : 1));
+      const extra = R.sharedSchedule ? this._sharedExtra(m) : Math.round(this._extraArrivals(Math.min(m, 6)) * D.ARRIVALS_SCALE * this.repArrivalMult() * this.repScaleArrivals() * R.arrivalsMult * (this.bizMode() ? M.DEAL.anonShare : 1));
       const total = organic + extra;
       const w = this._customerWeightsFor(m); const sum = Object.values(w).reduce((a, b) => a + b, 0) || 1;
       const ratio = this._typeRatio(m);
@@ -1404,7 +1405,12 @@
       const pk = M.MULTI.PERKS[id];
       this.mperks.push(id); (this.cfg.mperks = this.cfg.mperks || []).push(id);
       this._buildRules();
-      if (pk.now) { if (pk.now.cap) { this.warehouse.cap += pk.now.cap; this._assignCold(); } if (pk.now.cash) { this.cash += pk.now.cash; this.run.revenue += pk.now.cash; } }
+      if (pk.now) {
+        if (pk.now.cap) { this.warehouse.cap += pk.now.cap; this._assignCold(); }
+        if (pk.now.cash) { this.cash += pk.now.cash; this.run.revenue += pk.now.cash; }
+        if (pk.now.calls) for (const c of this.contracts) if (c) { c.maxCalls += pk.now.calls; c.calls += pk.now.calls; }   // 있는 계약도 바로 +1(새 계약은 callsDelta 로)
+        if (pk.now.refill) for (const c of this.contracts) if (c) c.calls = c.maxCalls;                                   // 지금 전부 가득
+      }
       this.perkOffer = null;
       this.say('log.perkPicked', { name: pk.name, icon: pk.icon });
       this.emit('perkPicked', { perk: id });
@@ -1574,6 +1580,12 @@
     // 멀티: 입고 대본은 매치 공유 — 넷이 같은 시드·같은 사이클이면 같은 짐을 받는다. 본 난수 흐름(파손·도난 굴림)은 사람마다 갈리므로
     // 대본은 (시드, 사이클)에서 파생한 씨앗으로 따로 굴린다(_campaignRoll 과 같은 수법). 사람에 따라 달라지는 입력(평판·고객 단계)은 쓰지 않는다.
     // 물량은 일차에 비례해 오른다: × (1 + rate × 지난 영업일), 마지막 보름은 × finalRushMult 「마감 폭주」
+    // 난투 사이클 m 의 추가 입고 수(공유 대본·마켓 예보가 같은 식을 쓴다): 기본 × 일차 비례 × 마지막 보름 폭주
+    _sharedExtra(m) {
+      const R = this.rules; let daysDone = 0; for (let c = 1; c < m; c++) daysDone += this.turns(c);
+      const scale = (1 + R.dayArrivalsRate * daysDone) * (m >= R.months ? R.finalRushMult : 1);
+      return Math.round(D.EXTRA_ARRIVALS[1] * D.ARRIVALS_SCALE * R.arrivalsMult * scale);
+    }
     _sharedSchedule(m) {
       const R = this.rules, turns = this.turns(m);
       const seed = (this.seed ^ Math.imul(m, 2654435761) ^ 0x5bd1e995) >>> 0;
@@ -1589,9 +1601,9 @@
         const gen = () => { const sp = this._genParcelSpec(ratio, m, cw); if (rate && this.rng.next() < rate) sp.trait = this.rng.weighted(this.rng.next() < R.attackShare ? atkW : bonW); return sp; };
         const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
         for (const t of organicTurns) sched[t].push(gen());
-        const scale = (1 + R.dayArrivalsRate * daysDone) * (m >= R.months ? R.finalRushMult : 1);
-        const extra = Math.round(D.EXTRA_ARRIVALS[1] * D.ARRIVALS_SCALE * R.arrivalsMult * scale);
-        const extraTurns = this.rng.shuffle([...Array(turns - 1).keys()].map(i => i + 1));
+        const extra = this._sharedExtra(m);
+        // 난투는 첫날부터 찬다 — 사이클 첫 턴도 뺀다(자유 런은 첫 턴을 비워 둔다). 유저: "난투 첫 물량이 너무 적어"
+        const extraTurns = this.rng.shuffle([...Array(turns).keys()]);
         for (let i = 0; i < extra; i++) sched[extraTurns[i % extraTurns.length]].push(gen());
         for (let t = 0; t < turns - 1; t++) if (this.weather[t] === 'storm' && sched[t].length) { sched[t + 1].push(...sched[t]); sched[t] = []; }
         return sched;
@@ -1859,6 +1871,7 @@
       this._addTrust(c.carrier, xp);
       let repD = this.repDeltaFor(chosen);
       if (repD > 0 && R.earlyRepBonus) repD += R.earlyRepBonus;   // 멀티 퍽: 일찍 보낸 호출의 평판 보너스
+      if (repD > 0 && R.rushRepBonus && this.month >= R.months) repD += R.rushRepBonus;   // 멀티 퍽: 마지막 보름 호출 평판 보너스
       if (repD) this.addRep(repD, MSG(repD > 0 ? 'why.repEarly' : 'why.repLate'));
       // 배차 대수 소모
       let refunded = false;
@@ -2097,7 +2110,7 @@
       const deals = this.bizMode() ? this._settleDeals() : [];
       // 평판: 사고 없이 넘긴 정산은 소문이 좋아지고, 상한까지 채운 채로 넘기면 등급이 오른다
       let repClean = 0, repTierUp = null, repPerks = null;
-      if (ms.penalty === 0) repClean = this.addRep(D.REP_GAIN.cleanMonth, MSG('why.repClean'));
+      if (ms.penalty === 0) repClean = this.addRep(D.REP_GAIN.cleanMonth + (R.cleanRepBonus || 0), MSG('why.repClean'));   // 멀티 퍽 🧹: 깨끗한 정산 +2
       if (!R.repStep && this.rep >= this.repCap() && this.repTier < D.REP_TIERS.length - 1) {
         this.repTier++; repTierUp = this.repTierId();
         this.say('log.repTierUp', { name: this.repTierName(), cap: this.repCap() });
@@ -2495,6 +2508,13 @@
         if (old) {
           if (old.calls >= 3) this.stats.replacedWithCalls = Math.max(this.stats.replacedWithCalls, old.calls);
           if (R.keepCalls && old.calls > 0) nc.calls = Math.min(nc.maxCalls + R.keepCalls, nc.calls + Math.min(R.keepCalls, old.calls));
+          // 같은 계열 상위 센터로 갈아타기: 강화와 신뢰는 따라간다 — 유저: "강화 버려지는 게 아깝네, 강화는 유지, 신뢰도 유지"
+          if (it.switchFrom === old.id && FAM(old.carrier) === FAM(it.carrier)) {
+            const baseOld = this._makeContract(old.carrier, old.grade).maxCalls;
+            nc.enh = JSON.parse(JSON.stringify(old.enh)); nc.maxCalls += Math.max(0, old.maxCalls - baseOld); nc.calls = nc.maxCalls;
+            this.trust[it.carrier] = Math.max(this.trust[it.carrier] || 0, this.trust[old.carrier] || 0);
+            nc.carried = true;
+          }
         }
         this.contracts[target] = nc;
         this.monthStats.firstContractBought = true; this.stats.contractsBought++;
@@ -2596,9 +2616,8 @@
       for (const e of ['cap1', 'regular', 'seal', 'optFragile', 'optCold']) { const E = D.ENHANCEMENTS[e]; if (e.startsWith('opt') && !this._canFitOpt(e)) continue; items.push({ kind: 'enh', enh: e, price: Math.round(E.price * mult), name: E.name, sold: false, standing: true }); }
       const facPrice = f => Math.round(D.FACILITIES[f].price * mult * R.facilityPriceMult * ((R.facilityPriceMap && R.facilityPriceMap[f]) || 1));
       const fac = f => { const F = D.FACILITIES[f]; if (this.warehouse[f] || (F.requires && !this.warehouse[F.requires])) return; items.push({ kind: 'fac', fac: f, standing: true, price: facPrice(f), name: F.name, sold: false }); };
-      fac(['expand1', 'expand2', 'expand3'].find(f => !this.warehouse[f]) || 'expand3');
-      fac(['cold1', 'cold2'].find(f => !this.warehouse[f]) || 'cold2');
-      fac('yard');
+      // 시설(창고 확장·냉장·야적)은 난투에서 팔지 않는다 — 유저: "난투에서 시설 업그레이드는 없애줘". 칸은 퍽(📦·🏕)으로만 는다
+      if (!R.noFacilities) { fac(['expand1', 'expand2', 'expand3'].find(f => !this.warehouse[f]) || 'expand3'); fac(['cold1', 'cold2'].find(f => !this.warehouse[f]) || 'cold2'); fac('yard'); }
       items.push(...this._refillItems());   // 배차 충전(가득) — 난투의 배차는 횟수다
       // 광고: 캠페인(📣)으로 물량을 끌어오는 게 난투의 조절 손잡이다 — 매체·매체 강화·광고권은 판다 (성장 투자는 없다)
       for (const it of this._adAndGrowthItems(mult)) if (['adTicket', 'media', 'mediaUp'].includes(it.kind)) items.push(it);

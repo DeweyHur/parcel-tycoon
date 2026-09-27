@@ -267,7 +267,7 @@
     },
 
     // 업체 신뢰도 (런 내, 업체별 누적 — 계약을 바꿔도 유지)
-    TRUST_LEVELS: [0, 3, 8, 15],    // 차 한 대 = −2~+2xp (실은 택배 점수 평균)
+    TRUST_LEVELS: [0, 8, 24, 50],   // 택배 하나 = −2~+2xp 가 그대로 쌓인다(한 차에 +10 도 흔함) → 총량을 키워 쉽게 못 채우게 (유저: "신뢰 총량이 너무 작아")
     TRUST_EFFECTS: [], // 단계 0 문구 — locales data.TRUST_EFFECTS[0]
     // 단계별 효과 문구 (마켓 카드·호출 모달·도감이 같은 문자열을 읽는다)
     trustEffectText(carrier, lv) { const f = DATA.familyOf ? DATA.familyOf(carrier) : carrier; if (lv >= 1 && DATA.TRUST_PERK_TEXT[f]) return DATA.TRUST_PERK_TEXT[f][lv - 1]; return DATA.TRUST_EFFECTS[0]; },
