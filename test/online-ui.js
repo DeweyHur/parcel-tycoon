@@ -26,7 +26,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
     for (let i = 0; i < 10; i++) { if (await page.$('#t-online')) break; await page.mouse.click(200, 400); await page.waitForTimeout(300); }
     return page;
   }
-  const idle = page => page.waitForFunction(() => !PT.busy, null, { timeout: 8000 });
+  const idle = page => page.waitForFunction(() => !PT.busy, null, { timeout: 30000, polling: 100 });   // 느린 머신에서는 하루 연출이 8초를 넘긴다
   const modalText = page => page.evaluate(() => (document.querySelector('#modal') || {}).textContent || '');
   const A = await open('A'), B = await open('B');
   ok('타이틀에 온라인 난투 버튼', !!(await A.$('#t-online')));
@@ -39,7 +39,8 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   await B.click('#t-online'); await B.waitForTimeout(700);
   { const e = JSON.parse((await S.call([['HGET', 'mq', pidA]]))[0]); e.at -= 61; await S.call([['HSET', 'mq', pidA, JSON.stringify(e)]]); }
   await B.waitForTimeout(3000); await A.waitForTimeout(2500);
-  for (const pg of [A, B]) await pg.evaluate(() => { const i = document.querySelector('#mintro'); if (i) i.click(); }); await A.waitForTimeout(900);
+  const skipIntro = async pg => { for (let k = 0; k < 50; k++) { const st = await pg.evaluate(() => ({ intro: !!document.querySelector('#mintro'), game: !!(PT.game) })); if (st.intro) { await pg.evaluate(() => { const e = document.querySelector('#mintro'); if (e) e.click(); }); return true; } if (st.game && k > 10) return false; await pg.waitForTimeout(100); } return false; };
+  for (const pg of [A, B]) await skipIntro(pg); await A.waitForTimeout(900);
   const closePrep = async pg => { await pg.evaluate(() => { if (PT.game && PT.game.phase === 'market') { const b = [...document.querySelectorAll('#modal .foot .btn')].pop(); if (b) b.click(); } }); await pg.waitForTimeout(500); };
   await closePrep(A); await closePrep(B); await idle(A); await idle(B);
   const stA = await A.evaluate(() => ({ online: !!(PT.match && PT.match.online), host: PT.match && PT.match.online && PT.match.online.host, n: PT.match && PT.match.players.length, games: PT.match && PT.match.players.filter(p => p.game).length, me: PT.match && PT.match.players[0].id === Profile.get().pid, seed: PT.game && PT.game.seed }));
@@ -89,7 +90,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   const roomB = await modalText(B), roomA = await modalText(A);
   ok('B 코드로 입장(소문자도) · 둘 다 명단에 둘 · B 는 방장 대기', /에이창고/.test(roomB) && /방장이 시작/.test(roomB) && /비창고/.test(roomA), roomA.replace(/\s+/g, ' ').slice(0, 100));
   await A.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].find(b => /시작/.test(b.textContent)).click()); await A.waitForTimeout(2000); await B.waitForTimeout(2500);
-  for (const pg of [A, B]) await pg.evaluate(() => { const i = document.querySelector('#mintro'); if (i) i.click(); }); await A.waitForTimeout(900);
+  for (const pg of [A, B]) await skipIntro(pg); await A.waitForTimeout(900);
   await closePrep(A); await closePrep(B);
   const inv = await A.evaluate(() => ({ online: !!(PT.match && PT.match.online), bots: PT.match && PT.match.players.filter(p => p.bot).map(p => p.name), n: PT.match && PT.match.players.length }));
   const invB = await B.evaluate(() => ({ online: !!(PT.match && PT.match.online), host: PT.match && PT.match.online.host, mid: PT.match && PT.match.online.mid }));
@@ -114,4 +115,4 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   ok('콘솔 에러 0', errors.length === 0, errors.slice(0, 5).join(' | '));
   console.log(`\n${pass.length} ok, ${fail.length} fail`);
   await browser.close(); process.exit(fail.length ? 1 : 0);
-})().catch(e => { console.error(e); process.exit(1); });
+})().catch(e => { console.error(e); console.error('ERRORS', (globalThis.__errors || []).slice(0, 5)); process.exit(1); });
