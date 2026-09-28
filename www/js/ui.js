@@ -728,6 +728,23 @@
     for (const b of g.storage.filter(x => x.kind === 'bomb')) parts.push(T('multi.bombRow', { size: g.storageVol(b), d: b.left, c: b.perTurn }));
     return parts;
   }
+  // 상대 카드의 창고 미니어처: 칸 하나가 점 하나 — 내 짐(금) · 밀려 들어온 남의 상자(주황) · 🧨 폭탄(빨강) · 빈 칸. 넘치면 붉은 테두리
+  // 공격이 이 격자에 '박히는' 게 보여야 상대가 실감난다 (유저: "창고를 전장으로")
+  function miniWarehouse(r) {
+    const cap = Math.max(1, r.cap || 28), used = r.used || 0, bomb = Math.min(used, r.bombVol || 0), pushed = Math.min(used - bomb, r.pushedVol || 0), own = Math.max(0, used - bomb - pushed);
+    const cols = cap > 32 ? 9 : cap > 24 ? 7 : 6, total = Math.max(cap, used);
+    let h = '';
+    for (let i = 0; i < total; i++) { const k = i < bomb ? 'b' : i < bomb + pushed ? 'p' : i < used ? 'o' : ''; h += `<i class="${k}${i >= cap ? ' x' : ''}"></i>`; }
+    return `<div class="mini ${used > cap ? 'over' : used >= cap * 0.8 ? 'hot' : ''}" style="--cols:${cols}">${h}</div>`;
+  }
+  // 내가 쏜 것이 상대 격자에 박힌다 — n 칸이 잠깐 켜진다(실제 상태는 그 사람의 다음 날에 바뀐다)
+  function landOn(pid, n, kind) {
+    const el = portraitEl(pid); const mini = el && el.querySelector('.mini'); if (!mini) return;
+    const empty = [...mini.querySelectorAll('i:not(.o):not(.p):not(.b)')];
+    const cells = empty.slice(0, n); if (!cells.length) { mini.classList.add('fx-bad'); setTimeout(() => mini.classList.remove('fx-bad'), 1000); return; }
+    cells.forEach((c, i) => setTimeout(() => { c.classList.add(kind, 'land'); }, i * 70));
+    setTimeout(() => cells.forEach(c => c.classList.remove('land')), 1600);
+  }
   function renderMultiStrip() {
     const el = $('#multi-strip'); if (!el) return;
     el.hidden = !match; if (!match) return;
@@ -743,7 +760,7 @@
         <span class="stamp">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : ''}</span>
         <b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
         <span class="reps">${reps}</span><span class="rk">${T('multi.day', { n: r.day })}${bombs ? ' 🧨' + (bombs > 1 ? bombs : '') : ''}${g.shields ? ' 🛡' : ''}</span>
-        <div class="wh ${over ? 'over' : fill >= 0.8 ? 'hot' : fill >= 0.5 ? 'mid' : ''}"><i style="width:${Math.round(fill * 100)}%"></i></div>
+        ${miniWarehouse(r)}
         <span class="repline" style="grid-column:1 / -1">★<b class="repnum">${r.repFinal != null ? r.repFinal : r.rep}</b>${r.penalty ? `<small style="color:var(--red)">−${r.penalty}</small>` : ''}</span></div>`;
     }).join('');
     el.querySelectorAll('.mp').forEach(d => d.onclick = () => { SFX.click(); showOpponent(match.players[+d.dataset.id]); });
@@ -803,12 +820,12 @@
     if (!match) return;
     let k = 0;
     for (const n of news) {
-      if (n.type === 'attack') { for (const to of n.to) flyIcon(traitIcon(n.trait), n.from, to, k * 90); k++;
+      if (n.type === 'attack') { for (const to of n.to) flyIcon(traitIcon(n.trait), n.from, to, k * 90, () => { const m = portraitEl(to) && portraitEl(to).querySelector('.mini'); if (m) { m.classList.add('fx-bad'); setTimeout(() => m.classList.remove('fx-bad'), 1000); } }); k++;
         if (n.from === ME()) mnotice(ME(), traitIcon(n.trait), n.focus ? `🎯 ${n.to.map(pname).join('·')} ×3` : T('multi.toAll'), 'me'); }
       if (n.type === 'note') { bubble(n.from, n.text); if (n.from !== ME()) mnotice(n.from, n.text, ''); }
-      if (n.type === 'push') { for (const to of n.to) flyIcon('📦', n.from, to, k * 90); k++;
+      if (n.type === 'push') { for (const to of n.to) flyIcon('📦', n.from, to, k * 90, () => landOn(to, n.n, 'p')); k++;
         if (n.from === ME()) mnotice(ME(), '📦', `${n.n} → ${n.to.map(pname).join('·')}`, 'me'); }
-      if (n.type === 'bomb') { for (const to of n.to) flyIcon('🧨', n.from, to, k * 90, () => { if (to === ME()) scene.shake(.5); }); k++;
+      if (n.type === 'bomb') { for (const to of n.to) flyIcon('🧨', n.from, to, k * 90, () => { if (to === ME()) scene.shake(.5); landOn(to, n.size || M.MULTI.BOMB.size, 'b'); }); k++;
         if (n.from === ME()) mnotice(ME(), '🧨', T(n.back ? 'multi.bombBackToast' : 'multi.bombOutToast', { name: n.to.map(pname).join('·') }), 'me'); }
     }
     // 나에게 온 공격·폭탄·밀어내기는 **한 번에 하나씩** 1초 간격으로 — 누가 쐈고(포트레잇이 번쩍) 무엇이 바뀌었는지(바뀐 곳이 빛난다) 보이게 (유저)

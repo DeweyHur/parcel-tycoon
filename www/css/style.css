@@ -1163,3 +1163,14 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 @keyframes fxBad { 0% { box-shadow: 0 0 0 2px var(--red, #ff6b6b); filter: brightness(1.6); } 100% { box-shadow: none; filter: none; } }
 .fx-new { animation: fxNew 1s ease-out; }
 @keyframes fxNew { 0% { box-shadow: 0 0 0 2px var(--gold, #ffd166); transform: scale(1.25); } 100% { box-shadow: none; transform: scale(1); } }
+/* 상대 카드 창고 미니어처 */
+#multi-strip .mp .mini { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(var(--cols, 7), 1fr); gap: 1px; padding: 1px; background: #0c0b16; border: 1px solid var(--line, #3a3860); min-width: 0; }
+#multi-strip .mp .mini i { display: block; aspect-ratio: 1; background: #1f1d33; min-height: 4px; }
+#multi-strip .mp .mini i.o { background: var(--gold, #f2c14e); }
+#multi-strip .mp .mini i.p { background: #ff8a3d; }
+#multi-strip .mp .mini i.b { background: var(--red, #ff6b6b); }
+#multi-strip .mp .mini i.x { outline: 1px solid var(--red, #ff6b6b); }
+#multi-strip .mp .mini.hot { border-color: #ff8a3d; }
+#multi-strip .mp .mini.over { border-color: var(--red, #ff6b6b); box-shadow: 0 0 6px rgba(255,80,80,.7); }
+#multi-strip .mp .mini i.land { animation: landIn .5s cubic-bezier(.2,1.6,.4,1); }
+@keyframes landIn { 0% { transform: scale(3); filter: brightness(2.5); } 100% { transform: scale(1); filter: none; } }

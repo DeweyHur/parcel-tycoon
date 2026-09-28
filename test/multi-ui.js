@@ -22,7 +22,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const modalText = () => page.evaluate(() => (document.querySelector('#modal') || {}).textContent || '');
   ok('타이틀에 난투 버튼', !!(await page.$('#t-multi')));
   await page.screenshot({ path: `${OUT}/M-00-title.png` });
-  await page.click('#t-multi'); await page.waitForSelector('#mintro', { timeout: 8000 }).catch(() => {}); await page.waitForTimeout(500);
+  await page.click('#t-multi'); const introT0 = Date.now(); let introSeen = false; for (let k = 0; k < 40 && !introSeen; k++) { introSeen = await page.evaluate(() => !!document.querySelector('#mintro')); if (!introSeen) await page.waitForTimeout(100); } console.log('intro after', Date.now() - introT0, 'ms', introSeen); await page.waitForTimeout(300);
   const intro = await page.evaluate(() => ({ on: !!document.querySelector('#mintro'), cards: document.querySelectorAll('#mintro .ic').length, vs: !!document.querySelector('#mintro .vs'), theme: !!document.querySelector('#mintro .theme'), me: document.querySelector('#mintro .ic.me b') && document.querySelector('#mintro .ic.me b').textContent }));
   await page.screenshot({ path: `${OUT}/M-00b-intro.png` });
   ok('시작 화면: 넷 소개 카드 · VS · 나', intro.on && intro.cards === 4 && intro.vs && intro.me === '나' && intro.theme, JSON.stringify(intro));

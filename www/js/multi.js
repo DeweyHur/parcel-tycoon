@@ -62,7 +62,7 @@
       if (e.type === 'attack') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receiveAttack({ trait: e.trait, mult: e.mult, from: e.from, fromName: e.fromName });
         match.news.push({ type: 'attack', from: e.from, to: e.to, trait: e.trait, focus: !!e.focus, remote: true }); }
       else if (e.type === 'bomb') { const t = match.players.find(p => p.id === e.to[0]); let blast = false; if (t && t.game && mine.has(t.id)) { const r = t.game.receiveBomb(Object.assign({}, e.bomb, { back: !!e.back })); blast = !!(r && r.blast); }
-        match.news.push({ type: 'bomb', from: e.from, to: e.to, blast, back: !!e.back, drop: !!e.drop, remote: true }); }
+        match.news.push({ type: 'bomb', from: e.from, to: e.to, blast, back: !!e.back, drop: !!e.drop, size: e.bomb && e.bomb.size, remote: true }); }
       else if (e.type === 'push') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receivePush({ n: e.n, from: e.from, fromName: e.fromName });
         match.news.push({ type: 'push', from: e.from, to: e.to, n: e.n, remote: true }); }
       else if (e.type === 'bombFizzle') match.news.push({ type: 'bombFizzle', from: e.from });
@@ -98,7 +98,7 @@
             if (bombsInPlay(match) >= M.MULTI.BOMB.max || !tg.length) { match.news.push({ type: 'bombFizzle', from: p.id }); continue; }
             const t = tg[Math.floor(mrand(match) * tg.length)];
             const r = t.game.receiveBomb({ size: o.size || M.MULTI.BOMB.size, days: M.MULTI.BOMB.days, hops: 0, from: p.id });
-            match.news.push({ type: 'bomb', from: p.id, to: [t.id], blast: !!r.blast }); continue;
+            match.news.push({ type: 'bomb', from: p.id, to: [t.id], blast: !!r.blast, size: o.size || M.MULTI.BOMB.size }); continue;
           }
           for (const t of tg) t.game.receiveAttack({ trait: o.trait, mult: o.mult, from: p.id, fromName: p.name });
           match.news.push({ type: 'attack', from: p.id, to: tg.map(t => t.id), trait: o.trait, focus: !!o.focus });
@@ -168,12 +168,12 @@
   // 한 사람의 상태 — 내 판(game)이 있으면 거기서, 원격(온라인 상대)이면 서버 스냅샷(snap)에서
   function stateOf(p) {
     const g = p.game;
-    if (g) return { alive: alive(g), done: finished(g), win: g.phase === 'win', cash: g.cash, rep: g.rep, repCap: g.repCap(), day: dayOf(g), days: totalDays(g), tier: g.repTier, perks: g.mperks.slice(), cap: g.warehouse.cap, used: g.usedVolume(), shields: g.shields, bombs: g.bombCount(), phase: g.phase };
+    if (g) return { alive: alive(g), done: finished(g), win: g.phase === 'win', cash: g.cash, rep: g.rep, repCap: g.repCap(), day: dayOf(g), days: totalDays(g), tier: g.repTier, perks: g.mperks.slice(), cap: g.warehouse.cap, used: g.usedVolume(), bombVol: g.storage.filter(x => x.kind === 'bomb').reduce((n, x) => n + g.storageVol(x), 0), pushedVol: g.parcels.filter(x => x.pushed).reduce((n, x) => n + x.size, 0), shields: g.shields, bombs: g.bombCount(), phase: g.phase };
     const s = p.snap || {}; const ph = s.phase || 'play', dead = ph === 'over' || ph === 'gone';
-    return { alive: !dead, done: ph !== 'play', win: ph === 'win', cash: s.cash || 0, rep: s.rep || 0, repCap: s.repCap || 20, day: s.day || 1, days: s.days || 78, tier: s.tier || 0, perks: s.perks || [], cap: s.cap || 28, used: s.used || 0, shields: s.shields || 0, bombs: s.bombs || 0, phase: ph, gone: ph === 'gone' };
+    return { alive: !dead, done: ph !== 'play', win: ph === 'win', cash: s.cash || 0, rep: s.rep || 0, repCap: s.repCap || 20, day: s.day || 1, days: s.days || 78, tier: s.tier || 0, perks: s.perks || [], cap: s.cap || 28, used: s.used || 0, bombVol: s.bombVol || 0, pushedVol: s.pushedVol || 0, shields: s.shields || 0, bombs: s.bombs || 0, phase: ph, gone: ph === 'gone' };
   }
   // 서버에 올릴 스냅샷 (stateOf 와 같은 모양)
-  function snapOf(g) { const st = stateOf({ game: g }); return { cash: st.cash, rep: st.rep, repCap: st.repCap, day: st.day, days: st.days, used: st.used, cap: st.cap, shields: st.shields, bombs: st.bombs, phase: st.phase, tier: st.tier, perks: st.perks }; }
+  function snapOf(g) { const st = stateOf({ game: g }); return { cash: st.cash, rep: st.rep, repCap: st.repCap, day: st.day, days: st.days, used: st.used, cap: st.cap, bombVol: st.bombVol, pushedVol: st.pushedVol, shields: st.shields, bombs: st.bombs, phase: st.phase, tier: st.tier, perks: st.perks }; }
   // 먼저 마감한 사람이 나오면 그 순간 남들의 일차를 적어 둔다 — 남은 날 ÷ latePenaltyDiv 만큼 평판 페널티(1등 제외). 승부는 평판
   function noteFinish(match) {
     if (match.firstFinish) return;
