@@ -410,12 +410,12 @@
     'log.attackIn': '{from}의 {icon} {name} 피격 — {detail}',
     'log.attackBlocked': '{from}의 {icon} {name} — {how}',
     'log.pushIn': '📦 {from}의 만차 — 택배 {n}개가 밀려 들어왔다',
-    'log.bombIn': '🧨 폭탄 도착 — {size}칸, {days}일 뒤 옆 창고로 (못 치움)',
-    'log.bombOut': '🧨 폭탄이 상대에게 갔다 ({size}칸으로 커져서)',
-    'log.bombBlast': '🧨 폭탄 폭발 — 넘친 짐 {n}개 도난',
+    'log.repairIn': '🏗 보수공사 시작 — {size}칸 점거, {days}일 뒤 옆 창고로 (못 치움)',
+    'log.repairOut': '🏗 공사팀이 옆 창고로 옮겨 갔다 ({size}칸으로 커져서)',
+    'log.repairBlast': '🏗 대공사 — 밀려난 짐 {n}개 도난',
     'why.trait': '{icon} 트레잇',
     'why.attack': '{icon} 공격',
-    'why.bombBlast': '🧨 폭탄 폭발',
+    'why.repairBlast': '🏗 대공사',
     'trait.d.rain': '야외 {n}개 젖음 · 기한 −1',
     'trait.d.claim': '평판 −{n}',
     'trait.d.rat': '신선 {n}개 폐기',
@@ -441,15 +441,15 @@
     'multi.introMe': '내 창고',
     'trait.blk.shield': '🛡 막음',
     'trait.blk.roof': '🏠 막음',
-    'err.bombStuck': '🧨 폭탄은 못 치운다 — 며칠 뒤 옆 창고로 간다',
+    'err.repairStuck': '🏗 공사 중인 자리는 못 치운다 — 며칠 뒤 옆 창고로 옮겨 간다',
     'multi.hitToast': '{from} → {icon} {name}: {detail}',
     'multi.blockToast': '{how} — {from}의 {icon} {name}',
     'multi.fireToast': '{icon} {name} → {names}',
     'multi.focusToast': '🎯 한 방! {icon} {name} → {names} ×3',
-    'multi.bombInToast': '{size}칸 · {days}일',
-    'multi.bombOutToast': '→ {name}',
-    'multi.bombBackToast': '🔄 → {name}',
-    'multi.bombBlastToast': '💥 −{n}',
+    'multi.repairInToast': '{size}칸 · {days}일',
+    'multi.repairOutToast': '→ {name}',
+    'multi.repairBackToast': '🔄 → {name}',
+    'multi.repairBlastToast': '💥 −{n}',
     'multi.bannerClosed': '{name} 폐업',
     'multi.bannerDone': '{name} 마감 · 잔액 {cash}c',
     'multi.bannerD': 'D-{n}',
@@ -461,7 +461,7 @@
     'multi.focusLine': '🎯 다음 공격은 1위에게 ×3',
     'multi.truckLine': '🚚 다음 호출 트럭 +1 무료',
     'multi.iceLine': '🧊 기한 정지 {d}일',
-    'multi.bombRow': '🧨 {size}칸 · {d}일',
+    'multi.repairRow': '🏗 {size}칸 · {d}일',
     'multi.traitLine': '{icon} {name} — {desc}',
     'pd.traitAtk': '기한 안에 보내면 상대 전원에게',
     'pd.traitBon': '기한 안에 보내면 나에게',
@@ -2046,7 +2046,7 @@
       }
     },
     "STORAGE_KINDS": {
-      "bomb": { "name": "폭탄" },
+      "repair": { "name": "보수공사" },
       "move": {
         "name": "이삿짐"
       },
@@ -2305,7 +2305,7 @@
     },
     "MULTI": {
     "TRAITS": {
-      "t_bomb": { "name": "폭탄", "desc": "랜덤 상대 창고에 🧨 3칸 (못 치움, 6일 뒤 다음 창고로)" },
+      "t_repair": { "name": "보수공사", "desc": "랜덤 상대 창고 🏗 3칸을 공사판으로 (못 치움, 6일 뒤 옆 창고로)" },
       "t_hurry": { "name": "독촉", "desc": "택배 3개를 오늘 안에 보내야 한다" },
       "t_road": { "name": "도로 통제", "desc": "계약 하나 다음 날 호출 불가 (계약이 하나뿐이면 무효)" },
       "t_seal": { "name": "창고 봉인", "desc": "창고 −6칸, 3일" },
@@ -2314,7 +2314,7 @@
       "t_ice": { "name": "얼음", "desc": "창고 안 모든 택배 기한 정지 3일" },
       "t_pack": { "name": "압축", "desc": "창고 +3칸, 3일" },
       "t_truck": { "name": "덤 트럭", "desc": "다음 호출 트럭 +1" },
-      "t_return": { "name": "되돌리기", "desc": "내 창고의 🧨 1개를 보낸 사람에게" },
+      "t_return": { "name": "되돌리기", "desc": "내 창고의 🏗 1개를 보낸 사람에게" },
       "t_focus": { "name": "한 방", "desc": "다음 공격을 1위 한 명에게만, 효과 ×3" }
     },
     "THEMES": {
@@ -2340,7 +2340,7 @@
       "m_dodge": { "name": "잽", "desc": "받는 공격 절반은 불발" },
       "m_early": { "name": "빠른 손", "desc": "일찍 보낸 호출 평판 +1 추가" },
       "m_trait": { "name": "장전", "desc": "내 공격 25% 확률로 2번" },
-      "m_heavy": { "name": "큰 폭탄", "desc": "내가 보내는 🧨 +2칸 더 크게" },
+      "m_heavy": { "name": "대공사", "desc": "내가 보내는 🏗 공사판 +2칸 더 크게" },
       "m_sharp": { "name": "날 세우기", "desc": "내 공격 효과 ×1.5" }
     },
     "FAMILY_NAMES": { "eco": "운영", "def": "방어", "atk": "공격" },

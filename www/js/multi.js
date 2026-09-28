@@ -61,11 +61,11 @@
     for (const e of res.events || []) {
       if (e.type === 'attack') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receiveAttack({ trait: e.trait, mult: e.mult, from: e.from, fromName: e.fromName });
         match.news.push({ type: 'attack', from: e.from, to: e.to, trait: e.trait, focus: !!e.focus, remote: true }); }
-      else if (e.type === 'bomb') { const t = match.players.find(p => p.id === e.to[0]); let blast = false; if (t && t.game && mine.has(t.id)) { const r = t.game.receiveBomb(Object.assign({}, e.bomb, { back: !!e.back })); blast = !!(r && r.blast); }
-        match.news.push({ type: 'bomb', from: e.from, to: e.to, blast, back: !!e.back, drop: !!e.drop, size: e.bomb && e.bomb.size, remote: true }); }
+      else if (e.type === 'repair') { const t = match.players.find(p => p.id === e.to[0]); let blast = false; if (t && t.game && mine.has(t.id)) { const r = t.game.receiveRepair(Object.assign({}, e.repair, { back: !!e.back })); blast = !!(r && r.blast); }
+        match.news.push({ type: 'repair', from: e.from, to: e.to, blast, back: !!e.back, drop: !!e.drop, size: e.repair && e.repair.size, remote: true }); }
       else if (e.type === 'push') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receivePush({ n: e.n, from: e.from, fromName: e.fromName });
         match.news.push({ type: 'push', from: e.from, to: e.to, n: e.n, remote: true }); }
-      else if (e.type === 'bombFizzle') match.news.push({ type: 'bombFizzle', from: e.from });
+      else if (e.type === 'repairFizzle') match.news.push({ type: 'repairFizzle', from: e.from });
       else if (e.type === 'note') match.news.push({ type: 'note', from: e.from, text: e.text });
     }
     // 내가 쏜 것도 서버가 목적지를 붙여 돌려주면 그때 날린다 — 온라인에선 발사 연출이 한 폴링(≤3초) 늦다
@@ -79,12 +79,12 @@
   }
   // 봇 하루 진행. 끝난 봇은 건드리지 않는다
   function botDay(p) { const g = p.game; if (finished(g)) return false; const r = BOT.multiDay(g, p.strat); g.takeEvents(); return r; }
-  // 매치 난수 (폭탄 목적지 — 서버가 정할 자리. 지금은 매치 시드에서)
+  // 매치 난수 (보수공사 목적지 — 서버가 정할 자리. 지금은 매치 시드에서)
   function mrand(match) { match.rng = (Math.imul(match.rng ^ (match.rng >>> 15), 0x2c1b3c6d) + 0x9e3779b9) >>> 0; return (match.rng >>> 8) / 16777216; }
   function targetsOf(match, from) { return match.players.filter(p => p.id !== from && !stateOf(p).done); }
-  function bombsInPlay(match) { return match.players.reduce((n, p) => n + stateOf(p).bombs, 0); }
-  // 각 판의 outbox(공격·폭탄 이사)를 상대 인박스로. 공격은 나 빼고 전원(마감·폐업 제외), 🎯 한 방은 1위 한 명에게만.
-  // 폭탄은 랜덤 상대 한 명(되돌리기는 보낸 사람) — 갈 곳이 없으면(전원 마감) 소멸. 매치당 동시 최대 BOMB.max
+  function repairsInPlay(match) { return match.players.reduce((n, p) => n + stateOf(p).repairs, 0); }
+  // 각 판의 outbox(공격·보수공사 이사)를 상대 인박스로. 공격은 나 빼고 전원(마감·폐업 제외), 🎯 한 방은 1위 한 명에게만.
+  // 보수공사는 랜덤 상대 한 명(되돌리기는 보낸 사람) — 갈 곳이 없으면(전원 마감) 소멸. 매치당 동시 최대 REPAIR.max
   function route(match) {
     for (const p of match.players) {
       const g = p.game; if (!g || !g.outbox.length) continue;
@@ -94,11 +94,11 @@
         if (o.type === 'attackOut') {
           let tg = targetsOf(match, p.id);
           if (o.focus) { const top = standings(match).find(r => r.alive && !r.done && r.p.id !== p.id); tg = top ? [top.p] : []; }
-          if (o.trait === 't_bomb') {
-            if (bombsInPlay(match) >= M.MULTI.BOMB.max || !tg.length) { match.news.push({ type: 'bombFizzle', from: p.id }); continue; }
+          if (o.trait === 't_repair') {
+            if (repairsInPlay(match) >= M.MULTI.REPAIR.max || !tg.length) { match.news.push({ type: 'repairFizzle', from: p.id }); continue; }
             const t = tg[Math.floor(mrand(match) * tg.length)];
-            const r = t.game.receiveBomb({ size: o.size || M.MULTI.BOMB.size, days: M.MULTI.BOMB.days, hops: 0, from: p.id });
-            match.news.push({ type: 'bomb', from: p.id, to: [t.id], blast: !!r.blast, size: o.size || M.MULTI.BOMB.size }); continue;
+            const r = t.game.receiveRepair({ size: o.size || M.MULTI.REPAIR.size, days: M.MULTI.REPAIR.days, hops: 0, from: p.id });
+            match.news.push({ type: 'repair', from: p.id, to: [t.id], blast: !!r.blast, size: o.size || M.MULTI.REPAIR.size }); continue;
           }
           for (const t of tg) t.game.receiveAttack({ trait: o.trait, mult: o.mult, from: p.id, fromName: p.name });
           match.news.push({ type: 'attack', from: p.id, to: tg.map(t => t.id), trait: o.trait, focus: !!o.focus });
@@ -107,37 +107,37 @@
           const t = tg[Math.floor(mrand(match) * tg.length)];
           t.game.receivePush({ n: o.n, from: p.id, fromName: p.name });
           match.news.push({ type: 'push', from: p.id, to: [t.id], n: o.n });
-        } else if (o.type === 'bombMove') {
+        } else if (o.type === 'repairMove') {
           let t = o.to != null ? match.players.find(x => x.id === o.to && !finished(x.game)) : null;
           const tg = targetsOf(match, p.id);
           if (!t) t = tg.length ? tg[Math.floor(mrand(match) * tg.length)] : null;
-          if (!t) { match.news.push({ type: 'bombFizzle', from: p.id }); continue; }
-          const b = Object.assign({}, o.bomb, { from: p.id, back: !!o.back });
-          const r = t.game.receiveBomb(b);
-          match.news.push({ type: 'bomb', from: p.id, to: [t.id], blast: !!r.blast, back: !!o.back, size: b.size });
+          if (!t) { match.news.push({ type: 'repairFizzle', from: p.id }); continue; }
+          const b = Object.assign({}, o.repair, { from: p.id, back: !!o.back });
+          const r = t.game.receiveRepair(b);
+          match.news.push({ type: 'repair', from: p.id, to: [t.id], blast: !!r.blast, back: !!o.back, size: b.size });
         }
       }
     }
   }
-  // 매 사이클 정산마다 폭탄 하나 자동 투하 — 사람의 시계 기준 (사람이 사이클을 넘길 때)
+  // 매 사이클 정산마다 보수공사 하나 자동 투하 — 사람의 시계 기준 (사람이 사이클을 넘길 때)
   function cycleDrop(match, cycle) {
     if (match.online) { if ((match.cycleDrops || 0) < cycle) { match.cycleDrops = cycle; match.online.pending.push({ from: match.players[0].id, type: 'cycle', n: cycle }); } return; }
-    if ((match.cycleDrops || 0) >= cycle || bombsInPlay(match) >= M.MULTI.BOMB.max) return;
+    if ((match.cycleDrops || 0) >= cycle || repairsInPlay(match) >= M.MULTI.REPAIR.max) return;
     match.cycleDrops = cycle;
     const tg = match.players.filter(p => !finished(p.game)); if (!tg.length) return;
     const t = tg[Math.floor(mrand(match) * tg.length)];
-    t.game.receiveBomb({ size: M.MULTI.BOMB.size + Math.floor((cycle - 1) / Math.max(1, t.game.rules.months - 1) * (M.MULTI.BOMB.late || 0)), days: M.MULTI.BOMB.days, hops: 0, from: null });   // 사이클 투하도 갈수록 크게
-    match.news.push({ type: 'bomb', from: null, to: [t.id], drop: true });
+    t.game.receiveRepair({ size: M.MULTI.REPAIR.size + Math.floor((cycle - 1) / Math.max(1, t.game.rules.months - 1) * (M.MULTI.REPAIR.late || 0)), days: M.MULTI.REPAIR.days, hops: 0, from: null });   // 사이클 투하도 갈수록 크게
+    match.news.push({ type: 'repair', from: null, to: [t.id], drop: true });
   }
   // ----- 재실행 검증 (3단계) — 같은 cfg·같은 입력 로그면 같은 판이 나와야 한다. 서버가 종료 시 돌려 본다 -----
-  // 로그 항목: wait{ids} · call{i,ids,n} · self{ids} · shop · buy{i,s,m} · close · perk{id} · atk{a} · bomb{b}
+  // 로그 항목: wait{ids} · call{i,ids,n} · self{ids} · shop · buy{i,s,m} · close · perk{id} · atk{a} · repair{b}
   function replay(cfg, log) {
     const g = new Game(Object.assign({}, cfg, { multi: true, mperks: [] }));   // 퍽은 로그(perk)로 다시 고른다 — cfg 에 남은 mperks 는 비운다 (준비 마켓 prep 은 cfg 그대로: 로그의 buy·close 가 재현한다)
     for (const e of log || []) {
       if (g.phase === 'over' || g.phase === 'win') break;
       if (e.t === 'wait') g.wait(e.ids); else if (e.t === 'call') g.callCarrier(e.i, e.ids, e.n || undefined); else if (e.t === 'self') g.selfShip(e.ids);
       else if (e.t === 'shop') g.openShop(); else if (e.t === 'buy') g.buy(e.i, e.s, e.m || undefined); else if (e.t === 'close') g.closeMarket();
-      else if (e.t === 'perk') g.pickPerk(e.id); else if (e.t === 'atk') g.receiveAttack(e.a); else if (e.t === 'bomb') g.receiveBomb(e.b); else if (e.t === 'push') g.receivePush(e.x);
+      else if (e.t === 'perk') g.pickPerk(e.id); else if (e.t === 'atk') g.receiveAttack(e.a); else if (e.t === 'repair') g.receiveRepair(e.b); else if (e.t === 'push') g.receivePush(e.x);
       else if (e.t === 'rbuy') g.buyRepShop(e.i, e.s); else if (e.t === 'rclose') g.closeRepShop();
       g.takeEvents();
     }
@@ -168,12 +168,12 @@
   // 한 사람의 상태 — 내 판(game)이 있으면 거기서, 원격(온라인 상대)이면 서버 스냅샷(snap)에서
   function stateOf(p) {
     const g = p.game;
-    if (g) return { alive: alive(g), done: finished(g), win: g.phase === 'win', cash: g.cash, rep: g.rep, repCap: g.repCap(), day: dayOf(g), days: totalDays(g), tier: g.repTier, perks: g.mperks.slice(), cap: g.warehouse.cap, used: g.usedVolume(), bombVol: g.storage.filter(x => x.kind === 'bomb').reduce((n, x) => n + g.storageVol(x), 0), pushedVol: g.parcels.filter(x => x.pushed).reduce((n, x) => n + x.size, 0), shields: g.shields, bombs: g.bombCount(), phase: g.phase };
+    if (g) return { alive: alive(g), done: finished(g), win: g.phase === 'win', cash: g.cash, rep: g.rep, repCap: g.repCap(), day: dayOf(g), days: totalDays(g), tier: g.repTier, perks: g.mperks.slice(), cap: g.warehouse.cap, used: g.usedVolume(), repairVol: g.storage.filter(x => x.kind === 'repair').reduce((n, x) => n + g.storageVol(x), 0), pushedVol: g.parcels.filter(x => x.pushed).reduce((n, x) => n + x.size, 0), shields: g.shields, repairs: g.repairCount(), phase: g.phase };
     const s = p.snap || {}; const ph = s.phase || 'play', dead = ph === 'over' || ph === 'gone';
-    return { alive: !dead, done: ph !== 'play', win: ph === 'win', cash: s.cash || 0, rep: s.rep || 0, repCap: s.repCap || 20, day: s.day || 1, days: s.days || 78, tier: s.tier || 0, perks: s.perks || [], cap: s.cap || 28, used: s.used || 0, bombVol: s.bombVol || 0, pushedVol: s.pushedVol || 0, shields: s.shields || 0, bombs: s.bombs || 0, phase: ph, gone: ph === 'gone' };
+    return { alive: !dead, done: ph !== 'play', win: ph === 'win', cash: s.cash || 0, rep: s.rep || 0, repCap: s.repCap || 20, day: s.day || 1, days: s.days || 78, tier: s.tier || 0, perks: s.perks || [], cap: s.cap || 28, used: s.used || 0, repairVol: s.repairVol || 0, pushedVol: s.pushedVol || 0, shields: s.shields || 0, repairs: s.repairs || 0, phase: ph, gone: ph === 'gone' };
   }
   // 서버에 올릴 스냅샷 (stateOf 와 같은 모양)
-  function snapOf(g) { const st = stateOf({ game: g }); return { cash: st.cash, rep: st.rep, repCap: st.repCap, day: st.day, days: st.days, used: st.used, cap: st.cap, bombVol: st.bombVol, pushedVol: st.pushedVol, shields: st.shields, bombs: st.bombs, phase: st.phase, tier: st.tier, perks: st.perks }; }
+  function snapOf(g) { const st = stateOf({ game: g }); return { cash: st.cash, rep: st.rep, repCap: st.repCap, day: st.day, days: st.days, used: st.used, cap: st.cap, repairVol: st.repairVol, pushedVol: st.pushedVol, shields: st.shields, repairs: st.repairs, phase: st.phase, tier: st.tier, perks: st.perks }; }
   // 먼저 마감한 사람이 나오면 그 순간 남들의 일차를 적어 둔다 — 남은 날 ÷ latePenaltyDiv 만큼 평판 페널티(1등 제외). 승부는 평판
   function noteFinish(match) {
     if (match.firstFinish) return;

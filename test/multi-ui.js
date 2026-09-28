@@ -61,7 +61,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await idle();
   const closed = await page.evaluate(() => ({ shop: !!PT.game.repShop, phase: PT.game.phase, modal: !!document.querySelector('#modal .pkcard'), tier: PT.game.repTier, rep: PT.game.rep, cap: PT.game.repCap() }));
   ok('닫기 → 넘친 평판만큼 계단이 이어지고, 다 닫으면 플레이 계속', !closed.shop && closed.phase === 'play' && !closed.modal && closed.rep < closed.cap + 1, JSON.stringify(Object.assign({ tiers }, closed)));
-  // ===== 2단계: 트레잇 · 공격 · 폭탄 =====
+  // ===== 2단계: 트레잇 · 공격 · 보수공사 =====
   // 내 창고에 🌧 소나기 트레잇 택배를 심고 대량으로 내보낸다 → 상대 전원에게 날아간다(outbox → 인박스)
   const fired = await page.evaluate(() => { const g = PT.game, m = PT.match; const c = g.contracts.find(x => x && /bulk/.test(x.carrier)); const si = g.contracts.indexOf(c);
     g.focusNext = false; g.parcels = g.parcels.filter(p => p.type !== 'normal'); const P = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: 't_hurry' }); g.parcels.push(P); g._assignCold(); PT.renderAll();
@@ -77,14 +77,14 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const hitR = await page.evaluate(n => ({ shields: PT.game.shields, logs: PT.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').slice(0, PT.game.log.filter(l => l.k === 'log.attackIn' || l.k === 'log.attackBlocked').length - n).map(l => l.k + ':' + l.p.icon) }), hit);
   ok('피격: 방패 한 겹이 먼저 온 🔒를 막고, ⏱는 맞았다', hitR.logs.includes('log.attackBlocked:🔒') && hitR.logs.includes('log.attackIn:⏱') && hitR.shields === 0, JSON.stringify(hitR));
   await page.screenshot({ path: `${OUT}/M-06-hit.png` });
-  // 이삿짐 폭탄: 강제 수락 — 창고를 먹고, 목록에 줄이 생기고, 돌려보낼 수 없다
-  const bomb = await page.evaluate(() => { const g = PT.game; const used = g.usedVolume(); const r = g.receiveBomb({ size: 3, days: 6, hops: 0, from: 1 }); PT.renderAll(); const s = g.storage.find(x => x.kind === 'bomb'); return { ok: r.ok, used, after: g.usedVolume(), rowText: document.querySelector('#multi-strip .mp.me').textContent, ret: g.returnStorage(s.id).ok }; });
-  ok('폭탄: 창고 +3칸 점유 · 상대 줄에 🧨 · 출고 불가', bomb.ok && bomb.after === bomb.used + 3 && /🧨/.test(bomb.rowText) && bomb.ret === false, JSON.stringify(bomb));
-  await page.screenshot({ path: `${OUT}/M-07-bomb.png` });
+  // 보수공사: 강제 수락 — 창고를 먹고, 목록에 줄이 생기고, 돌려보낼 수 없다
+  const repair = await page.evaluate(() => { const g = PT.game; const used = g.usedVolume(); const r = g.receiveRepair({ size: 3, days: 6, hops: 0, from: 1 }); PT.renderAll(); const s = g.storage.find(x => x.kind === 'repair'); return { ok: r.ok, used, after: g.usedVolume(), rowText: document.querySelector('#multi-strip .mp.me').textContent, ret: g.returnStorage(s.id).ok }; });
+  ok('보수공사: 창고 +3칸 점유 · 상대 줄에 🏗 · 출고 불가', repair.ok && repair.after === repair.used + 3 && /🏗/.test(repair.rowText) && repair.ret === false, JSON.stringify(repair));
+  await page.screenshot({ path: `${OUT}/M-07-repair.png` });
   // 6일 지나면 이사 간다 → 상대에게 +1칸
-  const moved = await page.evaluate(() => { const g = PT.game; const b = g.storage.find(x => x.kind === 'bomb'); b.left = 1; document.querySelector('#wait-btn').click(); return b.id; });
+  const moved = await page.evaluate(() => { const g = PT.game; const b = g.storage.find(x => x.kind === 'repair'); b.left = 1; document.querySelector('#wait-btn').click(); return b.id; });
   await page.waitForTimeout(900); await idle();
-  const mv = await page.evaluate(id => ({ mine: PT.game.storage.filter(s => s.id === id).length, others: PT.match.players.slice(1).map(p => p.game.storage.filter(s => s.kind === 'bomb').map(s => s.vol)).flat(), news: PT.game.log.some(l => l.k === 'log.bombOut') }), moved);
+  const mv = await page.evaluate(id => ({ mine: PT.game.storage.filter(s => s.id === id).length, others: PT.match.players.slice(1).map(p => p.game.storage.filter(s => s.kind === 'repair').map(s => s.vol)).flat(), news: PT.game.log.some(l => l.k === 'log.repairOut') }), moved);
   ok('이사 완료: 내 창고에서 사라지고 상대 창고에 4칸으로', mv.mine === 0 && mv.others.some(v => v >= 4) && mv.news, JSON.stringify(mv));
   // 포트레잇 4개
   const faces = await page.evaluate(() => [...document.querySelectorAll('#multi-strip .mp .face')].map(i => i.getAttribute('src').startsWith('data:image')));

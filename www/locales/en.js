@@ -409,12 +409,12 @@
     'log.attackIn': 'Hit by {from}\'s {icon} {name} — {detail}',
     'log.attackBlocked': '{from}\'s {icon} {name} — {how}',
     'log.pushIn': '📦 {from} filled a truck — {n} parcels pushed into your depot',
-    'log.bombIn': '🧨 Bomb landed — {size} cells, hops to the next depot in {days} days (cannot be cleared)',
-    'log.bombOut': '🧨 The bomb hopped to a rival (now {size} cells)',
-    'log.bombBlast': '🧨 Bomb burst — {n} overflow parcels stolen',
+    'log.repairIn': '🏗 Repair crew moved in — {size} cells, moves to the next depot in {days} days (cannot be cleared)',
+    'log.repairOut': '🏗 The repair crew moved on to a rival (now {size} cells)',
+    'log.repairBlast': '🏗 Full renovation — {n} displaced parcels stolen',
     'why.trait': '{icon} trait',
     'why.attack': '{icon} attack',
-    'why.bombBlast': '🧨 bomb burst',
+    'why.repairBlast': '🏗 full renovation',
     'trait.d.rain': '{n} outdoor parcels wet · deadline −1',
     'trait.d.claim': 'rep −{n}',
     'trait.d.rat': '{n} fresh parcels lost',
@@ -440,15 +440,15 @@
     'multi.introMe': 'Your depot',
     'trait.blk.shield': '🛡 blocked',
     'trait.blk.roof': '🏠 blocked',
-    'err.bombStuck': '🧨 A bomb cannot be cleared — it hops to the next depot in a few days',
+    'err.repairStuck': '🏗 Repair works cannot be cleared — they move to the next depot in a few days',
     'multi.hitToast': '{from} → {icon} {name}: {detail}',
     'multi.blockToast': '{how} — {from}\'s {icon} {name}',
     'multi.fireToast': '{icon} {name} → {names}',
     'multi.focusToast': '🎯 Focus! {icon} {name} → {names} ×3',
-    'multi.bombInToast': '{size} cells · {days}d',
-    'multi.bombOutToast': '→ {name}',
-    'multi.bombBackToast': '🔄 → {name}',
-    'multi.bombBlastToast': '💥 −{n}',
+    'multi.repairInToast': '{size} cells · {days}d',
+    'multi.repairOutToast': '→ {name}',
+    'multi.repairBackToast': '🔄 → {name}',
+    'multi.repairBlastToast': '💥 −{n}',
     'multi.bannerClosed': '{name} closed down',
     'multi.bannerDone': '{name} finished · {cash}c',
     'multi.bannerD': 'D-{n}',
@@ -460,7 +460,7 @@
     'multi.focusLine': '🎯 Next attack hits #1 ×3',
     'multi.truckLine': '🚚 Next call: +1 free truck',
     'multi.iceLine': '🧊 Deadlines frozen {d}d',
-    'multi.bombRow': '🧨 {size} cells · {d}d',
+    'multi.repairRow': '🏗 {size} cells · {d}d',
     'multi.traitLine': '{icon} {name} — {desc}',
     'pd.traitAtk': 'Ship on time to hit every rival',
     'pd.traitBon': 'Ship on time for a bonus',
@@ -2045,7 +2045,7 @@
       }
     },
     "STORAGE_KINDS": {
-      "bomb": { "name": "Bomb" },
+      "repair": { "name": "Repairs" },
       "move": {
         "name": "Household Goods"
       },
@@ -2304,7 +2304,7 @@
     },
     "MULTI": {
     "TRAITS": {
-      "t_bomb": { "name": "Bomb", "desc": "🧨 3 cells land in a random rival depot (cannot be cleared, hops on in 6 days)" },
+      "t_repair": { "name": "Repairs", "desc": "🏗 3 cells of repair works in a random rival depot (cannot be cleared, moves on in 6 days)" },
       "t_hurry": { "name": "Rush Call", "desc": "3 parcels must ship today" },
       "t_road": { "name": "Roadblock", "desc": "One contract cannot call next day (no effect with a single contract)" },
       "t_seal": { "name": "Seal", "desc": "Warehouse cap −6 cells for 3 days" },
@@ -2313,7 +2313,7 @@
       "t_ice": { "name": "Ice", "desc": "Every deadline in the warehouse pauses for 3 days" },
       "t_pack": { "name": "Compress", "desc": "Warehouse +3 cells for 3 days" },
       "t_truck": { "name": "Bonus Truck", "desc": "Next call: +1 truck" },
-      "t_return": { "name": "Send Back", "desc": "One 🧨 in my depot goes back to its sender" },
+      "t_return": { "name": "Send Back", "desc": "One 🏗 in my depot goes back to its sender" },
       "t_focus": { "name": "Focus", "desc": "Next attack hits #1 only, ×3" }
     },
     "THEMES": {
@@ -2339,7 +2339,7 @@
       "m_dodge": { "name": "Jab", "desc": "Half of incoming attacks fizzle" },
       "m_early": { "name": "Quick Hands", "desc": "Early calls rep +1 extra" },
       "m_trait": { "name": "Reload", "desc": "Your attacks fire twice 25% of the time" },
-      "m_heavy": { "name": "Big Bomb", "desc": "🧨 you send are +2 cells bigger" },
+      "m_heavy": { "name": "Full Renovation", "desc": "🏗 repair works you send are +2 cells bigger" },
       "m_sharp": { "name": "Sharpened", "desc": "Your attacks ×1.5" }
     },
     "FAMILY_NAMES": { "eco": "Ops", "def": "Defense", "atk": "Attack" },

@@ -1018,7 +1018,7 @@ t('멀티: 사람이 먼저 끝나면 봇은 끝까지 돌아 전원 완주·폐
   assert.ok(m.players.slice(1).every(p => p.game.phase === 'win' || p.game.phase === 'over')); assert.ok(!MULTI.allDone(m), '사람 판은 그대로');
 });
 
-// ----- 멀티 2단계: 트레잇 · 공격 인박스 · 이삿짐 폭탄 -----
+// ----- 멀티 2단계: 트레잇 · 공격 인박스 · 보수공사 -----
 t('멀티: 트레잇은 대본에 박혀 매치 공유 · 공격 40 : 보너스 60 근처 · 후반으로 갈수록 많이', () => {
   const g = MG(41); let early = 0, late = 0, atk = 0, bon = 0, tot = 0;
   for (let m = 1; m <= 6; m++) for (const sp of g._makeSchedule(m).flat()) { tot++; if (!sp.trait) continue; if (m <= 2) early++; else if (m >= 5) late++; if (M.MULTI.TRAITS[sp.trait].kind === 'attack') atk++; else bon++; }
@@ -1051,27 +1051,27 @@ t('멀티: 공격 트레잇은 outbox 로 나가고(🎯 한 방이면 ×3), 받
   const w = MG(45, { mperks: ['m_dodge'] }); w.rules.dodgeProb = 1; w.schedule = w.schedule.map(() => []); w.receiveAttack({ trait: 't_hurry', mult: 1, from: 9 }); w.wait([]); assert.ok(w.log.some(l => l.k === 'log.attackBlocked' && l.p.how.k === 'trait.blk.dodge'));
   assert.ok(!MG(46).receiveAttack.call(Object.assign(Object.create(Game.prototype), MG(46), { phase: 'win' }), { trait: 't_hurry' }), '마감한 창고엔 못 넣는다');
 });
-t('멀티: 이삿짐 폭탄 — 강제 수락(자리를 먹고 하루 +2c) · 출고 불가 · 0일이면 +1칸 −1일로 이사 · 6칸/1일은 도착하는 순간 터진다', () => {
+t('멀티: 보수공사 — 강제 수락(자리를 먹고 하루 +2c) · 출고 불가 · 0일이면 +1칸 −1일로 이사 · 6칸/1일은 도착하는 순간 터진다', () => {
   const g = MG(47); g.parcels = []; g.schedule = g.schedule.map(() => []);
-  const used = g.usedVolume(), cash = g.cash; const r = g.receiveBomb({ size: 3, days: 6, hops: 0, from: 2 });
-  assert.ok(r.ok && !r.blast); assert.equal(g.usedVolume(), used + 3); assert.equal(g.bombCount(), 1); assert.ok(!g.returnStorage(r.storage.id).ok);
+  const used = g.usedVolume(), cash = g.cash; const r = g.receiveRepair({ size: 3, days: 6, hops: 0, from: 2 });
+  assert.ok(r.ok && !r.blast); assert.equal(g.usedVolume(), used + 3); assert.equal(g.repairCount(), 1); assert.ok(!g.returnStorage(r.storage.id).ok);
   g.wait([]); assert.equal(g.cash, cash + 2); assert.equal(r.storage.left, 5);
   for (let i = 0; i < 5; i++) g.wait([]);
-  assert.equal(g.bombCount(), 0); const mv = g.outbox.find(o => o.type === 'bombMove'); assert.ok(mv); assert.deepEqual([mv.bomb.size, mv.bomb.days, mv.bomb.hops], [4, 5, 1]);
+  assert.equal(g.repairCount(), 0); const mv = g.outbox.find(o => o.type === 'repairMove'); assert.ok(mv); assert.deepEqual([mv.repair.size, mv.repair.days, mv.repair.hops], [4, 5, 1]);
   const v = MG(48); v.schedule = v.schedule.map(() => []); v.warehouse.cap = 10; v.parcels = [P(1, 'normal', 4, { outdoor: true }), P(2, 'normal', 4), P(3, 'normal', 1)];
-  const rb = v.receiveBomb({ size: 6, days: 1, hops: 5, from: 2 }); assert.ok(rb.blast); assert.ok(rb.stolen >= 1, '초과분만큼 도난'); assert.equal(v.bombCount(), 0);
-  const u = MG(49); u.schedule = u.schedule.map(() => []); u.receiveBomb({ size: 3, days: 6, hops: 0, from: 2 }); u.parcels = []; const p = u._spawnParcel({ type: 'normal', size: 1, customer: 'anon', trait: 't_return' }); u.parcels.push(p); u.cash = 1000;
-  u.callCarrier(slot(u, 'bulk'), [p.id]); assert.equal(u.bombCount(), 0); const back = u.outbox.find(o => o.type === 'bombMove'); assert.ok(back && back.to === 2 && back.back, '🔄 되돌리기는 보낸 사람에게');
+  const rb = v.receiveRepair({ size: 6, days: 1, hops: 5, from: 2 }); assert.ok(rb.blast); assert.ok(rb.stolen >= 1, '초과분만큼 도난'); assert.equal(v.repairCount(), 0);
+  const u = MG(49); u.schedule = u.schedule.map(() => []); u.receiveRepair({ size: 3, days: 6, hops: 0, from: 2 }); u.parcels = []; const p = u._spawnParcel({ type: 'normal', size: 1, customer: 'anon', trait: 't_return' }); u.parcels.push(p); u.cash = 1000;
+  u.callCarrier(slot(u, 'bulk'), [p.id]); assert.equal(u.repairCount(), 0); const back = u.outbox.find(o => o.type === 'repairMove'); assert.ok(back && back.to === 2 && back.back, '🔄 되돌리기는 보낸 사람에게');
 });
-t('멀티: 매치 라우팅 — 공격은 나 빼고 전원, 폭탄은 랜덤 한 명, 마감·폐업한 사람에겐 안 간다, 동시 폭탄 상한', () => {
+t('멀티: 매치 라우팅 — 공격은 나 빼고 전원, 보수공사는 랜덤 한 명, 마감·폐업한 사람에겐 안 간다, 동시 보수공사 상한', () => {
   const m = MULTI.newMatch({ seed: 51, name: 'H' }); const [h, a, b, c] = m.players.map(p => p.game);
   h.outbox.push({ type: 'attackOut', trait: 't_hurry', mult: 1 }); MULTI.route(m);
   assert.deepEqual([a, b, c].map(g => g.inbox.length), [1, 1, 1]); assert.equal(h.inbox.length, 0);
   c.phase = 'win'; h.outbox.push({ type: 'attackOut', trait: 't_road', mult: 1 }); MULTI.route(m); assert.deepEqual([a, b, c].map(g => g.inbox.length), [2, 2, 1]);
-  h.outbox.push({ type: 'attackOut', trait: 't_bomb', mult: 1, size: 3 }); MULTI.route(m); assert.equal(a.bombCount() + b.bombCount(), 1); assert.equal(c.bombCount(), 0);
-  for (let i = 0; i < 6; i++) { h.outbox.push({ type: 'attackOut', trait: 't_bomb', mult: 1, size: 3 }); MULTI.route(m); }
-  assert.ok(a.bombCount() + b.bombCount() + h.bombCount() <= M.MULTI.BOMB.max, '동시 폭탄은 4개까지');
-  const news = MULTI.takeNews(m); assert.ok(news.some(n => n.type === 'attack' && n.to.length === 3) && news.some(n => n.type === 'bomb') && news.some(n => n.type === 'bombFizzle'));
+  h.outbox.push({ type: 'attackOut', trait: 't_repair', mult: 1, size: 3 }); MULTI.route(m); assert.equal(a.repairCount() + b.repairCount(), 1); assert.equal(c.repairCount(), 0);
+  for (let i = 0; i < 6; i++) { h.outbox.push({ type: 'attackOut', trait: 't_repair', mult: 1, size: 3 }); MULTI.route(m); }
+  assert.ok(a.repairCount() + b.repairCount() + h.repairCount() <= M.MULTI.REPAIR.max, '동시 보수공사는 4개까지');
+  const news = MULTI.takeNews(m); assert.ok(news.some(n => n.type === 'attack' && n.to.length === 3) && news.some(n => n.type === 'repair') && news.some(n => n.type === 'repairFizzle'));
   const j = MULTI.fromJSON(JSON.parse(JSON.stringify(MULTI.toJSON(m)))); assert.equal(j.players[1].game.inbox.length, 2); assert.ok(j.players[0].face);
 });
 
@@ -1102,10 +1102,10 @@ t('서버: 큐 — 60초 넘게 기다리면 봇으로 채운다(봇 판은 무�
   assert.equal(r.status, 'ready'); assert.equal(r.match.players.filter(p => p.bot).length, 2); assert.ok(r.match.rated, '사람 둘이면 등급 판(봇과의 쌍만 안 센다)'); 
   assert.ok(r.match.players.every(p => p.face));
 });
-t('서버: 중계 — 공격은 나 빼고 전원, 🎯 는 평판 1위 한 명, 폭탄은 랜덤 한 명(상한 4), 사이클 투하는 한 번, 마감한 사람은 제외', async () => {
+t('서버: 중계 — 공격은 나 빼고 전원, 🎯 는 평판 1위 한 명, 보수공사는 랜덤 한 명(상한 4), 사이클 투하는 한 번, 마감한 사람은 제외', async () => {
   const S = API.memStore(); for (const p of PIDS) await call(S, { op: 'queue', pid: p, name: 'P', face: 'park' });
   const mid = (await call(S, { op: 'status', mid: (await S.call([['GET', 'mp:' + PIDS[0]]]))[0], pid: PIDS[0] })).match.id;
-  const snaps = {}; PIDS.forEach((p, i) => snaps[p] = { cash: 100 * (i + 1), rep: 10 + i, phase: 'play', bombs: 0 });
+  const snaps = {}; PIDS.forEach((p, i) => snaps[p] = { cash: 100 * (i + 1), rep: 10 + i, phase: 'play', repairs: 0 });
   for (const p of PIDS) await call(S, { op: 'push', mid, pid: p, snaps: { [p]: snaps[p] } });
   await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_hurry', mult: 1 }] });
   for (const p of PIDS.slice(1)) { const r = await call(S, { op: 'poll', mid, pid: p, since: 0 }); assert.equal(r.events.filter(e => e.type === 'attack').length, 1, p); }
@@ -1113,16 +1113,16 @@ t('서버: 중계 — 공격은 나 빼고 전원, 🎯 는 평판 1위 한 명,
   const d = await call(S, { op: 'poll', mid, pid: PIDS[3], since: 0 }), b = await call(S, { op: 'poll', mid, pid: PIDS[1], since: 0 });
   assert.equal(d.events.filter(e => e.trait === 't_seal').length, 1, '평판 1위(d)에게'); assert.equal(b.events.filter(e => e.trait === 't_seal').length, 0);
   assert.ok(!(await call(S, { op: 'push', mid, pid: PIDS[1], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_hurry' }] })).routed, '남의 이름으로는 못 쏜다');
-  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_bomb', size: 3 }] });
-  let bombs = 0; for (const p of PIDS) { const r = await call(S, { op: 'poll', mid, pid: p, since: 0 }); bombs += r.events.filter(e => e.type === 'bomb' && e.to && e.to[0] === p).length; }
-  assert.equal(bombs, 1, '폭탄은 한 명에게');
-  for (const p of PIDS.slice(1)) await call(S, { op: 'push', mid, pid: p, snaps: { [p]: Object.assign({}, snaps[p], { bombs: 2 }) } });   // 스냅샷상 폭탄 6개 = 상한 초과
-  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_bomb', size: 3 }] });
-  const all = await call(S, { op: 'poll', mid, pid: PIDS[0], since: 0 }); assert.equal(all.events.filter(e => e.type === 'bombFizzle').length, 1, '상한이면 불발');
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_repair', size: 3 }] });
+  let repairs = 0; for (const p of PIDS) { const r = await call(S, { op: 'poll', mid, pid: p, since: 0 }); repairs += r.events.filter(e => e.type === 'repair' && e.to && e.to[0] === p).length; }
+  assert.equal(repairs, 1, '보수공사는 한 명에게');
+  for (const p of PIDS.slice(1)) await call(S, { op: 'push', mid, pid: p, snaps: { [p]: Object.assign({}, snaps[p], { repairs: 2 }) } });   // 스냅샷상 보수공사 6개 = 상한 초과
+  await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_repair', size: 3 }] });
+  const all = await call(S, { op: 'poll', mid, pid: PIDS[0], since: 0 }); assert.equal(all.events.filter(e => e.type === 'repairFizzle').length, 1, '상한이면 불발');
   for (const p of PIDS.slice(1)) await call(S, { op: 'push', mid, pid: p, snaps: { [p]: snaps[p] } });
   await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'cycle', n: 1 }, { from: PIDS[0], type: 'cycle', n: 1 }] });
   assert.equal((await call(S, { op: 'poll', mid, pid: PIDS[0], since: 0 })).events.filter(e => e.drop).length + (await call(S, { op: 'poll', mid, pid: PIDS[1], since: 0 })).events.filter(e => e.drop).length + (await call(S, { op: 'poll', mid, pid: PIDS[2], since: 0 })).events.filter(e => e.drop).length + (await call(S, { op: 'poll', mid, pid: PIDS[3], since: 0 })).events.filter(e => e.drop).length, 1, '사이클 투하는 한 번');
-  await call(S, { op: 'push', mid, pid: PIDS[3], snaps: { [PIDS[3]]: { cash: 400, phase: 'win', bombs: 0 } } });
+  await call(S, { op: 'push', mid, pid: PIDS[3], snaps: { [PIDS[3]]: { cash: 400, phase: 'win', repairs: 0 } } });
   const c0 = (await call(S, { op: 'poll', mid, pid: PIDS[3], since: 0 })).events.length;
   await call(S, { op: 'push', mid, pid: PIDS[0], events: [{ from: PIDS[0], type: 'attackOut', trait: 't_rain' }] });
   assert.equal((await call(S, { op: 'poll', mid, pid: PIDS[3], since: 0 })).events.length, c0, '마감한 창고엔 안 간다');
@@ -1156,12 +1156,12 @@ t('멀티: 온라인 매치 — 서버 자리로 내 판(+호스트면 봇 판),
   const host = MULTI.newOnline(sm, PIDS[0], { name: 'A' }); assert.equal(host.players[0].id, PIDS[0]); assert.ok(host.online.host && host.players.filter(p => p.game).length === 3 && !host.players.find(p => p.id === PIDS[1]).game);
   const guest = MULTI.newOnline(sm, PIDS[1], { name: 'B' }); assert.equal(guest.players[0].id, PIDS[1]); assert.ok(!guest.online.host && guest.players.filter(p => p.game).length === 1);
   assert.deepEqual(MULTI.owned(host).sort(), [PIDS[0], 'bot2', 'bot3'].sort());
-  MULTI.applyServer(guest, { cursor: 2, snaps: { [PIDS[0]]: { cash: 900, rep: 30, repCap: 36, day: 20, phase: 'play', bombs: 1 }, bot2: { cash: 50, phase: 'over', day: 9 } }, events: [{ i: 1, type: 'attack', from: PIDS[0], to: [PIDS[1]], trait: 't_hurry', mult: 1, fromName: 'A' }, { i: 2, type: 'bomb', from: 'bot3', to: [PIDS[1]], bomb: { size: 3, days: 6, hops: 0, from: 'bot3' } }] });
-  const g = guest.players[0].game; assert.equal(g.inbox.length, 1); assert.equal(g.bombCount(), 1); assert.equal(guest.online.since, 2);
+  MULTI.applyServer(guest, { cursor: 2, snaps: { [PIDS[0]]: { cash: 900, rep: 30, repCap: 36, day: 20, phase: 'play', repairs: 1 }, bot2: { cash: 50, phase: 'over', day: 9 } }, events: [{ i: 1, type: 'attack', from: PIDS[0], to: [PIDS[1]], trait: 't_hurry', mult: 1, fromName: 'A' }, { i: 2, type: 'repair', from: 'bot3', to: [PIDS[1]], repair: { size: 3, days: 6, hops: 0, from: 'bot3' } }] });
+  const g = guest.players[0].game; assert.equal(g.inbox.length, 1); assert.equal(g.repairCount(), 1); assert.equal(guest.online.since, 2);
   const st = MULTI.standings(guest); assert.equal(st[0].p.id, PIDS[0], '스냅샷 잔액 900 이 1위'); assert.ok(!st.find(r => r.p.id === 'bot2').alive);
   assert.equal(guest.news.length, 2);
   g.outbox.push({ type: 'attackOut', trait: 't_rain', mult: 1 }); MULTI.route(guest); assert.equal(guest.online.pending.length, 1); assert.equal(guest.online.pending[0].from, PIDS[1]);
-  const out = MULTI.outgoing(guest); assert.equal(out.events.length, 1); assert.ok(out.snaps[PIDS[1]] && out.snaps[PIDS[1]].bombs === 1); assert.equal(guest.online.pending.length, 0);
+  const out = MULTI.outgoing(guest); assert.equal(out.events.length, 1); assert.ok(out.snaps[PIDS[1]] && out.snaps[PIDS[1]].repairs === 1); assert.equal(guest.online.pending.length, 0);
   const back = MULTI.fromJSON(JSON.parse(JSON.stringify(MULTI.toJSON(guest)))); assert.ok(back.online && back.online.mid === 'm1' && back.players[0].game && !back.players[1].game && back.players[1].snap.cash === 900);
 });
 

@@ -566,7 +566,7 @@
   }
 
   // ---------- 멀티 「난투」 (docs/MULTIPLAYER_DESIGN.md · js/multi.js) ----------
-  // 1단계: 봇 3명과 로컬 매치. 서버·매칭·트레잇·폭탄은 다음 단계 — 여기서는 규칙 셋(장 하루 소모·배차 무제한·즉시 결제·퍽 3택1)과 상대 줄만
+  // 1단계: 봇 3명과 로컬 매치. 서버·매칭·트레잇·보수공사는 다음 단계 — 여기서는 규칙 셋(장 하루 소모·배차 무제한·즉시 결제·퍽 3택1)과 상대 줄만
   function startMulti() {
     netStop();
     const nm = (Profile.get().campaign || {}).name || T('lv.nameDefault');
@@ -658,7 +658,7 @@
     modal(T('multi.boardTitle'), `${me}<div class="mtable">${rows}</div>`, [{ label: T('btn.close'), onClick: back || showTitle }]);
   }
   // ----- 관전 응원 (마감·폐업한 뒤, 남은 사람들에게 이모지 하나) -----
-  const CHEERS = ['👍', '🔥', '😂', '💀', '🧨'];
+  const CHEERS = ['👍', '🔥', '😂', '💀', '💥'];
   function sendCheer(t) { if (!match || !match.online) return; match.online.pending.push({ from: match.online.pid, type: 'note', text: t }); netSync(true); }
   // 말풍선은 카드가 다시 그려져도 살아 있어야 한다 — 남은 시간 동안은 renderMultiStrip 이 다시 붙인다
   const bubbles = {};
@@ -725,16 +725,16 @@
     if (g.freshFreezeUntil >= g.totalTurn) parts.push(T('multi.iceLine', { d: g.freshFreezeUntil - g.totalTurn + 1 }));
     if (g.freeTruckNext) parts.push(T('multi.truckLine'));
     if (g.focusNext) parts.push(T('multi.focusLine'));
-    for (const b of g.storage.filter(x => x.kind === 'bomb')) parts.push(T('multi.bombRow', { size: g.storageVol(b), d: b.left, c: b.perTurn }));
+    for (const b of g.storage.filter(x => x.kind === 'repair')) parts.push(T('multi.repairRow', { size: g.storageVol(b), d: b.left, c: b.perTurn }));
     return parts;
   }
-  // 상대 카드의 창고 미니어처: 칸 하나가 점 하나 — 내 짐(금) · 밀려 들어온 남의 상자(주황) · 🧨 폭탄(빨강) · 빈 칸. 넘치면 붉은 테두리
+  // 상대 카드의 창고 미니어처: 칸 하나가 점 하나 — 내 짐(금) · 밀려 들어온 남의 상자(주황) · 🏗 보수공사(빨강) · 빈 칸. 넘치면 붉은 테두리
   // 공격이 이 격자에 '박히는' 게 보여야 상대가 실감난다 (유저: "창고를 전장으로")
   function miniWarehouse(r) {
-    const cap = Math.max(1, r.cap || 28), used = r.used || 0, bomb = Math.min(used, r.bombVol || 0), pushed = Math.min(used - bomb, r.pushedVol || 0), own = Math.max(0, used - bomb - pushed);
+    const cap = Math.max(1, r.cap || 28), used = r.used || 0, repair = Math.min(used, r.repairVol || 0), pushed = Math.min(used - repair, r.pushedVol || 0), own = Math.max(0, used - repair - pushed);
     const cols = cap > 32 ? 9 : cap > 24 ? 7 : 6, total = Math.max(cap, used);
     let h = '';
-    for (let i = 0; i < total; i++) { const k = i < bomb ? 'b' : i < bomb + pushed ? 'p' : i < used ? 'o' : ''; h += `<i class="${k}${i >= cap ? ' x' : ''}"></i>`; }
+    for (let i = 0; i < total; i++) { const k = i < repair ? 'b' : i < repair + pushed ? 'p' : i < used ? 'o' : ''; h += `<i class="${k}${i >= cap ? ' x' : ''}"></i>`; }
     return `<div class="mini ${used > cap ? 'over' : used >= cap * 0.8 ? 'hot' : ''}" style="--cols:${cols}">${h}</div>`;
   }
   // 내가 쏜 것이 상대 격자에 박힌다 — n 칸이 잠깐 켜진다(실제 상태는 그 사람의 다음 날에 바뀐다)
@@ -754,12 +754,12 @@
       const dead = !r.alive, done = r.done && r.alive;
       const fill = r.cap ? Math.min(1, r.used / r.cap) : 0, over = r.used > r.cap;
       const reps = Array.from({ length: 5 }, (_, i) => `<i class="${r.rep >= (i + 1) * r.repCap / 5 ? 'on' : ''}"></i>`).join('');
-      const bombs = r.bombs, g = { cash: r.cash, shields: r.shields };
+      const repairs = r.repairs, g = { cash: r.cash, shields: r.shields };
       return `<div class="mp ${p.human ? 'me' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
         <img class="face" src="${faceOf(p, r)}" alt="">
         <span class="stamp">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : ''}</span>
         <b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
-        <span class="reps">${reps}</span><span class="rk">${T('multi.day', { n: r.day })}${bombs ? ' 🧨' + (bombs > 1 ? bombs : '') : ''}${g.shields ? ' 🛡' : ''}</span>
+        <span class="reps">${reps}</span><span class="rk">${T('multi.day', { n: r.day })}${repairs ? ' 🏗' + (repairs > 1 ? repairs : '') : ''}${g.shields ? ' 🛡' : ''}</span>
         ${miniWarehouse(r)}
         <span class="repline" style="grid-column:1 / -1">★<b class="repnum">${r.repFinal != null ? r.repFinal : r.rep}</b>${r.penalty ? `<small style="color:var(--red)">−${r.penalty}</small>` : ''}</span></div>`;
     }).join('');
@@ -778,7 +778,7 @@
       pkEl.querySelectorAll('[data-mperk]').forEach(a => a.onclick = () => { const pk = M.MULTI.PERKS[a.dataset.mperk]; SFX.click(); toast(`${pk.icon} ${pk.name} — ${pk.desc}`, 2400); }); }
     const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.textContent = parts.join(' · '); }
   }
-  // ---------- 연출 (8장): 발사 궤적 · 피격 비네트 · 방패 · 폭탄 · 배너 ----------
+  // ---------- 연출 (8장): 발사 궤적 · 피격 비네트 · 방패 · 보수공사 · 배너 ----------
   const ME = () => match ? match.players[0].id : 0;
   const portraitEl = pid => document.querySelector(`#multi-strip .mp[data-id="${pid}"]`);
   function centerOf(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
@@ -815,7 +815,7 @@
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 2200);
   }
   const shortDetail = d => d && d.k ? I18n.text({ k: d.k.replace('trait.d.', 'trait.s.'), p: d.p }) : '';
-  // 사람 판의 이벤트(내가 쏜 것·맞은 것·폭탄) + 매치 소식(봇끼리 · 봇이 나에게) → 화면
+  // 사람 판의 이벤트(내가 쏜 것·맞은 것·보수공사) + 매치 소식(봇끼리 · 봇이 나에게) → 화면
   function multiFx(events, news) {
     if (!match) return;
     let k = 0;
@@ -825,18 +825,18 @@
       if (n.type === 'note') { bubble(n.from, n.text); if (n.from !== ME()) mnotice(n.from, n.text, ''); }
       if (n.type === 'push') { for (const to of n.to) flyIcon('📦', n.from, to, k * 90, () => landOn(to, n.n, 'p')); k++;
         if (n.from === ME()) mnotice(ME(), '📦', `${n.n} → ${n.to.map(pname).join('·')}`, 'me'); }
-      if (n.type === 'bomb') { for (const to of n.to) flyIcon('🧨', n.from, to, k * 90, () => { if (to === ME()) scene.shake(.5); landOn(to, n.size || M.MULTI.BOMB.size, 'b'); }); k++;
-        if (n.from === ME()) mnotice(ME(), '🧨', T(n.back ? 'multi.bombBackToast' : 'multi.bombOutToast', { name: n.to.map(pname).join('·') }), 'me'); }
+      if (n.type === 'repair') { for (const to of n.to) flyIcon('🏗', n.from, to, k * 90, () => { if (to === ME()) scene.shake(.5); landOn(to, n.size || M.MULTI.REPAIR.size, 'b'); }); k++;
+        if (n.from === ME()) mnotice(ME(), '🏗', T(n.back ? 'multi.repairBackToast' : 'multi.repairOutToast', { name: n.to.map(pname).join('·') }), 'me'); }
     }
-    // 나에게 온 공격·폭탄·밀어내기는 **한 번에 하나씩** 1초 간격으로 — 누가 쐈고(포트레잇이 번쩍) 무엇이 바뀌었는지(바뀐 곳이 빛난다) 보이게 (유저)
+    // 나에게 온 공격·보수공사·밀어내기는 **한 번에 하나씩** 1초 간격으로 — 누가 쐈고(포트레잇이 번쩍) 무엇이 바뀌었는지(바뀐 곳이 빛난다) 보이게 (유저)
     const steps = [];
     for (const e of events) {
       if (e.type === 'attackIn') steps.push(e.blocked
         ? { from: e.from, icon: traitIcon(e.trait), text: `→ ${T('multi.you')} · ${T('trait.blk.' + e.blocked)}`, cls: 'ok', run: () => { if (e.blocked === 'shield') shieldFx(ME()); SFX.select(); } }
         : { from: e.from, icon: traitIcon(e.trait), text: `→ ${T('multi.you')} · ${shortDetail(e.detail)}`, cls: 'bad', run: () => { faceHit[ME()] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3); hitFx(e.trait); } });
       if (e.type === 'pushIn') steps.push({ from: e.from, icon: '📦', text: `+${e.n} → ${T('multi.you')}`, cls: 'bad', run: () => { SFX.thud(); scene.shake(.2); glow(e.ids.map(id => `.ptile[data-id="${id}"]`).join(','), 'fx-new'); } });
-      if (e.type === 'bombIn') steps.push({ from: e.from, icon: '🧨', text: T('multi.bombInToast', { size: e.storage.vol, days: e.storage.turns }), cls: 'bad', run: () => { SFX.thud(); scene.shake(.45); glow('#multi-status', 'fx-bad'); } });
-      if (e.type === 'bombBlast') steps.push({ from: ME(), icon: '🧨', text: T('multi.bombBlastToast', { n: e.stolen }), cls: 'bad', run: () => { SFX.discard(); scene.shake(.6); scene.mope(); } });
+      if (e.type === 'repairIn') steps.push({ from: e.from, icon: '🏗', text: T('multi.repairInToast', { size: e.storage.vol, days: e.storage.turns }), cls: 'bad', run: () => { SFX.thud(); scene.shake(.45); glow('#multi-status', 'fx-bad'); } });
+      if (e.type === 'repairBlast') steps.push({ from: ME(), icon: '🏗', text: T('multi.repairBlastToast', { n: e.stolen }), cls: 'bad', run: () => { SFX.discard(); scene.shake(.6); scene.mope(); } });
       if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
     }
     if (steps.length) playSteps(steps);
@@ -1456,7 +1456,7 @@
     const render = () => {
       g.setOutdoor(pref); pref = [...g.outdoorParcels().map(p => p.id), ...g.storage.filter(s => s.outdoor).map(s => 's' + s.id)];
       const row = (p, out) => { const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], claim = Math.round(((p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))) * cu.claimMult); return `<div class="parcel ${p.overdue ? 'overdue' : ''}" data-id="${p.id}"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}<span class="cust">${cu.icon}</span><span class="nm">${esc(t.short)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${p.reward}c · ${T('re.claim', { n: claim })}${out && (a.includes('cold') || a.includes('frozen')) ? ` <b style="color:var(--red)">${T('re.outOfZone')}</b>` : ''}${out && nextWx !== 'sunny' && nextWx !== 'snow' && !a.includes('cold') && !a.includes('frozen') && !g.rules.tent ? ` <b style="color:var(--orange)">${T('re.wet')}</b>` : ''}</div><div class="st">${parcelStatus(p)}</div></div>`; };
-      const srow = s => { const K = M.STORAGE_KINDS[s.kind]; if (s.kind === 'bomb') return `<div class="parcel storage bomb" data-sid="${s.id}"><div class="sw" style="background:#c0553b"></div><div>${T('multi.bombRow', { size: g.storageVol(s), d: s.left, c: s.perTurn })}</div></div>`; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#8c7bc0"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${T('re.storageClaim')}</div><div class="st">${T('storage.left', { n: s.left })}</div></div>`; };
+      const srow = s => { const K = M.STORAGE_KINDS[s.kind]; if (s.kind === 'repair') return `<div class="parcel storage repair" data-sid="${s.id}"><div class="sw" style="background:#c0553b"></div><div>${T('multi.repairRow', { size: g.storageVol(s), d: s.left, c: s.perTurn })}</div></div>`; return `<div class="parcel storage ${s.outdoor ? 'overdue' : ''}" data-sid="${s.id}"><div class="sw" style="background:#8c7bc0"></div><div>${K.icon} <span class="nm">${esc(K.name)}</span> ${T('fmt.cells', { n: g.storageVol(s) })} · ${T('re.storageClaim')}</div><div class="st">${T('storage.left', { n: s.left })}</div></div>`; };
       const inside = sortByUrgency(g.parcels.filter(p => !p.outdoor)), outside = sortByUrgency(g.parcels.filter(p => p.outdoor));
       const inVol = g.usedVolume() - g.outdoorVolume(), outVol = g.outdoorVolume();
       const body = `<div class="pickinfo"><span>${T('re.inside')} <b class="${inVol > cap ? 'bad' : ''}">${inVol}/${cap}</b></span><span>${T('re.outside', { vol: outVol, pct: Math.round(g.theftProb(nextWx) * 100) })}</span><span>${T('re.nextTurn')} ${NW.icon} ${NW.name}</span></div>

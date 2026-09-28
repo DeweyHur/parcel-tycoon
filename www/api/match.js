@@ -1,7 +1,7 @@
 // 멀티 「난투」 서버 (Vercel Serverless Function, docs/MULTIPLAYER_DESIGN.md 9·10장 · 부록 C)
 //   저장소: scores.js 와 같은 Upstash Redis REST. 서버리스라 WebSocket 은 없다 — 클라이언트가 **폴링**한다
 //   (눌러야 진행·타이머 없음이라 실시간이 필요 없다). 서버가 하는 일은 넷뿐:
-//   ① 매칭 큐(같은 등급 ±1 → 30초 ±2 → 60초 봇 채움)  ② 이벤트 중계(공격은 나 빼고 전원, 🎯 는 1위)  ③ 폭탄 목적지 랜덤(클라 조작 방지)
+//   ① 매칭 큐(같은 등급 ±1 → 30초 ±2 → 60초 봇 채움)  ② 이벤트 중계(공격은 나 빼고 전원, 🎯 는 1위)  ③ 보수공사 목적지 랜덤(클라 조작 방지)
 //   ④ 종료 시 입력 로그 재실행 검증(같은 시드 = 결정적) → 안 맞으면 그 판은 무효·ELO 미반영. ELO 는 모든 쌍을 1:1 로 (K 32, 30판 뒤 16)
 //   봇은 **호스트(첫 사람)** 클라이언트가 돌린다 — 봇 스냅샷·이벤트도 호스트가 올린다. 봇과의 쌍은 ELO 에 안 들어간다.
 //   POST { op, ... } 하나로: queue · leave · status · push · poll · finish · elo
@@ -135,7 +135,7 @@ async function matchmake(S) {
 // 스냅샷 ms:mid (해시 pid → json). 살아 있고 마감 안 한 사람 = 공격 대상. 3분 무응답이면 폐업으로 친다
 async function snapshots(S, m) {
   const h = hashAll((await S.call([['HGETALL', 'ms:' + m.id]]))[0]), t = now(), out = {};
-  for (const p of m.players) { const s = J(h[p.pid]) || { cash: 0, rep: 0, day: 1, phase: 'play', bombs: 0, at: m.created }; if (!p.bot && s.phase === 'play' && t - (s.at || m.created) > GONE_SEC) s.phase = 'gone'; out[p.pid] = s; }
+  for (const p of m.players) { const s = J(h[p.pid]) || { cash: 0, rep: 0, day: 1, phase: 'play', repairs: 0, at: m.created }; if (!p.bot && s.phase === 'play' && t - (s.at || m.created) > GONE_SEC) s.phase = 'gone'; out[p.pid] = s; }
   return out;
 }
 const active = s => s.phase === 'play';
@@ -144,18 +144,18 @@ async function appendEvents(S, m, list) {
   const base = (await S.call([['LLEN', 'me:' + m.id]]))[0];
   await S.call(list.map((e, i) => ['RPUSH', 'me:' + m.id, JSON.stringify(Object.assign({ i: base + i + 1, at: now() }, e))]).concat([['EXPIRE', 'me:' + m.id, TTL]]));
 }
-// 클라이언트가 올린 것(공격 발사·폭탄 이사·사이클)을 목적지가 붙은 이벤트로 바꾼다
+// 클라이언트가 올린 것(공격 발사·보수공사 이사·사이클)을 목적지가 붙은 이벤트로 바꾼다
 async function route(S, m, from, ev, snaps) {
   const others = m.players.filter(p => p.pid !== from && active(snaps[p.pid]));
-  const bombs = m.players.reduce((n, p) => n + ((snaps[p.pid] || {}).bombs || 0), 0);
+  const repairs = m.players.reduce((n, p) => n + ((snaps[p.pid] || {}).repairs || 0), 0);
   const out = [];
   if (ev.type === 'attackOut') {
     let tg = others;
     if (ev.focus) { const top = others.slice().sort((a, b) => ((snaps[b.pid].rep || 0) - (snaps[a.pid].rep || 0)) || ((snaps[b.pid].cash || 0) - (snaps[a.pid].cash || 0)))[0]; tg = top ? [top] : []; }   // 🎯 는 평판 1위(승부가 평판이라)
-    if (ev.trait === 't_bomb') {
-      if (bombs >= M.MULTI.BOMB.max || !tg.length) return [{ type: 'bombFizzle', from, to: null }];
+    if (ev.trait === 't_repair') {
+      if (repairs >= M.MULTI.REPAIR.max || !tg.length) return [{ type: 'repairFizzle', from, to: null }];
       const t = tg[rndInt(tg.length)];
-      return [{ type: 'bomb', from, to: [t.pid], bomb: { size: ev.size || M.MULTI.BOMB.size, days: M.MULTI.BOMB.days, hops: 0, from } }];
+      return [{ type: 'repair', from, to: [t.pid], repair: { size: ev.size || M.MULTI.REPAIR.size, days: M.MULTI.REPAIR.days, hops: 0, from } }];
     }
     for (const t of tg) out.push({ type: 'attack', from, to: [t.pid], trait: ev.trait, mult: ev.mult || 1, focus: !!ev.focus, fromName: (m.players.find(p => p.pid === from) || {}).name });
     return out;
@@ -165,18 +165,18 @@ async function route(S, m, from, ev, snaps) {
     const t = others[rndInt(others.length)];
     return [{ type: 'push', from, to: [t.pid], n: Math.max(1, Math.min(4, ev.n | 0)), fromName: (m.players.find(p => p.pid === from) || {}).name }];
   }
-  if (ev.type === 'bombMove') {
+  if (ev.type === 'repairMove') {
     let t = ev.to != null ? m.players.find(p => p.pid === ev.to && active(snaps[p.pid])) : null;
     if (!t) t = others.length ? others[rndInt(others.length)] : null;
-    if (!t) return [{ type: 'bombFizzle', from, to: null }];
-    return [{ type: 'bomb', from, to: [t.pid], back: !!ev.back, bomb: Object.assign({}, ev.bomb, { from }) }];
+    if (!t) return [{ type: 'repairFizzle', from, to: null }];
+    return [{ type: 'repair', from, to: [t.pid], back: !!ev.back, repair: Object.assign({}, ev.repair, { from }) }];
   }
-  if (ev.type === 'cycle') {   // 사이클 정산마다 폭탄 하나 자동 투하 (호스트가 보낸다, 한 사이클에 한 번)
-    if ((m.cycle || 0) >= ev.n || bombs >= M.MULTI.BOMB.max) return [];
+  if (ev.type === 'cycle') {   // 사이클 정산마다 보수공사 하나 자동 투하 (호스트가 보낸다, 한 사이클에 한 번)
+    if ((m.cycle || 0) >= ev.n || repairs >= M.MULTI.REPAIR.max) return [];
     m.cycle = ev.n; await saveMatch(S, m);
     const all = m.players.filter(p => active(snaps[p.pid])); if (!all.length) return [];
     const t = all[rndInt(all.length)];
-    return [{ type: 'bomb', from: null, to: [t.pid], drop: true, bomb: { size: M.MULTI.BOMB.size + Math.floor((ev.n - 1) / Math.max(1, (M.MULTI.CYCLES || 6) - 1) * (M.MULTI.BOMB.late || 0)), days: M.MULTI.BOMB.days, hops: 0, from: null } }];   // 갈수록 크게
+    return [{ type: 'repair', from: null, to: [t.pid], drop: true, repair: { size: M.MULTI.REPAIR.size + Math.floor((ev.n - 1) / Math.max(1, (M.MULTI.CYCLES || 6) - 1) * (M.MULTI.REPAIR.late || 0)), days: M.MULTI.REPAIR.days, hops: 0, from: null } }];   // 갈수록 크게
   }
   if (ev.type === 'note') return [{ type: 'note', from, to: null, text: String(ev.text || '').slice(0, 40) }];   // 관전 응원 이모지 (4단계 자리)
   return [];
@@ -271,7 +271,7 @@ async function handle(S, d, ip) {
   if (op === 'status') return [200, { match: m }];
   if (op === 'push') {
     const cmds = [], t = now();
-    for (const pid in (d.snaps || {})) { if (!own.has(pid)) continue; const s = d.snaps[pid]; cmds.push(['HSET', 'ms:' + m.id, pid, JSON.stringify({ cash: +s.cash || 0, rep: +s.rep || 0, repCap: +s.repCap || 0, day: +s.day || 1, days: +s.days || 0, used: +s.used || 0, cap: +s.cap || 0, shields: +s.shields || 0, bombs: +s.bombs || 0, phase: ['play', 'over', 'win', 'market'].includes(s.phase) ? (s.phase === 'market' ? 'play' : s.phase) : 'play', tier: +s.tier || 0, perks: Array.isArray(s.perks) ? s.perks.slice(0, 20) : [], at: t })]); }
+    for (const pid in (d.snaps || {})) { if (!own.has(pid)) continue; const s = d.snaps[pid]; cmds.push(['HSET', 'ms:' + m.id, pid, JSON.stringify({ cash: +s.cash || 0, rep: +s.rep || 0, repCap: +s.repCap || 0, day: +s.day || 1, days: +s.days || 0, used: +s.used || 0, cap: +s.cap || 0, shields: +s.shields || 0, repairs: +s.repairs || 0, phase: ['play', 'over', 'win', 'market'].includes(s.phase) ? (s.phase === 'market' ? 'play' : s.phase) : 'play', tier: +s.tier || 0, perks: Array.isArray(s.perks) ? s.perks.slice(0, 20) : [], at: t })]); }
     if (cmds.length) await S.call(cmds.concat([['EXPIRE', 'ms:' + m.id, TTL]]));
     const snaps = await snapshots(S, m), out = [];
     for (const ev of (d.events || []).slice(0, 50)) { if (!ev || !own.has(ev.from)) continue; out.push(...await route(S, m, ev.from, ev, snaps)); }
@@ -294,7 +294,7 @@ async function handle(S, d, ip) {
     const rec = { cash: Math.round(+r.cash || 0), rep: Math.round(+r.rep || 0), day: Math.round(+r.day || 0), days: Math.round(+r.days || 78), win: !!r.win, alive: !!r.win, verified, at: now() };
     // 먼저 마감한 사람: 그 순간 남들의 일차(스냅샷)를 적어 둔다 — 나머지는 남은 날만큼 평판 페널티
     if (rec.win && !m.firstFinish) { const snaps = await snapshots(S, m); const days = {}; for (const p of m.players) if (p.pid !== pid) days[p.pid] = (snaps[p.pid] || {}).day || 1; m.firstFinish = { pid, days, at: now() }; await saveMatch(S, m); }
-    await S.call([['HSET', 'mf:' + m.id, pid, JSON.stringify(rec)], ['EXPIRE', 'mf:' + m.id, TTL], ['HSET', 'ms:' + m.id, pid, JSON.stringify(Object.assign({ cash: rec.cash, rep: rec.rep, day: rec.day, phase: rec.win ? 'win' : 'over', bombs: 0, at: now() }))]]);
+    await S.call([['HSET', 'mf:' + m.id, pid, JSON.stringify(rec)], ['EXPIRE', 'mf:' + m.id, TTL], ['HSET', 'ms:' + m.id, pid, JSON.stringify(Object.assign({ cash: rec.cash, rep: rec.rep, day: rec.day, phase: rec.win ? 'win' : 'over', repairs: 0, at: now() }))]]);
     const results = hashAll((await S.call([['HGETALL', 'mf:' + m.id]]))[0]); for (const k in results) results[k] = J(results[k]);
     const humans = m.players.filter(p => !p.bot);
     let settled = m.settled || null;
