@@ -237,6 +237,9 @@
       sea:     [{ delay: 1 }, { cap: 6 }, { delay: 0 }],
     },
     TRUST_PERK_TEXT: {}, // locales data.TRUST_PERK_TEXT[carrier] = [t1, t2, t3]
+    // 난투: 돈도 배차 한도도 없으니 신뢰는 전 계열 공통으로 **칸** — Lv1 +1 · Lv2 +2 · Lv3 +3 (냉장·냉동 구역 같은 능력 특성은 그대로)
+    MULTI_TRUST_PERKS: [{ cap: 1 }, { cap: 2 }, { cap: 3 }],
+    MULTI_TRUST_KEEP: ['freezeOnCall', 'coldZone', 'frozenZone', 'customsDelta', 'noCustomsDelay', 'xlDelta', 'sizeMax', 'delay'],
 
     CARRIER_L3: {},
 

@@ -945,6 +945,8 @@ t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결�
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
   assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk'], '한길만 들고 시작');
   { const specs = g.schedule.flat().filter(sp => sp.type !== 'normal'); assert.ok(specs.length > 0, '대본엔 특수 물품이 있고'); assert.ok(g.parcels.every(p => p.type === 'normal'), '받아 줄 계약이 없으면 일반으로 온다'); }
+  { let plain = 0; for (let c = 1; c <= 6; c++) for (const d of g._sharedSchedule(c)) for (const sp of d) if (sp.type === 'normal' && !sp.rush && sp.trait) plain++; assert.equal(plain, 0, '보통 일반엔 트레잇이 안 붙는다(특수·⚡ 긴급만)'); }
+  { const c = g.contracts[0], cap0 = g.vehicleCap(c); g.trust[c.carrier] = 60; assert.equal(g.vehicleCap(c), cap0 + 3, '난투 신뢰 Lv3 = 용량 +3'); assert.equal(g.trustPerk(c.carrier, 'feeMult'), null, '배차비 특성은 없다'); g.trust[c.carrier] = 0; }
   assert.equal(g.monthEvents(1).length, 0); assert.equal(g.insurer, 'none');
 });
 t('멀티: 입고 대본은 매치 공유 — 같은 시드면 같은 짐, 평판이 달라도 같다', () => {
@@ -988,7 +990,7 @@ t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary)도 장도
 t('멀티: 평판 사다리 — 상한에 닿으면 상한 +6 · 등급 +1 · 평판 상점 3장(장 매물만, 값 없음) · 하나 고르면 닫힌다', () => {
   const g = MG(9); const cap0 = g.repCap(); g.cash = 0; g.addRep(99);
   assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + 6); assert.equal(g.rep, cap0); assert.ok(g.repShop && g.repShop.items.length === 3 && !g.perkOffer);
-  assert.ok(g.repShop.items.every(it => ['contract', 'enh', 'adTicket', 'media', 'mediaUp'].includes(it.kind) && it.price === 0), '퍽·시설·충전은 없고 값도 없다(돈 없는 규칙)');
+  assert.ok(g.repShop.items.every(it => ['contract', 'enh', 'adTicket', 'media', 'mediaUp', 'traitUnlock'].includes(it.kind) && it.price === 0), '퍽·시설·충전은 없고 값도 없다(돈 없는 규칙)');
   g.addRep(99); assert.equal(g.repTier, 1, '상점이 떠 있는 동안은 또 오르지 않는다');
   const sh = g.repShop; const it0 = sh.items.find(it => it.kind === 'enh' && D.ENHANCEMENTS[it.enh].kind !== 'opt') || sh.items.find(it => it.kind === 'contract' && it.switchFrom != null) || sh.items.find(it => it.kind === 'adTicket');
   assert.ok(it0, '고를 수 있는 카드'); const i = sh.items.indexOf(it0);
@@ -1042,8 +1044,9 @@ t('멀티: 공격 트레잇은 outbox 로 나가고(🎯 한 방이면 ×3), 받
   const v = MG(44); v.schedule = v.schedule.map(() => []); const rep = v.rep;
   const cap0 = v.warehouse.cap; v.receiveAttack({ trait: 't_seal', mult: 1, from: 9, fromName: 'X' }); assert.equal(v.warehouse.cap, cap0, '큐에만 쌓인다'); v.wait([]); assert.equal(v.warehouse.cap, cap0 - M.MULTI.SEAL); assert.ok(v.log.some(l => l.k === 'log.attackIn')); for (let i = 0; i < 3; i++) v.wait([]);
   v.shields = 1; v.receiveAttack({ trait: 't_hurry', mult: 1, from: 9 }); v.wait([]); assert.equal(v.shields, 0); assert.ok(v.log[0].k === 'log.attackBlocked' || v.log.some(l => l.k === 'log.attackBlocked'));
-  v.parcels.push(P(1, 'normal', 1, { deadline: 4, outdoor: true, arrivalTurn: 1 })); v.receiveAttack({ trait: 't_hurry', mult: 2, from: 9 }); v.wait([]); assert.ok(v.parcels[0].deadline <= 0, '×2 면 기한 −4 (+하루 경과)');
-  v.receiveAttack({ trait: 't_road', mult: 1, from: 9 }); v.wait([]); assert.ok(v.offFor(v.contracts[0]) && !v.canCall(v.contracts[0]), '🚧 오늘 호출 불가'); v.wait([]); assert.ok(!v.offFor(v.contracts[0]));
+  for (let i = 1; i <= 5; i++) v.parcels.push(P(i, 'normal', 1, { deadline: 4, deadline0: 4, outdoor: false, arrivalTurn: 1 })); v.receiveAttack({ trait: 't_hurry', mult: 1, from: 9 }); v.wait([]); { const hurried = v.parcels.filter(p => p.hurried); assert.equal(hurried.length, M.MULTI.HURRY_N, '⏱ 독촉은 3개만'); assert.ok(hurried.every(p => p.deadline === 1), '그 3개는 오늘까지'); assert.ok(v.parcels.some(p => !p.hurried && p.deadline >= 2), '나머지는 그대로'); }
+  v.contracts[1] = v._makeContract('cold0'); v.receiveAttack({ trait: 't_road', mult: 1, from: 9 }); v.wait([]); { const off = v.contracts.filter(c => c && v.offFor(c)); assert.equal(off.length, 1, '🚧 계약 하나만 막힌다'); assert.ok(!v.canCall(off[0])); } v.wait([]); assert.ok(v.contracts.every(c => !c || !v.offFor(c)));
+  { const one = MG(47); one.schedule = one.schedule.map(() => []); one.contracts = [one.contracts.find(Boolean)]; one.receiveAttack({ trait: 't_road', mult: 1, from: 9 }); one.wait([]); assert.ok(!one.offFor(one.contracts[0]) && one.log.some(l => l.k === 'log.attackBlocked' && l.p.how.k === 'trait.blk.void'), '계약이 하나뿐이면 🚧 는 무효'); }
   const cap = v.warehouse.cap; v.receiveAttack({ trait: 't_seal', mult: 1, from: 9 }); v.wait([]); assert.equal(v.warehouse.cap, cap - M.MULTI.SEAL); for (let i = 0; i < 3; i++) v.wait([]); assert.equal(v.warehouse.cap, cap);
   const w = MG(45, { mperks: ['m_dodge'] }); w.rules.dodgeProb = 1; w.schedule = w.schedule.map(() => []); w.receiveAttack({ trait: 't_hurry', mult: 1, from: 9 }); w.wait([]); assert.ok(w.log.some(l => l.k === 'log.attackBlocked' && l.p.how.k === 'trait.blk.dodge'));
   assert.ok(!MG(46).receiveAttack.call(Object.assign(Object.create(Game.prototype), MG(46), { phase: 'win' }), { trait: 't_hurry' }), '마감한 창고엔 못 넣는다');

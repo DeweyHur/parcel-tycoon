@@ -26,7 +26,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const intro = await page.evaluate(() => ({ on: !!document.querySelector('#mintro'), cards: document.querySelectorAll('#mintro .ic').length, vs: !!document.querySelector('#mintro .vs'), theme: !!document.querySelector('#mintro .theme'), me: document.querySelector('#mintro .ic.me b') && document.querySelector('#mintro .ic.me b').textContent }));
   await page.screenshot({ path: `${OUT}/M-00b-intro.png` });
   ok('시작 화면: 넷 소개 카드 · VS · 나', intro.on && intro.cards === 4 && intro.vs && intro.me === '나' && intro.theme, JSON.stringify(intro));
-  await page.click('#mintro'); await page.waitForTimeout(400);
+  await page.evaluate(() => { const i = document.querySelector('#mintro'); if (i) i.click(); }); await page.waitForTimeout(400);
   const slam = await page.evaluate(() => ({ intro: !!document.querySelector('#mintro'), slam: document.querySelectorAll('#multi-strip .mp.slam').length }));
   ok('게임 화면으로: 시작 화면 사라지고 상대 카드가 쾅 박힌다', !slam.intro && slam.slam === 4, JSON.stringify(slam));
   await page.waitForTimeout(1200); await idle();

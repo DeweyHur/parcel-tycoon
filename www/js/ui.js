@@ -721,7 +721,7 @@
     const parts = [];
     if (g.shields) parts.push(T('multi.shieldLine', { n: g.shields }));
     for (const m of g.capMods) parts.push(T('multi.tempLine', { icon: m.delta > 0 ? '📦' : '🔒', n: (m.delta > 0 ? '+' : '') + m.delta, d: m.until - g.totalTurn }));
-    if (g.roadblockDay === g.totalTurn) parts.push(T('multi.roadLine'));
+    if (g.roadblockDay === g.totalTurn && g.contracts[g.roadblockSlot]) parts.push(T('multi.roadLine', { name: g.contractName(g.contracts[g.roadblockSlot]) }));
     if (g.freshFreezeUntil >= g.totalTurn) parts.push(T('multi.iceLine', { d: g.freshFreezeUntil - g.totalTurn + 1 }));
     if (g.freeTruckNext) parts.push(T('multi.truckLine'));
     if (g.focusNext) parts.push(T('multi.focusLine'));
@@ -827,7 +827,7 @@
   // 공격 효과가 닿은 곳을 잠깐 빛낸다 — ⏱ 은 택배 칩 전부, 🔒 는 상태 줄, 🚧 는 계약 줄
   function glow(sel, cls) { document.querySelectorAll(sel).forEach(el => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 1100); }); }
   function hitFx(trait) {
-    if (trait === 't_hurry') glow('.ptile', 'fx-bad');
+    if (trait === 't_hurry') glow(game.parcels.filter(p => p.hurried === game.totalTurn).map(p => `.ptile[data-id="${p.id}"]`).join(',') || '.ptile', 'fx-bad');
     else if (trait === 't_seal') glow('#multi-status', 'fx-bad');
     else if (trait === 't_road') glow('#contract-strip .contract', 'fx-bad');
   }
@@ -906,6 +906,7 @@
       if (it.kind === 'perk') { const pk = M.MULTI.PERKS[it.perk]; icon = pk.icon; name = pk.name; desc = pk.desc; fam = 'fam-' + pk.family; nw = now(it.perk); }
       else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier]; const from = it.switchFrom != null && g.contracts.find(c => c && c.id === it.switchFrom); icon = it.switchFrom != null ? '⬆' : '📄'; name = car.name; desc = `${from ? esc(D.CARRIERS[from.carrier].name) + ' → ' : ''}🚚 ${car.trucks}대 · ${car.cap}칸 ${(car.caps || []).map(a => D.ATTRS[a] ? D.ATTRS[a].icon : '').join('')}`; fam = 'fam-eco'; }
       else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}` : ''; }
+      else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; const tn = it.ptype === 'rush' ? '⚡' : D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn }); desc = `${tr.icon || ''} ${esc(tr.name || '')} — ${esc(tr.desc || '')}`; fam = tr.kind === 'attack' ? 'fam-atk' : 'fam-def'; }
       else if (it.kind === 'adTicket') { const A = D.AD_MEDIA[it.media]; icon = A ? A.icon : '📣'; name = it.name || T('media.ticket', { name: T('media.' + it.media) }); desc = T('media.ticketOnce'); fam = 'fam-atk'; }
       else { icon = '🎁'; name = it.name || it.kind; }
       return `<button class="btn pkcard ${fam} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><b>${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
@@ -1583,9 +1584,15 @@
     return `<span class="trust" title="${nx ? T('trust.next', { have: nx.have, need: nx.need, effect: nx.effect }) : T('trust.max')}"><small>${esc(T('common.trust'))}</small><b class="tlv">Lv${lv}</b><span class="tbar">${bar}</span><small class="tnum">${num}</small></span>`;
   }
   // 단계별 효과 세 줄 — 이른 단계는 밝게, 아직인 단계는 흐리게. 호출 머리판 오른쪽 빈 자리에 선다
+  // 난투 신뢰 문구: 칸 +n (+ 능력 특성이 있으면 그것도)
+  function trustText(carrier, lv) {
+    if (!game || !game.rules.noMoney) return D.trustEffectText(carrier, lv);
+    const pk = (D.TRUST_PERKS[D.familyOf(carrier)] || [])[lv - 1] || {}; const keep = Object.keys(pk).some(k => D.MULTI_TRUST_KEEP.includes(k));
+    return T('multi.trustCap', { n: lv }) + (keep ? ' · ' + D.trustEffectText(carrier, lv) : '');
+  }
   function trustLevels(g, carrier) {
     const lv = g.trustLevel(carrier);
-    return `<span class="tlvs">${[1, 2, 3].map(k => `<span class="${k <= lv ? 'on' : ''}"><b>Lv${k}</b> ${esc(D.trustEffectText(carrier, k))}</span>`).join('')}</span>`;
+    return `<span class="tlvs">${[1, 2, 3].map(k => `<span class="${k <= lv ? 'on' : ''}"><b>Lv${k}</b> ${esc(trustText(carrier, k))}</span>`).join('')}</span>`;
   }
   // 신뢰도 트랙: 단계별 효과·필요 xp·달성 여부. xp가 null이면 진행도 없이 정적 표시(도감)
   function trustTrack(carrier, xp) {
@@ -1593,7 +1600,7 @@
     const rows = [1, 2, 3].map(lv => {
       const need = D.TRUST_LEVELS[lv], on = xp != null && xp >= need;
       const state = xp == null ? `${need}xp` : on ? '✓' : T('trust.remain', { n: Math.max(0, need - xp) });
-      return `<div class="ttrow ${on ? 'on' : ''}"><span class="lv">${lv}</span><span class="ef">${esc(D.trustEffectText(carrier, lv))}</span><span class="st">${state}</span></div>`;
+      return `<div class="ttrow ${on ? 'on' : ''}"><span class="lv">${lv}</span><span class="ef">${esc(trustText(carrier, lv))}</span><span class="st">${state}</span></div>`;
     }).join('');
     return `<div class="ttrack">${rows}</div>`;
   }
