@@ -336,7 +336,7 @@
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
       unlimitedCalls: true, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true, noFacilities: true, priceMult: 1.8, noMoney: true, traitSameDay: true,
-      carrierCapDelta: { bulk: -2, cold: -1, fragile: -1 }, maxParcelSize: 3, typeMaxSize: { fresh: 2, frozen: 2 }, noLateShipPenalty: true,
+      carrierCapDelta: { bulk: -2, cold: -1, fragile: -1 }, typeMaxSize: { fresh: 2, frozen: 2 }, typeShift: { fresh: 4, produce: 2, fragile: 2, intl: 6, large: 6, frozen: 6 },   // 여섯 종류가 처음부터 대본에 있다(계약을 사면 열리게) — 기본 표엔 통관·대형·냉동이 0 이라 사도 안 왔다   // 큰 택배는 받아 주는 계약(차 크기)이 있을 때만 온다 — contractGated 가 크기까지 본다. 코끼리(대형)를 사면 4칸이 온다 noLateShipPenalty: true,
       startFamilies: ['bulk'], contractGated: true, specialTraitMult: 2.2, normalAnywhere: true, typeTraits: true, noRush: true,   // 한길만 들고 시작 · 계약을 사야 그 특수 물품(과 트레잇)이 온다 · 특수 물품엔 트레잇 ×2.2   // 배차 한도 없음(유저: "평판으로 바뀌니 배차 한도는 없애는 게 맞다") 대신 차가 작다 — 시작 한길 4칸 · 신선 2칸 · 파손 2칸   // 장 값은 비싸게 — 살 게 시설뿐이던 때 돈이 남아돌았다(유저). 계약·강화·충전 전부 ×1.8   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 폭탄으로 돌아온다)
@@ -369,13 +369,14 @@
     HURRY_N: 3, SEAL: 6, BUZZ: 2,   // 공격 세기: 독촉은 3개를 오늘 안에 · 봉인 −6칸 · 입소문 평판 +2
     // 물품 종류마다 트레잇 [기본, 언락] — 랜덤이 아니다. 언락은 평판 상점 카드로 산다
     TYPE_TRAITS: {
-      fresh:   ['t_ice', 't_hurry'],      // 신선: 🧊 얼음 → ⏱ 독촉  (🎯 한 방·🚚 덤 트럭은 아래 두 종류가 가져간다 — 일반·⚡ 긴급엔 트레잇 없음, 난투엔 긴급도 없다)
+      fresh:   ['t_ice', 't_hurry'],      // 신선: 🧊 얼음(모든 기한 정지 3일) → ⏱ 독촉
       produce: ['t_buzz', 't_road'],      // 농산물: ⭐ 입소문 → 🚧 통제
-      fragile: ['t_seal', 't_shield'],    // 파손: 🔒 봉인 → 🛡 방패
-      frozen:  ['t_bomb', 't_pack'],      // 냉동: 🧨 폭탄 → 📦 압축
-      intl:    ['t_return', 't_truck'],   // 통관: 🔄 되돌리기 → 🚚 덤 트럭
+      frozen:  ['t_seal', 't_shield'],    // 냉동: 🔒 봉인 → 🛡 방패
+      intl:    ['t_return', 't_bomb'],    // 통관: 🔄 되돌리기 → 🧨 폭탄
       large:   ['t_pack', 't_focus'],     // 대형: 📦 압축 → 🎯 한 방
+      // 파손(fragile)엔 트레잇이 없다 — 깨질 위험 자체가 그 물품의 성격 (유저). 일반·⚡ 긴급도 없음(난투엔 긴급 자체가 없다)
     },
+
     BOMB: { size: 3, days: 6, perDay: 2, maxSize: 6, max: 4, late: 2 },   // late: 판이 끝나갈수록 처음 크기 +0~2   // 3칸/6일로 시작, 이사마다 +1칸 −1일, 6칸/1일이면 다음 이사 때 터진다. 매치당 동시 4개
     SHIELD_MAX: 2, TEMP_DAYS: 3,
     // 퍽 3택1 — 평판 등급이 오를 때마다 세 계열에서 한 장씩. 장착 상한 없음, 중복 가능(중첩 수치 표기).

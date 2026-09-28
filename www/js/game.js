@@ -61,7 +61,7 @@
   };
   const MULT_KEYS = ['attackMult', 'theftMult', 'breakMult', 'claimMult', 'premiumMult', 'storageFeeMult', 'feeMult', 'cashMult', 'revenueMult', 'priceMult', 'contractPriceMult', 'itemPriceMult', 'facilityCapMult', 'facilityPriceMult', 'trustXpMult', 'arrivalsMult', 'urgentDiscount', 'bigWeight', 'scoreMult'];
   const ADD_KEYS = ['cashDelta', 'opCostDelta', 'freshExtra', 'coldTrustBonus', 'rewardAll', 'bonusDelta', 'bigSizeDelta', 'sizeDelta', 'storeBigDelta', 'callsDelta', 'startCallsDelta', 'gradeShift', 'capDelta', 'xlDelta', 'monthlyStress', 'trustXpDelta', 'deadlineAll', 'firstCallBonus', 'skipBonus', 'heatAlerts', 'selfCapDelta', 'allStartTrust', 'finalRushReward', 'freeTrucksPerCycle', 'earlyRepBonus', 'returnGraceDelta', 'shieldPassive', 'dodgeProb', 'attackEcho', 'bombGrow'];
-  const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust', 'premiumDelta'];
+  const MAP_ADD_KEYS = ['rewardDelta', 'carrierCapDelta', 'deadlineDelta', 'carrierStartTrust', 'premiumDelta', 'typeShift'];   // typeShift 도 더한다(난투 기본 + 테마)
   const MAP_MULT_KEYS = ['rewardMult', 'marketWeight', 'customerWeights', 'weatherWeights', 'customerClaimMult'];
   const LIST_KEYS = ['banCarriers', 'guaranteeCarriers'];
   // 뒤에 오는 설정이 앞을 덮는다: 런(시나리오) → 회사 → 캠페인 장 → 퍽 순
@@ -75,7 +75,7 @@
         if (k === 'facilityPriceMult' && typeof v === 'object') { r.facilityPriceMap = Object.assign(r.facilityPriceMap || {}, v); continue; }
         if (MULT_KEYS.includes(k)) r[k] *= v;
         else if (ADD_KEYS.includes(k)) r[k] += v;
-        else if (MAP_ADD_KEYS.includes(k)) for (const t in v) r[k][t] = (r[k][t] || 0) + v[t];
+        else if (MAP_ADD_KEYS.includes(k)) { if (!r[k]) r[k] = {}; for (const t in v) r[k][t] = (r[k][t] || 0) + v[t]; }
         else if (MAP_MULT_KEYS.includes(k)) for (const t in v) r[k][t] = (r[k][t] || 1) * v[t];
         else if (LIST_KEYS.includes(k)) r[k] = r[k].concat(v);
         else r[k] = v;
@@ -1279,6 +1279,7 @@
       // 2) 남은 칸은 '가장 꽉 차게' — 순서대로 담기만 하면 2·2·1 을 담고 남은 2칸짜리를 못 싣는다(5/6).
       //    합이 최대인 조합 중에서, 앞(더 급한) 것을 최대한 포함하는 조합을 고른다.
       const urgent = p => p.overdue || this.rushToday(p) || (!p.noDeadline && p.deadline <= 1);
+      if (this.rules.multi) sorted = sorted.slice().sort((a, b) => (urgent(b) ? 1 : 0) - (urgent(a) ? 1 : 0) || (b.trait ? 1 : 0) - (a.trait ? 1 : 0));   // 난투: 급한 것 다음은 트레잇 택배(그날 안 보내면 사라진다) — 유저
       const fill = maxCap => {
         const chosen = new Set(); let v = 0;
         for (const p of sorted) if (urgent(p) && v + p.size <= maxCap) { chosen.add(p.id); v += p.size; }
@@ -1396,7 +1397,7 @@
     repScaleArrivals() { return this.rules.repStep ? 1 : this.repTierDef().arrivals || 1; }
     repScaleOpCost() { return this.rules.repStep ? 1 : this.repTierDef().opCost || 1; }
     // 이 등급부터 들어오기 시작하는 품목 (그 전에는 일반으로 돌린다). 멀티는 새 계약이 없으니 열리지 않는다
-    repUnlocked(type) { if (this.rules.noRepUnlock) return false; return (this.repTierDef().unlock || []).indexOf(type) >= 0; }
+    repUnlocked(type) { if (this.rules.noRepUnlock) return !!this.rules.contractGated; /* 난투: 평판 대신 계약이 연다 — 대본엔 다 있고 받아 주는 계약이 없으면 일반으로 온다 */ return (this.repTierDef().unlock || []).indexOf(type) >= 0; }
     // 지금 평판 등급에서 찾아올 수 있는 고객 (아직 거래 안 하는 고객 중)
     openCustomers() { return Object.keys(M.CUSTOMERS).filter(k => k !== 'anon' && !this.customers[k] && (M.CUSTOMERS[k].repTier || 0) <= this.repTier); }
     // 이 등급에서 새로 열린 고객 (등급이 막 올랐을 때 알려 주려고)
@@ -1423,9 +1424,11 @@
       this.emit('repTier', { tier: this.repTier, cap: this.repCap(), customers: [], perks: this.perkOffer.slice() });
     }
     // 평판 상점(난투): 장 매물(계약 업그레이드·새 계약·강화·광고권)에서 랜덤 3장. 시간은 안 간다 (유저: "일정 수준 평판 달성 시 상점, 랜덤 픽 3개, 내 돈으로 산다")
+    // 이 강화를 붙일 수 있는 슬롯(많이 나른 계약부터) — 없으면 −1. 특약은 받는 계약, 나머지는 빈 강화 칸
+    enhTarget(key) { const E = D.ENHANCEMENTS[key]; if (!E) return -1; let s = -1, max = -1; this.contracts.forEach((c, i) => { if (c && (E.kind !== 'opt' || this.optFits(key, c)) && (E.kind === 'trust' || this.enhUsed(c) < this.enhSlots(c)) && (c.delivered || 0) > max) { max = c.delivered || 0; s = i; } }); return s; }
     _drawRepShop() {
       // 퍽 카드는 없다(유저: "그 이상한 퍽들도 없애고 그냥 마켓 아이템들이 평판 올라가면 뜨는 거야") — 장 매물에서 랜덤 3장. 돈이 없는 규칙이면 값 0 · 하나만 고른다
-      const goods = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill').concat(this._traitUnlockItems())).slice(0, 3);
+      const goods = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill' && (it.kind !== 'enh' || this.enhTarget(it.enh) >= 0)).concat(this._traitUnlockItems())).slice(0, 3);   // 붙일 계약이 없는 강화는 안 뜬다
       if (this.rules.noMoney) for (const it of goods) it.price = 0;
       return goods;
     }
@@ -2082,7 +2085,7 @@
         if (isCold && !p.inCold) { p.warm = (p.warm || 0) + 1; if (heat || p.warm >= R.warmLimit) { discard.push([p, MSG(heat ? 'why.heatSpoil' : 'why.warmSpoil')]); continue; } }
         else if (isCold) p.warm = 0;
         if (isFrozen && !p.inFrozen) { discard.push([p, MSG('why.outsideFrozen')]); continue; }
-        const freeze = isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer));
+        const freeze = (isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer))) || (R.multi && this.freshFreezeUntil >= this.totalTurn);   // 난투 🧊 얼음: 모든 기한 정지(신선만 멈추면 너무 약하다 — 유저)
         const grace = this.returnGraceFor(p);
         // 무기한(첫 사이클)은 기한도 안 줄고 초과도 반송도 없다 — else 로 새면 바로 반송 처리로 빠진다
         if (p.noDeadline) continue;

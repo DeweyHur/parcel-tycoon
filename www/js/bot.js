@@ -162,7 +162,7 @@ function urgency(g) {
         if (!g.rules.noMoney && g.cash - price < reserve) continue;
         let s = null;
         if (it.kind === 'contract') { s = it.switchFrom != null ? g.contracts.findIndex(c => c && c.id === it.switchFrom) : g.contracts.findIndex(c => !c); if (s < 0) continue; }
-        else if (it.kind === 'enh') { const opt = D.ENHANCEMENTS[it.enh].kind === 'opt'; s = g.contracts.findIndex(c => c && (opt ? g.optFits(it.enh, c) : g.enhUsed(c) < g.enhSlots(c))); if (s < 0) continue; }
+        else if (it.kind === 'enh') { s = g.enhTarget(it.enh); if (s < 0) continue; }
         const r = g.buyRepShop(i, s); if (r && r.ok) { bought = true; if (g.repShop !== sh) break; }
       }
       if (g.repShop === sh) g.closeRepShop();   // 같은 상점이 아직 열려 있으면(못 샀거나 여러 장 규칙) 닫는다

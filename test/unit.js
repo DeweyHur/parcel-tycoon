@@ -940,11 +940,11 @@ const MG = (seed, extra) => new Game(Object.assign({ multi: true, seed, scenario
 t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4 · 시작 차는 작다', () => {
   const g = MG(1), R = g.rules;
   assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) < D.CARRIERS[c.carrier].cap + 1) && R.carrierCapDelta.bulk === -2, '차는 작다(배차 무제한 대신)');
-  { const big = []; for (let m = 1; m <= 6; m++) for (const t of g._sharedSchedule(m)) for (const sp of t) if (sp.size > 3 || ((sp.type === 'fresh' || sp.type === 'frozen') && sp.size > 2)) big.push(sp); assert.equal(big.length, 0, '3칸 넘는 택배는 안 온다 · 신선·냉동은 2칸까지'); }
+  { const big = []; const types = new Set(); for (let m = 1; m <= 6; m++) for (const t of g._sharedSchedule(m)) for (const sp of t) { types.add(sp.type); if ((sp.type === 'fresh' || sp.type === 'frozen') && sp.size > 2) big.push(sp); } assert.equal(big.length, 0, '신선·냉동은 2칸까지'); assert.ok(['intl', 'large', 'frozen'].every(t => types.has(t)), '통관·대형·냉동도 대본에 있다(계약을 사면 열린다)'); }
   assert.ok(R.multi && R.months === 6 && R.noHolidays && R.noCalendarEvents && R.noWeekend && R.unlimitedCalls && R.noCallFee && R.payNow && R.noLoan && R.noInsurance && !R.shopDay && R.autoSummary && R.repDecides);
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
   assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk'], '한길만 들고 시작');
-  { const specs = g.schedule.flat().filter(sp => sp.type !== 'normal'); assert.ok(specs.length > 0, '대본엔 특수 물품이 있고'); assert.ok(g.parcels.every(p => p.type === 'normal'), '받아 줄 계약이 없으면 일반으로 온다'); }
+  { const specs = g.schedule.flat().filter(sp => sp.type !== 'normal'); assert.ok(specs.length > 0, '대본엔 특수 물품이 있고'); assert.ok(g.parcels.every(p => p.type === 'normal' || p.type === 'produce'), '받아 줄 계약이 없으면 일반으로 온다(농산물은 아무 차나 싣는다)'); }
   { let plain = 0; for (let c = 1; c <= 6; c++) for (const d of g._sharedSchedule(c)) for (const sp of d) if (sp.type === 'normal' && (sp.trait || sp.rush)) plain++; assert.equal(plain, 0, '일반엔 트레잇도 ⚡ 긴급도 없다(특수 물품만)'); }
   { const c = g.contracts[0], cap0 = g.vehicleCap(c); g.trust[c.carrier] = 60; assert.equal(g.vehicleCap(c), cap0 + 3, '난투 신뢰 Lv3 = 용량 +3'); assert.equal(g.trustPerk(c.carrier, 'feeMult'), null, '배차비 특성은 없다'); g.trust[c.carrier] = 0; }
   assert.equal(g.monthEvents(1).length, 0); assert.equal(g.insurer, 'none');
@@ -953,7 +953,7 @@ t('멀티: 입고 대본은 매치 공유 — 같은 시드면 같은 짐, 평�
   const a = MG(5), b = MG(5); assert.deepEqual(a.schedule, b.schedule);
   b.rep = 3; b.repTier = 4; assert.deepEqual(a._makeSchedule(3), b._makeSchedule(3));
   assert.notDeepEqual(MG(6).schedule, a.schedule);
-  const types = new Set(a.schedule.flat().map(x => x.type)); for (const t of ['intl', 'large', 'frozen']) assert.ok(!types.has(t), t + ' 은 오지 않는다 (새 계약이 없으니 실을 곳도 없다)');
+  const types = new Set(a.schedule.flat().map(x => x.type)); assert.ok(['intl', 'large', 'frozen'].some(t => types.has(t)), '통관·대형·냉동도 대본엔 있다 — 받아 줄 계약이 없으면 도착할 때 일반이 된다');
 });
 t('멀티: 물량은 일차에 비례해 오르고 마지막 보름은 마감 폭주', () => {
   const g = MG(2); const n = m => g._makeSchedule(m).flat().length;
