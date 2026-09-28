@@ -945,7 +945,7 @@ t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결�
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
   assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk'], '한길만 들고 시작');
   { const specs = g.schedule.flat().filter(sp => sp.type !== 'normal'); assert.ok(specs.length > 0, '대본엔 특수 물품이 있고'); assert.ok(g.parcels.every(p => p.type === 'normal'), '받아 줄 계약이 없으면 일반으로 온다'); }
-  { let plain = 0; for (let c = 1; c <= 6; c++) for (const d of g._sharedSchedule(c)) for (const sp of d) if (sp.type === 'normal' && !sp.rush && sp.trait) plain++; assert.equal(plain, 0, '보통 일반엔 트레잇이 안 붙는다(특수·⚡ 긴급만)'); }
+  { let plain = 0; for (let c = 1; c <= 6; c++) for (const d of g._sharedSchedule(c)) for (const sp of d) if (sp.type === 'normal' && (sp.trait || sp.rush)) plain++; assert.equal(plain, 0, '일반엔 트레잇도 ⚡ 긴급도 없다(특수 물품만)'); }
   { const c = g.contracts[0], cap0 = g.vehicleCap(c); g.trust[c.carrier] = 60; assert.equal(g.vehicleCap(c), cap0 + 3, '난투 신뢰 Lv3 = 용량 +3'); assert.equal(g.trustPerk(c.carrier, 'feeMult'), null, '배차비 특성은 없다'); g.trust[c.carrier] = 0; }
   assert.equal(g.monthEvents(1).length, 0); assert.equal(g.insurer, 'none');
 });

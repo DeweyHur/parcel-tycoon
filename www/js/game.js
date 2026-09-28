@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, latePenaltyDiv: 3,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, bombs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, bombGrow: 0, attackMult: 1,
@@ -713,8 +713,8 @@
     // 폭탄은 판이 갈수록 크게 온다 — 석 달의 진행도 × BOMB.late (3칸 → 마지막엔 5칸). 유저: "이삿짐도 점점 큰 게"
     bombProgressBonus() { const total = this.totalDays ? this.totalDays() : 0; if (!total || !M.MULTI.BOMB.late) return 0; return Math.floor(Math.min(1, (this.totalTurn || 0) / total) * M.MULTI.BOMB.late); }
     // 물품 종류마다 트레잇이 정해져 있다(META.MULTI.TYPE_TRAITS: [기본, 언락]) — 언락을 산 종류는 둘 중 하나 (유저: "트레잇이 완전 랜덤이 아니라 해당 특수에 붙은 트레잇이 정해져 있으면")
-    traitPool(type, rush) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? (rush ? 'rush' : null) : type; const pair = key && TT[key]; if (!pair) return []; return this.traitUnlocks.includes(key) ? pair.slice() : [pair[0]]; }
-    _resolveTrait(sp) { const pool = this.traitPool(sp.type, sp.rush).filter(t => this.traitDef(t)); if (!pool.length) return null; return pool[this.rng.int(pool.length)]; }
+    traitPool(type) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? null : type; const pair = key && TT[key]; if (!pair) return []; return this.traitUnlocks.includes(key) ? pair.slice() : [pair[0]]; }
+    _resolveTrait(sp) { const pool = this.traitPool(sp.type).filter(t => this.traitDef(t)); if (!pool.length) return null; return pool[this.rng.int(pool.length)]; }
     _bombNext(b) { const B = M.MULTI.BOMB; return { size: Math.min(B.maxSize, this.storageVol(b) + 1), days: Math.max(1, b.turns - 1), hops: (b.hops || 0) + 1, from: this.cfg.pid != null ? this.cfg.pid : null }; }
     // 상대가 만차로 밀어 넣은 택배 — 다음 날 아침 내 창고에 n 개가 더 들어온다(일반, 1~2칸, 기한 짧게)
     receivePush(x) {
@@ -1434,7 +1434,7 @@
       const it = sh.items[i]; if (!it || it.sold) return { ok: false, msg: T('err.sold') };
       if (this.cash < (it.kind === 'perk' ? it.price : this.contractPrice ? (it.kind === 'contract' ? this.contractPrice(it) : it.price) : it.price)) return { ok: false, msg: T('err.noCash') };
       this._act('rbuy', { i, s: target == null ? null : target });
-      if (it.kind === 'traitUnlock') { it.sold = true; sh.bought++; if (!this.traitUnlocks.includes(it.ptype)) this.traitUnlocks.push(it.ptype); this.say('log.traitUnlock', { type: it.ptype === 'rush' ? '⚡' : D.PARCEL_TYPES[it.ptype].name, icon: (this.traitDef(it.trait) || {}).icon || '' }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, unlock: it.ptype }; }
+      if (it.kind === 'traitUnlock') { it.sold = true; sh.bought++; if (!this.traitUnlocks.includes(it.ptype)) this.traitUnlocks.push(it.ptype); this.say('log.traitUnlock', { type: D.PARCEL_TYPES[it.ptype].name, icon: (this.traitDef(it.trait) || {}).icon || '' }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, unlock: it.ptype }; }
       if (it.kind === 'perk') { this.cash -= it.price; this.run.spent += it.price; it.sold = true; sh.bought++; this._applyPerk(it.perk); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, perk: it.perk }; }
       // 장 매물은 buy() 로 — 잠깐 상점을 마켓으로 세워 두고 판다(로그는 rbuy 하나)
       const saved = { market: this.market, phase: this.phase };
@@ -1658,7 +1658,7 @@
         const TR = (M.MULTI && M.MULTI.TRAITS) || {}, total = this.totalDays(), prog = total ? daysDone / total : 0;
         const rate = R.traits ? R.traitRate[0] + (R.traitRate[1] - R.traitRate[0]) * prog : 0;
         const atkW = {}, bonW = {}; for (const k in TR) (TR[k].kind === 'attack' ? atkW : bonW)[k] = TR[k].weight;
-        const gen = () => { const sp = this._genParcelSpec(ratio, m, cw); const r = sp.type !== 'normal' ? rate * (R.specialTraitMult || 1) : sp.rush ? rate : 0; if (r && this.rng.next() < r) sp.trait = this.rng.weighted(this.rng.next() < R.attackShare ? atkW : bonW); return sp; };   // 트레잇은 특수 물품(×2.2)과 ⚡ 긴급에만 — 보통 일반엔 안 붙는다 (유저)
+        const gen = () => { const sp = this._genParcelSpec(ratio, m, cw); const r = sp.type !== 'normal' ? rate * (R.specialTraitMult || 1) : 0; if (r && this.rng.next() < r) sp.trait = this.rng.weighted(this.rng.next() < R.attackShare ? atkW : bonW); return sp; };   // 트레잇은 특수 물품에만(×2.2) — 일반엔 안 붙는다. 초반엔 공격이 없어도 된다 (유저)
         const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
         for (const t of organicTurns) sched[t].push(gen());
         const extra = this._sharedExtra(m);
@@ -1745,7 +1745,7 @@
       if (!premium && ((this.growth && this.growth.branding) || 0) > 0 && this.rng.next() < this.growth.branding * D.GROWTH.branding.premiumChance) premium = true;
       const spec = { type, size: +this.rng.weighted(w), customer };
       if (attrs) spec.attrs = attrs; if (premium) spec.premium = true;
-      if (type === 'normal' && !attrs && this.shows('rushCargo') && this.rng.next() < D.RUSH_CARGO.chance) spec.rush = true;
+      if (type === 'normal' && !attrs && this.shows('rushCargo') && !R.noRush && this.rng.next() < D.RUSH_CARGO.chance) spec.rush = true;
       return spec;
     }
     _spawnParcel(spec) {
@@ -2689,7 +2689,7 @@
     // 트레잇 언락 카드: 내가 받는 물품 종류 중 아직 안 연 것 (유저: "마켓에 해당 특수 물품에 붙는 트레잇을 언락하는 것도")
     _traitUnlockItems() {
       const TT = M.MULTI.TYPE_TRAITS || {}; if (!this.rules.typeTraits) return [];
-      const keys = Object.keys(TT).filter(k => !this.traitUnlocks.includes(k) && (k === 'rush' || this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: k, size: 1, attrs: D.PARCEL_TYPES[k].attrs || [], customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)) && (!(D.PARCEL_TYPES[k].attrs || []).includes('fragile') || this.contractCaps(c).includes('fragile')))));
+      const keys = Object.keys(TT).filter(k => !this.traitUnlocks.includes(k) && (this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: k, size: 1, attrs: D.PARCEL_TYPES[k].attrs || [], customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)) && (!(D.PARCEL_TYPES[k].attrs || []).includes('fragile') || this.contractCaps(c).includes('fragile')))));
       return keys.map(k => ({ kind: 'traitUnlock', ptype: k, trait: TT[k][1], price: 0, name: k, sold: false }));
     }
     _shopItems() {
