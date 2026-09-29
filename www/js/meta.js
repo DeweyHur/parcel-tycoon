@@ -337,7 +337,7 @@
       multi: true,
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
-      unlimitedCalls: true, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true, noFacilities: true, priceMult: 1.8, noMoney: true, traitSameDay: true,
+      unlimitedCalls: true, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true, noFacilities: true, priceMult: 1.8, noMoney: true, traitSameDay: false,
       truckCap: { base: 4, bulkPerTier: 2, perTwoTiers: 1 }, maxTrucks: 1, famTrucks: { large: 2 },   // 차는 4칸 한 대 — 한길만 등급마다 +2칸(일반을 치우는 전문화), 특수는 두 등급에 +1, 거인(대형)만 두 대 (유저: "최대 처리 4칸으로 보고")
       typeMaxSize: { fresh: 2, frozen: 2, intl: 4, large: 4 }, typeShift: { fresh: 4, produce: 2, fragile: 2, intl: 6, large: 6, frozen: 6 },   // 여섯 종류가 처음부터 대본에 있다(계약을 사면 열리게) — 기본 표엔 통관·대형·냉동이 0 이라 사도 안 왔다   // 큰 택배는 받아 주는 계약(차 크기)이 있을 때만 온다 — contractGated 가 크기까지 본다. 코끼리(대형)를 사면 4칸이 온다 noLateShipPenalty: true,
       startFamilies: ['bulk'], contractGated: true, specialTraitMult: 2.2, normalAnywhere: true, typeTraits: true, noRush: true,   // 한길만 들고 시작 · 계약을 사야 그 특수 물품(과 트레잇)이 온다 · 특수 물품엔 트레잇 ×2.2   // 배차 한도 없음(유저: "평판으로 바뀌니 배차 한도는 없애는 게 맞다") 대신 차가 작다 — 시작 한길 4칸 · 신선 2칸 · 파손 2칸   // 장 값은 비싸게 — 살 게 시설뿐이던 때 돈이 남아돌았다(유저). 계약·강화·충전 전부 ×1.8   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
@@ -352,7 +352,7 @@
       capDelta: 4,                                                       // 시작 창고 +4칸 (열린 질문 4 — 후보값)
       marketMaxBuy: 0, upcomingTurns: 2,
       // 2단계: 트레잇·보수공사 (3장·4장). 입고의 15%→35%(일차 비례)에 트레잇, 공격 40 : 보너스 60
-      chainPush: true, traits: true, traitRate: [0.15, 0.35], attackShare: 0.4, repairs: true,
+      chainPush: false, mixCombo: true, traits: true, traitRate: [0.15, 0.35], attackShare: 0.4, repairs: true,
     },
     // 택배 트레잇 — 기한 안에 출고하면 발동, 반송·폐기면 불발. 공격은 나 빼고 전원(살아 있고 마감 안 한 상대)에게, 보너스는 나에게.
     // 원칙: 한 방은 반나절 손해를 넘지 않는다 — 죽이는 건 공격이 아니라 물량. 이름·설명은 locales meta.MULTI.TRAITS[id]
@@ -372,6 +372,7 @@
       t_focus:  { kind: 'bonus', icon: '🎯', weight: 12 },    // 다음 공격 트레잇을 1위 한 명에게만 ×3
       t_deal:   { kind: 'bonus', icon: '🛒', weight: 12 },    // 🛒 단골: 평판 상점이 한 번 더 열린다(계단과 무관)
     },
+    MIX: { streakMax: 3, maxMult: 4 },   // 🔗 조합: 배수 = 종류 수 + 연쇄 − 1 (최대 ×4), 연쇄는 3까지. 조합 아닌 호출이면 연쇄는 끊긴다
     HURRY_N: 3, SEAL: 6, BUZZ: 2, CAP_FLOOR: 0.7, BLAST_MAX: 2,   // 창고는 공격으로 70% 아래로 안 줄고, 대공사는 두 개까지만 턴다 — 한 방이 창고를 비우면 손맛이 없다   // 공격 세기: 독촉은 3개를 오늘 안에 · 봉인 −6칸 · 입소문 평판 +2
     // 물품 종류마다 트레잇 [기본, 언락] — 랜덤이 아니다. 언락은 평판 상점 카드로 산다
     // 전문화 트랙(TRACKS)을 따라 묶었다 — 한 계열의 두 트레잇은 같은 성격이다 (유저: "어떤 트레잇이 주로 나오는지 보여서 어떤 전문화를 택할지")

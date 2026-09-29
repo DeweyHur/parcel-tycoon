@@ -122,9 +122,9 @@
           match.news.push({ type: 'attack', from: p.id, to: tg.map(t => t.id), trait: o.trait, focus: !!o.focus });
         } else if (o.type === 'push') {   // 만차 밀어내기: 랜덤 상대 한 명
           const tg = targetsOf(match, p.id); if (!tg.length) continue;
-          const t = tg[Math.floor(mrand(match) * tg.length)];
-          t.game.receivePush({ n: o.n, from: p.id, fromName: p.name, big: !!o.big });
-          match.news.push({ type: 'push', from: p.id, to: [t.id], n: o.n, big: !!o.big });
+          const list = o.all ? tg : [tg[Math.floor(mrand(match) * tg.length)]];   // 🔗 조합 한 방은 전원에게
+          for (const t of list) t.game.receivePush({ n: o.n, from: p.id, fromName: p.name, big: !!o.big });
+          match.news.push({ type: 'push', from: p.id, to: list.map(t => t.id), n: o.n, big: !!o.big, mix: !!o.mix });
         } else if (o.type === 'repairMove') {
           let t = o.to != null ? match.players.find(x => x.id === o.to && !finished(x.game)) : null;
           const tg = targetsOf(match, p.id);

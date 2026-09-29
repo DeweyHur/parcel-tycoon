@@ -519,6 +519,9 @@
     'multi.pickOut': '내보낼 계약',
     'multi.trustCap': '용량 +{n}칸',
     'multi.repShopTitle': '평판 업! 상점 — {n}장',
+    'mix.title': '조합',
+    'mix.label': '연쇄 {n} · 다음 +{next}',
+    'log.mix': '🔗 {kinds} 조합 ×{n}',
     'log.dawn': '🌅 새벽 출발 — 오늘 한 번 더',
     'why.famRule': '{icon}',
     'call.dawn': '🌅 하루 안 씀',
@@ -2332,8 +2335,8 @@
     },
     "FAM_RULES": {
       "cold": { "name": "새벽 출발", "desc": "오늘 온 신선만 실으면 하루 안 씀" },
-      "frozen": { "name": "냉동 비축", "desc": "냉동실 안은 기한 정지 · 만차 연쇄 +2" },
-      "large": { "name": "덩치", "desc": "밀어내기 4칸 상자 · 대형 1개 = 트럭 만차" },
+      "frozen": { "name": "냉동 비축", "desc": "냉동실 안은 기한 정지 · 조합에 끼면 연쇄 +1" },
+      "large": { "name": "덩치", "desc": "조합에 끼면 4칸 상자가 날아감 · 트럭 두 대" },
       "intl": { "name": "보세 구역", "desc": "통관 대기 0칸 · 통관 끝난 날 트레잇 ×2" },
       "fragile": { "name": "무사고", "desc": "파손품 안 깨고 보내면 평판 +1" }
     },

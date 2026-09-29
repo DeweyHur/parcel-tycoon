@@ -1155,6 +1155,10 @@
     }
     const chain = g.chainState();
     const cm = $('#chain-meter');
+    if (g.rules.mixCombo) {   // 난투: 연속 만차 대신 🔗 조합 연쇄 — 서로 다른 특수 물품을 한 차에 같이 보낼 때마다 오른다
+      const st = g.mixStreak || 0; cm.hidden = st < 1;
+      if (st > 0) { $('#chain-title').textContent = T('mix.title'); $('#chain-fill').style.width = Math.min(100, st / M.MULTI.MIX.streakMax * 100) + '%'; $('#chain-label').textContent = T('mix.label', { n: st, next: st }); cm.className = 'chain-meter mix' + (st >= M.MULTI.MIX.streakMax ? ' max' : ''); }
+    } else {
     cm.hidden = !g.shows('chain') || chain.count < 1;
     if (chain.count > 0) {
       $('#chain-title').textContent = T('chain.title');
@@ -1162,6 +1166,7 @@
       // 난투: 배율이 아니라 다음 만차에 밀어낼 개수 — "⚡×2 · 📦 3 →"
       $('#chain-label').textContent = g.rules.chainPush ? `⚡×${chain.count} · 📦 ${Math.min(chain.count, chain.max - 1)} →` : chain.count >= 2 ? T('chain.mult', { n: chain.count, mult: chain.mult.toFixed(2) }) : T('chain.armed');
       cm.className = 'chain-meter' + (chain.level >= chain.max ? ' max' : '');
+    }
     }
     const mm = $('#mission-meter');
     mm.hidden = !g.shows('mission');            // 서장에는 목표가 없다 — 미터도 없다
@@ -1926,7 +1931,9 @@
     const repD = game.rules.noMoney ? game.repDeltaFor(selP) : 0;
     const gauge = game.rules.noMoney ? `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip net">★<b>${repD >= 0 ? '+' : ''}${repD}</b></span>${game.dawnReady(c, selP) ? `<span class="money-chip dawn">${T('call.dawn')}</span>` : ''}</div></div>` : `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
     const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
-    const money = `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, D.LOAD_CHAIN.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
+    const mp = game.mixPreview(selP);   // 🔗 조합 미리보기: 두 종류 이상이면 합쳐진 한 방
+    const mixLine = mp && mp.mult ? `<div class="chain-preview mix">🔗 ${mp.kinds.map(t => esc(D.PARCEL_TYPES[t].short || t)).join('+')} ×${mp.mult}</div>` : '';
+    const money = mixLine + `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, D.LOAD_CHAIN.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
     const riskLine = riskSel.length ? `<div class="riskline">${game.rules.noMoney ? T('call.riskShort', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100) }) : T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
@@ -1958,7 +1965,8 @@
     if (!r.ok) { toast(r.msg); return; }
     pendingCall = r;
     if (r.dawn) setTimeout(() => rewardBurst(T('log.dawn'), 2), 350);
-    const showChain = game.shows('chain');       // 서장에는 연속 만차가 없다 — 축하도 하지 않는다
+    const showChain = game.shows('chain') && !game.rules.mixCombo;
+    if (r.mix) { document.body.classList.remove('chain-hit'); void document.body.offsetWidth; document.body.classList.add('chain-hit'); scene.shake(.3 + r.mix.mult * .08); SFX.combo(r.mix.mult); rewardBurst(`🔗 ${(r.mix.icons.length ? r.mix.icons.join('') : r.mix.kinds.map(t => D.PARCEL_TYPES[t].short || t).join('+'))} ×${r.mix.mult}`, Math.min(3, r.mix.mult)); setTimeout(() => document.body.classList.remove('chain-hit'), 800); }   // 합체 — 트레잇 아이콘이 한 덩어리로       // 서장에는 연속 만차가 없다 — 축하도 하지 않는다
     if (r.chain === 1 && showChain) {
       SFX.select(); rewardBurst(r.pushed ? `📦 ${r.pushed} →` : T('chain.perfect'), 1);   // 토스트 없음 — 만차는 바가 보여 준다 (유저: "쓸데없는 노티 보이지 마"). 난투는 밀어낸 개수
     }

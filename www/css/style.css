@@ -1196,3 +1196,7 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 .money-chip.dawn { color: #ffd9a0; margin-left: 4px; }
 .frule.dawnpick { font: inherit; font-size: 11px; color: #ffd9a0; background: #2a2236; border: 2px solid #6a5a40; padding: 1px 5px; margin-left: 4px; cursor: pointer; box-shadow: 1px 1px 0 #000; }
 .frule.dawnpick.on { border-color: var(--gold, #ffd166); color: var(--gold, #ffd166); }
+
+/* 🔗 조합(난투) */
+.chain-preview.mix { color: #ff9ef0; text-shadow: 0 0 6px #ff4fd8; }
+.chain-meter.mix #chain-fill { background: linear-gradient(90deg, #ff9ef0, #ffd166); }

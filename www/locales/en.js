@@ -518,6 +518,9 @@
     'multi.pickOut': 'Which contract goes',
     'multi.trustCap': 'capacity +{n}',
     'multi.repShopTitle': 'Rep up! Shop — {n} cards',
+    'mix.title': 'Combo',
+    'mix.label': 'chain {n} · next +{next}',
+    'log.mix': '🔗 {kinds} combo ×{n}',
     'log.dawn': '🌅 Dawn run — one more call today',
     'why.famRule': '{icon}',
     'call.dawn': '🌅 no day used',
@@ -2331,8 +2334,8 @@
     },
     "FAM_RULES": {
       "cold": { "name": "Dawn run", "desc": "Only today's fresh aboard: no day used" },
-      "frozen": { "name": "Deep freeze", "desc": "No countdown in the freezer · full load chain +2" },
-      "large": { "name": "Heavyweight", "desc": "Pushes 4-cell crates · one large = full truck" },
+      "frozen": { "name": "Deep freeze", "desc": "No countdown in the freezer · combo chain +1" },
+      "large": { "name": "Heavyweight", "desc": "In a combo, 4-cell crates fly · two trucks" },
       "intl": { "name": "Bonded zone", "desc": "Customs wait takes 0 cells · traits ×2 on clearance day" },
       "fragile": { "name": "Zero breaks", "desc": "Fragile shipped intact: rep +1 each" }
     },

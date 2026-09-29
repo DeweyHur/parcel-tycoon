@@ -166,8 +166,8 @@ async function route(S, m, from, ev, snaps) {
   }
   if (ev.type === 'push') {   // 만차 밀어내기: 랜덤 상대 한 명
     if (!others.length) return [];
-    const t = others[rndInt(others.length)];
-    return [Object.assign({ type: 'push', from, to: [t.pid], n: Math.max(1, Math.min(4, ev.n | 0)), fromName: (m.players.find(p => p.pid === from) || {}).name }, ev.big ? { big: true } : {})];   // 🦣 4칸 상자
+    const list = ev.all ? others : [others[rndInt(others.length)]];   // 🔗 조합 한 방은 전원에게
+    return list.map(t => Object.assign({ type: 'push', from, to: [t.pid], n: Math.max(1, Math.min(4, ev.n | 0)), fromName: (m.players.find(p => p.pid === from) || {}).name }, ev.big ? { big: true } : {}));   // 🦣 4칸 상자
   }
   if (ev.type === 'repairMove') {
     let t = ev.to != null ? m.players.find(p => p.pid === ev.to && active(snaps[p.pid])) : null;

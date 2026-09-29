@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, finishDump: false, pushMult: 1, freshNoSpoil: false,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false, ownCargo: 0, maxTrucks: 0, repKeepTier: false, pushFlat: 0, truckCap: null, famTrucks: null, theftMaxDay: 0,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false, ownCargo: 0, maxTrucks: 0, repKeepTier: false, pushFlat: 0, mixCombo: false, truckCap: null, famTrucks: null, theftMaxDay: 0,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, repairs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, repairGrow: 0, attackMult: 1,
@@ -653,7 +653,7 @@
       const tr = p.trait && this.traitDef(p.trait); if (!tr || p.overdue) return;
       const R = this.rules;
       if (tr.kind === 'bonus') {
-        if (p.trait === 't_buzz') this.addRep(M.MULTI.BUZZ || 1, MSG('why.trait', { icon: tr.icon }));
+        if (p.trait === 't_buzz') this.addRep((M.MULTI.BUZZ || 1) * (this._mixMult || 1), MSG('why.trait', { icon: tr.icon }));
         else if (p.trait === 't_shield') this.shields = Math.min(M.MULTI.SHIELD_MAX, this.shields + 1);
         else if (p.trait === 't_ice') this.freshFreezeUntil = this.totalTurn + M.MULTI.TEMP_DAYS;
         else if (p.trait === 't_pack') this._capMod(3, M.MULTI.TEMP_DAYS, 't_pack');
@@ -669,7 +669,7 @@
       const echo = this.trackEcho(), n = 1 + (echo && this.rng.next() < echo ? 1 : 0);   // ⚔ 공격 트랙: 메아리
       for (let i = 0; i < n; i++) {
         const clr = this.clearedToday(p) ? (M.MULTI.FAM_RULES.intl.clearMult || 2) : 1;   // 🛃 통관 끝난 날: ×2
-        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1) * clr, focus: this.focusNext, size: p.trait === 't_repair' ? Math.min(M.MULTI.REPAIR.maxSize, M.MULTI.REPAIR.size + R.repairGrow + this.repairProgressBonus() + (clr > 1 ? 2 : 0)) : 0, cleared: clr > 1 };
+        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1) * clr * (this._mixMult || 1), focus: this.focusNext, size: p.trait === 't_repair' ? Math.min(M.MULTI.REPAIR.maxSize, M.MULTI.REPAIR.size + R.repairGrow + this.repairProgressBonus() + (clr > 1 ? 2 : 0)) : 0, cleared: clr > 1 };
         this.outbox.push(atk); this.emit('attackOut', atk);
       }
       this.focusNext = false;
@@ -1146,6 +1146,8 @@
       const s = this.rushState(), used = this.usedVolume();
       return s.ready && trucks >= D.RUSH.minTrucks && fill >= D.RUSH.minFill && used > 0 && volume / used >= D.RUSH.clearShare;
     }
+    // 🔗 조합 미리보기(호출 창): 이 짐들을 같이 보내면 몇 종 · 배수 몇
+    mixPreview(ps) { if (!this.rules.mixCombo) return null; const kinds = [...new Set(ps.filter(p => p && p.type !== 'normal' && !p.pushed).map(p => p.type))]; if (kinds.length < 2) return { kinds, mult: 0, streak: this.mixStreak || 0 }; const st = Math.min(M.MULTI.MIX.streakMax, (this.mixStreak || 0) + 1 + (kinds.includes('frozen') && this.ownsFam('frozen') ? 1 : 0)); return { kinds, mult: Math.min(M.MULTI.MIX.maxMult, kinds.length + st - 1), streak: st }; }
     chainState() {
       const C = D.LOAD_CHAIN;
       const level = Math.min(this.loadChain || 0, C.max);
@@ -1238,6 +1240,7 @@
       return true;
     }
     contractNeed(c) { const car = D.CARRIERS[c.carrier]; if (!car.need) return null; const need = car.need.slice();
+      for (const a of car.caps || []) if (D.GATING_ATTRS.includes(a) && !need.includes(a)) need.push(a);   // 복합 능력(냉동칸 딸린 냉장차 등)은 그 물품도 받는다 — 능력만 있고 받지는 않던 것
       for (const o of this.contractOpts(c)) { const a = D.ENHANCEMENTS[o].attr; if (!need.includes(a)) need.push(a); } return need; }
     contractSizeMax(c) { const car = D.CARRIERS[c.carrier]; const pk = this.trustPerk(c.carrier, 'sizeMax'); const m = pk ? Math.max(car.sizeMax, pk) : car.sizeMax; return Math.min(m, this.vehicleCap(c)); }   // 차보다 큰 택배는 못 싣는다(차가 작아진 난투에서 4칸 신선이 두 대에 걸쳐 실리던 것)
     // car: 업체 데이터, p: 택배(또는 {type,size,attrs,customs} 의사 택배), caps: 계약 단위 능력, sizeMax: 계약 단위 최대 크기
@@ -1245,7 +1248,7 @@
       caps = caps || car.caps; sizeMax = sizeMax == null ? car.sizeMax : sizeMax;
       need = need === undefined ? car.need : need;
       const attrs = (p.attrs || D.PARCEL_TYPES[p.type].attrs).filter(a => D.GATING_ATTRS.includes(a) || (need || []).includes(a));
-      if (p.size < car.sizeMin || p.size > sizeMax) return false;
+      if (p.size < (this.rules.truckCap ? 1 : car.sizeMin) || p.size > sizeMax) return false;   // 난투: 거인 차도 작은 짐을 싣는다(조합하려고)
       // 일반 전용(대량) 차도 ⚠ 는 싣는다 — 파손 능력이 없으니 깨질 확률을 안고(breakProb). 규칙 문구 「능력 없는 업체로 보내면 파손 확률」 그대로
       if (car.onlyPlain && attrs.filter(a => D.GATING_ATTRS.includes(a) && a !== 'fragile').length) return false;
       if (car.allowAttrs && attrs.some(a => D.GATING_ATTRS.includes(a) && !car.allowAttrs.includes(a) && !caps.includes(a))) return false;   // 특약(보냉·완충)으로 붙인 능력은 설비 제한도 푼다 — 통관 차에 보냉 특약을 붙여도 신선을 못 싣던 것
@@ -2009,14 +2012,32 @@
       this.waitStack = 0;
       this._assignCold();
       const freezeFresh = !!this.trustPerk(c.carrier, 'freezeOnCall');
+      // 🔗 조합(난투): 한 차에 서로 다른 특수 물품을 같이 실으면 트레잇이 합쳐져 세진다 — 종류 수 k, 연달아 조합하면 연쇄 +1 (유저: "한 차가 특약을 얻어서 동시에 다른 종류를 보내면 머징한 기능이 날아가는 거")
+      let mix = null;
+      if (R.mixCombo) {
+        const kinds = [...new Set(chosen.filter(p => p.type !== 'normal' && !p.pushed).map(p => p.type))];
+        if (kinds.length >= 2) {
+          this.mixStreak = Math.min(M.MULTI.MIX.streakMax, (this.mixStreak || 0) + 1 + (kinds.includes('frozen') && this.ownsFam('frozen') ? 1 : 0));   // 🧊 냉동이 끼면 연쇄 +1 더
+          const mult = Math.min(M.MULTI.MIX.maxMult, kinds.length + this.mixStreak - 1);
+          const icons = chosen.filter(p => p.trait && !p.overdue).map(p => (this.traitDef(p.trait) || {}).icon).filter(Boolean);
+          const boxes = Math.max(1, mult - 1), big = kinds.includes('large') && this.ownsFam('large');
+          mix = { kinds, mult, streak: this.mixStreak, icons, boxes, big };
+          this._mixMult = mult;
+          this.outbox.push(Object.assign({ type: 'push', n: boxes, all: true, mix: true }, big ? { big: true } : {}));   // 합쳐진 한 방은 일반 상자로도 날아간다 — 상대 전원에게 (🦣 대형이 끼면 4칸 상자)
+          this.stats.mixes = (this.stats.mixes || 0) + 1; this.stats.maxMix = Math.max(this.stats.maxMix || 0, mult);
+          this.say('log.mix', { kinds: kinds.map(t => D.PARCEL_TYPES[t].short || t).join('+'), n: mult });
+          this.emit('mix', mix);
+        } else this.mixStreak = 0;
+      }
       for (const p of chosen) this._fireTrait(p);
+      this._mixMult = 0;
       if (safeFragile) this.addRep(safeFragile * (M.MULTI.FAM_RULES.fragile.rep || 1), MSG('why.famRule', { icon: M.MULTI.FAM_RULES.fragile.icon }));
       this.say('log.call', { name: this.contractName(c), count: chosen.length, revenue, delay: delay ? MSG('log.callDelay', { delay }) : '', broken: broken ? MSG('log.callBroken', { broken }) : '', refund: refunded ? MSG('log.callRefund') : '', calls: c.calls, fee });
       this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, pushed });
       this._updateTrustStats();
       if (dawn) { this.dawnDay = this.totalTurn; this.say('log.dawn'); this.emit('dawn', {}); }   // 🌅 하루가 안 간다 — 오늘 한 번 더 부를 수 있다
       else this._endTurn(false, freezeFresh);
-      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, pushed, missionUp, dawn };
+      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, pushed, missionUp, dawn, mix };
     }
     // 직접 배송(대기 턴의 부가 행동): 고른 택배를 배송비를 내고 처리. 보상 그대로. wait()에서 호출
     selfDeliver(ids) {
