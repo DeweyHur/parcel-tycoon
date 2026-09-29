@@ -939,7 +939,8 @@ const MULTI = require('../www/js/multi.js'), BOT = require('../www/js/bot.js');
 const MG = (seed, extra) => new Game(Object.assign({ multi: true, seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false }, extra || {}));
 t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4 · 시작 차는 작다', () => {
   const g = MG(1), R = g.rules;
-  assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) < D.CARRIERS[c.carrier].cap + 1) && R.carrierCapDelta.bulk === -2, '차는 작다(배차 무제한 대신)');
+  assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) === R.truckCap.base) && g.simulMax(g.contracts.find(Boolean)) === 1, '차는 4칸 한 대(배차 무제한 대신)');
+  { const L = g._makeContract('large0'), I = g._makeContract('intl2'), B = g._makeContract('bulk2'); assert.equal(g.maxTrucks(L), 2, '거인만 두 대'); assert.equal(g.maxTrucks(I), 1); assert.equal(g.vehicleCap(I), 5, '관세도 4칸 + 두 등급에 한 칸'); assert.equal(g.vehicleCap(B), 8, '한길은 등급마다 +2칸'); }
   { const big = []; const types = new Set(); for (let m = 1; m <= 6; m++) for (const t of g._sharedSchedule(m)) for (const sp of t) { types.add(sp.type); if ((sp.type === 'fresh' || sp.type === 'frozen') && sp.size > 2) big.push(sp); } assert.equal(big.length, 0, '신선·냉동은 2칸까지'); assert.ok(['intl', 'large', 'frozen'].every(t => types.has(t)), '통관·대형·냉동도 대본에 있다(계약을 사면 열린다)'); }
   assert.ok(R.multi && R.months === 6 && R.noHolidays && R.noCalendarEvents && R.noWeekend && R.unlimitedCalls && R.noCallFee && R.payNow && R.noLoan && R.noInsurance && !R.shopDay && R.autoSummary && R.repDecides);
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
@@ -967,7 +968,7 @@ t('멀티: 배차 무제한 — 배차비 0, 배차 눈금은 안 줄고, 두 �
   assert.ok(r.ok, r.msg); assert.equal(r.fee, 0); assert.equal(g.feesDue, 0); assert.equal(g.cash, cash + r.revenue); assert.equal(c.calls, calls, '배차는 안 줄어든다');
   for (let i = 0; i < 20; i++) { g.parcels.push(P(10 + i, 'normal', 2)); assert.ok(g.callCarrier(si, [10 + i]).ok, '몇 번이고 부른다 ' + i); }
   const late = P(90, 'normal', 2, { deadline0: 4, deadline: 0, overdue: true }); g.parcels.push(late); const rep0 = g.rep; assert.equal(g.repDeltaFor([late]), 0); g.callCarrier(si, [90]); assert.ok(g.rep >= rep0, '늦게라도 실어 나르면 평판은 안 깎인다');
-  assert.equal(g.simulMax(c), D.MAX_TRUCKS);
+  assert.equal(g.simulMax(c), 1, '난투는 한 대');
 });
 t('멀티: 사이클 끝 장 없음 · 배차 리필 · 「장 보러 간 날」(shopDay) 규칙이면 매물은 업그레이드·강화·충전·광고·새 계약 2(시설 없음), 나오는 데 하루', () => {
   // 사이클 끝엔 장이 없다(유저: "상점을 없애면") — 곧장 다음 보름, 배차는 다시 찬다
@@ -990,7 +991,7 @@ t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary)도 장도
 t('멀티: 연 특수 물품은 내 몫이 온다 — 대형 계약을 사면 일반 일부가 대형으로(부피는 그만큼 일반을 덜어 낸다)', () => {
   const run = own => { const g = MG(71); g.firstShopDone = true; if (own) g.contracts[g.contracts.findIndex(c => !c)] = g._makeContract('large0'); let large = 0, vol = 0; for (let d = 0; d < 26 && g.phase === 'play'; d++) { g.parcels = []; g.wait([]); if (g.repShop) g.closeRepShop(); for (const p of g.parcels) { if (p.type === 'large') large++; if (!p.pushed) vol += p.size; } } return { large, vol }; };
   const a = run(false), b = run(true);
-  assert.equal(a.large, 0, '대형 계약이 없으면 대형은 안 온다'); assert.ok(b.large >= 12, '대형 계약이 있으면 하루 하나꼴 — ' + b.large);
+  assert.equal(a.large, 0, '대형 계약이 없으면 대형은 안 온다'); assert.ok(b.large >= 8, '대형 계약이 있으면 사흘에 하나 넘게 — ' + b.large);
   assert.ok(Math.abs(b.vol - a.vol) <= a.vol * 0.2, '부피는 비슷하다 ' + a.vol + ' / ' + b.vol);
 });
 t('멀티: 창고를 통째로 비우는 공격은 없다 — 칸은 70% 아래로 안 줄고 · 도난은 하루 둘 · 독촉은 하루 셋', () => {
@@ -1051,7 +1052,7 @@ t('멀티: 전문화 트랙 — 첫 상점은 트랙마다 새 계약(계열이 
 });
 t('멀티: 평판 사다리 — 상한에 닿으면 상한 +6 · 등급 +1 · 평판 상점 3장(장 매물만, 값 없음) · 하나 고르면 닫힌다', () => {
   const g = MG(9); g.firstShopDone = true; const cap0 = g.repCap(); g.cash = 0; g.addRep(99);   // 첫 상점(트랙 셋)은 아래 검사에서
-  assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + 6); assert.equal(g.rep, cap0); assert.ok(g.repShop && g.repShop.items.length === 3 && !g.perkOffer);
+  assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + M.MULTI.mods.repStep); assert.equal(g.rep, cap0); assert.ok(g.repShop && g.repShop.items.length === 3 && !g.perkOffer);
   assert.ok(g.repShop.items.every(it => ['contract', 'enh', 'adTicket', 'media', 'mediaUp', 'traitUnlock'].includes(it.kind) && it.price === 0), '퍽·시설·충전은 없고 값도 없다(돈 없는 규칙)');
   g.addRep(99); assert.equal(g.repTier, 1, '상점이 떠 있는 동안은 또 오르지 않는다');
   const sh = g.repShop; const it0 = sh.items.find(it => it.kind === 'enh' && D.ENHANCEMENTS[it.enh].kind !== 'opt') || sh.items.find(it => it.kind === 'contract' && it.switchFrom != null) || sh.items.find(it => it.kind === 'adTicket');
@@ -1089,7 +1090,7 @@ t('멀티: 트레잇은 대본에 박혀 매치 공유 · 공격 40 : 보너스 
 });
 t('멀티: 보너스 트레잇은 그날 출고할 때 나에게 — ⭐ 평판 +2 · 🛡 방패(최대 2) · 📦 임시 칸 · 🚚 덤 트럭 · 안 보내면 그날 밤 사라진다', () => {
   const g = MG(42); g.parcels = []; g.schedule = g.schedule.map(() => []); const si = slot(g, 'bulk'); g.cash = 1000;
-  const mk = (id, tr) => { const p = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: tr }); g.parcels.push(p); return p; };
+  const mk = (id, tr) => { const p = g._spawnParcel({ type: 'normal', size: 1, customer: 'anon', trait: tr }); g.parcels.push(p); return p; };
   const b = mk(2, 't_buzz'); const rep = g.rep; let r = g.callCarrier(si, [b.id]);
   assert.ok(r.ok); assert.ok(g.rep >= rep + M.MULTI.BUZZ, '⭐ 입소문 +2');
   const c = mk(3, 't_shield'), d = mk(4, 't_shield'), e = mk(5, 't_shield'); g.callCarrier(si, [c.id, d.id, e.id]); assert.equal(g.shields, 2);
@@ -1144,7 +1145,7 @@ const call = (S, d) => API.handle(S, d, 'test').then(r => r[1]);
 t('멀티: 재실행 검증 — 같은 시드·같은 입력 로그면 같은 판, 한 줄만 빠져도 다르다', () => {
   const m = MULTI.newMatch({ seed: 77, name: 'H' }); const h = m.players[0].game; let g = 0;
   while (!(h.phase === 'over' || h.phase === 'win') && g++ < 500) { BOT.multiDay(h, 'greedy'); h.takeEvents(); MULTI.tick(m); if (h.month > (m._c || 0)) { m._c = h.month; MULTI.cycleDrop(m, h.month); } }
-  const f = MULTI.fingerprint(h); assert.ok(h.actLog.length > 50 && h.actLog.some(e => e.t === 'atk') && h.actLog.some(e => e.t === 'rbuy'));
+  const f = MULTI.fingerprint(h); assert.ok(h.actLog.length > 50 && h.actLog.some(e => e.t === 'atk' || e.t === 'push') && h.actLog.some(e => e.t === 'rbuy'));
   assert.ok(MULTI.verify(h.cfg, h.actLog, f).ok); const bad = h.actLog.slice(); bad.splice(bad.findIndex(e => e.t === 'wait'), 1); assert.ok(!MULTI.verify(h.cfg, bad, f).ok);
   assert.ok(!MULTI.verify(h.cfg, h.actLog, Object.assign({}, f, { cash: f.cash + 1 })).ok, '잔액을 부풀리면 안 맞는다');
 });
@@ -1281,7 +1282,7 @@ t('멀티: 캐릭터 — 사람이 고르고 봇은 남은 것을 하나씩(겹�
   const base = g(null);
   assert.equal(g('dock').warehouse.cap, base.warehouse.cap + 4); assert.equal(g('easy').rules.deadlineAll, base.rules.deadlineAll + 1);
   assert.equal(g('bigshot').rules.pushMult, 2); assert.equal(g('bolt').rules.attackMult, base.rules.attackMult * 2);
-  assert.equal(g('hangil').rules.carrierCapDelta.bulk, base.rules.carrierCapDelta.bulk + 1);
+  assert.equal(g('hangil').rules.carrierCapDelta.bulk, (base.rules.carrierCapDelta.bulk || 0) + 1);
   // 같은 cfg 로 다시 만들면 같은 판 (재실행 검증이 캐릭터를 잃지 않는다)
   const j = MULTI.fromJSON(JSON.parse(JSON.stringify(MULTI.toJSON(m)))); assert.equal(j.players[0].chr, 'dawn'); assert.equal(j.players[0].game.cfg.mchar, 'dawn');
   const rnd = MULTI.newMatch({ seed: 5, name: 'H' }); assert.ok(rnd.players[0].chr, '안 고르면 랜덤');

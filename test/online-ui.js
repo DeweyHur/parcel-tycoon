@@ -102,8 +102,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   // B 끝내고 응원 → A 포트레잇에 말풍선 + 토스트
   await finishVia(B); await B.waitForTimeout(1200);
   await B.evaluate(() => document.querySelector('[data-cheer="🔥"]').click()); await B.waitForTimeout(1200);
-  await A.evaluate(() => PT.netSync(false)); await A.waitForTimeout(700);
-  const cheered = await A.evaluate(() => ({ bubble: !!document.querySelector('#multi-strip .bubble'), toast: document.querySelector('#toast').textContent }));
+  let cheered = null; for (let k = 0; k < 6; k++) { await A.evaluate(() => PT.netSync(false)); await A.waitForTimeout(500); cheered = await A.evaluate(() => ({ bubble: !!document.querySelector('#multi-strip .bubble'), toast: document.querySelector('#toast').textContent })); if (cheered.bubble || /🔥/.test(cheered.toast)) break; }   // 다른 토스트(신뢰 단계 등)가 덮을 수 있어 몇 번 본다
   ok('응원: B 의 🔥 가 A 화면 포트레잇 말풍선·토스트로', cheered.bubble || /🔥/.test(cheered.toast), JSON.stringify(cheered));
   await A.screenshot({ path: `${OUT}/O-06-cheer.png` });
   await finishVia(A); await A.waitForTimeout(7000);

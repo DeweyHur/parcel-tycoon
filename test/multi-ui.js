@@ -51,8 +51,8 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('사이클 끝 → 장 없이 다음 보름 · 배차 리필', cyc.phase === 'play' && cyc.month === 2 && cyc.calls === cyc.max && !cyc.market, JSON.stringify(cyc).slice(0, 200));
   // 평판 상점: 평판을 상한까지 올리면 랜덤 3장(퍽 + 매물) — 내 돈으로 산다
   await page.evaluate(() => { const g = PT.game; g.cash = 3000; g.addRep(99, null); PT.renderAll(); });
-  const offer = await page.evaluate(() => ({ items: PT.game.repShop && PT.game.repShop.items.map(it => it.kind), tier: PT.game.repTier, cap: PT.game.repCap() }));
-  ok('상한 도달 → 등급 +1 · 상한 +6 · 상점 3장', offer.items && offer.items.length === 3 && offer.tier >= 1 && offer.cap === 20 + 6 * offer.tier, JSON.stringify(offer));
+  const PT_STEP = await page.evaluate(() => PT.game.rules.repStep); const offer = await page.evaluate(() => ({ items: PT.game.repShop && PT.game.repShop.items.map(it => it.kind), tier: PT.game.repTier, cap: PT.game.repCap() }));
+  ok('상한 도달 → 등급 +1 · 상한 +6 · 상점 3장', offer.items && offer.items.length === 3 && offer.tier >= 1 && offer.cap === 20 + PT_STEP * offer.tier, JSON.stringify(offer));
   await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(500); await idle();   // 다음 마감에서 checkPhase 가 상점을 띄운다
   let t = await modalText();
   ok('평판 상점 팝업 — 값 없는 카드 3장', /상점|전문화/.test(t) && (await page.$$('.pkcard')).length === 3 && !/\d+c\b/.test(t), t.slice(0, 80).replace(/\s+/g, ' '));

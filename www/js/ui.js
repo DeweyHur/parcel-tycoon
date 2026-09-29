@@ -1857,7 +1857,7 @@
     if (pick.sel.has(id)) { pick.sel.delete(id); SFX.cancel(); }
     else {
       // 담는 만큼 차가 붙는다 — 두 대까지. 막는 건 두 대를 넘거나 남은 배차가 모자랄 때 (서장처럼 동시 호출이 아직 안 열렸으면 한 대)
-      const maxTrucks = game.simulMax(c), hard = game.shows('simul') ? game.maxTrucks() : 1;
+      const maxTrucks = game.simulMax(c), hard = game.shows('simul') ? game.maxTrucks(c) : 1;
       const picked = [...pick.sel].map(q => game.parcels.find(x => x.id === q)).filter(Boolean).concat([p]);
       const needT = game.packTrucks(c, picked).length;
       if (needT > maxTrucks) { toast(needT > hard ? T('call.maxSelect', { n: hard, cap: game.vehicleCap(c) * hard }) : T('err.noTrucks', { n: c.calls })); return; }
@@ -1994,7 +1994,7 @@
     saveGame();
   }
   function announceCustomers(events) { let claim = 0; for (const e of events) { if (e.type === 'claim') claim += e.amount; if (e.type === 'custLevel') toastLater(`${M.CUSTOMERS[e.customer].icon} ${T('log.custLevel', { name: M.CUSTOMERS[e.customer].name, level: e.level })}`, 2200); if (e.type === 'custSuspend') toastLater(`${M.CUSTOMERS[e.customer].icon} ${T('toast.custSuspend', { name: M.CUSTOMERS[e.customer].name })}`, 2600); } if (claim) setTimeout(() => floatText(T('float.claim', { n: claim }), true, 50), 350); }
-  function announceTrust(events) { if (game && !game.shows('trust')) return; for (const e of events) if (e.type === 'trustup') toastLater(T('toast.trustUp', { name: D.CARRIERS[e.carrier].name, level: e.level, effect: D.trustEffectText(e.carrier, e.level) }), 2400); }
+  function announceTrust(events) { if (game && !game.shows('trust')) return; for (const e of events) if (e.type === 'trustup') toastLater(T('toast.trustUp', { name: D.CARRIERS[e.carrier].name, level: e.level, effect: trustText(e.carrier, e.level) }), 2400); }
   function doWait(selfIds) {
     if (busy || game.phase !== 'play') return;
     SFX.resume();

@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, finishDump: false, pushMult: 1, freshNoSpoil: false,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false, ownCargo: 0, maxTrucks: 0, repKeepTier: false, theftMaxDay: 0,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false, ownCargo: 0, maxTrucks: 0, repKeepTier: false, pushFlat: 0, truckCap: null, famTrucks: null, theftMaxDay: 0,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, repairs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, repairGrow: 0, attackMult: 1,
@@ -1068,10 +1068,12 @@
     // 차량 한 대의 용량(칸): 업체 + 등급 + 적재 보강 + 특약 + 신뢰 특성 + 회사·고객 보정. 대기 보너스(스킵·짠돌이 대기 누적·첫 호출)는 칸으로 더해진다
     vehicleCap(c) {
       const R = this.rules;
-      let cap = D.CARRIERS[c.carrier].cap + c.enh.cap + c.enh.capDelta + (famVal(R.carrierCapDelta, c.carrier) || 0) + (this.trustPerk(c.carrier, 'cap') || 0);
-      for (const id in this.customers || {}) { const cc = this.customerPerk(id, 'carrierCap'); const d = famVal(cc, c.carrier); if (d) cap += d; }
+      // 난투(truckCap): 차는 계열 불문 4칸에서 시작 — 한길(일반)만 등급마다 크게 자라고, 특수 계열은 두 등급에 한 칸. 관세 8~12칸이 모든 계열의 상위 호환이던 것 (유저)
+      const TC = R.truckCap, tier = D.CARRIERS[c.carrier].tier || 0, baseCap = TC ? TC.base + (FAM(c.carrier) === 'bulk' ? TC.bulkPerTier * tier : Math.floor(tier / 2) * TC.perTwoTiers) : D.CARRIERS[c.carrier].cap;
+      let cap = baseCap + c.enh.cap + c.enh.capDelta + (famVal(R.carrierCapDelta, c.carrier) || 0) + (this.trustPerk(c.carrier, 'cap') || 0);
+      if (!TC) for (const id in this.customers || {}) { const cc = this.customerPerk(id, 'carrierCap'); const d = famVal(cc, c.carrier); if (d) cap += d; }
       // 칸 보너스는 호출마다 칸 수를 바꾼다 — 캠페인에서는 통째로 꺼 둔다 (levels.js FLAGS: capBonus)
-      if (this.shows('capBonus')) {
+      if (this.shows('capBonus') && !TC) {
         if (R.skipBonus && this.waitedLastTurn) cap += R.skipBonus;
         if (R.waitStack) cap += Math.min(R.waitStack, this.waitStack);
         if (R.firstCallBonus && this.monthStats && this.monthStats.calls === 0) cap += R.firstCallBonus;
@@ -1159,10 +1161,10 @@
     simulMax(c) {
       if (!this.shows('simul')) return 1;
       const avail = c.calls + (this.rules.spareCall && !this.monthStats.spareUsed && c.calls <= 0 ? 1 : 0);
-      return Math.max(1, Math.min(this.maxTrucks(), avail));
+      return Math.max(1, Math.min(this.maxTrucks(c), avail));
     }
     // 한 호출 최대 대수 — 자유 런은 한 대(배차를 여러 번), 난투는 두 대 (meta.js RUN · MULTI.mods maxTrucks)
-    maxTrucks() { return this.rules.maxTrucks || D.MAX_TRUCKS; }
+    maxTrucks(c) { const R = this.rules, f = c && R.famTrucks && R.famTrucks[FAM(c.carrier)]; return f || R.maxTrucks || D.MAX_TRUCKS; }   // 난투: 한 대 — 거인(대형)만 두 대
     // 대당 배차비
     truckFee(c) {
       const R = this.rules, car = D.CARRIERS[c.carrier];
@@ -1888,14 +1890,14 @@
       // 차량: 부피 합에 맞는 대수. 동시 대수·남은 배차·배차비 검사
       const vcap = this.vehicleCap(c), volume = chosen.reduce((s, p) => s + p.size, 0);
       let trucks = Math.max(this.trucksNeeded(c, chosen), trucksArg || 1);
-      const maxT = this.shows('simul') ? this.maxTrucks() : 1;
+      const maxT = this.shows('simul') ? this.maxTrucks(c) : 1;
       if (trucks > maxT) return { ok: false, msg: T('err.overTrucks', { n: maxT, cap: vcap * maxT }) };
       const avail = unlimited ? Infinity : c.calls + (useSpare ? 1 : 0);
       if (trucks > avail) return { ok: false, msg: T('err.noTrucks', { n: c.calls }) };
       const fee = this.callFee(c, trucks);
       // 후불: 배차비는 월말 정산에서 빠진다 (자금 부족으로 호출이 막히지 않는다)
       // 멀티(payNow): 즉시 차감 — 잔액이 곧 점수라 보이는 숫자가 실제 숫자여야 한다. 돈이 모자라면 못 부른다
-      if (R.payNow && this.cash < fee) return { ok: false, msg: T('err.noCashFee', { fee, cash: this.cash }) };
+      if (R.payNow && fee > 0 && this.cash < fee) return { ok: false, msg: T('err.noCashFee', { fee, cash: this.cash }) };
       if (R.payNow) this.cash -= fee; else this.feesDue += fee;
       this.monthStats.spent += fee; this.monthStats.fees = (this.monthStats.fees || 0) + fee; this.run.spent += fee; this.stats.feesPaid += fee; this.stats.trucksCalled += trucks;
       if (this.regularFreeLeft(c) > 0) c.freeUsed = (c.freeUsed || 0) + 1;
@@ -1960,7 +1962,7 @@
       const chainMult = chainLevel >= 2 ? 1 + (chainLevel - 1) * D.LOAD_CHAIN.step : 1;
       let chainBonus = 0, pushed = 0;
       // 난투: 만차는 돈이 아니라 **밀어내기** — 연속 만차 2회째부터(1·2·3개) 상대 창고에 택배를 밀어 넣는다 (유저: "만차가 돈 올려주지 말고 일부 택배를 상대에게")
-      if (R.chainPush && chainQualified && chainLevel >= 2) { pushed = (chainLevel - 1) * (R.pushMult || 1); const big = this.famRule(c, 'large'); this.outbox.push(Object.assign({ type: 'push', n: pushed }, big ? { big: true } : {})); this.emit('pushOut', { n: pushed }); this.stats.pushed = (this.stats.pushed || 0) + pushed; if (chainLevel >= D.LOAD_CHAIN.max) this.loadChain = 0; }   // 최대에서 밀고 나면 처음부터
+      if (R.chainPush && chainQualified && chainLevel >= 2) { pushed = (R.pushFlat ? Math.min(R.pushFlat, chainLevel - 1) : chainLevel - 1) * (R.pushMult || 1); const big = this.famRule(c, 'large'); this.outbox.push(Object.assign({ type: 'push', n: pushed }, big ? { big: true } : {})); this.emit('pushOut', { n: pushed }); this.stats.pushed = (this.stats.pushed || 0) + pushed; if (chainLevel >= D.LOAD_CHAIN.max) this.loadChain = 0; }   // 최대에서 밀고 나면 처음부터
       if (chainMult > 1 && !R.chainPush) {
         const beforeChain = revenue;
         revenue = Math.round(revenue * chainMult);
