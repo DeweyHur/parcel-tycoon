@@ -331,7 +331,8 @@
   // 규칙은 개인 런에서 **빼고**(새 계약·배차 제한·어음·명절·주말·보험·보관), 상호작용을 **더한다**(트레잇·보수공사·퍽 3택1).
   // 여기 있는 것은 데이터만 — 매치 진행(봇·순위·저장)은 js/multi.js, 규칙 훅은 game.js 의 rules.* 문.
   const MULTI = {
-    PLAYERS: 4, CYCLES: 6, PHASE: 2,   // PHASE: 지금 구현된 단계(docs/MULTIPLAYER_DESIGN.md 13장). 퍽 카드 풀이 이 값을 본다
+    PLAYERS: 2, CYCLES: 6, PHASE: 2,   // 1:1 (2026-09-29, MULTIPLAYER_PILLARS: 넷을 읽는 건 모바일에서 어렵다 — 상대 창고 하나를 크게, 그 창고의 하루가 보이게)
+      // PHASE: 지금 구현된 단계(docs/MULTIPLAYER_DESIGN.md 13장). 퍽 카드 풀이 이 값을 본다
     // 개인 런 시나리오 위에 얹는 멀티 규칙 셋 (mergeMods 로 병합 — 뒤가 앞을 덮는다)
     mods: {
       multi: true,

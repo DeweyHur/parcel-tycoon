@@ -5,6 +5,7 @@ const fs = require('fs');
 const OUT = process.env.OUT || 'shots';
 const BASE = process.env.BASE || 'http://localhost:8765';
 const pass = [], fail = [];
+const M_N = +(process.env.PLAYERS || 2);   // 1:1 (META.MULTI.PLAYERS)
 const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` — ${extra}` : '')); console.log((cond ? '  ok  ' : ' FAIL ') + name + (extra ? ` — ${extra}` : '')); };
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
@@ -28,15 +29,15 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   const introT0 = Date.now(); let introSeen = false; for (let k = 0; k < 40 && !introSeen; k++) { introSeen = await page.evaluate(() => !!document.querySelector('#mintro')); if (!introSeen) await page.waitForTimeout(100); } console.log('intro after', Date.now() - introT0, 'ms', introSeen); await page.waitForTimeout(300);
   const intro = await page.evaluate(() => ({ on: !!document.querySelector('#mintro'), cards: document.querySelectorAll('#mintro .ic').length, vs: !!document.querySelector('#mintro .vs'), theme: !!document.querySelector('#mintro .theme'), me: document.querySelector('#mintro .ic.me b') && document.querySelector('#mintro .ic.me b').textContent }));
   await page.screenshot({ path: `${OUT}/M-00b-intro.png` });
-  ok('시작 화면: 넷 소개 카드 · VS · 나', intro.on && intro.cards === 4 && intro.vs && /나$/.test(intro.me) && intro.theme, JSON.stringify(intro));
+  ok('시작 화면: 넷 소개 카드 · VS · 나', intro.on && intro.cards === M_N && intro.vs && /나$/.test(intro.me) && intro.theme, JSON.stringify(intro));
   await page.evaluate(() => { const i = document.querySelector('#mintro'); if (i) i.click(); }); await page.waitForTimeout(400);
   const slam = await page.evaluate(() => ({ intro: !!document.querySelector('#mintro'), slam: document.querySelectorAll('#multi-strip .mp.slam').length }));
-  ok('게임 화면으로: 시작 화면 사라지고 상대 카드가 쾅 박힌다', !slam.intro && slam.slam === 4, JSON.stringify(slam));
+  ok('게임 화면으로: 시작 화면 사라지고 상대 카드가 쾅 박힌다', !slam.intro && slam.slam === M_N, JSON.stringify(slam));
   await page.waitForTimeout(1200); await idle();
   const prep = await page.evaluate(() => ({ phase: PT.game.phase, theme: PT.game.cfg.mtheme, modal: !!document.querySelector('#modal .foot, #modal .card, #modal .pkcard') }));
   ok('준비 마켓 없이 곧장 플레이 · 테마 있음', prep.phase === 'play' && !!prep.theme && !prep.modal, JSON.stringify(prep));
   const st = await page.evaluate(() => { const g = PT.game, m = PT.match; return { multi: g.rules.multi, storyOff: !!(g.story && g.story.off), players: m.players.length, strip: !document.querySelector('#multi-strip').hidden, cols: document.querySelectorAll('#multi-strip .mp').length, shop: document.querySelector('#shop-btn').hidden, turn: document.querySelector('#hud-turn').textContent, c3: document.querySelector('#c3').hidden, cap: g.warehouse.cap, cash: g.cash, months: g.rules.months }; });
-  ok('난투 시작: 멀티 규칙 · 4인 · 상대 줄 4칸 · 장 보기 버튼 없음 · D+1 · 빈 슬롯 숨김 · 대사 꺼짐', st.multi && st.storyOff && st.players === 4 && st.strip && st.cols === 4 && st.shop && /D\+1/.test(st.turn) && st.c3, JSON.stringify(st));
+  ok('난투 시작: 멀티 규칙 · 4인 · 상대 줄 4칸 · 장 보기 버튼 없음 · D+1 · 빈 슬롯 숨김 · 대사 꺼짐', st.multi && st.storyOff && st.players === M_N && st.strip && st.cols === M_N && st.shop && /D\+1/.test(st.turn) && st.c3, JSON.stringify(st));
   await page.screenshot({ path: `${OUT}/M-01-day1.png` });
   // 며칠 플레이: 차가 차면 부르고, 아니면 호출 없음 (봇이 따라오는지)
   const oneDay = async () => { const did = await page.evaluate(() => { const g = PT.game; if (g.perkOffer) { const c = document.querySelector('.pkcard'); if (c) c.click(); return 'perk'; } if (g.phase !== 'play') return 'skip'; const B = window.BOT; const b = B.STRATS.balanced(g); if (b) { document.querySelector('#c' + b.i).click(); return 'card'; } document.querySelector('#wait-btn').click(); return 'wait'; }); await page.waitForTimeout(150); if (did === 'card') { await page.evaluate(() => { const w = document.querySelector('#wait-btn'); if (!w.disabled) w.click(); }); } await page.waitForTimeout(400); await idle(); return did; };
@@ -91,11 +92,11 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('이사 완료: 내 창고에서 사라지고 상대 창고에 4칸으로', mv.mine === 0 && mv.others.some(v => v >= 4) && mv.news, JSON.stringify(mv));
   // 포트레잇 4개
   const faces = await page.evaluate(() => [...document.querySelectorAll('#multi-strip .mp .face')].map(i => i.getAttribute('src').startsWith('data:image')));
-  ok('포트레잇 4개(스프라이트)', faces.length === 4 && faces.every(Boolean));
+  ok('포트레잇 4개(스프라이트)', faces.length === M_N && faces.every(Boolean));
   // 난투는 저장하지 않는다 — saveGame 을 불러도 멀티 저장 키가 안 생기고, 자금 칸은 접혀 있고 잔액만 작게, 상대 카드엔 평판만
   await page.evaluate(() => PT.saveGame());
   const nosave = await page.evaluate(() => ({ save: !!localStorage.getItem('pt_multi_v1'), cashBox: document.querySelector('#hud-cash-box').hidden, due: document.querySelector('#hud-due').textContent, stripCash: /\dc\b/.test(document.querySelector('#multi-strip').textContent), repnum: document.querySelectorAll('#multi-strip .repnum').length }));
-  ok('저장 없음 · HUD 에 돈 없음 · 상대 카드는 평판만', !nosave.save && nosave.cashBox && nosave.due === '' && !nosave.stripCash && nosave.repnum === 4, JSON.stringify(nosave));
+  ok('저장 없음 · HUD 에 돈 없음 · 상대 카드는 평판만', !nosave.save && nosave.cashBox && nosave.due === '' && !nosave.stripCash && nosave.repnum === M_N, JSON.stringify(nosave));
   // 평판이 오르면 숫자가 굴러가며 카드·HUD 가 반짝인다
   const anim = await page.evaluate(async () => { const g = PT.game; g.rep = Math.max(0, g.rep - 6); PT.renderAll(); await new Promise(r => setTimeout(r, 1100)); const before = document.querySelector('#stress-num').textContent; g.addRep(3, 'test'); PT.renderAll(); await new Promise(r => setTimeout(r, 120));
     const mid = document.querySelector('#stress-num').textContent, pulsing = document.querySelector('#stress-wrap').classList.contains('rep-up') || document.querySelector('#multi-strip .mp.me').classList.contains('rep-up');
@@ -106,7 +107,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.evaluate(() => { PT.renderAll(); }); await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(1500); await idle();
   t = await modalText();
   const res = await page.evaluate(() => ({ phase: PT.game.phase, reason: PT.game.result && PT.game.result.reason, rep: PT.game.rep, day: PT.game.totalTurn, rows: document.querySelectorAll('.mrow').length, allDone: PT.match.players.every(p => p.game.phase === 'win' || p.game.phase === 'over'), save: !!localStorage.getItem('pt_multi_v1'), multi: (Profile.get().multi || {}).played, best: (Profile.get().multi || {}).best }));
-  ok('결과: 순위표 4줄 · 봇 전부 완주 · 저장 삭제 · 프로필 기록', /난투/.test(t) && res.rows === 4 && res.allDone && !res.save && res.multi === 1, JSON.stringify(res) + ' ' + t.slice(0, 60).replace(/\s+/g, ' '));
+  ok('결과: 순위표 4줄 · 봇 전부 완주 · 저장 삭제 · 프로필 기록', /난투/.test(t) && res.rows === M_N && res.allDone && !res.save && res.multi === 1, JSON.stringify(res) + ' ' + t.slice(0, 60).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-05-result.png` });
   ok('콘솔 에러 0', errors.length === 0, errors.slice(0, 5).join(' | '));
   console.log(`\n${pass.length} ok, ${fail.length} fail`);

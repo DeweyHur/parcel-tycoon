@@ -1091,7 +1091,7 @@ t('멀티: 평판 사다리 — 상한에 닿으면 상한 +6 · 등급 +1 · �
   const s2 = Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON()))); assert.ok(s2.rules.multi && s2.repCap() === g.repCap(), '세이브를 열어도 멀티 규칙이 돌아온다');
 });
 t('멀티: 매치 — 봇 3명이 각자 시계로 따라오고, 순위는 생존 → 평판 → 잔액, 저장·복원', () => {
-  const m = MULTI.newMatch({ seed: 21, name: '나', botNames: ['가', '나', '다'] });
+  const m = MULTI.newMatch({ bots: 3, seed: 21, name: '나', botNames: ['가', '나', '다'] });
   assert.equal(m.players.length, 4); assert.ok(m.players[0].human && m.players[0].game.rules.multi);
   assert.equal(m.players[0].game.phase, 'play'); assert.ok(m.players[0].game.cfg.mtheme, '준비 마켓 없이 곧장 · 테마는 시드가 정한다');
   assert.ok(m.players.every(p => p.game.cfg.mtheme === m.players[0].game.cfg.mtheme), '넷이 같은 테마');
@@ -1154,7 +1154,7 @@ t('멀티: 보수공사 — 강제 수락(자리를 먹고 하루 +2c) · 출고
   u.callCarrier(slot(u, 'bulk'), [p.id]); assert.equal(u.repairCount(), 0); const back = u.outbox.find(o => o.type === 'repairMove'); assert.ok(back && back.to === 2 && back.back, '🔄 되돌리기는 보낸 사람에게');
 });
 t('멀티: 매치 라우팅 — 공격은 한 명: 조준(탭)한 상대, 없으면 가장 꽉 찬 창고 · 마감·폐업한 사람에겐 안 간다 · 동시 보수공사 상한', () => {
-  const m = MULTI.newMatch({ seed: 51, name: 'H' }); const [h, a, b, c] = m.players.map(p => p.game);
+  const m = MULTI.newMatch({ bots: 3, seed: 51, name: 'H' }); const [h, a, b, c] = m.players.map(p => p.game);
   for (const g of [a, b, c]) g.parcels = []; for (let i = 0; i < 6; i++) b.parcels.push(b._spawnParcel({ type: 'normal', size: 2, customer: 'anon' }));
   h.outbox.push({ type: 'attackOut', trait: 't_hurry', mult: 1 }); MULTI.route(m);
   assert.deepEqual([a, b, c].map(g => g.inbox.length), [0, 1, 0], '가장 꽉 찬 창고(b) 한 명'); assert.equal(h.inbox.length, 0);
@@ -1167,7 +1167,14 @@ t('멀티: 매치 라우팅 — 공격은 한 명: 조준(탭)한 상대, 없으
   const j = MULTI.fromJSON(JSON.parse(JSON.stringify(MULTI.toJSON(m)))); assert.equal(j.players[1].game.inbox.length, 1); assert.ok(j.players[0].face);
 });
 
+t('멀티 1:1: 기본 매치는 둘(나 + 봇 하나) · 공격·조합 상자·보수공사는 늘 그 상대에게 · 결과 두 줄', () => {
+  const m = MULTI.newMatch({ seed: 303, name: 'H' }); assert.equal(m.players.length, 2); const [h, o] = m.players.map(p => p.game);
+  h.outbox.push({ type: 'attackOut', trait: 't_hurry', mult: 1 }, { type: 'push', n: 2, all: true }); MULTI.route(m); assert.equal(o.inbox.length, 2);
+  let k = 0; while (!(h.phase === 'over' || h.phase === 'win') && k++ < 400) { BOT.multiDay(h, 'balanced'); MULTI.tick(m); }
+  MULTI.finishAll(m); const st = MULTI.standings(m); assert.equal(st.length, 2); assert.ok(st.every(r => r.day >= 1));
+});
 // ----- 멀티 3단계: 서버(www/api/match.js, 인메모리 스토어) · 재실행 검증 · ELO -----
+M.MULTI.PLAYERS = 4;   // 서버 검사들은 4인 판으로 쓰였다 — 규칙은 인원과 무관하다(1:1 은 online-ui 가 브라우저에서 본다). 이 아래는 끝까지 4인
 const API = require('../www/api/match.js');
 const PIDS = ['aaaaaaaaaaaa', 'bbbbbbbbbbbb', 'cccccccccccc', 'dddddddddddd'];
 const call = (S, d) => API.handle(S, d, 'test').then(r => r[1]);
@@ -1288,7 +1295,7 @@ t('멀티: 온라인 봇 이름은 내 언어의 이름표(nid)로, 방 생성 �
 });
 
 t('멀티: 먼저 마감한 사람이 나오면 평판 페널티 대신 — 아직 달리는 판에 남은 날마다 상자가 하나씩 밀려온다(🏁 push, 로그에 남는다)', () => {
-  const m = MULTI.newMatch({ seed: 61, name: 'H' }); const [h, a, b, c] = m.players.map(p => p.game);
+  const m = MULTI.newMatch({ bots: 3, seed: 61, name: 'H' }); const [h, a, b, c] = m.players.map(p => p.game);
   a.phase = 'win'; a.totalTurn = 78; h.totalTurn = 60; b.totalTurn = 72; c.totalTurn = 78;
   MULTI.noteFinish(m); assert.equal(m.firstFinish.id, 1); assert.deepEqual(m.firstFinish.days, { 0: 60, 2: 72, 3: 78 });
   const rows = MULTI.standings(m); const by = {}; for (const r of rows) by[r.p.id] = r;
@@ -1303,7 +1310,7 @@ t('멀티: 먼저 마감한 사람이 나오면 평판 페널티 대신 — 아�
   const g2 = MULTI.replay(h.cfg, h.actLog); assert.equal(g2.actLog.length, h.actLog.length);
 });
 t('멀티: 캐릭터 — 사람이 고르고 봇은 남은 것을 하나씩(겹치지 않음, 이름 = 캐릭터 이름), 패시브가 규칙에 얹힌다', () => {
-  const m = MULTI.newMatch({ seed: 5, name: 'H', chr: 'dawn', charNames: { hangil: '한길', bigshot: '큰손', dawn: '새벽', dock: '도크', easy: '느긋', bolt: '번개' } });
+  const m = MULTI.newMatch({ bots: 3, seed: 5, name: 'H', chr: 'dawn', charNames: { hangil: '한길', bigshot: '큰손', dawn: '새벽', dock: '도크', easy: '느긋', bolt: '번개' } });
   const chrs = m.players.map(p => p.chr); assert.equal(chrs[0], 'dawn'); assert.equal(new Set(chrs).size, 4, '넷이 다 다르다');
   for (const p of m.players.slice(1)) assert.equal(p.name, { hangil: '한길', bigshot: '큰손', dawn: '새벽', dock: '도크', easy: '느긋', bolt: '번개' }[p.chr]);
   assert.ok(m.players[0].game.rules.freshNoSpoil); assert.equal(m.players[0].game.cfg.mchar, 'dawn');

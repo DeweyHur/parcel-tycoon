@@ -751,6 +751,7 @@
   // 내가 쏜 것이 상대 격자에 박힌다 — n 칸이 잠깐 켜진다(실제 상태는 그 사람의 다음 날에 바뀐다)
   function landOn(pid, n, kind) {
     if (!match) return;   // 연출이 늦게 도는 사이 판이 끝났을 수 있다
+    if (oppScene && oppPlayer() && oppPlayer().id === pid) { oppScene.shake(0.25); oppScene.mope(); }   // 1:1: 상대 창고가 흔들린다
     const el = portraitEl(pid); const sat = el && el.querySelector('.sat');
     if (sat) { const r = MULTI.standings(match).find(x => x.p.id === pid) || {}; const cap = Math.max(1, r.cap || 28), from = Math.min(100, (r.used || 0) / cap * 100), w = Math.min(100 - from, n / cap * 100);   // 게이지 끝에 박힌 만큼 번쩍 — 실제 칸은 그 사람의 다음 날에
       const seg = document.createElement('u'); seg.className = 'land ' + (kind || ''); seg.style.left = from + '%'; seg.style.width = Math.max(4, w) + '%'; sat.appendChild(seg); sat.classList.add('fx'); setTimeout(() => { seg.remove(); sat.classList.remove('fx'); }, 1600); return; }
@@ -760,10 +761,35 @@
     cells.forEach((c, i) => setTimeout(() => { c.classList.add(kind, 'land'); }, i * 70));
     setTimeout(() => cells.forEach(c => c.classList.remove('land')), 1600);
   }
+  // ---------- 1:1 상대 창고 (MULTIPLAYER_PILLARS 기둥 3: 같은 공간감) ----------
+  // 상대 카드 왼쪽에 상대 창고를 같은 3D 모델로 작게. 상대가 하루를 넘기면 그날 빠진 짐을 트럭이 실어 가고(재생 2초 안팎), 새 짐이 떨어진다.
+  // 봇은 그 판을 그대로, 온라인 상대는 스냅샷(칸 수)으로 만든 가짜 창고로 그린다 — 실시간 싱크는 필요 없고 "지금 뭘 하는지"만 보이면 된다
+  let oppScene = null, oppKey = null;
+  function oppPlayer() { return match && match.players.length === 2 ? match.players.find(p => p.id !== ME()) : null; }
+  function oppView(p) {
+    if (p.game) return p.game;
+    const s = p.snap || {}, cap = s.cap || 28, used = Math.min(cap + 10, s.used || 0), parcels = []; let v = 0, k = 0;
+    while (v < used) { const sz = used - v >= 2 ? 2 : 1; parcels.push({ id: 'o' + (k++), type: 'normal', size: sz, baseSize: sz, customer: 'anon', outdoor: v + sz > cap, deadline: 3 }); v += sz; }
+    return { warehouse: { cap, cold: 0, frozen: 0, xl: 0 }, parcels, storage: [], usedVolume: () => used, outdoorVolume: () => Math.max(0, used - cap) };
+  }
+  function syncOpp() {
+    const el = $('#opp3d'); if (!el) return; const p = oppPlayer(); const card = p && portraitEl(p.id);
+    if (!p || !card || !window.Scene3D) { el.hidden = true; return; }
+    const sc = $('#scene').getBoundingClientRect(), r = card.getBoundingClientRect();
+    el.hidden = false; el.style.left = (r.left - sc.left + 2) + 'px'; el.style.top = (r.top - sc.top + 2) + 'px'; el.style.width = Math.round(r.width * 0.5) + 'px'; el.style.height = Math.max(40, r.height - 4) + 'px';
+    if (!oppScene) { try { oppScene = new Scene3D(el); oppScene.renderer.setPixelRatio(1); } catch (e) { el.hidden = true; return; } }
+    if (oppKey !== match) { oppKey = match; for (const [id, b] of oppScene.boxes) oppScene.scene.remove(b); oppScene.boxes.clear(); oppScene._primed = false; }
+    if (oppScene.busy) return;   // 재생 중이면 끝나고 다음 렌더에
+    const g = oppView(p), now = new Set(g.parcels.map(x => x.id));
+    const gone = oppScene._primed ? [...oppScene.boxes.keys()].filter(id => typeof id !== 'string' || !id.startsWith('s')).filter(id => !now.has(id)) : [];
+    if (gone.length) { oppScene.deliver(gone.slice(0, 12), () => { oppScene.sync(oppView(p), { animate: true }); }, { trucks: Math.min(2, Math.ceil(gone.length / 4)) }); }   // 상대가 부른 트럭이 짐을 싣고 나간다
+    else oppScene.sync(g, { animate: !!oppScene._primed });
+    oppScene._primed = true;
+  }
   function renderMultiStrip() {
     const el = $('#multi-strip'); if (!el) return;
-    el.hidden = !match; const rc = $('#race'); if (rc) rc.hidden = !match; if (!match) return;
-    const rows = MULTI.standings(match), aimNow = MULTI.aimOf(match, ME());
+    el.hidden = !match; const rc = $('#race'); if (rc) rc.hidden = !match; if (!match) { const o3 = $('#opp3d'); if (o3) o3.hidden = true; return; }
+    const rows = MULTI.standings(match), aimNow = MULTI.aimOf(match, ME()), duel = match.players.length === 2;
     el.innerHTML = match.players.map(p => {
       const r = rows.find(x => x.p === p);
       const dead = !r.alive, done = r.done && r.alive;
@@ -773,13 +799,13 @@
       const stock = (r.stock || []).map(x => `<b class="${x.a ? 'atk' : ''}">${x.i}${x.n > 1 ? `<sub>${x.n}</sub>` : ''}</b>`).join('');
       const def = `${r.shields ? '🛡' + (r.shields > 1 ? r.shields : '') : ''}${r.reflect ? '🪞' : ''}${r.repairs ? '🏗' + (r.repairs > 1 ? r.repairs : '') : ''}`;
       const aimP = !p.human && r.alive && !r.done && aimNow && aimNow.id === p.id;
-      return `<div class="mp ${p.human ? 'me' : ''} ${aimP ? 'aimed' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
+      return `<div class="mp ${p.human ? 'me' : ''} ${duel && !p.human ? 'opp' : ''} ${aimP && !duel ? 'aimed' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
         <img class="face" src="${faceOf(p, r)}" alt="">
         <span class="stamp">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : ''}</span>
         ${p.chr && M.MULTI.CHARS[p.chr] ? `<span class="cic">${M.MULTI.CHARS[p.chr].icon}</span>` : ''}<b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
         <div class="sat ${heat}" style="grid-column:1 / -1"><i style="width:${Math.min(100, pct)}%"></i><em>${pct}%</em></div>
         <span class="stock" style="grid-column:1 / -1">${stock}${def ? `<span class="def">${def}</span>` : ''}</span>
-        ${aimP ? `<span class="aim ${match.aim === p.id ? 'lock' : ''}">🎯</span>` : ''}
+        ${aimP && !duel ? `<span class="aim ${match.aim === p.id ? 'lock' : ''}">🎯</span>` : ''}
         <span class="repline" style="grid-column:1 / -1">★<b class="repnum">${r.repFinal != null ? r.repFinal : r.rep}</b>${r.penalty ? `<small style="color:var(--red)">−${r.penalty}</small>` : ''}</span></div>`;
     }).join('');
     // 탭 = 조준(다시 탭하면 풀림 → 가장 꽉 찬 창고), 꾹 = 상세. 내 카드는 상세만
@@ -787,6 +813,7 @@
       d.onclick = () => { if (d._held) { d._held = false; return; } SFX.select(); match.aim = match.aim === p.id ? null : p.id; renderMultiStrip(); if (pick) renderCallBar(); };
       bindHold(d, () => { d._held = true; showOpponent(p); }); });
     renderRace(rows);
+    syncOpp();   // 1:1: 상대 창고가 3D 로 — 트럭이 오가고 짐이 쌓인다
     // 평판 숫자는 굴러간다 — 카드가 통째로 다시 그려져도 직전 값에서 이어서
     if (stripRep.m !== match) { stripRep.m = match; stripRep.v = {}; }
     for (const p of match.players) { const r = rows.find(x => x.p === p), v = r.repFinal != null ? r.repFinal : r.rep, was = stripRep.v[p.id], card = portraitEl(p.id);

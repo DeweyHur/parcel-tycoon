@@ -1221,3 +1221,13 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 #multi-strip .mp .aim.lock { opacity: 1; animation: aimpulse 1.2s ease-in-out infinite; }
 @keyframes aimpulse { 50% { transform: scale(1.25); } }
 .chain-preview.aimto { color: #ffb3b3; } .chain-preview.aimto.hot { color: #ff8a3d; text-shadow: 0 0 6px #ff5b5b; }
+
+/* 1:1 난투: 내 카드는 좁게, 상대 카드는 넓게 — 왼쪽 50% 는 상대 창고 3D(#opp3d) */
+#multi-strip .mp.me:not(:only-child) { flex: 0 0 27%; }
+#multi-strip .mp.opp { flex: 1 1 0; padding: 2px 34px 2px calc(50% + 4px); min-height: 96px; }
+#multi-strip .mp.opp .nm { font-size: 11px; }
+#multi-strip .mp.opp .face { left: auto; right: 2px; }
+#multi-strip .mp.opp .cic { left: auto; right: 2px; }
+#multi-strip .mp.opp .stamp { left: auto; right: 0; }
+#opp3d { position: absolute; z-index: 6; pointer-events: none; overflow: hidden; border: 1px solid #000; background: linear-gradient(#6fb3e0, #a9dcf5 60%, #6b8f4e 60.5%); }
+#opp3d canvas { display: block; width: 100%; height: 100%; }

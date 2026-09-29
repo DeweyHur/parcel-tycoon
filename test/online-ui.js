@@ -7,6 +7,7 @@ const API = require('../www/api/match.js');
 const OUT = process.env.OUT || 'shots';
 const BASE = process.env.BASE || 'http://localhost:8765';
 const pass = [], fail = [];
+const ON_N = +(process.env.PLAYERS || 2);   // 1:1 (META.MULTI.PLAYERS)
 const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log((cond ? '  ok  ' : ' FAIL ') + name + (extra ? ` — ${extra}` : '')); };
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
@@ -38,7 +39,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   // A 를 61초 기다린 것으로 — 다음 사람이 오면 봇으로 채워 시작한다
   const pidA = await A.evaluate(() => Profile.get().pid), pidB = await B.evaluate(() => Profile.get().pid);
   await B.click('#t-online'); await pickChr(B, 'dawn'); await B.waitForTimeout(700);
-  { const e = JSON.parse((await S.call([['HGET', 'mq', pidA]]))[0]); e.at -= 61; await S.call([['HSET', 'mq', pidA, JSON.stringify(e)]]); }
+  { const raw = (await S.call([['HGET', 'mq', pidA]]))[0]; if (raw) { const e = JSON.parse(raw); e.at -= 61; await S.call([['HSET', 'mq', pidA, JSON.stringify(e)]]); } }   // 1:1 이면 B 가 오는 순간 바로 성립한다
   await B.waitForTimeout(3000); await A.waitForTimeout(2500);
   const skipIntro = async pg => { for (let k = 0; k < 50; k++) { const st = await pg.evaluate(() => ({ intro: !!document.querySelector('#mintro'), game: !!(PT.game) })); if (st.intro) { await pg.evaluate(() => { const e = document.querySelector('#mintro'); if (e) e.click(); }); return true; } if (st.game && k > 10) return false; await pg.waitForTimeout(100); } return false; };
   for (const pg of [A, B]) await skipIntro(pg); await A.waitForTimeout(900);
@@ -47,8 +48,8 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   const stA = await A.evaluate(() => ({ online: !!(PT.match && PT.match.online), host: PT.match && PT.match.online && PT.match.online.host, n: PT.match && PT.match.players.length, games: PT.match && PT.match.players.filter(p => p.game).length, me: PT.match && PT.match.players[0].id === Profile.get().pid, seed: PT.game && PT.game.seed }));
   const stB = await B.evaluate(() => ({ online: !!(PT.match && PT.match.online), host: PT.match && PT.match.online && PT.match.online.host, n: PT.match && PT.match.players.length, games: PT.match && PT.match.players.filter(p => p.game).length, me: PT.match && PT.match.players[0].id === Profile.get().pid, seed: PT.game && PT.game.seed }));
   const chA = await A.evaluate(() => PT.match.players.map(p => [p.id, p.chr, p.name]).sort()), chB = await B.evaluate(() => PT.match.players.map(p => [p.id, p.chr, p.name]).sort());
-  ok('캐릭터: 둘 다 새벽을 골랐지만 A(먼저)만 새벽, 넷이 다 다르고 두 화면이 같다 · 봇 이름 = 캐릭터 이름', chA.find(x => x[0] === pidA)[1] === 'dawn' && chA.find(x => x[0] === pidB)[1] !== 'dawn' && new Set(chA.map(x => x[1])).size === 4 && chA.every(x => x[1]) && JSON.stringify(chA) === JSON.stringify(chB) && chA.filter(x => /^bot/.test(x[0])).every(x => ({ hangil: '한길', bigshot: '큰손', dawn: '새벽', dock: '도크', easy: '느긋', bolt: '번개' })[x[1]] === x[2]), JSON.stringify(chA));
-  ok('매치 성립: A 호스트(봇 2 판 보유) · B 손님(내 판만) · 같은 서버 시드', stA.online && stA.host && stA.n === 4 && stA.games === 3 && stA.me && stB.online && !stB.host && stB.n === 4 && stB.games === 1 && stB.me && stA.seed === stB.seed, JSON.stringify({ stA, stB }));
+  ok('캐릭터: 둘 다 새벽을 골랐지만 A(먼저)만 새벽, 넷이 다 다르고 두 화면이 같다 · 봇 이름 = 캐릭터 이름', chA.find(x => x[0] === pidA)[1] === 'dawn' && chA.find(x => x[0] === pidB)[1] !== 'dawn' && new Set(chA.map(x => x[1])).size === ON_N && chA.every(x => x[1]) && JSON.stringify(chA) === JSON.stringify(chB) && chA.filter(x => /^bot/.test(x[0])).every(x => ({ hangil: '한길', bigshot: '큰손', dawn: '새벽', dock: '도크', easy: '느긋', bolt: '번개' })[x[1]] === x[2]), JSON.stringify(chA));
+  ok('매치 성립: A 호스트(봇 2 판 보유) · B 손님(내 판만) · 같은 서버 시드', stA.online && stA.host && stA.n === ON_N && stA.games === ON_N - 1 && stA.me && stB.online && !stB.host && stB.n === ON_N && stB.games === 1 && stB.me && stA.seed === stB.seed, JSON.stringify({ stA, stB }));
   const oneDay = async page => { await page.evaluate(() => { const g = PT.game; if (g.phase !== 'play' || g.perkOffer) return; const b = window.BOT.STRATS.balanced(g); if (b) { document.querySelector('#c' + b.i).click(); } else document.querySelector('#wait-btn').click(); }); await page.waitForTimeout(150); await page.evaluate(() => { const w = document.querySelector('#wait-btn'); if (w && !w.disabled && PT.game.phase === 'play') w.click(); }); await page.waitForTimeout(400); await idle(page); };
   for (let i = 0; i < 5; i++) { await oneDay(A); await oneDay(B); }
   await A.waitForTimeout(3500); await B.waitForTimeout(500);
@@ -78,7 +79,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   const fin = await S.call([['HGETALL', 'mf:' + (await S.call([['GET', 'mp:' + pidA]]))[0]]]);
   const mid = await A.evaluate(() => PT.match.online.mid); const results = Object.fromEntries((await S.call([['HGETALL', 'mf:' + mid]]))[0].reduce((a, v, i, arr) => (i % 2 === 0 ? a.concat([[v, JSON.parse(arr[i + 1])]]) : a), []));
   // A 는 테스트가 택배를 몰래 심었으니(로그에 없는 행동) 재실행이 안 맞아야 한다 — 그게 검증이다. B 는 통과
-  ok('종료: 넷 다 결과 · B 는 재실행 검증 통과 · 로그 밖 행동을 한 A 는 불합격', Object.keys(results).length === 4 && !results[pidA].verified && results[pidB].verified, JSON.stringify(Object.fromEntries(Object.entries(results).map(([k, v]) => [k.slice(0, 4), [v.cash, v.verified]]))));
+  ok('종료: 넷 다 결과 · B 는 재실행 검증 통과 · 로그 밖 행동을 한 A 는 불합격', Object.keys(results).length === ON_N && !results[pidA].verified && results[pidB].verified, JSON.stringify(Object.fromEntries(Object.entries(results).map(([k, v]) => [k.slice(0, 4), [v.cash, v.verified]]))));
   ok('결과 화면: 검증 실패 → 이 판 무효 · 등급 변동 없음 (둘 다)', /무효/.test(tA) && /무효/.test(tB) && !/기다리는 중/.test(tB), tA.slice(0, 60).replace(/\s+/g, ' '));
   await A.screenshot({ path: `${OUT}/O-04-result.png` });
   const eloA = await A.evaluate(() => (Profile.get().multi || {}).elo), eloB = await B.evaluate(() => (Profile.get().multi || {}).elo);
@@ -99,7 +100,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   const inv = await A.evaluate(() => ({ online: !!(PT.match && PT.match.online), bots: PT.match && PT.match.players.filter(p => p.bot).map(p => p.name), n: PT.match && PT.match.players.length }));
   const invB = await B.evaluate(() => ({ online: !!(PT.match && PT.match.online), host: PT.match && PT.match.online.host, mid: PT.match && PT.match.online.mid }));
   const midA = await A.evaluate(() => PT.match.online.mid);
-  ok('초대 매치 시작: 둘 다 같은 매치 · 봇 2(이름은 한국어 이름표)', inv.online && invB.online && inv.n === 4 && invB.mid === midA && inv.bots.length === 2 && inv.bots.every(n => /^[가-힣]+$/.test(n)), JSON.stringify({ inv, invB }));
+  ok('초대 매치 시작: 둘 다 같은 매치 · 봇 2(이름은 한국어 이름표)', inv.online && invB.online && inv.n === ON_N && invB.mid === midA && inv.bots.length === ON_N - 2 && inv.bots.every(n => /^[가-힣]+$/.test(n)), JSON.stringify({ inv, invB }));
   // B 끝내고 응원 → A 포트레잇에 말풍선 + 토스트
   await finishVia(B); await B.waitForTimeout(1200);
   await B.evaluate(() => document.querySelector('[data-cheer="🔥"]').click()); await B.waitForTimeout(1200);

@@ -9,7 +9,7 @@ const path = require('path');
 const M = require(path.join(__dirname, '..', 'js', 'meta.js'));
 const MULTI = require(path.join(__dirname, '..', 'js', 'multi.js'));
 
-const PLAYERS = M.MULTI.PLAYERS, ELO_START = M.MULTI.ELO_START, BAND = M.MULTI.ELO_STEP;
+const ELO_START = M.MULTI.ELO_START, BAND = M.MULTI.ELO_STEP;
 const WAIT_WIDEN = 30, WAIT_BOTS = 60;      // 초
 const GONE_SEC = 180;                        // 3분 무응답 = 폐업 판정
 const TTL = 6 * 3600;
@@ -102,7 +102,7 @@ async function createMatch(S, humans, opts) {
   const chrOf = x => { let c = validChr(x.chr); if (!c || taken.has(c)) c = free.find(k => !taken.has(k)) || null; if (c) taken.add(c); return c; };   // 먼저 들어온 사람이 이긴다 — 겹치면 뒷사람이 남은 것에서
   const players = humans.map((x, i) => ({ pid: x.pid, name: x.name, face: x.face, chr: chrOf(x), elo: x.elo, bot: false, host: i === 0 }));
   const faces = MULTI.FACES.filter(f => !players.some(p => p.face === f));
-  for (let i = players.length; i < PLAYERS; i++) players.push(mkBot(i, faces, chrOf({})));
+  for (let i = players.length; i < M.MULTI.PLAYERS; i++) players.push(mkBot(i, faces, chrOf({})));
   const m = Object.assign({ id: mkId(), seed: rndInt(2147483647), players, created: t, rated: players.filter(p => !p.bot).length >= 2, cycle: 0 }, opts || {});
   await saveMatch(S, m);
   await S.call(humans.map(x => ['SET', 'mp:' + x.pid, m.id, 'EX', TTL]));
@@ -118,7 +118,7 @@ async function roomView(S, code, pid) {
   const started = (await S.call([['GET', 'invm:' + code]]))[0];
   if (started) { const m = await loadMatch(S, started); if (m && m.players.some(p => p.pid === pid)) return { status: 'ready', match: m, code }; }
   const room = await roomOf(S, code); if (!room) return { status: 'gone', code };
-  return { status: 'room', code, host: room[0].pid, players: room.map(x => ({ pid: x.pid, name: x.name, face: x.face, chr: x.chr || null, me: x.pid === pid })), max: PLAYERS };
+  return { status: 'room', code, host: room[0].pid, players: room.map(x => ({ pid: x.pid, name: x.name, face: x.face, chr: x.chr || null, me: x.pid === pid })), max: M.MULTI.PLAYERS };
 }
 // ----- 매칭 큐 -----
 // 큐는 해시 mq: pid → { pid, name, face, elo, at }. 폴링(queue op)마다 짝을 맞춰 본다 — 서버리스엔 타이머가 없다
@@ -127,10 +127,10 @@ async function matchmake(S) {
   if (!q.length) return null;
   const t = now(), head = q[0], waited = t - head.at;
   const band = BAND * (waited >= WAIT_WIDEN ? 2 : 1);
-  const group = q.filter(x => Math.abs(x.elo - head.elo) <= band).slice(0, PLAYERS);
-  if (group.length < PLAYERS && waited < WAIT_BOTS) return null;
+  const group = q.filter(x => Math.abs(x.elo - head.elo) <= band).slice(0, M.MULTI.PLAYERS);
+  if (group.length < M.MULTI.PLAYERS && waited < WAIT_BOTS) return null;
   // 상위 등급(팀장 이상)에서는 봇 없이 사람만 — 넷이 안 모이면 계속 기다린다
-  if (group.length < PLAYERS && head.elo >= ELO_START + BAND * 3) return null;
+  if (group.length < M.MULTI.PLAYERS && head.elo >= ELO_START + BAND * 3) return null;
   await S.call(group.map(x => ['HDEL', 'mq', x.pid]));
   return createMatch(S, group);
 }
@@ -255,7 +255,7 @@ async function handle(S, d, ip) {
     if (!validPid(d.pid) || !validCode(d.code)) return [400, { error: 'code' }];
     const room = await roomOf(S, d.code); if (!room) return [404, { error: 'noroom' }];
     if ((await S.call([['GET', 'invm:' + d.code]]))[0]) return [409, { error: 'started' }];
-    if (room.length >= PLAYERS && !room.some(x => x.pid === d.pid)) return [409, { error: 'full' }];
+    if (room.length >= M.MULTI.PLAYERS && !room.some(x => x.pid === d.pid)) return [409, { error: 'full' }];
     const entry = { pid: d.pid, name: cleanName(d.name), face: MULTI.FACES.includes(d.face) ? d.face : 'park', chr: validChr(d.chr), elo: (await getElo(S, d.pid)).elo, at: room.find(x => x.pid === d.pid) ? room.find(x => x.pid === d.pid).at : now() };
     await S.call([['HSET', 'inv:' + d.code, d.pid, JSON.stringify(entry)]]);
     return [200, await roomView(S, d.code, d.pid)];
@@ -268,7 +268,7 @@ async function handle(S, d, ip) {
     if (room[0].pid !== d.pid) return [403, { error: 'nothost' }];
     if (room.length < 2) return [409, { error: 'alone' }];
     const already = (await S.call([['GET', 'invm:' + d.code]]))[0]; if (already) return [200, await roomView(S, d.code, d.pid)];
-    const m = await createMatch(S, room.slice(0, PLAYERS), { rated: false, invite: d.code });
+    const m = await createMatch(S, room.slice(0, M.MULTI.PLAYERS), { rated: false, invite: d.code });
     await S.call([['SET', 'invm:' + d.code, m.id, 'EX', TTL]]);
     return [200, { status: 'ready', match: m, code: d.code }];
   }
