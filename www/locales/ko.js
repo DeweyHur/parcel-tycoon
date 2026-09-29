@@ -2333,7 +2333,7 @@
       "t_pack": { "name": "압축", "desc": "창고 +3칸, 3일" },
       "t_truck": { "name": "덤 트럭", "desc": "다음 호출 트럭 +1" },
       "t_return": { "name": "되돌리기", "desc": "내 창고의 🏗 1개를 보낸 사람에게" },
-      "t_focus": { "name": "한 방", "desc": "다음 공격을 1위 한 명에게만, 효과 ×3" },
+      "t_focus": { "name": "한 방", "desc": "다음 공격 효과 ×3" },
       "t_deal": { "name": "단골", "desc": "평판 상점 한 번 더" }
     },
     "FAM_RULES": {

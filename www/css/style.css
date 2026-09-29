@@ -1200,3 +1200,24 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 /* 🔗 조합(난투) */
 .chain-preview.mix { color: #ff9ef0; text-shadow: 0 0 6px #ff4fd8; }
 .chain-meter.mix #chain-fill { background: linear-gradient(90deg, #ff9ef0, #ffd166); }
+
+/* 난투 상대 카드: 포화 게이지 · 비축 · 조준 (MULTIPLAYER_PILLARS 기둥 2) */
+#multi-strip .mp .sat { position: relative; height: 12px; background: #0c0b16; border: 1px solid #000; margin: 2px 0 1px; overflow: hidden; }
+#multi-strip .mp .sat i { position: absolute; left: 0; top: 0; bottom: 0; background: #6fd08c; transition: width .5s ease-out, background .3s; }
+#multi-strip .mp .sat.warm i { background: #f2c14e; } #multi-strip .mp .sat.hot i { background: #ff8a3d; } #multi-strip .mp .sat.over i { background: #ff5b5b; }
+#multi-strip .mp .sat.hot, #multi-strip .mp .sat.over { animation: satblink 1s steps(2) infinite; }
+@keyframes satblink { 50% { box-shadow: 0 0 0 1px #ff5b5b, 0 0 6px #ff5b5b; } }
+#multi-strip .mp .sat em { position: absolute; right: 2px; top: -1px; font-size: 9px; font-style: normal; color: #fff; text-shadow: 1px 1px 0 #000; }
+#multi-strip .mp .sat u.land { position: absolute; top: 0; bottom: 0; background: #fff; text-decoration: none; animation: landflash 1.6s ease-out both; }
+#multi-strip .mp .sat u.land.b { background: #ff5b5b; }
+@keyframes landflash { 0% { opacity: 1; transform: scaleY(1.6); } 60% { opacity: .9; } 100% { opacity: 0; } }
+#multi-strip .mp .stock { display: flex; gap: 2px; align-items: center; min-height: 13px; font-size: 11px; overflow: hidden; }
+#multi-strip .mp .stock b { font-weight: normal; position: relative; }
+#multi-strip .mp .stock b.atk { text-shadow: 0 0 4px #ff5b5b; }
+#multi-strip .mp .stock sub { font-size: 8px; color: #fff; vertical-align: bottom; }
+#multi-strip .mp .stock .def { margin-left: auto; font-size: 10px; }
+#multi-strip .mp.aimed { border-color: #ff6b6b; }
+#multi-strip .mp .aim { position: absolute; right: -4px; top: -8px; font-size: 14px; opacity: .55; pointer-events: none; }
+#multi-strip .mp .aim.lock { opacity: 1; animation: aimpulse 1.2s ease-in-out infinite; }
+@keyframes aimpulse { 50% { transform: scale(1.25); } }
+.chain-preview.aimto { color: #ffb3b3; } .chain-preview.aimto.hot { color: #ff8a3d; text-shadow: 0 0 6px #ff5b5b; }

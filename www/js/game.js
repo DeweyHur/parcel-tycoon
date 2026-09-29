@@ -750,11 +750,13 @@
       this.inbox.push({ push: true, n: x.n, from: x.from, fromName: x.fromName, dump: !!x.dump, big: !!x.big }); return true;
     }
     _applyPush(x) {
-      const n = Math.max(1, Math.round(x.n || 1)), ids = [];
+      // 🔥 만석: 이미 80% 넘게 찬 창고에 떨어지면 상자가 두 배 — 같은 공격도 상대 상태에 따라 값이 달라진다 (MULTIPLAYER_PILLARS 기둥 2)
+      const H = M.MULTI && M.MULTI.HOT, hot = !!(H && this.rules.multi && !x.dump && this.usage() >= H.at);
+      const n = Math.max(1, Math.round(x.n || 1)) * (hot ? H.mult : 1), ids = [];
       for (let i = 0; i < n; i++) { const p = this._spawnParcel({ type: 'normal', size: x.big ? ((M.MULTI.FAM_RULES && M.MULTI.FAM_RULES.large.pushSize) || 4) : 1 + (this.rng.next() < 0.4 ? 1 : 0), customer: 'anon' }); if (!p) continue; p.deadline = Math.min(p.deadline, 3); p.deadline0 = p.deadline0 || p.deadline; p.pushed = true; this.parcels.push(p); ids.push(p.id); }
       this._assignCold();
       this.say(x.dump ? 'log.dumpIn' : 'log.pushIn', { from: x.fromName || '', n: ids.length });
-      this.emit('pushIn', { n: ids.length, from: x.from, fromName: x.fromName, ids, dump: !!x.dump });
+      this.emit('pushIn', { n: ids.length, from: x.from, fromName: x.fromName, ids, dump: !!x.dump, hot });
     }
     receiveRepair(b) {
       if (this.phase === 'over' || this.phase === 'win') return { ok: false };

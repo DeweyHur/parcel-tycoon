@@ -750,7 +750,11 @@
   }
   // 내가 쏜 것이 상대 격자에 박힌다 — n 칸이 잠깐 켜진다(실제 상태는 그 사람의 다음 날에 바뀐다)
   function landOn(pid, n, kind) {
-    const el = portraitEl(pid); const mini = el && el.querySelector('.mini'); if (!mini) return;
+    if (!match) return;   // 연출이 늦게 도는 사이 판이 끝났을 수 있다
+    const el = portraitEl(pid); const sat = el && el.querySelector('.sat');
+    if (sat) { const r = MULTI.standings(match).find(x => x.p.id === pid) || {}; const cap = Math.max(1, r.cap || 28), from = Math.min(100, (r.used || 0) / cap * 100), w = Math.min(100 - from, n / cap * 100);   // 게이지 끝에 박힌 만큼 번쩍 — 실제 칸은 그 사람의 다음 날에
+      const seg = document.createElement('u'); seg.className = 'land ' + (kind || ''); seg.style.left = from + '%'; seg.style.width = Math.max(4, w) + '%'; sat.appendChild(seg); sat.classList.add('fx'); setTimeout(() => { seg.remove(); sat.classList.remove('fx'); }, 1600); return; }
+    const mini = el && el.querySelector('.mini'); if (!mini) return;
     const empty = [...mini.querySelectorAll('i:not(.o):not(.p):not(.b)')];
     const cells = empty.slice(0, n); if (!cells.length) { mini.classList.add('fx-bad'); setTimeout(() => mini.classList.remove('fx-bad'), 1000); return; }
     cells.forEach((c, i) => setTimeout(() => { c.classList.add(kind, 'land'); }, i * 70));
@@ -759,22 +763,29 @@
   function renderMultiStrip() {
     const el = $('#multi-strip'); if (!el) return;
     el.hidden = !match; const rc = $('#race'); if (rc) rc.hidden = !match; if (!match) return;
-    const rows = MULTI.standings(match);
+    const rows = MULTI.standings(match), aimNow = MULTI.aimOf(match, ME());
     el.innerHTML = match.players.map(p => {
       const r = rows.find(x => x.p === p);
       const dead = !r.alive, done = r.done && r.alive;
       const fill = r.cap ? Math.min(1, r.used / r.cap) : 0, over = r.used > r.cap;
-      const reps = Array.from({ length: 5 }, (_, i) => `<i class="${r.rep >= (i + 1) * r.repCap / 5 ? 'on' : ''}"></i>`).join('');
-      const repairs = r.repairs, g = { cash: r.cash, shields: r.shields };
-      return `<div class="mp ${p.human ? 'me' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
+      // 상대 카드 = 2초 안에 읽히는 위험도: 포화 게이지 · 비축(들고 있는 트레잇) · 방어 — 숫자·격자는 뺐다 (MULTIPLAYER_PILLARS 기둥 2)
+      const pct = Math.round(fill * 100), heat = over ? 'over' : fill >= 0.8 ? 'hot' : fill >= 0.55 ? 'warm' : '';
+      const stock = (r.stock || []).map(x => `<b class="${x.a ? 'atk' : ''}">${x.i}${x.n > 1 ? `<sub>${x.n}</sub>` : ''}</b>`).join('');
+      const def = `${r.shields ? '🛡' + (r.shields > 1 ? r.shields : '') : ''}${r.reflect ? '🪞' : ''}${r.repairs ? '🏗' + (r.repairs > 1 ? r.repairs : '') : ''}`;
+      const aimP = !p.human && r.alive && !r.done && aimNow && aimNow.id === p.id;
+      return `<div class="mp ${p.human ? 'me' : ''} ${aimP ? 'aimed' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
         <img class="face" src="${faceOf(p, r)}" alt="">
         <span class="stamp">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : ''}</span>
         ${p.chr && M.MULTI.CHARS[p.chr] ? `<span class="cic">${M.MULTI.CHARS[p.chr].icon}</span>` : ''}<b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
-        <span class="reps">${reps}</span><span class="rk">${T('multi.day', { n: r.day })}${repairs ? ' 🏗' + (repairs > 1 ? repairs : '') : ''}${g.shields ? ' 🛡' : ''}</span>
-        ${miniWarehouse(r)}
+        <div class="sat ${heat}" style="grid-column:1 / -1"><i style="width:${Math.min(100, pct)}%"></i><em>${pct}%</em></div>
+        <span class="stock" style="grid-column:1 / -1">${stock}${def ? `<span class="def">${def}</span>` : ''}</span>
+        ${aimP ? `<span class="aim ${match.aim === p.id ? 'lock' : ''}">🎯</span>` : ''}
         <span class="repline" style="grid-column:1 / -1">★<b class="repnum">${r.repFinal != null ? r.repFinal : r.rep}</b>${r.penalty ? `<small style="color:var(--red)">−${r.penalty}</small>` : ''}</span></div>`;
     }).join('');
-    el.querySelectorAll('.mp').forEach(d => d.onclick = () => { SFX.click(); showOpponent(match.players[+d.dataset.id]); });
+    // 탭 = 조준(다시 탭하면 풀림 → 가장 꽉 찬 창고), 꾹 = 상세. 내 카드는 상세만
+    el.querySelectorAll('.mp').forEach(d => { const p = match.players.find(x => String(x.id) === d.dataset.id); if (!p) return; if (p.human) { d.onclick = () => { SFX.click(); showOpponent(p); }; return; }
+      d.onclick = () => { if (d._held) { d._held = false; return; } SFX.select(); match.aim = match.aim === p.id ? null : p.id; renderMultiStrip(); if (pick) renderCallBar(); };
+      bindHold(d, () => { d._held = true; showOpponent(p); }); });
     renderRace(rows);
     // 평판 숫자는 굴러간다 — 카드가 통째로 다시 그려져도 직전 값에서 이어서
     if (stripRep.m !== match) { stripRep.m = match; stripRep.v = {}; }
@@ -866,7 +877,7 @@
       if (e.type === 'attackIn') steps.push(e.blocked
         ? { from: e.from, icon: traitIcon(e.trait), text: `→ ${T('multi.you')} · ${T('trait.blk.' + e.blocked)}`, cls: 'ok', run: () => { if (e.blocked === 'shield') shieldFx(ME()); SFX.select(); } }
         : { from: e.from, icon: traitIcon(e.trait), text: `→ ${T('multi.you')} · ${shortDetail(e.detail)}`, cls: 'bad', run: () => { faceHit[ME()] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3); hitFx(e.trait); } });
-      if (e.type === 'pushIn') steps.push({ from: e.from, icon: e.dump ? '🏁' : '📦', text: `${e.dump ? '🏁 ' : ''}+${e.n} → ${T('multi.you')}`, cls: 'bad', run: () => { SFX.thud(); scene.shake(.2); glow(e.ids.map(id => `.ptile[data-id="${id}"]`).join(','), 'fx-new'); } });
+      if (e.type === 'pushIn') steps.push({ from: e.from, icon: e.dump ? '🏁' : '📦', text: `${e.dump ? '🏁 ' : ''}+${e.n} → ${T('multi.you')}${e.hot ? ' 🔥×2' : ''}`, cls: 'bad', run: () => { SFX.thud(); scene.shake(.2); glow(e.ids.map(id => `.ptile[data-id="${id}"]`).join(','), 'fx-new'); } });
       if (e.type === 'repairIn') steps.push({ from: e.from, icon: '🏗', text: T('multi.repairInToast', { size: e.storage.vol, days: e.storage.turns }), cls: 'bad', run: () => { SFX.thud(); scene.shake(.45); glow('#multi-status', 'fx-bad'); } });
       if (e.type === 'repairBlast') steps.push({ from: ME(), icon: '🏗', text: T('multi.repairBlastToast', { n: e.stolen }), cls: 'bad', run: () => { SFX.discard(); scene.shake(.6); scene.mope(); } });
       if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
@@ -1932,8 +1943,10 @@
     const gauge = game.rules.noMoney ? `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip net">★<b>${repD >= 0 ? '+' : ''}${repD}</b></span>${game.dawnReady(c, selP) ? `<span class="money-chip dawn">${T('call.dawn')}</span>` : ''}</div></div>` : `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
     const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
     const mp = game.mixPreview(selP);   // 🔗 조합 미리보기: 두 종류 이상이면 합쳐진 한 방
+    const tgt = game.rules.multi && match ? MULTI.aimOf(match, ME()) : null, fires = selP.some(p => p.trait && !p.overdue && (M.MULTI.TRAITS[p.trait] || {}).kind === 'attack') || (mp && mp.mult);
+    const aimLine = tgt && fires ? (() => { const f = MULTI.fillOf(tgt), hot = f >= M.MULTI.HOT.at, boxes = mp && mp.mult ? Math.max(1, mp.mult - 1) * (hot ? M.MULTI.HOT.mult : 1) : 0; return `<div class="chain-preview aimto ${hot ? 'hot' : ''}">→ 🎯 ${esc(tgt.name)} ${Math.round(f * 100)}%${boxes ? ` · 📦${boxes}${hot ? ' 🔥' : ''}` : ''}</div>`; })() : '';   // 누구에게 · 얼마나 — 만석이면 🔥
     const mixLine = mp && mp.mult ? `<div class="chain-preview mix">🔗 ${mp.kinds.map(t => esc(D.PARCEL_TYPES[t].short || t)).join('+')} ×${mp.mult}</div>` : '';
-    const money = mixLine + `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, D.LOAD_CHAIN.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
+    const money = mixLine + aimLine + `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, D.LOAD_CHAIN.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
     const riskLine = riskSel.length ? `<div class="riskline">${game.rules.noMoney ? T('call.riskShort', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100) }) : T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;

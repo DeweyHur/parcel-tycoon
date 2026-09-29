@@ -107,15 +107,15 @@
     for (const p of match.players) {
       const g = p.game; if (!g || !g.outbox.length) continue;
       const out = g.outbox.splice(0);
-      if (match.online) { for (const o of out) match.online.pending.push(Object.assign({ from: p.id }, o)); continue; }   // 온라인: 서버가 목적지를 정한다 (net.js 가 보낸다)
+      if (match.online) { for (const o of out) match.online.pending.push(Object.assign({ from: p.id }, o, p.human && match.aim != null && o.to == null ? { aim: match.aim } : {})); continue; }   // 조준은 서버가 푼다(없으면 가장 꽉 찬 창고)   // 온라인: 서버가 목적지를 정한다 (net.js 가 보낸다)
       for (const o of out) {
         if (o.type === 'attackOut') {
-          let tg = targetsOf(match, p.id);
-          if (o.focus) { const top = standings(match).find(r => r.alive && !r.done && r.p.id !== p.id); tg = top ? [top.p] : []; }
-          if (o.to != null) tg = tg.filter(t => t.id === o.to);   // 🪞 반사: 보낸 사람 한 명
+          let tg;
+          if (o.to != null) tg = targetsOf(match, p.id).filter(t => t.id === o.to);   // 🪞 반사: 보낸 사람 한 명
+          else { const t = aimOf(match, p.id); tg = t ? [t] : []; }   // 공격은 한 명 — 조준(없으면 가장 꽉 찬 창고). 🎯 는 이제 세기(×3)만
           if (o.trait === 't_repair') {
             if (repairsInPlay(match) >= M.MULTI.REPAIR.max || !tg.length) { match.news.push({ type: 'repairFizzle', from: p.id }); continue; }
-            const t = tg[Math.floor(mrand(match) * tg.length)];
+            const t = tg[0];
             const r = t.game.receiveRepair({ size: o.size || M.MULTI.REPAIR.size, days: M.MULTI.REPAIR.days, hops: 0, from: p.id });
             match.news.push({ type: 'repair', from: p.id, to: [t.id], blast: !!r.blast, size: o.size || M.MULTI.REPAIR.size }); continue;
           }
@@ -123,7 +123,7 @@
           match.news.push({ type: 'attack', from: p.id, to: tg.map(t => t.id), trait: o.trait, focus: !!o.focus });
         } else if (o.type === 'push') {   // 만차 밀어내기: 랜덤 상대 한 명
           const tg = targetsOf(match, p.id); if (!tg.length) continue;
-          const list = o.all ? tg : [tg[Math.floor(mrand(match) * tg.length)]];   // 🔗 조합 한 방은 전원에게
+          const at = aimOf(match, p.id); const list = at ? [at] : [];   // 🔗 조합 상자도 조준한 한 명에게
           for (const t of list) t.game.receivePush({ n: o.n, from: p.id, fromName: p.name, big: !!o.big });
           match.news.push({ type: 'push', from: p.id, to: list.map(t => t.id), n: o.n, big: !!o.big, mix: !!o.mix });
         } else if (o.type === 'repairMove') {
@@ -187,12 +187,18 @@
   // 한 사람의 상태 — 내 판(game)이 있으면 거기서, 원격(온라인 상대)이면 서버 스냅샷(snap)에서
   function stateOf(p) {
     const g = p.game;
-    if (g) return { alive: alive(g), done: finished(g), win: g.phase === 'win', cash: g.cash, rep: g.rep, repCap: g.repCap(), day: dayOf(g), days: totalDays(g), tier: g.repTier, perks: g.mperks.slice(), cap: g.warehouse.cap, used: g.usedVolume(), repairVol: g.storage.filter(x => x.kind === 'repair').reduce((n, x) => n + g.storageVol(x), 0), pushedVol: g.parcels.filter(x => x.pushed).reduce((n, x) => n + x.size, 0), shields: g.shields, repairs: g.repairCount(), phase: g.phase };
+    if (g) return { alive: alive(g), done: finished(g), win: g.phase === 'win', cash: g.cash, rep: g.rep, repCap: g.repCap(), day: dayOf(g), days: totalDays(g), tier: g.repTier, perks: g.mperks.slice(), cap: g.warehouse.cap, used: g.usedVolume(), repairVol: g.storage.filter(x => x.kind === 'repair').reduce((n, x) => n + g.storageVol(x), 0), pushedVol: g.parcels.filter(x => x.pushed).reduce((n, x) => n + x.size, 0), shields: g.shields, repairs: g.repairCount(), phase: g.phase , stock: stockOf(g), reflect: g.reflectNext || 0 };
     const s = p.snap || {}; const ph = s.phase || 'play', dead = ph === 'over' || ph === 'gone';
-    return { alive: !dead, done: ph !== 'play', win: ph === 'win', cash: s.cash || 0, rep: s.rep || 0, repCap: s.repCap || 20, day: s.day || 1, days: s.days || 78, tier: s.tier || 0, perks: s.perks || [], cap: s.cap || 28, used: s.used || 0, repairVol: s.repairVol || 0, pushedVol: s.pushedVol || 0, shields: s.shields || 0, repairs: s.repairs || 0, phase: ph, gone: ph === 'gone' };
+    const extra = { stock: Array.isArray(s.stock) ? s.stock.slice(0, 4) : [], reflect: s.reflect || 0 };
+    return { alive: !dead, done: ph !== 'play', win: ph === 'win', cash: s.cash || 0, rep: s.rep || 0, repCap: s.repCap || 20, day: s.day || 1, days: s.days || 78, tier: s.tier || 0, perks: s.perks || [], cap: s.cap || 28, used: s.used || 0, repairVol: s.repairVol || 0, pushedVol: s.pushedVol || 0, shields: s.shields || 0, repairs: s.repairs || 0, phase: ph, gone: ph === 'gone', stock: extra.stock, reflect: extra.reflect };
   }
   // 서버에 올릴 스냅샷 (stateOf 와 같은 모양)
-  function snapOf(g) { const st = stateOf({ game: g }); return { cash: st.cash, rep: st.rep, repCap: st.repCap, day: st.day, days: st.days, used: st.used, cap: st.cap, repairVol: st.repairVol, pushedVol: st.pushedVol, shields: st.shields, repairs: st.repairs, phase: st.phase, tier: st.tier, perks: st.perks }; }
+  // 비축: 창고에 들고 있는 트레잇 택배 — 아이콘별 개수, 많은 순 4개 (상대 읽기: "저 사람이 뭘 모으고 있나")
+  function stockOf(g) { const c = {}; for (const x of g.parcels) if (x.trait && !x.overdue) { const t = M.MULTI.TRAITS[x.trait]; if (t) { const k = t.icon + (t.kind === 'attack' ? '!' : ''); c[k] = (c[k] || 0) + 1; } } return Object.keys(c).sort((a, b) => c[b] - c[a]).slice(0, 4).map(k => ({ i: k.replace('!', ''), n: c[k], a: k.endsWith('!') })); }
+  function snapOf(g) { const st = stateOf({ game: g }); return { cash: st.cash, rep: st.rep, repCap: st.repCap, day: st.day, days: st.days, used: st.used, cap: st.cap, repairVol: st.repairVol, pushedVol: st.pushedVol, shields: st.shields, repairs: st.repairs, phase: st.phase, tier: st.tier, perks: st.perks, stock: st.stock, reflect: st.reflect }; }
+  // 조준: 사람은 카드를 탭해 고른 상대(match.aim), 아니면 **가장 꽉 찬 창고** — 봇도 같은 규칙(읽는 상대). 공격·조합 상자·보수공사가 전부 이 한 명에게 간다 (MULTIPLAYER_PILLARS: "언제·누구에게")
+  function fillOf(p) { const st = stateOf(p); return st.cap ? st.used / st.cap : 0; }
+  function aimOf(match, from) { const tg = targetsOf(match, from).filter(p => stateOf(p).alive); if (!tg.length) return null; const me = match.players.find(p => p.id === from); if (me && me.human && match.aim != null) { const a = tg.find(p => p.id === match.aim); if (a) return a; } return tg.slice().sort((a, b) => fillOf(b) - fillOf(a) || a.id - b.id)[0]; }
   // 먼저 마감한 사람이 나오면 그 순간 남들의 일차를 적어 둔다 — 남은 날 ÷ latePenaltyDiv 만큼 평판 페널티(1등 제외). 승부는 평판
   function noteFinish(match) {
     if (match.firstFinish) return;
@@ -217,6 +223,6 @@
   function fromJSON(o) { return { v: o.v, seed: o.seed, started: o.started, rng: o.rng || hash('route' + o.seed), cycleDrops: o.cycleDrops || 0, firstFinish: o.firstFinish || null, news: [], online: o.online ? Object.assign({ pending: [], results: {}, settled: null }, o.online) : null, players: o.players.map((p, i) => ({ face: FACES[i % FACES.length], ...p, game: p.game ? Game.fromJSON(p.game) : null })) }; }
 
   const MULTI = {
-    themeOf, SCENARIO, FACES, CHAR_IDS, charName, finishDump, replay, fingerprint, verify, noteFinish, penaltyOf, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
+    themeOf, SCENARIO, FACES, aimOf, fillOf, stockOf, CHAR_IDS, charName, finishDump, replay, fingerprint, verify, noteFinish, penaltyOf, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
   if (typeof module !== 'undefined') module.exports = MULTI; else root.MULTI = MULTI;
 })(typeof window !== 'undefined' ? window : globalThis);

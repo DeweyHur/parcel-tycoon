@@ -153,13 +153,16 @@ async function route(S, m, from, ev, snaps) {
   const others = m.players.filter(p => p.pid !== from && active(snaps[p.pid]));
   const repairs = m.players.reduce((n, p) => n + ((snaps[p.pid] || {}).repairs || 0), 0);
   const out = [];
+  // 조준: 보낸 사람이 고른 상대(ev.aim), 아니면 가장 꽉 찬 창고 — 공격·조합 상자·보수공사 모두 한 명에게
+  const fill = p => { const s = snaps[p.pid] || {}; return s.cap ? (s.used || 0) / s.cap : 0; };
+  const aimed = () => (ev.aim != null && others.find(p => p.pid === ev.aim)) || others.slice().sort((a, b) => fill(b) - fill(a))[0] || null;
   if (ev.type === 'attackOut') {
-    let tg = others;
-    if (ev.to != null) tg = tg.filter(t => t.pid === ev.to);   // 🪞 반사
-    if (ev.focus) { const top = others.slice().sort((a, b) => ((snaps[b.pid].rep || 0) - (snaps[a.pid].rep || 0)) || ((snaps[b.pid].cash || 0) - (snaps[a.pid].cash || 0)))[0]; tg = top ? [top] : []; }   // 🎯 는 평판 1위(승부가 평판이라)
+    let tg;
+    if (ev.to != null) tg = others.filter(t => t.pid === ev.to);   // 🪞 반사
+    else { const t = aimed(); tg = t ? [t] : []; }
     if (ev.trait === 't_repair') {
       if (repairs >= M.MULTI.REPAIR.max || !tg.length) return [{ type: 'repairFizzle', from, to: null }];
-      const t = tg[rndInt(tg.length)];
+      const t = tg[0];
       return [{ type: 'repair', from, to: [t.pid], repair: { size: ev.size || M.MULTI.REPAIR.size, days: M.MULTI.REPAIR.days, hops: 0, from } }];
     }
     for (const t of tg) out.push({ type: 'attack', from, to: [t.pid], trait: ev.trait, mult: ev.mult || 1, focus: !!ev.focus, fromName: (m.players.find(p => p.pid === from) || {}).name });
@@ -167,7 +170,7 @@ async function route(S, m, from, ev, snaps) {
   }
   if (ev.type === 'push') {   // 만차 밀어내기: 랜덤 상대 한 명
     if (!others.length) return [];
-    const list = ev.all ? others : [others[rndInt(others.length)]];   // 🔗 조합 한 방은 전원에게
+    const at = ev.dump ? null : aimed(); const list = at ? [at] : [];   // 🔗 조합 상자도 조준한 한 명에게
     return list.map(t => Object.assign({ type: 'push', from, to: [t.pid], n: Math.max(1, Math.min(4, ev.n | 0)), fromName: (m.players.find(p => p.pid === from) || {}).name }, ev.big ? { big: true } : {}));   // 🦣 4칸 상자
   }
   if (ev.type === 'repairMove') {
@@ -276,7 +279,7 @@ async function handle(S, d, ip) {
   if (op === 'status') return [200, { match: m }];
   if (op === 'push') {
     const cmds = [], t = now();
-    for (const pid in (d.snaps || {})) { if (!own.has(pid)) continue; const s = d.snaps[pid]; cmds.push(['HSET', 'ms:' + m.id, pid, JSON.stringify({ cash: +s.cash || 0, rep: +s.rep || 0, repCap: +s.repCap || 0, day: +s.day || 1, days: +s.days || 0, used: +s.used || 0, cap: +s.cap || 0, shields: +s.shields || 0, repairs: +s.repairs || 0, phase: ['play', 'over', 'win', 'market'].includes(s.phase) ? (s.phase === 'market' ? 'play' : s.phase) : 'play', tier: +s.tier || 0, perks: Array.isArray(s.perks) ? s.perks.slice(0, 20) : [], at: t })]); }
+    for (const pid in (d.snaps || {})) { if (!own.has(pid)) continue; const s = d.snaps[pid]; cmds.push(['HSET', 'ms:' + m.id, pid, JSON.stringify({ cash: +s.cash || 0, rep: +s.rep || 0, repCap: +s.repCap || 0, day: +s.day || 1, days: +s.days || 0, used: +s.used || 0, cap: +s.cap || 0, shields: +s.shields || 0, repairs: +s.repairs || 0, phase: ['play', 'over', 'win', 'market'].includes(s.phase) ? (s.phase === 'market' ? 'play' : s.phase) : 'play', tier: +s.tier || 0, perks: Array.isArray(s.perks) ? s.perks.slice(0, 20) : [], repairVol: +s.repairVol || 0, pushedVol: +s.pushedVol || 0, reflect: +s.reflect || 0, stock: Array.isArray(s.stock) ? s.stock.slice(0, 4).map(x => ({ i: String((x && x.i) || '').slice(0, 4), n: Math.max(0, Math.min(99, +(x && x.n) || 0)), a: !!(x && x.a) })) : [], at: t })]); }   // 비축·반사도 — 상대 카드가 읽힌다
     if (cmds.length) await S.call(cmds.concat([['EXPIRE', 'ms:' + m.id, TTL]]));
     const snaps = await snapshots(S, m), out = [];
     for (const ev of (d.events || []).slice(0, 50)) { if (!ev || !own.has(ev.from)) continue; out.push(...await route(S, m, ev.from, ev, snaps)); }

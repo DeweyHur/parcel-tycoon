@@ -2332,7 +2332,7 @@
       "t_pack": { "name": "Compress", "desc": "Warehouse +3 cells for 3 days" },
       "t_truck": { "name": "Bonus Truck", "desc": "Next call: +1 truck" },
       "t_return": { "name": "Send Back", "desc": "One 🏗 in my depot goes back to its sender" },
-      "t_focus": { "name": "Focus", "desc": "Next attack hits #1 only, ×3" },
+      "t_focus": { "name": "Focus", "desc": "Next attack ×3" },
       "t_deal": { "name": "Regulars", "desc": "One more rep shop" }
     },
     "FAM_RULES": {

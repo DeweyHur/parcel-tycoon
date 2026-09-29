@@ -56,6 +56,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   ok('B 화면: A 와 봇들이 스냅샷으로 보인다(일차)', snapB.aSnap >= 5 && snapB.botSnap.every(d => d >= 4), JSON.stringify(snapB));
   await B.screenshot({ path: `${OUT}/O-02-guest.png` });
   // A 가 ⏱ 독촉 트레잇 택배를 내보낸다 → 서버가 B·봇들에게 → B 는 다음 날 맞는다
+  await A.evaluate(pidB => { PT.match.aim = pidB; }, pidB);   // 공격은 한 명 — A 가 B 를 조준
   await A.evaluate(() => { const g = PT.game; g.focusNext = false; const c = g.contracts.find(x => x && /bulk/.test(x.carrier)); const si = g.contracts.indexOf(c); c.calls = Math.max(c.calls, 1); g.parcels = g.parcels.filter(p => p.type !== 'normal'); const P = g._spawnParcel({ type: 'normal', size: 2, customer: 'anon', trait: 't_hurry' }); g.parcels.push(P); g._assignCold(); PT.renderAll(); document.querySelector('#c' + si).click(); });
   await A.waitForTimeout(200); await A.evaluate(() => { const w = document.querySelector('#wait-btn'); if (!w.disabled) w.click(); }); await A.waitForTimeout(800); await idle(A);
   await B.waitForTimeout(4000);
