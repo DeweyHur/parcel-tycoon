@@ -1083,6 +1083,7 @@
 
   // ---------- play ----------
   function startPlay(o) {
+    if (game && !game.rules.multi && match) { match = null; netStop(); stopRoom(); }   // 난투를 보다가 개인 런으로 넘어가면 상대 줄·레이스가 남아 있던 것 (가을 첫 런에 마감한 넷이 보였다)
     syncNoGame();
     game.takeEvents();
     scene.sync(game, { animate: true });
@@ -1604,7 +1605,7 @@
   function pips(cells, cap, over, trucks) {
     // 칸이 많은 차(대형·통관 12~16칸)도 숫자 대신 칸으로 — 다섯 칸마다 틈을 두어 센다. 합이 길면 눈금을 가늘게(dense)
     // 두 대 이상이면 한 대가 한 줄 — 납작해져도 전부 보인다 (유저: "보낼 수 있는 양이 잘리네, 특히 트럭 두 대일 때")
-    const n = trucks || 1, dense = cap > 16 || (n === 1 && cap * n > 16);
+    const n = trucks || 1, dense = cap > 12;   // 12칸 넘는 차는 눈금을 가늘게 — 이름이 긴 계약 줄에서 16칸이 잘렸다
     const overH = over.length ? '<i class="gap"></i>' + over.slice(0, 6).map((css, i) => `<i class="over${over.length > 6 && i === 5 ? ' more' : ''}" style="background:${css}"></i>`).join('') : '';   // 넘치는 칸은 여섯까지만
     const row = t => { let h = ''; for (let k = 0; k < cap; k++) { const i = t * cap + k; if (cap > PIP_MAX && k && k % 5 === 0) h += '<i class="g5"></i>'; h += cells[i] ? `<i class="on" style="background:${cells[i]}"></i>` : '<i></i>'; }
       return h + '<b class="cab"></b>' + (t === n - 1 ? overH : ''); };   // 트럭 앞머리 — 계약 목록에서만 보인다
@@ -1614,7 +1615,7 @@
   // 계약 카드용 한 대 적재 미리보기 (호출 팝업의 '급한 순 자동 선택'과 같은 규칙)
   // 지금 한 대 부르면 얼마를 받고 얼마를 내는가. '개당 Nc' 는 버는 돈으로 읽혀서(유저 지적)
   // 받는 값·배차비·남는 값 셋을 그대로 보여 준다 — 호출 팝업의 +수입/−비용/순익과 같은 언어다.
-  const pickTrucks = (g, c) => Math.max(1, Math.min(g.simulMax(c), c.calls || 1));
+  const pickTrucks = (g, c) => Math.max(1, (g.rules.unlimitedCalls || !g.shows('calls')) ? g.simulMax(c) : Math.min(g.simulMax(c), c.calls || 1));   // 배차 무제한(난투)이면 늘 두 대 — 배차 수가 1로 남은 계약이 한 줄로 그려져 잘리던 것
   function loadPreview(g, c, elig) {
     const vcap = g.vehicleCap(c);
     const rewardOf = p => (p.reward != null ? p.reward : g.baseReward(p.type, p.baseSize));

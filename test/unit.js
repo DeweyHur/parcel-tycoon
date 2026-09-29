@@ -987,6 +987,31 @@ t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary)도 장도
   let n = 0; while (g.month === 1 && g.phase === 'play' && n++ < 30) { g.schedule = g.schedule.map(() => []); g.wait([]); }
   assert.equal(g.phase, 'play'); assert.equal(g.month, 2); assert.equal(g.debt, 0); assert.ok(g.cash < 0, '마이너스는 마이너스대로'); assert.ok(g.events.some(e => e.type === 'settle'));
 });
+t('멀티: 연 특수 물품은 내 몫이 온다 — 대형 계약을 사면 일반 일부가 대형으로(부피는 그만큼 일반을 덜어 낸다)', () => {
+  const run = own => { const g = MG(71); g.firstShopDone = true; if (own) g.contracts[g.contracts.findIndex(c => !c)] = g._makeContract('large0'); let large = 0, vol = 0; for (let d = 0; d < 26 && g.phase === 'play'; d++) { g.parcels = []; g.wait([]); if (g.repShop) g.closeRepShop(); for (const p of g.parcels) { if (p.type === 'large') large++; if (!p.pushed) vol += p.size; } } return { large, vol }; };
+  const a = run(false), b = run(true);
+  assert.equal(a.large, 0, '대형 계약이 없으면 대형은 안 온다'); assert.ok(b.large >= 12, '대형 계약이 있으면 하루 하나꼴 — ' + b.large);
+  assert.ok(Math.abs(b.vol - a.vol) <= a.vol * 0.2, '부피는 비슷하다 ' + a.vol + ' / ' + b.vol);
+});
+t('멀티: 창고를 통째로 비우는 공격은 없다 — 칸은 70% 아래로 안 줄고 · 도난은 하루 둘 · 독촉은 하루 셋', () => {
+  const g = MG(81); g.firstShopDone = true; g.schedule = g.schedule.map(() => []); g.parcels = []; const base = g.warehouse.cap;
+  for (let i = 0; i < 3; i++) g.receiveAttack({ trait: 't_seal', mult: 2, from: 9 }); g.wait([]); assert.ok(g.warehouse.cap >= Math.ceil(base * 0.7), '칸 바닥 ' + g.warehouse.cap + '/' + base);
+  for (let i = 0; i < 30; i++) g.parcels.push(g._spawnParcel({ type: 'normal', size: 2, customer: 'anon' })); g._assignCold(); g.rules.theftMult = 20; const n0 = g.parcels.length; g.wait([]); assert.ok(n0 - g.parcels.length <= 2 + 3, '하루 도난 둘(+반송 여유) — ' + (n0 - g.parcels.length));
+  for (const p of g.parcels) { p.deadline = 4; p.overdue = false; } g.receiveAttack({ trait: 't_hurry', mult: 1, from: 8 }); g.receiveAttack({ trait: 't_hurry', mult: 1, from: 7 }); g.receiveAttack({ trait: 't_hurry', mult: 1, from: 6 }); g.shields = 0; g.wait([]); assert.ok(g.parcels.filter(p => p.hurried === g.totalTurn).length <= M.MULTI.HURRY_N, '독촉은 하루 셋까지');
+});
+t('계절 이어하기: 냉동 고객이 있는데 냉동 계약이 없으면 붙인 냉동 특약으로 정말 싣는다(설비 제한에 막히던 것)', () => {
+  const carry = { cash: 700, year: 2026, warehouse: { cap: 32, cold: 8, frozen: 4, xl: 0 }, contracts: ['bulk1', 'fragile0', 'cold0', 'intl0'].map(k => ({ carrier: k, grade: D.CARRIERS[k].grade, calls: 3, enh: { cap: 0, capDelta: 0, opts: [] } })), customers: [['anon', 0], ['ice', 2]], trust: {}, growth: {}, media: { flyer: 1 }, adTickets: {} };
+  const g = new Game({ scenario: 'kr_autumn', company: 'local', perks: [], prep: false, carry, seed: 11 });
+  assert.ok(g.contracts.some(c => c && g.canHandle(c, { type: 'frozen', size: 1, attrs: ['frozen'], customs: 0 })), '냉동을 실을 계약이 있다');
+});
+t('특약이 설비 제한도 푼다 — 통관 차 + 보냉 특약 = 신선 적재 · 난투는 그 물품이 안 오면 특약을 안 판다', () => {
+  const g = MG(73); g.firstShopDone = true; const s = g.contracts.findIndex(c => !c); g.contracts[s] = g._makeContract('intl2');
+  const fresh = { type: 'fresh', size: 1, attrs: ['cold'], customs: 0 }; assert.ok(!g.canHandle(g.contracts[s], fresh));
+  assert.ok(!g._optUseful('optCold'), '냉장 계열이 없으면 신선이 안 온다 — 보냉 특약도 안 판다');
+  g.contracts[s].opts = ['optCold']; if (g.contracts[s].enh && Array.isArray(g.contracts[s].enh.opts)) g.contracts[s].enh.opts.push('optCold');
+  const it = { kind: 'enh', enh: 'optCold', price: 0, name: 'x', sold: false }; const h = MG(74); h.firstShopDone = true; const hs = h.contracts.findIndex(c => !c); h.contracts[hs] = h._makeContract('intl2'); h.repShop = { items: [it], bought: 0 }; assert.ok(h.buyRepShop(0, hs).ok);
+  assert.ok(h.contractCaps(h.contracts[hs]).includes('cold') && h.canHandle(h.contracts[hs], fresh), '보냉 특약을 단 통관 차는 신선을 싣는다');
+});
 t('멀티: 계열 규칙 — 🌅 새벽 출발 · 🧊 냉동 비축·연쇄 +2 · 🦣 4칸 상자·대형 = 만차 · 🛃 보세 0칸·통관 끝난 날 ×2 · ⚠ 무사고 평판', () => {
   const fresh = () => { const g = MG(61); g.schedule = g.schedule.map(() => []); g.parcels = []; g.repShop = null; g.firstShopDone = true; return g; };
   const add = (g, spec) => { const p = g._spawnParcel(Object.assign({ customer: 'anon' }, spec)); g.parcels.push(p); g._assignCold(); return p; };

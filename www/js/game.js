@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, finishDump: false, pushMult: 1, freshNoSpoil: false,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false, ownCargo: 0, theftMaxDay: 0,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, repairs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, repairGrow: 0, attackMult: 1,
@@ -675,6 +675,8 @@
       this.focusNext = false;
       this.say('log.traitAttack', { icon: tr.icon, name: tr.name });
     }
+    // 난투: 공격으로 줄어드는 칸의 바닥 — 제 칸(임시 증감 뺀 것)의 70% 아래로는 안 내려간다
+    capFloor() { const base = this.warehouse.cap - this.capMods.reduce((a, m) => a + m.delta, 0); return Math.ceil(base * (M.MULTI.CAP_FLOOR || 0.7)); }
     _capMod(delta, days, why) { this.capMods.push({ delta, until: this.totalTurn + days, why }); this.warehouse.cap += delta; this._assignCold(); }
     // 상대가 보낸 공격 — 큐에 쌓였다가 내가 다음 날로 넘길 때 적용된다. 마감·폐업한 창고에는 못 넣는다
     receiveAttack(a) { if (this.phase === 'over' || this.phase === 'win') return false; this._act('atk', { a: { trait: a.trait, mult: a.mult, from: a.from, fromName: a.fromName } }); this.inbox.push(a); return true; }
@@ -699,15 +701,16 @@
         else if (a.trait === 't_claim') { this.addRep(-k, MSG('why.attack', { icon: tr.icon })); detail = MSG('trait.d.claim', { n: k }); }
         else if (a.trait === 't_rat') { let n = 0; for (const p of this.parcels.filter(x => this._attrs(x).includes('cold')).slice(0, k)) { this._discardParcel(p, MSG('why.attack', { icon: tr.icon }), 1, 'discard'); n++; } detail = MSG('trait.d.rat', { n }); }
         else if (a.trait === 't_hurry') {   // ⏱ 독촉: 전부가 아니라 몇 개만 — 오늘 안에 보내야 한다(기한 1) (유저: "기한 줄이는 것도 치명적, 하나당 몇 개만 바로 보내게")
-          const n = (M.MULTI.HURRY_N || 3) * k; const cand = this.rng.shuffle(this.parcels.filter(p => !p.overdue && !p.noDeadline && p.deadline > 1)).slice(0, n);
-          for (const p of cand) { p.deadline = 1; p.hurried = this.totalTurn; } detail = MSG('trait.d.hurry', { n: cand.length }); }
+          if (this.hurryDay !== this.totalTurn) { this.hurryDay = this.totalTurn; this.hurryN = 0; } const n = Math.max(0, (M.MULTI.HURRY_N || 3) * Math.min(2, k) - this.hurryN); const cand = this.rng.shuffle(this.parcels.filter(p => !p.overdue && !p.noDeadline && p.deadline > 1)).slice(0, n);
+          for (const p of cand) { p.deadline = 1; p.hurried = this.totalTurn; } this.hurryN += cand.length;   // 하루에 독촉 받는 택배는 최대 3개(×2 한 방이면 6) — 여러 명이 쏴도 겹치지 않는다
+          detail = MSG('trait.d.hurry', { n: cand.length }); }
         else if (a.trait === 't_road') {   // 🚧 계약 하나만 막힌다(랜덤). 계약이 하나뿐이면 무효 — 전부 막히면 치명적 (유저)
           const slots = this.contracts.map((c, i) => c ? i : -1).filter(i => i >= 0);
           if (slots.length >= 2) { this.roadblockDay = this.totalTurn; this.roadblockSlot = slots[this.rng.int(slots.length)]; detail = MSG('trait.d.road', { name: this.contractName(this.contracts[this.roadblockSlot]) }); }
           else { blocked = 'void'; }
         }
         else if (a.trait === 't_refund') { const ps = this.parcels.slice().sort((x, y) => x.arrivalTurn - y.arrivalTurn).slice(0, k); for (const p of ps) this._discardParcel(p, MSG('why.attack', { icon: tr.icon }), 1, 'returned'); detail = MSG('trait.d.refund', { n: ps.length }); }
-        else if (a.trait === 't_seal') { const n = (M.MULTI.SEAL || 3) * k, on = this.capMods.find(x => x.why === 't_seal'); if (on) { on.until = this.totalTurn + M.MULTI.TEMP_DAYS; if (-on.delta < n) { this.warehouse.cap -= n + on.delta; on.delta = -n; this._assignCold(); } } else this._capMod(-n, M.MULTI.TEMP_DAYS, 't_seal'); detail = MSG('trait.d.seal', { n, d: M.MULTI.TEMP_DAYS }); }   // 🔒 봉인은 겹치지 않는다 — 걸려 있으면 기간만 새로(창고가 0 아래로 내려가던 것)
+        else if (a.trait === 't_seal') { const n = Math.min(M.MULTI.SEAL || 3, Math.max(0, this.warehouse.cap - this.capFloor())), on = this.capMods.find(x => x.why === 't_seal'); if (on) { on.until = this.totalTurn + M.MULTI.TEMP_DAYS; if (-on.delta < n) { this.warehouse.cap -= n + on.delta; on.delta = -n; this._assignCold(); } } else this._capMod(-n, M.MULTI.TEMP_DAYS, 't_seal'); detail = MSG('trait.d.seal', { n, d: M.MULTI.TEMP_DAYS }); }   // 🔒 봉인은 겹치지 않는다 — 걸려 있으면 기간만 새로(창고가 0 아래로 내려가던 것)
       }
       this.say(blocked ? 'log.attackBlocked' : 'log.attackIn', { icon: tr.icon, name: tr.name, from: a.fromName || '', detail, how: blocked ? MSG('trait.blk.' + blocked) : '' });
       this.emit('attackIn', { trait: a.trait, from: a.from, fromName: a.fromName, blocked, detail, mult: a.mult });
@@ -755,7 +758,7 @@
       const B = M.MULTI.REPAIR;
       if (b.size >= B.maxSize && b.days <= 1 && b.hops > 0) {   // 다 커진 공사판은 도착하는 순간 대공사가 된다 — 초과분 도난 판정 1회, 그 뒤 소멸
         const over = Math.max(0, this.usedVolume() + b.size - this.warehouse.cap); let stolen = 0, vol = 0;
-        for (const p of this.parcels.slice().sort((x, y) => (y.outdoor ? 1 : 0) - (x.outdoor ? 1 : 0))) { if (vol >= over) break; vol += this.storeSize(p); this.parcels.splice(this.parcels.indexOf(p), 1); this.monthStats.stolen++; this.stats.stolen++; stolen++; this.emit('stolen', { parcel: p }); this._claim(p, MSG('why.repairBlast'), 'stolen'); }
+        for (const p of this.parcels.slice().sort((x, y) => (y.outdoor ? 1 : 0) - (x.outdoor ? 1 : 0))) { if (vol >= over || (this.rules.multi && stolen >= (M.MULTI.BLAST_MAX || 2))) break; vol += this.storeSize(p); this.parcels.splice(this.parcels.indexOf(p), 1); this.monthStats.stolen++; this.stats.stolen++; stolen++; this.emit('stolen', { parcel: p }); this._claim(p, MSG('why.repairBlast'), 'stolen'); }
         if (stolen) this.addRep(-Math.min(3, stolen), MSG('why.repairBlast'));
         this.say('log.repairBlast', { n: stolen }); this.emit('repairBlast', { stolen, from: b.from });
         this._assignCold(); return { ok: true, blast: true, stolen };
@@ -1241,7 +1244,7 @@
       if (p.size < car.sizeMin || p.size > sizeMax) return false;
       // 일반 전용(대량) 차도 ⚠ 는 싣는다 — 파손 능력이 없으니 깨질 확률을 안고(breakProb). 규칙 문구 「능력 없는 업체로 보내면 파손 확률」 그대로
       if (car.onlyPlain && attrs.filter(a => D.GATING_ATTRS.includes(a) && a !== 'fragile').length) return false;
-      if (car.allowAttrs && attrs.some(a => D.GATING_ATTRS.includes(a) && !car.allowAttrs.includes(a))) return false;
+      if (car.allowAttrs && attrs.some(a => D.GATING_ATTRS.includes(a) && !car.allowAttrs.includes(a) && !caps.includes(a))) return false;   // 특약(보냉·완충)으로 붙인 능력은 설비 제한도 푼다 — 통관 차에 보냉 특약을 붙여도 신선을 못 싣던 것
       if (need && !need.some(a => attrs.includes(a))) { if (!(this.rules.normalAnywhere && !attrs.length)) return false; }   // 난투: 전문 차도 일반은 싣는다 — "파손은 싣는데 일반은 못 싣는 건 상식상 애매" (유저)
       if (attrs.includes('frozen') && !caps.includes('frozen')) return false;
       if (attrs.includes('customs') && (p.customs || 0) > 0 && !caps.includes('customs')) return false;
@@ -1449,11 +1452,13 @@
     // 평판 상점(난투): 장 매물(계약 업그레이드·새 계약·강화·광고권)에서 랜덤 3장. 시간은 안 간다 (유저: "일정 수준 평판 달성 시 상점, 랜덤 픽 3개, 내 돈으로 산다")
     // 이 강화를 붙일 수 있는 슬롯(많이 나른 계약부터) — 없으면 −1. 특약은 받는 계약, 나머지는 빈 강화 칸
     enhTarget(key) { const E = D.ENHANCEMENTS[key]; if (!E) return -1; let s = -1, max = -1; this.contracts.forEach((c, i) => { if (c && (E.kind !== 'opt' || this.optFits(key, c)) && (E.kind === 'trust' || this.enhUsed(c) < this.enhSlots(c)) && (c.delivered || 0) > max) { max = c.delivered || 0; s = i; } }); return s; }
+    // 난투: 특약은 그 속성의 물품이 실제로 올 때만 판다 — 신선은 냉장 계열이 있어야 오는데, 냉장 계약이 있으면 보냉 특약이 필요 없다
+    _optUseful(key) { const E = D.ENHANCEMENTS[key]; if (!E || E.kind !== 'opt' || !this.rules.typeFamilies) return true; return Object.keys(D.PARCEL_TYPES).some(t => (D.PARCEL_TYPES[t].attrs || []).includes(E.attr) && this.typeOpen(t) && this.contracts.some(c => c && this.optFits(key, c))); }
     _drawRepShop() {
       // 첫 상점은 트랙마다 새 계약 한 장씩 — 계열이 모두 다르다 (유저: "첫 마켓은 모두 계열이 다른 걸로")
       if (this.rules.multi && M.MULTI.TRACKS && !this.firstShopDone) { this.firstShopDone = true; const first = this._trackContractItems(); if (first.length >= 2) { if (this.rules.noMoney) for (const it of first) it.price = 0; return first; } }
       // 퍽 카드는 없다(유저: "그 이상한 퍽들도 없애고 그냥 마켓 아이템들이 평판 올라가면 뜨는 거야") — 장 매물에서 랜덤 3장. 돈이 없는 규칙이면 값 0 · 하나만 고른다
-      const goods = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill' && (it.kind !== 'enh' || this.enhTarget(it.enh) >= 0)).concat(this._traitUnlockItems())).slice(0, this.shopCards());   // 붙일 계약이 없는 강화는 안 뜬다
+      const goods = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill' && (it.kind !== 'enh' || this.enhTarget(it.enh) >= 0) && (it.kind !== 'enh' || this._optUseful(it.enh))).concat(this._traitUnlockItems())).slice(0, this.shopCards());   // 붙일 계약이 없는 강화는 안 뜬다
       if (this.rules.noMoney) for (const it of goods) it.price = 0;
       return goods;
     }
@@ -1807,6 +1812,11 @@
       const R = this.rules;
       if (R.typeTraits) specs = specs.map(sp => sp.trait ? Object.assign({}, sp, { trait: this._resolveTrait(sp) }) : sp);   // 대본의 트레잇은 '붙었다'는 표시 — 무엇이 붙는지는 물품 종류(와 내 언락)가 정한다
       if (R.contractGated) specs = specs.map(sp => { if (sp.type === 'normal') return sp; const attrs = D.PARCEL_TYPES[sp.type].attrs || []; const ok = this.typeOpen(sp.type) && this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: sp.type, size: sp.size, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)) && (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile'))); return ok ? sp : Object.assign({}, sp, { type: 'normal', attrs: null, trait: null, size: Math.min(sp.size, 2) }); });
+      // 난투: 내가 연 특수 물품은 내 몫이 더 온다 — 일반 입고 일부가 그 물품으로 바뀐다(열린 종류마다 ownCargo). 대본은 넷이 같지만 계약을 산 사람에겐 그 짐이 온다
+      // (유저: "거인을 가졌는데 거인 화물이 안 옴" — 공유 대본에서 대형은 5% 남짓이라 계약을 사도 며칠씩 빈 차였다)
+      if (R.ownCargo && R.typeFamilies) { const open = Object.keys(M.MULTI.TYPE_FAMILIES || {}).filter(t => this.typeOpen(t)); if (open.length) specs = specs.map(sp => { if (sp.type !== 'normal' || this.rng.next() >= R.ownCargo * open.length) return sp; const t = open[this.rng.int(open.length)], T0 = D.PARCEL_TYPES[t], attrs = T0.attrs || []; const fits = (T0.sizes || [1]).filter(z => this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: t, size: z, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)))); if (!fits.length) return sp; const w = {}; for (const z of fits) w[z] = (T0.sizeWeight && T0.sizeWeight[z]) || D.SIZE_WEIGHT[z] || 1; const z = +this.rng.weighted(w); this.cargoDebt = (this.cargoDebt || 0) + z - sp.size; return Object.assign({}, sp, { type: t, attrs: null, size: z, trait: null, own: true }); });
+        // 부피는 그대로 — 커진 만큼 그날(모자라면 다음 날) 일반 입고를 덜어 낸다. 대형 4칸이 오면 일반 두어 개가 안 온다
+        const kept = []; for (const sp of specs) { if (this.cargoDebt > 0 && sp.type === 'normal' && !sp.trait) { this.cargoDebt -= sp.size; continue; } kept.push(sp); } specs = kept; }
       const arrived = specs.map(s => this._spawnParcel(s));
       this.parcels.push(...arrived);
       this._assignCold();
@@ -2071,8 +2081,11 @@
       const R = this.rules, tp = this.theftProb();
       let pen = 0;
       if (tp <= 0) return 0;
+      let took = 0;   // 난투: 하루 도난 상한(theftMaxDay) — 공격으로 칸이 줄어든 날 야외가 통째로 털려 창고가 비던 것 (유저: "창고를 아예 비워버리네, 손맛을 날린다")
       for (const p of this.outdoorParcels()) {
+        if (R.theftMaxDay && took >= R.theftMaxDay) break;
         if (this.rng.next() >= tp) continue;
+        took++;
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.monthStats.stolen++; this.stats.stolen++;
         if (R.insurance && !this.insuranceUsed) { this.insuranceUsed = true; reasons.push(MSG('r.stolenInsured')); this.emit('stolen', { parcel: p }); }

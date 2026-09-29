@@ -341,7 +341,8 @@
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 보수공사으로 돌아온다)
       repStep: 6, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
-      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.8, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true,   // 1.8·+2%/일: 첫 사이클 창고 30%대 → 끝에 넘친다 (유저: "아무리 비워도 창고가 비지를 않아" — 2.6·+1% 는 첫날부터 한 번 호출 용량과 입고가 같았다)
+      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.8, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true, ownCargo: 0.12, theftMaxDay: 2,   // 연 특수 물품마다 일반 입고의 12% 가 그 물품으로
+        // 1.8·+2%/일: 첫 사이클 창고 30%대 → 끝에 넘친다 (유저: "아무리 비워도 창고가 비지를 않아" — 2.6·+1% 는 첫날부터 한 번 호출 용량과 입고가 같았다)
       finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 5개쯤(+만차 밀어내기). 전문 차도 일반을 실어 여유가 커서 2.6(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
       fuelRate: 0,                                                       // (배차비가 없으니 유가도 없다 — 값은 남겨 둔다)
       repDecides: true, finishDump: true,                                // 승부는 잔액이 아니라 **평판**. 누가 먼저 마감하면 아직 달리는 사람에겐 남은 날마다 상자가 하나씩 밀려온다 — 평판 페널티(남은 날 ÷3) 대신 물건으로 (유저: "시간 자체가 무기")
@@ -368,7 +369,7 @@
       t_focus:  { kind: 'bonus', icon: '🎯', weight: 12 },    // 다음 공격 트레잇을 1위 한 명에게만 ×3
       t_deal:   { kind: 'bonus', icon: '🛒', weight: 12 },    // 🛒 단골: 평판 상점이 한 번 더 열린다(계단과 무관)
     },
-    HURRY_N: 3, SEAL: 6, BUZZ: 2,   // 공격 세기: 독촉은 3개를 오늘 안에 · 봉인 −6칸 · 입소문 평판 +2
+    HURRY_N: 3, SEAL: 6, BUZZ: 2, CAP_FLOOR: 0.7, BLAST_MAX: 2,   // 창고는 공격으로 70% 아래로 안 줄고, 대공사는 두 개까지만 턴다 — 한 방이 창고를 비우면 손맛이 없다   // 공격 세기: 독촉은 3개를 오늘 안에 · 봉인 −6칸 · 입소문 평판 +2
     // 물품 종류마다 트레잇 [기본, 언락] — 랜덤이 아니다. 언락은 평판 상점 카드로 산다
     // 전문화 트랙(TRACKS)을 따라 묶었다 — 한 계열의 두 트레잇은 같은 성격이다 (유저: "어떤 트레잇이 주로 나오는지 보여서 어떤 전문화를 택할지")
     TYPE_TRAITS: {
