@@ -509,7 +509,7 @@
     'multi.boardEmpty': '아직 등급 판을 끝낸 사람이 없습니다',
     'multi.boardMe': '나 {r}위 / {n}명 · ELO {elo} · {rank}',
     'multi.firstNote': '{name}이/가 먼저 마감 — 나머지는 남은 날만큼 평판 −(3일에 1)',
-    'multi.repLadder': '상한까지 {n} — 닿으면 상한 +{step}, 퍽 카드 3장에서 하나',
+    'multi.repLadder': '상한까지 {n} — 닿으면 상점 {c}장 · 다음 계단 +{step}',
     'multi.tier': '평판 {n}단계',
     'multi.shopBtn': '🛒 장 보기',
     'multi.shopBtnSub': '하루 소모',
@@ -518,7 +518,13 @@
     'multi.shopClose': '장 보고 나오기 · 하루',
     'multi.pickOut': '내보낼 계약',
     'multi.trustCap': '용량 +{n}칸',
-    'multi.repShopTitle': '평판 업! 상점 — 3장',
+    'multi.repShopTitle': '평판 업! 상점 — {n}장',
+    'multi.firstShopTitle': '평판 업! 전문화 고르기',
+    'multi.bonusShopTitle': '🛒 단골! 상점 — {n}장',
+    'track.shop': '장사', 'track.atk': '공격', 'track.def': '방어',
+    'track.fx.shop': '계단 {s} · {c}장',
+    'track.fx.atk': '메아리 {p}%',
+    'track.fx.def': '🛡 {n}/일',
     'multi.perkTitle': '평판 업! 하나 골라',
     'multi.perkSub': '',
     'multi.perkStack': '×{n}',
@@ -2318,7 +2324,8 @@
       "t_pack": { "name": "압축", "desc": "창고 +3칸, 3일" },
       "t_truck": { "name": "덤 트럭", "desc": "다음 호출 트럭 +1" },
       "t_return": { "name": "되돌리기", "desc": "내 창고의 🏗 1개를 보낸 사람에게" },
-      "t_focus": { "name": "한 방", "desc": "다음 공격을 1위 한 명에게만, 효과 ×3" }
+      "t_focus": { "name": "한 방", "desc": "다음 공격을 1위 한 명에게만, 효과 ×3" },
+      "t_deal": { "name": "단골", "desc": "평판 상점 한 번 더" }
     },
     "CHARS": {
       "hangil": { "name": "한길", "desc": "트럭 한 칸 더" },

@@ -508,7 +508,7 @@
     'multi.boardEmpty': 'Nobody has finished a rated match yet',
     'multi.boardMe': 'You #{r} of {n} · ELO {elo} · {rank}',
     'multi.firstNote': '{name} finished first — everyone else loses 1 rep per 3 days left',
-    'multi.repLadder': '{n} to the cap — reach it for cap +{step} and one of three perk cards',
+    'multi.repLadder': '{n} to the cap — reach it for a {c}-card shop · next step +{step}',
     'multi.tier': 'Rep tier {n}',
     'multi.shopBtn': '🛒 Shop',
     'multi.shopBtnSub': 'costs a day',
@@ -517,7 +517,13 @@
     'multi.shopClose': 'Leave shop · 1 day',
     'multi.pickOut': 'Which contract goes',
     'multi.trustCap': 'capacity +{n}',
-    'multi.repShopTitle': 'Rep up! Shop — 3 cards',
+    'multi.repShopTitle': 'Rep up! Shop — {n} cards',
+    'multi.firstShopTitle': 'Rep up! Pick a specialty',
+    'multi.bonusShopTitle': '🛒 Regulars! Shop — {n} cards',
+    'track.shop': 'Trade', 'track.atk': 'Attack', 'track.def': 'Defense',
+    'track.fx.shop': 'step {s} · {c} cards',
+    'track.fx.atk': 'echo {p}%',
+    'track.fx.def': '🛡 {n}/day',
     'multi.perkTitle': 'Rep up! Pick one',
     'multi.perkSub': '',
     'multi.perkStack': '×{n}',
@@ -2317,7 +2323,8 @@
       "t_pack": { "name": "Compress", "desc": "Warehouse +3 cells for 3 days" },
       "t_truck": { "name": "Bonus Truck", "desc": "Next call: +1 truck" },
       "t_return": { "name": "Send Back", "desc": "One 🏗 in my depot goes back to its sender" },
-      "t_focus": { "name": "Focus", "desc": "Next attack hits #1 only, ×3" }
+      "t_focus": { "name": "Focus", "desc": "Next attack hits #1 only, ×3" },
+      "t_deal": { "name": "Regulars", "desc": "One more rep shop" }
     },
     "CHARS": {
       "hangil": { "name": "Hangil", "desc": "Trucks carry +1 cell" },

@@ -785,8 +785,11 @@
     // 시작 직후엔 카드가 하나씩 제자리에 쾅 박힌다 (효과음은 slamStrip 이 맞춰 낸다)
     if (stripSlam && Date.now() < stripSlam) el.querySelectorAll('.mp').forEach((d, i) => { d.classList.add('slam'); d.style.animationDelay = (i * 0.18) + 's'; });
     // 내가 장착한 퍽 — 아이콘으로 늘 보인다 (유저: "장착한 퍽들은 화면에 아이콘으로")
-    const pkEl = $('#mperks'); if (pkEl) { const ids = game.mperks || []; pkEl.hidden = !ids.length;
-      pkEl.innerHTML = [...new Set(ids)].map(id => { const pk = M.MULTI.PERKS[id]; const n = ids.filter(x => x === id).length; return `<a class="pk ${pk.family}" data-mperk="${id}">${pk.icon}${n > 1 ? `<small>×${n}</small>` : ''}</a>`; }).join('');
+    // 난투엔 퍽이 없다 — 그 자리에 내 전문화 트랙 레벨(🛒 장사 · ⚔ 공격 · 🛡 방어). 누르면 지금 패시브
+    const pkEl = $('#mperks'); if (pkEl) { const ids = game.mperks || [], tks = M.MULTI.TRACKS ? Object.keys(M.MULTI.TRACKS).filter(k => game.trackLv(k) > 0) : [];
+      pkEl.hidden = !ids.length && !tks.length;
+      pkEl.innerHTML = tks.map(k => `<a class="pk ${TRACK_CLS[k]}" data-track="${k}">${M.MULTI.TRACKS[k].icon}<small>${game.trackLv(k)}</small></a>`).join('') + [...new Set(ids)].map(id => { const pk = M.MULTI.PERKS[id]; const n = ids.filter(x => x === id).length; return `<a class="pk ${pk.family}" data-mperk="${id}">${pk.icon}${n > 1 ? `<small>×${n}</small>` : ''}</a>`; }).join('');
+      pkEl.querySelectorAll('[data-track]').forEach(a => a.onclick = () => { const k = a.dataset.track; SFX.click(); toast(`${M.MULTI.TRACKS[k].icon} ${T('track.' + k)} ${game.trackLv(k)} — ${trackFx(game, k, game.trackLv(k))}`, 2400); });
       pkEl.querySelectorAll('[data-mperk]').forEach(a => a.onclick = () => { const pk = M.MULTI.PERKS[a.dataset.mperk]; SFX.click(); toast(`${pk.icon} ${pk.name} — ${pk.desc}`, 2400); }); }
     const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.textContent = parts.join(' · '); }
   }
@@ -804,6 +807,7 @@
     const gap = lead > 0 ? `<em class="gap">${T('multi.raceBehind', { n: lead })}</em>` : '';
     el.innerHTML = `${ticks.join('')}${marks}<b class="fin">🏁</b>${gap}`;
     const strip = $('#multi-strip'); if (strip) el.style.top = (strip.offsetTop + strip.offsetHeight + 4) + 'px';
+    { const below = el.offsetTop + el.offsetHeight + 4 + 'px'; for (const id of ['#mperks', '#multi-status']) { const x = $(id); if (x) x.style.top = below; } }   // 트랙 칩·상태 줄은 트랙 밑 — 상대 카드가 커져서 104px 은 내 카드를 가렸다
     el.querySelectorAll('.rm').forEach(d => d.onclick = () => { const p = match.players.find(x => String(x.id) === d.dataset.id); if (p) { SFX.click(); showOpponent(p); } });
   }
   // ---------- 연출 (8장): 발사 궤적 · 피격 비네트 · 방패 · 보수공사 · 배너 ----------
@@ -933,6 +937,19 @@
   }
   // 평판 상점(난투): 평판 상한에 닿으면 랜덤 3장 — 퍽·계약·강화·광고권을 내 돈으로. 여러 장 사도 되고, 닫으면 끝(시간은 안 간다)
   // 슬롯은 자동으로 고른다(업그레이드는 그 계약, 새 계약은 빈 슬롯 → 제일 덜 나른 슬롯, 강화는 제일 많이 나른 계약) — 대화 없이 (유저: "스피드감")
+  // 전문화 트랙(🛒 장사 · ⚔ 공격 · 🛡 방어): 카드 색·아이콘, 계열이 여는 물품의 트레잇, 레벨에 따른 패시브 한 줄
+  const TRACK_CLS = { shop: 'eco', atk: 'atk', def: 'def' };
+  function trackFx(g, k, lv) {
+    const TK = M.MULTI.TRACKS[k]; if (!TK || !lv) return '';
+    if (k === 'shop') return T('track.fx.shop', { c: Math.min(TK.cardsMax, 3 + Math.floor(lv / TK.cardsPer)), s: Math.max(Math.min(TK.stepMin, g.rules.repStep), g.rules.repStep - TK.step * lv) });
+    if (k === 'atk') return T('track.fx.atk', { p: Math.round(Math.min(1, (g.rules.attackEcho || 0) + TK.echo * lv) * 100) });
+    return T('track.fx.def', { n: Math.min(TK.shieldMax, Math.ceil(lv / TK.shieldPer)) });
+  }
+  // 이 계열이 여는 물품들의 트레잇 [기본 → 언락] 아이콘
+  function familyTraits(fam) {
+    const TF = M.MULTI.TYPE_FAMILIES || {}, TT = M.MULTI.TYPE_TRAITS || {}, ic = id => (M.MULTI.TRAITS[id] || {}).icon || '';
+    return Object.keys(TF).filter(t => TF[t].includes(fam) && TT[t]).map(t => TT[t].map(ic).join('→')).join(' ');
+  }
   function showRepShop() {
     const g = game, sh = g.repShop; if (!sh) return;
     if (!sh.shown) { sh.shown = true; BGM.stinger('fanfare', 0.8); }
@@ -948,16 +965,18 @@
       return null; };
     const card = (it, i) => {
       const price = it.kind === 'contract' ? g.contractPrice(it) : it.price, can = !it.sold && g.cash >= price && !(it.kind === 'enh' && slotFor(it) < 0);   // 붙일 계약이 없는 강화는 눌리지 않는다
-      let icon, name, desc = '', fam = '', nw = '';
+      let icon, name, desc = '', fam = '', nw = '', tag = '';
       if (it.kind === 'perk') { const pk = M.MULTI.PERKS[it.perk]; icon = pk.icon; name = pk.name; desc = pk.desc; fam = 'fam-' + pk.family; nw = now(it.perk); }
-      else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier]; const from = it.switchFrom != null && g.contracts.find(c => c && c.id === it.switchFrom); icon = it.switchFrom != null ? '⬆' : '📄'; name = car.name; desc = `${from ? esc(D.CARRIERS[from.carrier].name) + ' → ' : ''}🚚 ${car.trucks}대 · ${car.cap}칸 ${(car.caps || []).map(a => D.ATTRS[a] ? D.ATTRS[a].icon : '').join('')}`; fam = 'fam-eco'; }
+      else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier]; const from = it.switchFrom != null && g.contracts.find(c => c && c.id === it.switchFrom); const tk = g.rules.multi && g.trackOf(it.carrier), TK = tk && M.MULTI.TRACKS[tk];
+        icon = TK ? TK.icon : it.switchFrom != null ? '⬆' : '📄'; name = car.name; desc = `${from ? '⬆ ' : ''}🚚 ${T('fmt.cells', { n: g.vehicleCap({ carrier: it.carrier, grade: it.grade, enh: { cap: 0, capDelta: 0 }, opts: [] }) })} ${(car.caps || []).map(a => D.ATTRS[a] ? D.ATTRS[a].icon : '').join('')}`; fam = 'fam-' + (tk ? TRACK_CLS[tk] : 'eco');
+        if (TK) { const gain = (car.tier || 0) + 1 - (from ? (D.CARRIERS[from.carrier].tier || 0) + 1 : 0), after = g.trackLv(tk) + gain; nw = familyTraits(D.familyOf(it.carrier)); tag = `${T('track.' + tk)} · ${trackFx(g, tk, after)}`; } }
       else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}` : T('mk.enhNoTarget'); }
-      else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn }); desc = `${tr.icon || ''} ${esc(tr.name || '')} — ${esc(tr.desc || '')}`; fam = tr.kind === 'attack' ? 'fam-atk' : 'fam-def'; }
+      else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn }); desc = `${tr.icon || ''} ${esc(tr.name || '')} — ${esc(tr.desc || '')}`; const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
       else if (it.kind === 'adTicket') { const A = D.AD_MEDIA[it.media]; icon = A ? A.icon : '📣'; name = it.name || T('media.ticket', { name: T('media.' + it.media) }); desc = T('media.ticketOnce'); fam = 'fam-atk'; }
       else { icon = '🎁'; name = it.name || it.kind; }
-      return `<button class="btn pkcard ${fam} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><b>${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
+      return `<button class="btn pkcard ${fam} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><b>${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${tag ? `<em>${esc(tag)}</em>` : ''}${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
     const body = `<div class="pkrow">${sh.items.map(card).join('')}</div>${g.rules.noMoney ? '' : `<div class="d" style="text-align:right;color:var(--gold)">${g.cash}c</div>`}`;
-    const m = modal(T('multi.repShopTitle'), body, [{ label: T('btn.close'), cls: 'primary', onClick: () => { g.closeRepShop(); closeModal(); game.takeEvents(); saveGame(); renderAll(); checkPhase(); } }]);
+    const m = modal(sh.bonus ? T('multi.bonusShopTitle', { n: sh.items.length }) : sh.items.every(it => it.kind === 'contract' && it.switchFrom == null && g.rules.multi && g.trackOf(it.carrier)) ? T('multi.firstShopTitle') : T('multi.repShopTitle', { n: sh.items.length }), body, [{ label: T('btn.close'), cls: 'primary', onClick: () => { g.closeRepShop(); closeModal(); game.takeEvents(); saveGame(); renderAll(); checkPhase(); } }]);
     // 새 계약인데 빈 슬롯이 없으면 무엇을 내보낼지 고른다 (유저: "빈 슬롯 없으면 교체를 고르게")
     const pickReplace = (it, i) => {
       const body = `<p style="font-size:12px;color:var(--dim)">${T('multi.pickOut')}</p>` + g.contracts.map((c, si) => c ? `<div class="card" data-s="${si}"><div class="t"><span>${esc(g.contractName(c))}${gradeBadge(c.grade)}</span></div><div class="d">${T('fmt.cells', { n: g.vehicleCap(c) })} · ${enhNames(g, c).join(' · ') || T('common.none')}</div></div>` : '').join('');
@@ -1351,7 +1370,7 @@
     const g = game, floor = g.repFloor(), cap = g.repCap(), top = g.repTier >= D.REP_TIERS.length - 1;
     // 멀티: 등급표가 아니라 사다리 — 상한에 닿으면 상한 +step, 퍽 3택1
     if (g.rules.repStep) { const band = Math.max(1, cap - floor), inBand = Math.max(0, Math.min(band, g.rep - floor));
-      modal(T('hud.rep'), `<div class="kv"><span>${T('repi.tier')}</span><span class="v">${esc(g.repTierName())} ${g.rep}/${cap}</span></div><div class="gauge rep" style="width:100%;height:14px"><i style="width:${Math.round(inBand / band * 100)}%"></i></div><div class="d">${T('multi.repLadder', { n: g.repToNext(), step: g.rules.repStep })}</div><div class="d" style="color:var(--green);margin-top:8px">${T('repi.up')}</div><div class="d" style="color:var(--red)">${T('repi.down')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]); return; }
+      modal(T('hud.rep'), `<div class="kv"><span>${T('repi.tier')}</span><span class="v">${esc(g.repTierName())} ${g.rep}/${cap}</span></div><div class="gauge rep" style="width:100%;height:14px"><i style="width:${Math.round(inBand / band * 100)}%"></i></div><div class="d">${T('multi.repLadder', { n: g.repToNext(), step: g.repStepNow(), c: g.shopCards() })}</div><div class="d" style="color:var(--green);margin-top:8px">${T('repi.up')}</div><div class="d" style="color:var(--red)">${T('repi.down')}</div>`, [{ label: T('btn.close'), onClick: closeModal }]); return; }
     const band = Math.max(1, cap - floor), inBand = Math.max(0, Math.min(band, g.rep - floor));
     const next = top ? null : D.REP_TIERS[g.repTier + 1];
     const newCust = top ? [] : g.customersAtTier(g.repTier + 1).filter(k => !g.customers[k]);

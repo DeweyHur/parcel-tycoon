@@ -987,8 +987,24 @@ t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary)도 장도
   let n = 0; while (g.month === 1 && g.phase === 'play' && n++ < 30) { g.schedule = g.schedule.map(() => []); g.wait([]); }
   assert.equal(g.phase, 'play'); assert.equal(g.month, 2); assert.equal(g.debt, 0); assert.ok(g.cash < 0, '마이너스는 마이너스대로'); assert.ok(g.events.some(e => e.type === 'settle'));
 });
+t('멀티: 전문화 트랙 — 첫 상점은 트랙마다 새 계약(계열이 다 다르다) · 계열이 물품을 연다 · 🛒 계단·카드 · ⚔ 메아리 · 🛡 매일 방패 · 🛒 단골', () => {
+  const g = MG(9); const cap0 = g.repCap(); g.addRep(99);
+  const it = g.repShop.items; assert.equal(it.length, 3); assert.ok(it.every(x => x.kind === 'contract' && x.switchFrom == null), '첫 상점은 새 계약만');
+  assert.deepEqual(it.map(x => g.trackOf(x.carrier)).sort(), ['atk', 'def', 'shop'], '트랙마다 한 장'); assert.equal(new Set(it.map(x => D.familyOf(x.carrier))).size, 3, '계열이 모두 다르다');
+  assert.ok(!g.typeOpen('produce') && !g.typeOpen('fresh'), '한길만으로는 특수 물품이 안 열린다');
+  const si = it.findIndex(x => g.trackOf(x.carrier) === 'shop'); const empty = g.contracts.findIndex(c => !c);
+  assert.ok(g.buyRepShop(si, empty).ok); assert.equal(g.trackLv('shop'), 1); assert.ok(g.typeOpen('produce') && g.typeOpen('fragile') && !g.typeOpen('fresh'), '파손 계열이 농산물·파손을 연다');
+  assert.equal(g.repStepNow(), M.MULTI.mods.repStep - 1, '🛒 계단 −1'); const c1 = g.repCap(); g.addRep(99); assert.equal(g.repCap(), c1 + M.MULTI.mods.repStep - 1, '다음 계단이 짧다'); assert.equal(g.repFloor(), c1);
+  if (g.repShop) g.closeRepShop();
+  assert.ok(g.repShop == null || g.closeRepShop());
+  const e2 = g.contracts.findIndex(c => !c); g.contracts[e2] = g._makeContract('frozen0'); assert.equal(g.trackShields(), 1); g.shields = 0; g.schedule = g.schedule.map(() => []); g.wait([]); if (g.repShop) g.closeRepShop(); assert.ok(g.shields >= 1, '🛡 매일 아침 방패');
+  const e3 = g.contracts.findIndex(c => !c); g.contracts[e3] = g._makeContract('cold0'); assert.equal(g.trackEcho(), M.MULTI.TRACKS.atk.echo, '⚔ 메아리');
+  assert.deepEqual(M.MULTI.TYPE_TRAITS.produce, ['t_buzz', 't_deal']);
+  g.repShop = null; g.openBonusShop(); assert.ok(g.repShop && g.repShop.bonus, '🛒 단골 → 상점 한 번 더'); g.openBonusShop(); assert.equal(g.pendingShops, 1, '떠 있으면 닫힌 뒤에'); g.closeRepShop(); assert.ok(g.repShop && g.repShop.bonus && !g.pendingShops);
+  assert.ok(cap0 > 0);
+});
 t('멀티: 평판 사다리 — 상한에 닿으면 상한 +6 · 등급 +1 · 평판 상점 3장(장 매물만, 값 없음) · 하나 고르면 닫힌다', () => {
-  const g = MG(9); const cap0 = g.repCap(); g.cash = 0; g.addRep(99);
+  const g = MG(9); g.firstShopDone = true; const cap0 = g.repCap(); g.cash = 0; g.addRep(99);   // 첫 상점(트랙 셋)은 아래 검사에서
   assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + 6); assert.equal(g.rep, cap0); assert.ok(g.repShop && g.repShop.items.length === 3 && !g.perkOffer);
   assert.ok(g.repShop.items.every(it => ['contract', 'enh', 'adTicket', 'media', 'mediaUp', 'traitUnlock'].includes(it.kind) && it.price === 0), '퍽·시설·충전은 없고 값도 없다(돈 없는 규칙)');
   g.addRep(99); assert.equal(g.repTier, 1, '상점이 떠 있는 동안은 또 오르지 않는다');
