@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, finishDump: false, pushMult: 1, freshNoSpoil: false,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false, ownCargo: 0, theftMaxDay: 0,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false, ownCargo: 0, maxTrucks: 0, repKeepTier: false, theftMaxDay: 0,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, repairs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, repairGrow: 0, attackMult: 1,
@@ -1159,8 +1159,10 @@
     simulMax(c) {
       if (!this.shows('simul')) return 1;
       const avail = c.calls + (this.rules.spareCall && !this.monthStats.spareUsed && c.calls <= 0 ? 1 : 0);
-      return Math.max(1, Math.min(D.MAX_TRUCKS, avail));
+      return Math.max(1, Math.min(this.maxTrucks(), avail));
     }
+    // 한 호출 최대 대수 — 자유 런은 한 대(배차를 여러 번), 난투는 두 대 (meta.js RUN · MULTI.mods maxTrucks)
+    maxTrucks() { return this.rules.maxTrucks || D.MAX_TRUCKS; }
     // 대당 배차비
     truckFee(c) {
       const R = this.rules, car = D.CARRIERS[c.carrier];
@@ -1434,7 +1436,7 @@
       if (!n || !this.shows('rep')) return 0;
       if (n < 0) this.repDropped = true;
       const before = this.rep;
-      this.rep = Math.max(0, Math.min(this.repCap(), this.rep + n));
+      this.rep = Math.max(this.rules.repKeepTier ? this.repFloor() : 0, Math.min(this.repCap(), this.rep + n));   // 난투: 올라간 계단은 안 내려간다 — 막판 폭주에 넷이 다 0 근처로 떨어져 점수가 무의미해지던 것
       const d = this.rep - before;
       if (d) this.emit('rep', { delta: d, why, rep: this.rep });
       // 멀티: 상한에 닿는 순간 등급이 오른다(정산을 기다리지 않는다) → 상한 +step, 퍽 카드 3장. 팝업은 시간을 안 쓴다
@@ -1814,7 +1816,8 @@
       if (R.contractGated) specs = specs.map(sp => { if (sp.type === 'normal') return sp; const attrs = D.PARCEL_TYPES[sp.type].attrs || []; const ok = this.typeOpen(sp.type) && this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: sp.type, size: sp.size, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)) && (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile'))); return ok ? sp : Object.assign({}, sp, { type: 'normal', attrs: null, trait: null, size: Math.min(sp.size, 2) }); });
       // 난투: 내가 연 특수 물품은 내 몫이 더 온다 — 일반 입고 일부가 그 물품으로 바뀐다(열린 종류마다 ownCargo). 대본은 넷이 같지만 계약을 산 사람에겐 그 짐이 온다
       // (유저: "거인을 가졌는데 거인 화물이 안 옴" — 공유 대본에서 대형은 5% 남짓이라 계약을 사도 며칠씩 빈 차였다)
-      if (R.ownCargo && R.typeFamilies) { const open = Object.keys(M.MULTI.TYPE_FAMILIES || {}).filter(t => this.typeOpen(t)); if (open.length) specs = specs.map(sp => { if (sp.type !== 'normal' || this.rng.next() >= R.ownCargo * open.length) return sp; const t = open[this.rng.int(open.length)], T0 = D.PARCEL_TYPES[t], attrs = T0.attrs || []; const fits = (T0.sizes || [1]).filter(z => this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: t, size: z, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)))); if (!fits.length) return sp; const w = {}; for (const z of fits) w[z] = (T0.sizeWeight && T0.sizeWeight[z]) || D.SIZE_WEIGHT[z] || 1; const z = +this.rng.weighted(w); this.cargoDebt = (this.cargoDebt || 0) + z - sp.size; return Object.assign({}, sp, { type: t, attrs: null, size: z, trait: null, own: true }); });
+      if (R.ownCargo && R.typeFamilies) { const open = Object.keys(M.MULTI.TYPE_FAMILIES || {}).filter(t => this.typeOpen(t)); if (open.length) { let frz = 0, cld = 0; specs = specs.map(sp => { if (sp.type !== 'normal' || this.rng.next() >= R.ownCargo * open.length) return sp; const t = open[this.rng.int(open.length)], T0 = D.PARCEL_TYPES[t], attrs = T0.attrs || []; const fits = (T0.sizes || [1]).filter(z => this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: t, size: z, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)))); const room = attrs.includes('frozen') ? (this.warehouse.frozen || 0) - this.parcels.filter(q => this._attrs(q).includes('frozen')).reduce((a, q) => a + q.size, 0) - frz : attrs.includes('cold') ? (this.warehouse.cold || 0) - this.coldUsed() - cld : Infinity;   // 냉동·신선은 들어갈 자리가 있을 때만 — 냉동실 4칸에 냉동이 쏟아져 즉시 폐기되던 것
+        const fit2 = fits.filter(z => z <= room); if (!fit2.length) return sp; fits.length = 0; fits.push(...fit2); const w = {}; for (const z of fits) w[z] = (T0.sizeWeight && T0.sizeWeight[z]) || D.SIZE_WEIGHT[z] || 1; const z = +this.rng.weighted(w); if (attrs.includes('frozen')) frz += z; else if (attrs.includes('cold')) cld += z; this.cargoDebt = (this.cargoDebt || 0) + z - sp.size; return Object.assign({}, sp, { type: t, attrs: null, size: z, trait: null, own: true }); }); }
         // 부피는 그대로 — 커진 만큼 그날(모자라면 다음 날) 일반 입고를 덜어 낸다. 대형 4칸이 오면 일반 두어 개가 안 온다
         const kept = []; for (const sp of specs) { if (this.cargoDebt > 0 && sp.type === 'normal' && !sp.trait) { this.cargoDebt -= sp.size; continue; } kept.push(sp); } specs = kept; }
       const arrived = specs.map(s => this._spawnParcel(s));
@@ -1885,7 +1888,7 @@
       // 차량: 부피 합에 맞는 대수. 동시 대수·남은 배차·배차비 검사
       const vcap = this.vehicleCap(c), volume = chosen.reduce((s, p) => s + p.size, 0);
       let trucks = Math.max(this.trucksNeeded(c, chosen), trucksArg || 1);
-      const maxT = this.shows('simul') ? D.MAX_TRUCKS : 1;
+      const maxT = this.shows('simul') ? this.maxTrucks() : 1;
       if (trucks > maxT) return { ok: false, msg: T('err.overTrucks', { n: maxT, cap: vcap * maxT }) };
       const avail = unlimited ? Infinity : c.calls + (useSpare ? 1 : 0);
       if (trucks > avail) return { ok: false, msg: T('err.noTrucks', { n: c.calls }) };
@@ -2573,7 +2576,7 @@
     // 그래서 강화 없이 만차로 굴려도 비용은 75% — 남는 25%를 신뢰·강화로 키우는 게 성장이다.
     // 재계약은 '가득 충전'이다 — 몇 대가 남았든 값은 같다: 계약 본래 대수 × 기본 배차비 × 절반(= 만차 수입의 25%).
     // 신뢰로 배차비가 싸져도, 한도 강화(+대)를 해도 값은 그대로다.
-    refillPrice(c) { return Math.round(Math.max(1, D.CARRIERS[c.carrier].trucks) * this.baseTruckFee(c) * D.PREPAY_RATE); }
+    refillPrice(c) { return Math.round(Math.max(1, D.CARRIERS[c.carrier].trucks) * (this.rules.callsMult || 1) * this.baseTruckFee(c) * D.PREPAY_RATE); }   // 배차가 늘면(callsMult) 충전값도 — 배차 한 번 값은 그대로
     // 실시간 계약 — 철도·해상처럼 원래 마켓에서만 팔던 계약을, 달이 끝나길 기다리지 않고 지금 웃돈을 얹어 들인다.
     // 아직 안 열린 계열(_familyOpen)은 마켓과 똑같이 안 나온다 — 진도를 건너뛰게 하지 않는다.
     realtimeContracts() {

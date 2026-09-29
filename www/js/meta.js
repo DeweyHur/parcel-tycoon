@@ -248,7 +248,9 @@
   //   겨울 다음은 나라별·다른 시나리오, 위클리 런이 이어 붙는다 (반기·한 해는 없앴다).
   // 무료판(BUILD.demo)은 FREE_RUNS(봄·여름)까지. 여름을 넘기면 본편 안내로 간다.
   const SPANS = { quarter: { months: 6, scoreMult: 1 }, half: { months: 12, scoreMult: 1.25 }, year: { months: 24, scoreMult: 1.5 } };
-  const RUN = (country, span, startMonth, icon, unlock, extra) => Object.assign({ country, span, icon, months: SPANS[span].months, mods: { calendar: country, startMonth, scoreMult: SPANS[span].scoreMult }, unlock }, extra || {});
+  // 자유 런: 배차 1.5배 — 특수 계약의 배차가 물량에 비해 적었다 (유저: "배차 횟수 자체가 적어"). 트럭 한 대 고정(maxTrucks 1)도 돌려 봤지만 하루 한 번 호출이라 처리량이 반이 되어 봇 생존 가을 30%→3%. 캠페인(봄)은 대본이 두 대를 가르치니 그대로
+  const FREE_RUN_MODS = { callsMult: 1.5 };
+  const RUN = (country, span, startMonth, icon, unlock, extra) => Object.assign({ country, span, icon, months: SPANS[span].months, mods: Object.assign({ calendar: country, startMonth, scoreMult: SPANS[span].scoreMult }, extra && extra.campaign ? {} : FREE_RUN_MODS), unlock }, extra || {});
   const SCENARIOS = {
     kr_spring: RUN('kr', 'quarter', 3,  '🌸', null, { campaign: true }),
     kr_summer: RUN('kr', 'quarter', 6,  '☔', null, { chainFrom: 'campaign', chainNext: 'kr_autumn' }),
@@ -341,7 +343,7 @@
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 보수공사으로 돌아온다)
       repStep: 6, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
-      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.8, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true, ownCargo: 0.12, theftMaxDay: 2,   // 연 특수 물품마다 일반 입고의 12% 가 그 물품으로
+      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.8, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true, ownCargo: 0.12, maxTrucks: 2, callsMult: 1, repKeepTier: true, theftMaxDay: 2,   // 연 특수 물품마다 일반 입고의 12% 가 그 물품으로
         // 1.8·+2%/일: 첫 사이클 창고 30%대 → 끝에 넘친다 (유저: "아무리 비워도 창고가 비지를 않아" — 2.6·+1% 는 첫날부터 한 번 호출 용량과 입고가 같았다)
       finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 5개쯤(+만차 밀어내기). 전문 차도 일반을 실어 여유가 커서 2.6(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
       fuelRate: 0,                                                       // (배차비가 없으니 유가도 없다 — 값은 남겨 둔다)

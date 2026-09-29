@@ -1744,9 +1744,12 @@
   // 2칸이면 두 칸이 붙은 상자, 색은 종류, 테두리는 상태. 기한 줄마다 늘어선다.
   // 평소엔 누르면 상세, 차를 부른 동안엔 누르면 싣고/빼기.
   function tileIcons(p) {
-    const a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'];
-    const list = a.map(k => D.ATTRS[k].icon);
+    // 색이 종류를 말한다 — 종류에 원래 붙은 속성(신선의 ❄, 냉동의 🧊 …)은 다시 찍지 않는다. 칸에는 **고객**이 먼저,
+    // 그다음 색으로는 안 보이는 속성만(깨지는 수입품의 ⚠ 같은 두 번째 속성) (유저: "고객 아이콘이 중요 · 2속성이면 배경에 안 나오는 아이콘을 표시")
+    const a = attrsOf(p), base = D.PARCEL_TYPES[p.type].attrs || [], cu = M.CUSTOMERS[p.customer || 'anon'];
+    const list = [];
     if (leadOn() && p.customer && p.customer !== 'anon') list.push(cu.icon);
+    for (const k of a) if (!base.includes(k)) list.push(D.ATTRS[k].icon);
     return list.slice(0, p.size);   // 칸마다 하나 — 넘치는 것은 상세에서
   }
   function parcelTile(p, s) {
@@ -1854,7 +1857,7 @@
     if (pick.sel.has(id)) { pick.sel.delete(id); SFX.cancel(); }
     else {
       // 담는 만큼 차가 붙는다 — 두 대까지. 막는 건 두 대를 넘거나 남은 배차가 모자랄 때 (서장처럼 동시 호출이 아직 안 열렸으면 한 대)
-      const maxTrucks = game.simulMax(c), hard = game.shows('simul') ? D.MAX_TRUCKS : 1;
+      const maxTrucks = game.simulMax(c), hard = game.shows('simul') ? game.maxTrucks() : 1;
       const picked = [...pick.sel].map(q => game.parcels.find(x => x.id === q)).filter(Boolean).concat([p]);
       const needT = game.packTrucks(c, picked).length;
       if (needT > maxTrucks) { toast(needT > hard ? T('call.maxSelect', { n: hard, cap: game.vehicleCap(c) * hard }) : T('err.noTrucks', { n: c.calls })); return; }
