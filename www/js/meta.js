@@ -341,7 +341,7 @@
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 보수공사으로 돌아온다)
       repStep: 6, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
-      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.8, dayArrivalsRate: 0.02, typeFamilies: true,   // 1.8·+2%/일: 첫 사이클 창고 30%대 → 끝에 넘친다 (유저: "아무리 비워도 창고가 비지를 않아" — 2.6·+1% 는 첫날부터 한 번 호출 용량과 입고가 같았다)
+      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.8, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true,   // 1.8·+2%/일: 첫 사이클 창고 30%대 → 끝에 넘친다 (유저: "아무리 비워도 창고가 비지를 않아" — 2.6·+1% 는 첫날부터 한 번 호출 용량과 입고가 같았다)
       finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 5개쯤(+만차 밀어내기). 전문 차도 일반을 실어 여유가 커서 2.6(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
       fuelRate: 0,                                                       // (배차비가 없으니 유가도 없다 — 값은 남겨 둔다)
       repDecides: true, finishDump: true,                                // 승부는 잔액이 아니라 **평판**. 누가 먼저 마감하면 아직 달리는 사람에겐 남은 날마다 상자가 하나씩 밀려온다 — 평판 페널티(남은 날 ÷3) 대신 물건으로 (유저: "시간 자체가 무기")
@@ -375,7 +375,7 @@
       fresh:   ['t_hurry', 't_road'],     // ⚔ 신선(냉장 계열): ⏱ 독촉 → 🚧 통제
       intl:    ['t_repair', 't_seal'],    // ⚔ 통관: 🏗 보수공사 → 🔒 봉인
       frozen:  ['t_shield', 't_ice'],     // 🛡 냉동: 🛡 방패 → 🧊 얼음
-      large:   ['t_pack', 't_return'],    // 🛡 대형: 📦 압축 → 🔄 되돌리기
+      large:   ['t_pack', 't_focus'],     // 🛡 대형: 📦 압축 → 🎯 한 방 (덩치로 누르는 계열이라 마지막은 압박)
       produce: ['t_buzz', 't_deal'],      // 🛒 농산물(파손 계열): ⭐ 입소문 → 🛒 단골
       // 파손(fragile)엔 트레잇이 없다 — 깨질 위험 자체가 그 물품의 성격 (유저). 일반도 없음(난투엔 긴급 자체가 없다)
     },
@@ -384,6 +384,15 @@
     TYPE_FAMILIES: { fresh: ['cold'], produce: ['fragile'], fragile: ['fragile'], frozen: ['frozen'], intl: ['intl'], large: ['large'] },
     // 전문화 트랙 셋 — 계열마다 하나. 트랙 레벨 = 그 트랙 계약마다 (1 + 등급) 의 합. 패시브는 레벨을 따라 는다 (game.js trackLv)
     // 🛒 장사: 평판 상점이 더 자주·더 넓게 · ⚔ 공격: 공격이 한 번 더(메아리) · 🛡 방어: 매일 아침 방패
+    // 계열 규칙 — 계열마다 그 계열만의 규칙 하나 (유저: "냉장/통관/냉동/대형 모두 더 전문화, 개성 있게"). 이름·설명은 locales meta.MULTI.FAM_RULES[fam]
+    // 냉장 = 템포 · 냉동 = 비축 · 대형 = 덩치 · 통관 = 지연 폭탄 · 파손 = 무사고
+    FAM_RULES: {
+      cold:    { icon: '🌅' },   // 새벽 출발: 오늘 들어온 신선만 실은 냉장 호출은 하루를 쓰지 않는다(하루 한 번)
+      frozen:  { icon: '🧊' },   // 냉동 비축: 냉동실 안 냉동품은 기한이 줄지 않는다 · 냉동 호출 만차는 연쇄 +2
+      large:   { icon: '🦣', pushSize: 4 },   // 덩치: 대형 호출의 밀어내기는 4칸 상자 · 대형 하나가 실린 트럭은 만차로 친다
+      intl:    { icon: '🛃', clearMult: 2 },   // 보세 구역: 통관 대기 짐은 0칸 · 통관 끝난 날 보내면 트레잇 ×2 (대기 중엔 트레잇이 안 사라진다)
+      fragile: { icon: '⚠', rep: 1 },       // 무사고: 파손 계열로 파손품을 기한 안에 보내면 개당 평판 +1
+    },
     TRACKS: {
       shop: { icon: '🛒', families: ['fragile'], cardsPer: 2, cardsMax: 5, step: 1, stepMin: 4 },   // 상점 카드 +1/2레벨(최대 5장) · 평판 계단 −1/레벨(최소 4)
       atk:  { icon: '⚔', families: ['cold', 'intl'], echo: 0.25 },                                 // 공격 메아리 +25%/레벨(최대 100%)

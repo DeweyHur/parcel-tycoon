@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, finishDump: false, pushMult: 1, freshNoSpoil: false,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, repairs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, repairGrow: 0, attackMult: 1,
@@ -668,7 +668,8 @@
       // 공격: 나 빼고 전원. 🎯 한 방이 걸려 있으면 1위 한 명에게 ×3
       const echo = this.trackEcho(), n = 1 + (echo && this.rng.next() < echo ? 1 : 0);   // ⚔ 공격 트랙: 메아리
       for (let i = 0; i < n; i++) {
-        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1), focus: this.focusNext, size: p.trait === 't_repair' ? M.MULTI.REPAIR.size + R.repairGrow + this.repairProgressBonus() : 0 };
+        const clr = this.clearedToday(p) ? (M.MULTI.FAM_RULES.intl.clearMult || 2) : 1;   // 🛃 통관 끝난 날: ×2
+        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1) * clr, focus: this.focusNext, size: p.trait === 't_repair' ? Math.min(M.MULTI.REPAIR.maxSize, M.MULTI.REPAIR.size + R.repairGrow + this.repairProgressBonus() + (clr > 1 ? 2 : 0)) : 0, cleared: clr > 1 };
         this.outbox.push(atk); this.emit('attackOut', atk);
       }
       this.focusNext = false;
@@ -716,6 +717,13 @@
     repairProgressBonus() { const total = this.totalDays ? this.totalDays() : 0; if (!total || !M.MULTI.REPAIR.late) return 0; return Math.floor(Math.min(1, (this.totalTurn || 0) / total) * M.MULTI.REPAIR.late); }
     // 물품 종류마다 트레잇이 정해져 있다(META.MULTI.TYPE_TRAITS: [기본, 언락]) — 언락을 산 종류는 둘 중 하나 (유저: "트레잇이 완전 랜덤이 아니라 해당 특수에 붙은 트레잇이 정해져 있으면")
     // 난투: 이 특수 물품을 여는 계열 계약이 있나 (META.MULTI.TYPE_FAMILIES) — 없으면 그 물품은 일반으로 온다
+    // 계열 규칙(난투): 이 계약의 계열이 fam 이면 그 규칙이 켜진다
+    famRule(c, fam) { return !!(this.rules.famRules && c && FAM(c.carrier) === fam && M.MULTI.FAM_RULES && M.MULTI.FAM_RULES[fam]); }
+    ownsFam(fam) { return this.rules.famRules && this.contracts.some(c => c && FAM(c.carrier) === fam); }
+    // 🌅 새벽 출발: 오늘 들어온 신선만 싣는 냉장 호출 — 하루를 안 쓴다(하루 한 번)
+    dawnReady(c, ps) { return this.famRule(c, 'cold') && this.dawnDay !== this.totalTurn && ps.length > 0 && ps.every(p => p && p.type === 'fresh' && p.arrivalTurn === this.totalTurn); }
+    // 🛃 통관이 오늘 끝난 짐(오늘 보내면 트레잇 ×2)
+    clearedToday(p) { return !!(this.rules.famRules && p && p.clearDay === this.totalTurn && !p.customs); }
     typeOpen(type) { const TF = this.rules.typeFamilies && M.MULTI && M.MULTI.TYPE_FAMILIES; const fams = TF && TF[type]; return !fams || this.contracts.some(c => c && fams.includes(FAM(c.carrier))); }
     // 전문화 트랙(🛒 장사 · ⚔ 공격 · 🛡 방어) — 계열마다 하나. 레벨 = 그 트랙 계약마다 (1 + 등급)
     trackOf(carrier) { const T = (M.MULTI && M.MULTI.TRACKS) || {}, f = FAM(carrier); for (const k in T) if (T[k].families.includes(f)) return k; return null; }
@@ -731,12 +739,12 @@
     // 상대가 만차로 밀어 넣은 택배 — 다음 날 아침 내 창고에 n 개가 더 들어온다(일반, 1~2칸, 기한 짧게)
     receivePush(x) {
       if (this.phase === 'over' || this.phase === 'win') return false;
-      this._act('push', { x: Object.assign({ n: x.n, from: x.from == null ? null : x.from, fromName: x.fromName || '' }, x.dump ? { dump: true } : {}) });
-      this.inbox.push({ push: true, n: x.n, from: x.from, fromName: x.fromName, dump: !!x.dump }); return true;
+      this._act('push', { x: Object.assign({ n: x.n, from: x.from == null ? null : x.from, fromName: x.fromName || '' }, x.dump ? { dump: true } : {}, x.big ? { big: true } : {}) });
+      this.inbox.push({ push: true, n: x.n, from: x.from, fromName: x.fromName, dump: !!x.dump, big: !!x.big }); return true;
     }
     _applyPush(x) {
       const n = Math.max(1, Math.round(x.n || 1)), ids = [];
-      for (let i = 0; i < n; i++) { const p = this._spawnParcel({ type: 'normal', size: 1 + (this.rng.next() < 0.4 ? 1 : 0), customer: 'anon' }); if (!p) continue; p.deadline = Math.min(p.deadline, 3); p.deadline0 = p.deadline0 || p.deadline; p.pushed = true; this.parcels.push(p); ids.push(p.id); }
+      for (let i = 0; i < n; i++) { const p = this._spawnParcel({ type: 'normal', size: x.big ? ((M.MULTI.FAM_RULES && M.MULTI.FAM_RULES.large.pushSize) || 4) : 1 + (this.rng.next() < 0.4 ? 1 : 0), customer: 'anon' }); if (!p) continue; p.deadline = Math.min(p.deadline, 3); p.deadline0 = p.deadline0 || p.deadline; p.pushed = true; this.parcels.push(p); ids.push(p.id); }
       this._assignCold();
       this.say(x.dump ? 'log.dumpIn' : 'log.pushIn', { from: x.fromName || '', n: ids.length });
       this.emit('pushIn', { n: ids.length, from: x.from, fromName: x.fromName, ids, dump: !!x.dump });
@@ -1251,7 +1259,7 @@
     rushMult(p) { return p && p.rush ? (p.overdue ? D.RUSH_CARGO.later : D.RUSH_CARGO.sameDay) : 1; }
     rushToday(p) { return !!(p && p.rush && !p.overdue); }
     isSpecialist(car, type) { return Array.isArray(car.specialist) ? car.specialist.includes(type) : car.specialist === type; }
-    canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)); }
+    canHandle(c, p) { return this._carrierAccepts(D.CARRIERS[c.carrier], p, this.contractCaps(c), p && p.pushed && p.size > this.contractSizeMax(c) ? this.vehicleCap(c) : this.contractSizeMax(c), this.contractNeed(c)); }   // 밀려온 큰 상자(🦣 4칸)는 차에 들어가기만 하면 싣는다
     // 이 택배를 (파손 없이) 받아 주는 계열들 — 지금 계약이 없을 때 "뭘 사면 되는지" 말해 주려고
     familiesFor(p) {
       const out = [];
@@ -1328,7 +1336,8 @@
       return this.eligibleParcels(c).length > 0;
     }
     // 창고에서 차지하는 칸. 트럭에 실을 때는 p.size 그대로다 — 공간 최적화(storeBigDelta)는 창고 적재만 줄인다
-    storeSize(p) { const d = this.rules.storeBigDelta; return d && (p.baseSize || p.size) >= 4 ? Math.max(1, p.size + d) : p.size; }
+    storeSize(p) { if (this.rules.famRules && p.customs > 0 && this.ownsFam('intl')) return 0;   // 🛃 보세 구역: 통관 대기 짐은 칸을 안 먹는다
+      const d = this.rules.storeBigDelta; return d && (p.baseSize || p.size) >= 4 ? Math.max(1, p.size + d) : p.size; }
     usedVolume() {
       let v = 0, xl = 0;
       for (const p of this.parcels) { v += this.storeSize(p); if (p.baseSize >= 7) xl++; }
@@ -1884,7 +1893,8 @@
       const lv = this.trustLevel(c);
       const specialistAll = false;
       let revenue = 0, xp = 1, special = false, onTime = 0, broken = 0, delivered = [];
-      let cert = false;
+      let cert = false, safeFragile = 0;
+      const dawn = this.dawnReady(c, chosen);   // 🌅 새벽 출발 — 싣기 전에 본다
       if (this.items.transitCert > 0 && chosen.some(p => this.breakProb(c, p) > 0)) { this.items.transitCert--; cert = true; this.say('log.transitCert'); }
       const snow = this.weatherNow() === 'snow';
       for (const p of chosen) {
@@ -1909,6 +1919,7 @@
         revenue += r;
         this.stats.deliveredByType[p.type]++;
         delivered.push(p);
+        if (!p.overdue && p.type === 'fragile' && this.famRule(c, 'fragile')) safeFragile++;   // ⚠ 무사고
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.emit('deliver', { parcel: p, reward: r });
       }
@@ -1928,14 +1939,15 @@
       revenue = Math.round(revenue * R.revenueMult);
       if (R.finalRushReward && this.month >= R.months) revenue = Math.round(revenue * (1 + R.finalRushReward));   // 멀티 퍽: 마감 폭주 보수
       const deliveredVolume = chosen.reduce((sum, p) => sum + p.size, 0);
-      const actualFill = deliveredVolume / (vcap * trucks);
+      // 🦣 덩치: 대형 하나가 실린 트럭은 만차로 친다
+      const actualFill = this.famRule(c, 'large') ? Math.min(1, chosen.reduce((s, p) => s + (p.type === 'large' ? vcap : p.size), 0) / (vcap * trucks)) : deliveredVolume / (vcap * trucks);
       const chainQualified = this.shows('chain') && actualFill >= D.LOAD_CHAIN.minFill && broken === 0;
-      this.loadChain = chainQualified ? (this.loadChain || 0) + 1 : 0;
+      this.loadChain = chainQualified ? (this.loadChain || 0) + (this.famRule(c, 'frozen') ? 2 : 1) : 0;   // 🧊 냉동 호출 만차는 연쇄 +2
       const chainLevel = Math.min(this.loadChain, D.LOAD_CHAIN.max);
       const chainMult = chainLevel >= 2 ? 1 + (chainLevel - 1) * D.LOAD_CHAIN.step : 1;
       let chainBonus = 0, pushed = 0;
       // 난투: 만차는 돈이 아니라 **밀어내기** — 연속 만차 2회째부터(1·2·3개) 상대 창고에 택배를 밀어 넣는다 (유저: "만차가 돈 올려주지 말고 일부 택배를 상대에게")
-      if (R.chainPush && chainQualified && chainLevel >= 2) { pushed = (chainLevel - 1) * (R.pushMult || 1); this.outbox.push({ type: 'push', n: pushed }); this.emit('pushOut', { n: pushed }); this.stats.pushed = (this.stats.pushed || 0) + pushed; if (chainLevel >= D.LOAD_CHAIN.max) this.loadChain = 0; }   // 최대에서 밀고 나면 처음부터
+      if (R.chainPush && chainQualified && chainLevel >= 2) { pushed = (chainLevel - 1) * (R.pushMult || 1); const big = this.famRule(c, 'large'); this.outbox.push(Object.assign({ type: 'push', n: pushed }, big ? { big: true } : {})); this.emit('pushOut', { n: pushed }); this.stats.pushed = (this.stats.pushed || 0) + pushed; if (chainLevel >= D.LOAD_CHAIN.max) this.loadChain = 0; }   // 최대에서 밀고 나면 처음부터
       if (chainMult > 1 && !R.chainPush) {
         const beforeChain = revenue;
         revenue = Math.round(revenue * chainMult);
@@ -1983,11 +1995,13 @@
       this._assignCold();
       const freezeFresh = !!this.trustPerk(c.carrier, 'freezeOnCall');
       for (const p of chosen) this._fireTrait(p);
+      if (safeFragile) this.addRep(safeFragile * (M.MULTI.FAM_RULES.fragile.rep || 1), MSG('why.famRule', { icon: M.MULTI.FAM_RULES.fragile.icon }));
       this.say('log.call', { name: this.contractName(c), count: chosen.length, revenue, delay: delay ? MSG('log.callDelay', { delay }) : '', broken: broken ? MSG('log.callBroken', { broken }) : '', refund: refunded ? MSG('log.callRefund') : '', calls: c.calls, fee });
       this.emit('call', { contract: c, count: chosen.length, revenue, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, pushed });
       this._updateTrustStats();
-      this._endTurn(false, freezeFresh);
-      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, pushed, missionUp };
+      if (dawn) { this.dawnDay = this.totalTurn; this.say('log.dawn'); this.emit('dawn', {}); }   // 🌅 하루가 안 간다 — 오늘 한 번 더 부를 수 있다
+      else this._endTurn(false, freezeFresh);
+      return { ok: true, revenue, count: chosen.length, broken, delay, trucks, fee, fill, rush, rushBonus, chain: this.loadChain, chainMult, chainBonus, pushed, missionUp, dawn };
     }
     // 직접 배송(대기 턴의 부가 행동): 고른 택배를 배송비를 내고 처리. 보상 그대로. wait()에서 호출
     selfDeliver(ids) {
@@ -2085,7 +2099,7 @@
       let pen = 0; const reasons = [];
       const discard = [], returned = [];
       // 난투: 트레잇 택배는 그날 안 보내면 사라진다(벌점 없음) — 유저: "트레잇 붙은 물품은 무조건 그날 배송 안 하면 사라지는 게 낫다"
-      if (R.traitSameDay) { const gone = this.parcels.filter(p => p.trait && !p.pushed); if (gone.length) { this.parcels = this.parcels.filter(p => !gone.includes(p)); this.say('log.traitGone', { n: gone.length }); this.emit('traitGone', { n: gone.length, ids: gone.map(p => p.id) }); } }
+      if (R.traitSameDay) { const gone = this.parcels.filter(p => p.trait && !p.pushed && !(R.famRules && p.customs > 0)); if (gone.length) { this.parcels = this.parcels.filter(p => !gone.includes(p)); this.say('log.traitGone', { n: gone.length }); this.emit('traitGone', { n: gone.length, ids: gone.map(p => p.id) }); } }
       const heat = this.isHeatTurn(), wx = this.weatherNow(), snow = wx === 'snow', wet = (wx === 'rain' || wx === 'storm') && !R.tent;
       for (const p of this.parcels) {
         p.age++;
@@ -2096,12 +2110,12 @@
         if (this._attrs(p).includes('produce') && heat && !p.inCold) { if (p.outdoor) { discard.push([p, MSG('why.heatSpoil')]); continue; } if (!this.warehouse.vent && !p.overdue && !p.noDeadline) { p.deadline -= 2; reasons.push(MSG('r.heatProduce', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); } }
         if (p.outdoor && snow) { if (isFrozen) continue; if (isCold) { p.warm = 0; if (!p.overdue) continue; } }
         // 통관 대기: 기한은 통관 뒤 시작
-        if (p.customs > 0) { if (isCold && !p.inCold) p.coldDuringCustoms = false; p.customs--; continue; }
+        if (p.customs > 0) { if (isCold && !p.inCold) p.coldDuringCustoms = false; p.customs--; if (!p.customs) p.clearDay = this.totalTurn + 1; continue; }
         // 신선: 냉장 구역 밖이면 폭염 즉시 / warmLimit턴 뒤 폐기. 안이면 기한만 진행(냉동고 퍽·냉장 L3는 기한 정지)
         if (isCold && !p.inCold && !R.freshNoSpoil) { p.warm = (p.warm || 0) + 1; if (heat || p.warm >= R.warmLimit) { discard.push([p, MSG(heat ? 'why.heatSpoil' : 'why.warmSpoil')]); continue; } }
         else if (isCold) p.warm = 0;
         if (isFrozen && !p.inFrozen) { discard.push([p, MSG('why.outsideFrozen')]); continue; }
-        const freeze = (isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer))) || (R.multi && this.freshFreezeUntil >= this.totalTurn);   // 난투 🧊 얼음: 모든 기한 정지(신선만 멈추면 너무 약하다 — 유저)
+        const freeze = (isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer))) || (R.multi && this.freshFreezeUntil >= this.totalTurn) || (isFrozen && p.inFrozen && this.ownsFam('frozen'));   // 🧊 냉동 비축: 냉동실 안은 기한 정지   // 난투 🧊 얼음: 모든 기한 정지(신선만 멈추면 너무 약하다 — 유저)
         const grace = this.returnGraceFor(p);
         // 무기한(첫 사이클)은 기한도 안 줄고 초과도 반송도 없다 — else 로 새면 바로 반송 처리로 빠진다
         if (p.noDeadline) continue;

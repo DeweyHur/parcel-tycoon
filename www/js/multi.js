@@ -69,7 +69,7 @@
         match.news.push({ type: 'attack', from: e.from, to: e.to, trait: e.trait, focus: !!e.focus, remote: true }); }
       else if (e.type === 'repair') { const t = match.players.find(p => p.id === e.to[0]); let blast = false; if (t && t.game && mine.has(t.id)) { const r = t.game.receiveRepair(Object.assign({}, e.repair, { back: !!e.back })); blast = !!(r && r.blast); }
         match.news.push({ type: 'repair', from: e.from, to: e.to, blast, back: !!e.back, drop: !!e.drop, size: e.repair && e.repair.size, remote: true }); }
-      else if (e.type === 'push') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receivePush({ n: e.n, from: e.from, fromName: nameOf(e) });
+      else if (e.type === 'push') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receivePush({ n: e.n, from: e.from, fromName: nameOf(e), big: !!e.big });
         match.news.push({ type: 'push', from: e.from, to: e.to, n: e.n, remote: true }); }
       else if (e.type === 'repairFizzle') match.news.push({ type: 'repairFizzle', from: e.from });
       else if (e.type === 'note') match.news.push({ type: 'note', from: e.from, text: e.text });
@@ -123,8 +123,8 @@
         } else if (o.type === 'push') {   // 만차 밀어내기: 랜덤 상대 한 명
           const tg = targetsOf(match, p.id); if (!tg.length) continue;
           const t = tg[Math.floor(mrand(match) * tg.length)];
-          t.game.receivePush({ n: o.n, from: p.id, fromName: p.name });
-          match.news.push({ type: 'push', from: p.id, to: [t.id], n: o.n });
+          t.game.receivePush({ n: o.n, from: p.id, fromName: p.name, big: !!o.big });
+          match.news.push({ type: 'push', from: p.id, to: [t.id], n: o.n, big: !!o.big });
         } else if (o.type === 'repairMove') {
           let t = o.to != null ? match.players.find(x => x.id === o.to && !finished(x.game)) : null;
           const tg = targetsOf(match, p.id);

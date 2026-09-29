@@ -987,6 +987,27 @@ t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary)도 장도
   let n = 0; while (g.month === 1 && g.phase === 'play' && n++ < 30) { g.schedule = g.schedule.map(() => []); g.wait([]); }
   assert.equal(g.phase, 'play'); assert.equal(g.month, 2); assert.equal(g.debt, 0); assert.ok(g.cash < 0, '마이너스는 마이너스대로'); assert.ok(g.events.some(e => e.type === 'settle'));
 });
+t('멀티: 계열 규칙 — 🌅 새벽 출발 · 🧊 냉동 비축·연쇄 +2 · 🦣 4칸 상자·대형 = 만차 · 🛃 보세 0칸·통관 끝난 날 ×2 · ⚠ 무사고 평판', () => {
+  const fresh = () => { const g = MG(61); g.schedule = g.schedule.map(() => []); g.parcels = []; g.repShop = null; g.firstShopDone = true; return g; };
+  const add = (g, spec) => { const p = g._spawnParcel(Object.assign({ customer: 'anon' }, spec)); g.parcels.push(p); g._assignCold(); return p; };
+  // 🌅 냉장: 오늘 온 신선만 → 하루가 안 간다(하루 한 번)
+  { const g = fresh(); g.contracts[1] = g._makeContract('cold0'); const a = add(g, { type: 'fresh', size: 1 }); a.arrivalTurn = g.totalTurn;
+    const day = g.totalTurn; const r = g.callCarrier(1, [a.id]); assert.ok(r.ok && r.dawn, '새벽 출발'); assert.equal(g.totalTurn, day, '하루가 안 갔다');
+    const b = add(g, { type: 'fresh', size: 1 }); b.arrivalTurn = g.totalTurn; const r2 = g.callCarrier(1, [b.id]); assert.ok(r2.ok && !r2.dawn, '하루 한 번'); assert.equal(g.totalTurn, day + 1);
+    const c = add(g, { type: 'fresh', size: 1 }); c.arrivalTurn = g.totalTurn - 1; assert.ok(!g.dawnReady(g.contracts[1], [c]), '어제 온 건 안 된다'); }
+  // 🧊 냉동: 냉동실 안 기한 정지 · 만차 연쇄 +2
+  { const g = fresh(); g.contracts[1] = g._makeContract('frozen0'); g.warehouse.frozen = Math.max(4, g.warehouse.frozen || 0); const f = add(g, { type: 'frozen', size: 1 }); assert.ok(f.inFrozen); const d0 = f.deadline; g.wait([]); assert.equal(f.deadline, d0, '냉동 비축');
+    const cap = g.vehicleCap(g.contracts[1]); const ns = []; for (let i = 0; i < cap; i++) ns.push(add(g, { type: 'normal', size: 1 })); g.loadChain = 0; g.callCarrier(1, ns.map(p => p.id), 1); assert.equal(g.loadChain, 2, '연쇄 +2'); }
+  // 🦣 대형: 대형 하나 = 트럭 만차 · 밀어내기는 4칸 상자
+  { const g = fresh(); g.contracts[1] = g._makeContract('large0'); const L = add(g, { type: 'large', size: 4 }); g.loadChain = 1; const r = g.callCarrier(1, [L.id], 1); assert.ok(r.ok); assert.equal(g.loadChain, 2, '대형 하나로 만차'); assert.ok(g.outbox.some(o => o.type === 'push' && o.big), '4칸 상자를 민다');
+    const v = fresh(); v.receivePush({ n: 1, from: 9, big: true }); v.wait([]); const box = v.parcels.find(p => p.pushed); assert.ok(box && box.size === 4); assert.ok(v.contracts.some(c => c && v.canHandle(c, box)), '4칸 차면 한길도 싣는다'); }
+  // 🛃 통관: 대기 중 0칸 · 대기 중엔 트레잇이 안 사라진다 · 끝난 날 ×2
+  { const g = fresh(); g.contracts[1] = g._makeContract('intl0'); const u0 = g.usedVolume(); const x = add(g, { type: 'intl', size: 4, trait: 't_seal' }); assert.ok(x.customs > 0); assert.equal(g.usedVolume(), u0, '보세 0칸');
+    let n = 0; while (x.customs > 0 && n++ < 5) g.wait([]); assert.ok(g.parcels.includes(x), '대기 중 트레잇 택배는 남는다'); assert.ok(g.clearedToday(x), '오늘 통관 끝');
+    g.outbox = []; g.callCarrier(1, [x.id]); const o = g.outbox.find(q => q.type === 'attackOut'); assert.ok(o && o.mult === 2 && o.cleared, '×2'); }
+  // ⚠ 파손: 파손 계열로 기한 안에 → 평판 +1
+  { const g = fresh(); g.contracts[1] = g._makeContract('fragile0'); const f = add(g, { type: 'fragile', size: 1 }); g.rep = 10; const before = g.rep; g.callCarrier(1, [f.id]); assert.ok(g.rep >= before + 1, '무사고 평판'); }
+});
 t('멀티: 전문화 트랙 — 첫 상점은 트랙마다 새 계약(계열이 다 다르다) · 계열이 물품을 연다 · 🛒 계단·카드 · ⚔ 메아리 · 🛡 매일 방패 · 🛒 단골', () => {
   const g = MG(9); const cap0 = g.repCap(); g.addRep(99);
   const it = g.repShop.items; assert.equal(it.length, 3); assert.ok(it.every(x => x.kind === 'contract' && x.switchFrom == null), '첫 상점은 새 계약만');

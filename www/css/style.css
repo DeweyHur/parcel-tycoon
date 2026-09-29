@@ -1189,3 +1189,10 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 #multi-strip .mp .mini.over { border-color: var(--red, #ff6b6b); box-shadow: 0 0 6px rgba(255,80,80,.7); }
 #multi-strip .mp .mini i.land { animation: landIn .5s cubic-bezier(.2,1.6,.4,1); }
 @keyframes landIn { 0% { transform: scale(3); filter: brightness(2.5); } 100% { transform: scale(1); filter: none; } }
+
+/* 계열 규칙(난투): 상점 카드의 규칙 이름 · 통관 끝난 날 ×2 · 새벽 출발 */
+.pkcard .frule { color: #fff; font-weight: normal; }
+.ptile .tb.x2 { box-shadow: 0 0 0 1px var(--gold, #ffd166), 0 0 8px rgba(255,209,102,.9); color: var(--gold, #ffd166); }
+.money-chip.dawn { color: #ffd9a0; margin-left: 4px; }
+.frule.dawnpick { font: inherit; font-size: 11px; color: #ffd9a0; background: #2a2236; border: 2px solid #6a5a40; padding: 1px 5px; margin-left: 4px; cursor: pointer; box-shadow: 1px 1px 0 #000; }
+.frule.dawnpick.on { border-color: var(--gold, #ffd166); color: var(--gold, #ffd166); }

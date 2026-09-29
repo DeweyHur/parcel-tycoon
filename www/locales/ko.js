@@ -519,6 +519,9 @@
     'multi.pickOut': '내보낼 계약',
     'multi.trustCap': '용량 +{n}칸',
     'multi.repShopTitle': '평판 업! 상점 — {n}장',
+    'log.dawn': '🌅 새벽 출발 — 오늘 한 번 더',
+    'why.famRule': '{icon}',
+    'call.dawn': '🌅 하루 안 씀',
     'multi.firstShopTitle': '평판 업! 전문화 고르기',
     'multi.bonusShopTitle': '🛒 단골! 상점 — {n}장',
     'track.shop': '장사', 'track.atk': '공격', 'track.def': '방어',
@@ -2326,6 +2329,13 @@
       "t_return": { "name": "되돌리기", "desc": "내 창고의 🏗 1개를 보낸 사람에게" },
       "t_focus": { "name": "한 방", "desc": "다음 공격을 1위 한 명에게만, 효과 ×3" },
       "t_deal": { "name": "단골", "desc": "평판 상점 한 번 더" }
+    },
+    "FAM_RULES": {
+      "cold": { "name": "새벽 출발", "desc": "오늘 온 신선만 실으면 하루 안 씀" },
+      "frozen": { "name": "냉동 비축", "desc": "냉동실 안은 기한 정지 · 만차 연쇄 +2" },
+      "large": { "name": "덩치", "desc": "밀어내기 4칸 상자 · 대형 1개 = 트럭 만차" },
+      "intl": { "name": "보세 구역", "desc": "통관 대기 0칸 · 통관 끝난 날 트레잇 ×2" },
+      "fragile": { "name": "무사고", "desc": "파손품 안 깨고 보내면 평판 +1" }
     },
     "CHARS": {
       "hangil": { "name": "한길", "desc": "트럭 한 칸 더" },

@@ -518,6 +518,9 @@
     'multi.pickOut': 'Which contract goes',
     'multi.trustCap': 'capacity +{n}',
     'multi.repShopTitle': 'Rep up! Shop — {n} cards',
+    'log.dawn': '🌅 Dawn run — one more call today',
+    'why.famRule': '{icon}',
+    'call.dawn': '🌅 no day used',
     'multi.firstShopTitle': 'Rep up! Pick a specialty',
     'multi.bonusShopTitle': '🛒 Regulars! Shop — {n} cards',
     'track.shop': 'Trade', 'track.atk': 'Attack', 'track.def': 'Defense',
@@ -2325,6 +2328,13 @@
       "t_return": { "name": "Send Back", "desc": "One 🏗 in my depot goes back to its sender" },
       "t_focus": { "name": "Focus", "desc": "Next attack hits #1 only, ×3" },
       "t_deal": { "name": "Regulars", "desc": "One more rep shop" }
+    },
+    "FAM_RULES": {
+      "cold": { "name": "Dawn run", "desc": "Only today's fresh aboard: no day used" },
+      "frozen": { "name": "Deep freeze", "desc": "No countdown in the freezer · full load chain +2" },
+      "large": { "name": "Heavyweight", "desc": "Pushes 4-cell crates · one large = full truck" },
+      "intl": { "name": "Bonded zone", "desc": "Customs wait takes 0 cells · traits ×2 on clearance day" },
+      "fragile": { "name": "Zero breaks", "desc": "Fragile shipped intact: rep +1 each" }
     },
     "CHARS": {
       "hangil": { "name": "Hangil", "desc": "Trucks carry +1 cell" },

@@ -969,6 +969,7 @@
       if (it.kind === 'perk') { const pk = M.MULTI.PERKS[it.perk]; icon = pk.icon; name = pk.name; desc = pk.desc; fam = 'fam-' + pk.family; nw = now(it.perk); }
       else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier]; const from = it.switchFrom != null && g.contracts.find(c => c && c.id === it.switchFrom); const tk = g.rules.multi && g.trackOf(it.carrier), TK = tk && M.MULTI.TRACKS[tk];
         icon = TK ? TK.icon : it.switchFrom != null ? '⬆' : '📄'; name = car.name; desc = `${from ? '⬆ ' : ''}🚚 ${T('fmt.cells', { n: g.vehicleCap({ carrier: it.carrier, grade: it.grade, enh: { cap: 0, capDelta: 0 }, opts: [] }) })} ${(car.caps || []).map(a => D.ATTRS[a] ? D.ATTRS[a].icon : '').join('')}`; fam = 'fam-' + (tk ? TRACK_CLS[tk] : 'eco');
+        const FR = g.rules.famRules && (M.MULTI.FAM_RULES || {})[D.familyOf(it.carrier)]; if (FR && !from) desc += `<br><b class="frule">${FR.icon} ${esc(FR.name || '')}</b><br>${esc(FR.desc || '')}`;
         if (TK) { const gain = (car.tier || 0) + 1 - (from ? (D.CARRIERS[from.carrier].tier || 0) + 1 : 0), after = g.trackLv(tk) + gain; nw = familyTraits(D.familyOf(it.carrier)); tag = `${T('track.' + tk)} · ${trackFx(g, tk, after)}`; } }
       else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}` : T('mk.enhNoTarget'); }
       else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn }); desc = `${tr.icon || ''} ${esc(tr.name || '')} — ${esc(tr.desc || '')}`; const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
@@ -1757,7 +1758,7 @@
     const ic = tileIcons(p);
     const cells = Array.from({ length: p.size }, (_, k) => `<i>${ic[k] ? `<span>${ic[k]}</span>` : ''}</i>`).join('');
     const vb = p.rush ? `<b class="vb rushb${game.rushToday(p) ? ' now' : ''}">⚡</b>` : valueTier(p) ? `<b class="vb">${valueTier(p) === 3 ? '✦' : valueTier(p) === 2 ? '◆' : '▲'}</b>` : '';
-    const tr = p.trait && M.MULTI.TRAITS[p.trait]; const tb = tr ? `<b class="tb ${tr.kind}" title="${esc(tr.name)}">${tr.kind === 'attack' ? '⚔' : ''}${tr.icon}</b>` : '';
+    const tr = p.trait && M.MULTI.TRAITS[p.trait]; const tb = tr ? `<b class="tb ${tr.kind}${game.clearedToday(p) ? ' x2' : ''}" title="${esc(tr.name)}">${tr.kind === 'attack' ? '⚔' : ''}${tr.icon}${game.clearedToday(p) ? '×2' : ''}</b>` : '';   // 🛃 통관 끝난 날: ×2
     return `<button type="button" class="${cls}${tr ? ' trait' : ''}" data-id="${p.id}" style="--c:${t.css}" title="${esc(tip)}" aria-label="${esc(tip)}">${cells}${vb}${tb}</button>`;
   }
   function renderStock(container, parcels, s) {
@@ -1919,7 +1920,7 @@
     const tbtn = '';
     // 난투(noMoney): 수익·비용·순수익 대신 평판 한 줄 — 돈은 없다, 평판만 (유저: "배차비 순수익 이런 거 다 없애고 평판 관리만")
     const repD = game.rules.noMoney ? game.repDeltaFor(selP) : 0;
-    const gauge = game.rules.noMoney ? `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip net">★<b>${repD >= 0 ? '+' : ''}${repD}</b></span></div></div>` : `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
+    const gauge = game.rules.noMoney ? `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip net">★<b>${repD >= 0 ? '+' : ''}${repD}</b></span>${game.dawnReady(c, selP) ? `<span class="money-chip dawn">${T('call.dawn')}</span>` : ''}</div></div>` : `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
     const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
     const money = `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, D.LOAD_CHAIN.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
@@ -1927,9 +1928,13 @@
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;
     let trust = '';
     if (game.shows('trust')) { const tg = game.trustGainPreview(c, selP); const maxed = !game.trustNext(c.carrier); trust = `<div class="trustline" title="${esc(T('call.trustHold'))}">${trustBar(game, c.carrier, maxed || !cm.sel.size ? 0 : tg.xp)}${trustLevels(game, c.carrier)}</div>`; }
-    head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}${tbtn ? `<span class="tbtn">${tbtn}</span>` : ''}</div>${gauge}${hint}${money}${riskLine}${trust}`;
+    const FRc = game.rules.famRules && (M.MULTI.FAM_RULES || {})[D.familyOf(c.carrier)];   // 계열 규칙 — 호출 창에서도 보이게
+    // 🌅 새벽 출발을 쓸 수 있으면 그 이름이 버튼 — 누르면 오늘 온 신선만 골라 준다
+    const dawnIds = game.famRule(c, 'cold') && game.dawnDay !== game.totalTurn ? elig.filter(p => p.type === 'fresh' && p.arrivalTurn === game.totalTurn).map(p => p.id) : [];
+    head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}${FRc ? (dawnIds.length ? ` <button type="button" class="frule dawnpick${game.dawnReady(c, selP) ? ' on' : ''}" title="${esc(FRc.desc || '')}">${FRc.icon} ${esc(FRc.name || '')}</button>` : ` <small class="frule" title="${esc(FRc.desc || '')}">${FRc.icon} ${esc(FRc.name || '')}</small>`) : ''}${tbtn ? `<span class="tbtn">${tbtn}</span>` : ''}</div>${gauge}${hint}${money}${riskLine}${trust}`;
     // 신뢰 줄은 꾹 누르면 단계표(다음 단계·효과)가 나온다
     { const tl = head.querySelector('.trustline'); if (tl) bindHold(tl, () => showContractDetail(c)); }
+    { const dp = head.querySelector('.dawnpick'); if (dp) dp.onclick = () => { SFX.click(); cm.sel = new Set(dawnIds); cm.auto = false; renderAll(); }; }
     head.hidden = false; foot.hidden = true; foot.innerHTML = '';
     // 호출은 아래 큰 버튼이 맡는다 — 카드를 누른 차 이름과 순수익·대수를 그 버튼에 적는다
     pickAction = { label: `${car.badge || '🚚'} ${T('call.btn')} · ${esc(car.short || game.contractName(c))}`, sub: cm.sel.size ? `${game.rules.noMoney ? `★${repD >= 0 ? '+' : ''}${repD}` : `${T('call.net')} ${net >= 0 ? '+' : ''}${net}c`} · ${T('fmt.trucks', { n: trucks })} · ${vol}/${cap}` : T('call.pickNone'), on: cm.sel.size ? () => { const ids = [...cm.sel]; cm.auto = true; doCall(i, ids, trucks); } : null };
@@ -1948,6 +1953,7 @@
     const r = game.callCarrier(i, ids, trucks);
     if (!r.ok) { toast(r.msg); return; }
     pendingCall = r;
+    if (r.dawn) setTimeout(() => rewardBurst(T('log.dawn'), 2), 350);
     const showChain = game.shows('chain');       // 서장에는 연속 만차가 없다 — 축하도 하지 않는다
     if (r.chain === 1 && showChain) {
       SFX.select(); rewardBurst(r.pushed ? `📦 ${r.pushed} →` : T('chain.perfect'), 1);   // 토스트 없음 — 만차는 바가 보여 준다 (유저: "쓸데없는 노티 보이지 마"). 난투는 밀어낸 개수
