@@ -15,22 +15,26 @@
   function hash(s) { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; }
   // 테마: 시드가 정한다(넷이 같다) — 폭염·성수기·장마… 시작 화면에서 알려 주고 규칙에 얹는다
   function themeOf(seed) { const T = Object.keys((M.MULTI && M.MULTI.THEMES) || {}); return T.length ? T[(seed >>> 0) % T.length] : null; }
-  function mkGame(seed, name, pid) { return new Game({ multi: true, seed, scenario: SCENARIO, company: 'local', perks: [], prep: false, companyName: name, pid, mtheme: themeOf(seed) }); }   // 준비 마켓도 없다(유저: "기본 상점은 없애달라고") — 시작 화면 → 곧장 D+1
+  function mkGame(seed, name, pid, chr) { return new Game({ multi: true, seed, scenario: SCENARIO, company: 'local', perks: [], prep: false, companyName: name, pid, mtheme: themeOf(seed), mchar: chr || null }); }   // mchar: 캐릭터 패시브(META.MULTI.CHARS)   // 준비 마켓도 없다(유저: "기본 상점은 없애달라고") — 시작 화면 → 곧장 D+1
   function alive(g) { return g.phase !== 'over'; }
   function finished(g) { return g.phase === 'over' || g.phase === 'win'; }
   // 지난 영업일 수(장 본 날 포함) — 시계가 다르니 이게 있어야 "저 사람은 벌써 끝나간다"가 읽힌다
   function dayOf(g) { return g.totalTurn || 0; }
   function totalDays(g) { let n = 0; for (let c = 1; c <= g.rules.months; c++) n += g.turns(c); return n; }
 
-  // 새 매치. names: 봇 이름 후보(locale). 사람은 players[0]
+  // 캐릭터 = 창고 성격 (META.MULTI.CHARS). 봇은 캐릭터 그 자체다 — 이름도 캐릭터 이름. o.charNames: {id → 내 언어 이름}
+  const CHAR_IDS = () => Object.keys((M.MULTI && M.MULTI.CHARS) || {});
+  function charName(id, o) { return (o && o.charNames && o.charNames[id]) || (M.MULTI.CHARS[id] && M.MULTI.CHARS[id].name) || id; }
+  // 새 매치. 사람은 players[0] — o.chr 로 캐릭터를 고른다(없으면 랜덤). 봇은 남은 캐릭터를 하나씩
   function newMatch(o) {
     const seed = o.seed != null ? o.seed : (Date.now() % 2147483647);
     const rng = new (root.Rng || require('./game.js').Rng)(hash('bots' + seed));
-    const pool = (o.botNames || ['A', 'B', 'C']).slice(); const pick = () => pool.length ? pool.splice(rng.int(pool.length), 1)[0] : 'Bot';
+    const ids = CHAR_IDS(); const chr = o.chr && ids.includes(o.chr) ? o.chr : ids.length ? ids[rng.int(ids.length)] : null;
+    const pool = rng.shuffle(ids.filter(x => x !== chr)); const pick = i => pool.length ? pool.shift() : null;
     const bots = o.bots != null ? o.bots : (M.MULTI.PLAYERS - 1);
     const faces = rng.shuffle(FACES);
-    const players = [{ id: 0, name: o.name || 'You', human: true, face: faces[0], game: mkGame(seed, o.name, 0) }];
-    for (let i = 0; i < bots; i++) players.push({ id: i + 1, name: pick(), human: false, face: faces[(i + 1) % faces.length], strat: STRATS[i % STRATS.length], speed: SPEEDS[i % SPEEDS.length], acc: 0, game: mkGame(seed, null, i + 1) });
+    const players = [{ id: 0, name: o.name || 'You', human: true, face: faces[0], chr, game: mkGame(seed, o.name, 0, chr) }];
+    for (let i = 0; i < bots; i++) { const c = pick(i); players.push({ id: i + 1, name: c ? charName(c, o) : (o.botNames || ['Bot'])[i % (o.botNames || ['Bot']).length], human: false, face: faces[(i + 1) % faces.length], chr: c, strat: STRATS[i % STRATS.length], speed: SPEEDS[i % SPEEDS.length], acc: 0, game: mkGame(seed, null, i + 1, c) }); }
     return { v: 2, seed, players, started: Date.now(), rng: hash('route' + seed), news: [], cycleDrops: 0 };
   }
   // ----- 온라인 매치 (3단계, www/api/match.js) -----
@@ -38,10 +42,10 @@
   function newOnline(sm, mypid, o) {
     const players = sm.players.map(p => {
       const me = p.pid === mypid, host = sm.players[0].pid === mypid;
-      const bn = o && o.botNames; const name = p.bot && bn && bn.length ? bn[(p.nid || 0) % bn.length] : p.name;   // 봇 이름은 내 언어로
-      const base = { id: p.pid, name, face: p.face || 'park', human: !p.bot, remote: !me && !p.bot, bot: !!p.bot, strat: p.strat, elo: p.elo, speed: p.bot ? SPEEDS[(+p.pid.replace(/\D/g, '') || 1) % SPEEDS.length] : 1, snap: null };
-      if (me) base.game = mkGame(sm.seed, o && o.name || p.name, p.pid);
-      else if (p.bot && host) base.game = mkGame(sm.seed, null, p.pid);
+      const bn = o && o.botNames; const name = p.bot ? (p.chr ? charName(p.chr, o) : bn && bn.length ? bn[(p.nid || 0) % bn.length] : p.name) : p.name;   // 봇 이름은 내 언어로(캐릭터 이름)
+      const base = { id: p.pid, name, face: p.face || 'park', chr: p.chr || null, human: !p.bot, remote: !me && !p.bot, bot: !!p.bot, strat: p.strat, elo: p.elo, speed: p.bot ? SPEEDS[(+p.pid.replace(/\D/g, '') || 1) % SPEEDS.length] : 1, snap: null };
+      if (me) base.game = mkGame(sm.seed, o && o.name || p.name, p.pid, p.chr);
+      else if (p.bot && host) base.game = mkGame(sm.seed, null, p.pid, p.chr);
       return base;
     });
     // 내 자리를 맨 앞으로 (화면은 맨 왼쪽이 나)
@@ -57,13 +61,15 @@
     for (const p of match.players) if (!p.game && res.snaps && res.snaps[p.id]) p.snap = res.snaps[p.id];
     if (res.results) on.results = res.results;
     if (res.match && res.match.settled) on.settled = res.match.settled;
+    if (res.match && res.match.firstFinish && !match.firstFinish) match.firstFinish = { id: res.match.firstFinish.pid, days: res.match.firstFinish.days || {}, at: res.match.firstFinish.at };   // 서버가 적어 둔 첫 마감 — 그때부터 내 판에 상자가 밀려온다
     const mine = new Set(owned(match));
+    const nameOf = e => { const p = match.players.find(x => x.id === e.from); return (p && p.name) || e.fromName || ''; };   // 이름은 내 언어의 것으로 (서버의 봇 이름은 캐릭터 id)
     for (const e of res.events || []) {
-      if (e.type === 'attack') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receiveAttack({ trait: e.trait, mult: e.mult, from: e.from, fromName: e.fromName });
+      if (e.type === 'attack') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receiveAttack({ trait: e.trait, mult: e.mult, from: e.from, fromName: nameOf(e) });
         match.news.push({ type: 'attack', from: e.from, to: e.to, trait: e.trait, focus: !!e.focus, remote: true }); }
       else if (e.type === 'repair') { const t = match.players.find(p => p.id === e.to[0]); let blast = false; if (t && t.game && mine.has(t.id)) { const r = t.game.receiveRepair(Object.assign({}, e.repair, { back: !!e.back })); blast = !!(r && r.blast); }
         match.news.push({ type: 'repair', from: e.from, to: e.to, blast, back: !!e.back, drop: !!e.drop, size: e.repair && e.repair.size, remote: true }); }
-      else if (e.type === 'push') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receivePush({ n: e.n, from: e.from, fromName: e.fromName });
+      else if (e.type === 'push') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receivePush({ n: e.n, from: e.from, fromName: nameOf(e) });
         match.news.push({ type: 'push', from: e.from, to: e.to, n: e.n, remote: true }); }
       else if (e.type === 'repairFizzle') match.news.push({ type: 'repairFizzle', from: e.from });
       else if (e.type === 'note') match.news.push({ type: 'note', from: e.from, text: e.text });
@@ -85,7 +91,19 @@
   function repairsInPlay(match) { return match.players.reduce((n, p) => n + stateOf(p).repairs, 0); }
   // 각 판의 outbox(공격·보수공사 이사)를 상대 인박스로. 공격은 나 빼고 전원(마감·폐업 제외), 🎯 한 방은 1위 한 명에게만.
   // 보수공사는 랜덤 상대 한 명(되돌리기는 보낸 사람) — 갈 곳이 없으면(전원 마감) 소멸. 매치당 동시 최대 REPAIR.max
+  // 먼저 마감한 사람이 있으면, 아직 달리는 판에는 남은 날마다 상자가 하나씩 밀려온다 (평판 페널티 대신 물건 — "시간 자체가 무기").
+  // 내 판(과 호스트의 봇 판)에만 넣는다 — 온라인 상대는 저마다 제 판에 넣고 로그(push)에 남긴다
+  function finishDump(match) {
+    const ff = match.firstFinish; if (!ff) return;
+    const w = match.players.find(p => p.id === ff.id);
+    for (const p of match.players) {
+      const g = p.game; if (!g || p.id === ff.id || finished(g) || !g.rules.finishDump) continue;
+      const base = ff.days[p.id] != null ? ff.days[p.id] : dayOf(g); const due = Math.max(0, dayOf(g) - base);
+      while ((p.dumped || 0) < due) { p.dumped = (p.dumped || 0) + 1; g.receivePush({ n: 1, from: ff.id, fromName: w ? w.name : '', dump: true }); match.news.push({ type: 'push', from: ff.id, to: [p.id], n: 1, dump: true }); }
+    }
+  }
   function route(match) {
+    noteFinish(match); finishDump(match);
     for (const p of match.players) {
       const g = p.game; if (!g || !g.outbox.length) continue;
       const out = g.outbox.splice(0);
@@ -181,10 +199,11 @@
     const days = {}; for (const p of match.players) if (p.id !== w.id) days[p.id] = stateOf(p).day;
     match.firstFinish = { id: w.id, days, at: Date.now() };
   }
+  // 옛 규칙(남은 날 ÷3 평판 페널티)은 finishDump 로 바뀌었다 — 이제 페널티는 늘 0. 결과 화면의 −n 칸도 자연히 안 뜬다
   function penaltyOf(match, p, st) {
     const ff = match.firstFinish; if (!ff || ff.id === p.id || ff.days[p.id] == null) return 0;
-    const div = (p.game && p.game.rules.latePenaltyDiv) || M.MULTI.mods.latePenaltyDiv || 3;
-    return Math.max(0, Math.ceil((st.days - ff.days[p.id]) / div));
+    if (M.MULTI.mods.finishDump) return 0;
+    return Math.max(0, Math.ceil((st.days - ff.days[p.id]) / 3));
   }
   function standings(match) {
     const rows = match.players.map(p => { const st = stateOf(p); const pen = penaltyOf(match, p, st); return Object.assign({ p, name: p.name, human: p.human, usage: 0, penalty: pen, repFinal: Math.max(0, st.rep - pen) }, st); });
@@ -193,10 +212,10 @@
     rows.forEach((r, i) => r.rank = i + 1);
     return rows;
   }
-  function toJSON(match) { return { v: match.v, seed: match.seed, started: match.started, rng: match.rng, cycleDrops: match.cycleDrops || 0, firstFinish: match.firstFinish || null, online: match.online || null, players: match.players.map(p => ({ id: p.id, name: p.name, human: p.human, remote: !!p.remote, bot: !!p.bot, face: p.face, strat: p.strat, speed: p.speed, snap: p.snap || null, game: p.game ? p.game.toJSON() : null })) }; }
+  function toJSON(match) { return { v: match.v, seed: match.seed, started: match.started, rng: match.rng, cycleDrops: match.cycleDrops || 0, firstFinish: match.firstFinish || null, online: match.online || null, players: match.players.map(p => ({ id: p.id, name: p.name, human: p.human, remote: !!p.remote, bot: !!p.bot, face: p.face, chr: p.chr || null, dumped: p.dumped || 0, strat: p.strat, speed: p.speed, snap: p.snap || null, game: p.game ? p.game.toJSON() : null })) }; }
   function fromJSON(o) { return { v: o.v, seed: o.seed, started: o.started, rng: o.rng || hash('route' + o.seed), cycleDrops: o.cycleDrops || 0, firstFinish: o.firstFinish || null, news: [], online: o.online ? Object.assign({ pending: [], results: {}, settled: null }, o.online) : null, players: o.players.map((p, i) => ({ face: FACES[i % FACES.length], ...p, game: p.game ? Game.fromJSON(p.game) : null })) }; }
 
   const MULTI = {
-    themeOf, SCENARIO, FACES, replay, fingerprint, verify, noteFinish, penaltyOf, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
+    themeOf, SCENARIO, FACES, CHAR_IDS, charName, finishDump, replay, fingerprint, verify, noteFinish, penaltyOf, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
   if (typeof module !== 'undefined') module.exports = MULTI; else root.MULTI = MULTI;
 })(typeof window !== 'undefined' ? window : globalThis);

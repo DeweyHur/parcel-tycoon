@@ -409,6 +409,7 @@
     'log.attackIn': 'Hit by {from}\'s {icon} {name} — {detail}',
     'log.attackBlocked': '{from}\'s {icon} {name} — {how}',
     'log.pushIn': '📦 {from} filled a truck — {n} parcels pushed into your depot',
+    'log.dumpIn': '🏁 {from} finished — +{n} box for every day left',
     'log.repairIn': '🏗 Repair crew moved in — {size} cells, moves to the next depot in {days} days (cannot be cleared)',
     'log.repairOut': '🏗 The repair crew moved on to a rival (now {size} cells)',
     'log.repairBlast': '🏗 Full renovation — {n} displaced parcels stolen',
@@ -438,6 +439,8 @@
     'multi.strat.greedy': 'Aggressive',
     'multi.strat.saver': 'Careful',
     'multi.introMe': 'Your depot',
+    'multi.chrTitle': 'Who are you today?',
+    'multi.raceBehind': '{n}d behind',
     'trait.blk.shield': '🛡 blocked',
     'trait.blk.roof': '🏠 blocked',
     'err.repairStuck': '🏗 Repair works cannot be cleared — they move to the next depot in a few days',
@@ -2315,6 +2318,14 @@
       "t_truck": { "name": "Bonus Truck", "desc": "Next call: +1 truck" },
       "t_return": { "name": "Send Back", "desc": "One 🏗 in my depot goes back to its sender" },
       "t_focus": { "name": "Focus", "desc": "Next attack hits #1 only, ×3" }
+    },
+    "CHARS": {
+      "hangil": { "name": "Hangil", "desc": "Trucks carry +1 cell" },
+      "bigshot": { "name": "Bigshot", "desc": "Full-load push ×2" },
+      "dawn": { "name": "Dawn", "desc": "Fresh never spoils" },
+      "dock": { "name": "Dock", "desc": "Depot +4 cells" },
+      "easy": { "name": "Easy", "desc": "All deadlines +1 day" },
+      "bolt": { "name": "Bolt", "desc": "My attacks ×2" }
     },
     "THEMES": {
       "spring": { "name": "Spring Day", "desc": "Nothing special — pure skill" },

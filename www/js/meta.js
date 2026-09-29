@@ -343,7 +343,7 @@
       repStep: 6, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
       sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 2.6, dayArrivalsRate: 0.01, finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 5개쯤(+만차 밀어내기). 전문 차도 일반을 실어 여유가 커서 2.6(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
       fuelRate: 0,                                                       // (배차비가 없으니 유가도 없다 — 값은 남겨 둔다)
-      repDecides: true, latePenaltyDiv: 3,                               // 승부는 잔액이 아니라 **평판**. 먼저 마감한 사람 빼고는 그때 남은 날 ÷3 만큼 평판 페널티 (유저 2026-09-26)
+      repDecides: true, finishDump: true,                                // 승부는 잔액이 아니라 **평판**. 누가 먼저 마감하면 아직 달리는 사람에겐 남은 날마다 상자가 하나씩 밀려온다 — 평판 페널티(남은 날 ÷3) 대신 물건으로 (유저: "시간 자체가 무기")
       capDelta: 4,                                                       // 시작 창고 +4칸 (열린 질문 4 — 후보값)
       marketMaxBuy: 0, upcomingTurns: 2,
       // 2단계: 트레잇·보수공사 (3장·4장). 입고의 15%→35%(일차 비례)에 트레잇, 공격 40 : 보너스 60
@@ -393,6 +393,17 @@
       fresh:   { icon: '🧊', mods: { typeShift: { fresh: 12, produce: 8 } } },
       fragile: { icon: '⚠', mods: { typeShift: { fragile: 14 }, breakMult: 1.5 } },
       thief:   { icon: '🕵', mods: { theftMult: 2 } },
+    },
+    // 캐릭터 = 창고 성격. 넷이 같은 창고를 돌리면 "나"가 없다 — 사람은 고르고, 봇은 남은 것을 하나씩 받는다 (봇 이름 = 캐릭터 이름).
+    // 패시브 하나씩, 규칙에 얹는다 (game.js cfg.mchar). 이름·설명은 locales meta.MULTI.CHARS[id]
+    // 유저: "큰손은 밀어내기 ×2, 새벽은 신선이 안 상함, 도크는 트럭 한 대 더, 느긋은 기한 +1"
+    CHARS: {
+      hangil:  { icon: '🚚', mods: { carrierCapDelta: { bulk: 1, cold: 1, fragile: 1 } } },   // 한길: 트럭 한 칸 더
+      bigshot: { icon: '💰', mods: { pushMult: 2 } },                                            // 큰손: 만차 밀어내기 ×2
+      dawn:    { icon: '🌙', mods: { freshNoSpoil: true } },                                     // 새벽: 신선이 안 상함
+      dock:    { icon: '🏗', mods: { capDelta: 4 } },                                            // 도크: 창고 +4칸 (배차 무제한이라 '트럭 한 대 더'는 창고로)
+      easy:    { icon: '🐢', mods: { deadlineAll: 1 } },                                         // 느긋: 모든 기한 +1
+      bolt:    { icon: '⚡', mods: { attackMult: 2 } },                                          // 번개: 내 공격 트레잇 효과 ×2 (대본은 넷이 같으니 확률이 아니라 위력으로)
     },
     PERKS: {
       // 🚚 운영 — 돈이 점수가 아니니(배차비 없음·평판 승부) 배차 횟수와 평판으로 (옛 경제 퍽: 배차비·보수·현금은 뺐다)

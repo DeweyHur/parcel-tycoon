@@ -127,9 +127,9 @@
     m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort'), showTitle); return; }   /* 취소하면 타이틀로 — closeModal 만 하면 뒤에 판이 없어 까만 화면이 남았다 */ showScenarioSelect(); };
     // 인수인계는 캠페인으로 강제된다 — 끝낸 뒤 타이틀에는 다시 보이지 않는다
     const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
-    m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); startMulti(); };
-    const iv = m.querySelector('#t-invite'); if (iv) iv.onclick = () => { SFX.resume(); SFX.select(); showInvite(); };
-    const on = m.querySelector('#t-online'); if (on) on.onclick = () => { SFX.resume(); SFX.select(); showQueue(); };
+    m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); showCharPick(startMulti); };
+    const iv = m.querySelector('#t-invite'); if (iv) iv.onclick = () => { SFX.resume(); SFX.select(); showCharPick(showInvite); };
+    const on = m.querySelector('#t-online'); if (on) on.onclick = () => { SFX.resume(); SFX.select(); showCharPick(showQueue); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex(companiesHidden() ? 'carriers' : 'companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
@@ -567,10 +567,18 @@
 
   // ---------- 멀티 「난투」 (docs/MULTIPLAYER_DESIGN.md · js/multi.js) ----------
   // 1단계: 봇 3명과 로컬 매치. 서버·매칭·트레잇·보수공사는 다음 단계 — 여기서는 규칙 셋(장 하루 소모·배차 무제한·즉시 결제·퍽 3택1)과 상대 줄만
-  function startMulti() {
+  // 캐릭터 고르기 — 난투(로컬·온라인·초대) 들어가기 전에 한 번. 6장 중 한 장, 고르는 순간 "이번 판은 이렇게 간다"가 생긴다 (유저: "캐릭터 = 창고 성격")
+  const charNames = () => { const o = {}; for (const id of MULTI.CHAR_IDS()) o[id] = M.MULTI.CHARS[id].name || id; return o; };
+  function showCharPick(done) {
+    const P = Profile.get(), last = P.multi && P.multi.chr;
+    const cards = MULTI.CHAR_IDS().map(id => { const c = M.MULTI.CHARS[id]; return `<button class="btn pkcard chr ${id === last ? 'last' : ''}" data-id="${id}"><span class="ic">${c.icon}</span><b>${esc(c.name || id)}</b><small>${esc(c.desc || '')}</small></button>`; }).join('');
+    const m = modal(T('multi.chrTitle'), `<div class="pkrow chrgrid">${cards}</div>`, [{ label: T('btn.cancel'), onClick: showTitle }]);
+    m.querySelectorAll('.pkcard').forEach(b => b.onclick = () => { SFX.select(); P.multi = Object.assign(P.multi || {}, { chr: b.dataset.id }); Profile.save(); closeModal(); done(b.dataset.id); });
+  }
+  function startMulti(chr) {
     netStop();
     const nm = (Profile.get().campaign || {}).name || T('lv.nameDefault');
-    match = MULTI.newMatch({ name: nm, botNames: T('multi.botNames').split('·') });
+    match = MULTI.newMatch({ name: nm, chr: chr || (Profile.get().multi || {}).chr, charNames: charNames(), botNames: T('multi.botNames').split('·') });
     game = match.players[0].game; lastRank = myRank();
     closeModal(); showMatchIntro(() => { startPlay(); slamStrip(); });
   }
@@ -578,13 +586,16 @@
   function showMatchIntro(done) {
     const old = document.getElementById('mintro'); if (old) old.remove();
     const on = match.online, P = Profile.get();
-    const sub = p => { if (p.id === ME()) return on && P.multi && P.multi.rank != null ? T('multi.rankName.' + P.multi.rank) : T('multi.introMe');
-      if (p.bot || !p.human) return T('multi.strat.' + (p.strat || 'balanced'));
-      return p.elo != null ? `${T('multi.rankName.' + M.MULTI.RANKS[Math.max(0, Math.min(M.MULTI.RANKS.length - 1, Math.floor((p.elo - M.MULTI.ELO_START) / M.MULTI.ELO_STEP)))])} · ${p.elo}` : ''; };
+    // 카드 밑줄: 캐릭터 패시브 한 줄 (사람이면 등급도) — 봇은 캐릭터 그 자체라 성향 대신 능력이 붙는다
+    const chrLine = p => { const c = p.chr && M.MULTI.CHARS[p.chr]; return c ? `${c.icon} ${esc(c.desc || c.name || p.chr)}` : ''; };
+    const sub = p => { const cl = chrLine(p);
+      if (p.id === ME()) { const r = on && P.multi && P.multi.rank != null ? T('multi.rankName.' + P.multi.rank) : ''; return cl ? (r ? `${r} · ${cl}` : cl) : (r || T('multi.introMe')); }
+      if (p.bot || !p.human) return cl || T('multi.strat.' + (p.strat || 'balanced'));
+      const r = p.elo != null ? `${T('multi.rankName.' + M.MULTI.RANKS[Math.max(0, Math.min(M.MULTI.RANKS.length - 1, Math.floor((p.elo - M.MULTI.ELO_START) / M.MULTI.ELO_STEP)))])} · ${p.elo}` : ''; return cl ? (r ? `${r} · ${cl}` : cl) : r; };
     const layer = document.createElement('div'); layer.id = 'mintro';
     const th = game && game.cfg.mtheme && M.MULTI.THEMES[game.cfg.mtheme];
     const themeHtml = th ? `<div class="theme"><span class="tic">${th.icon}</span><b>${esc(th.name || game.cfg.mtheme)}</b><small>${esc(th.desc || '')}</small></div>` : '';
-    layer.innerHTML = `<div class="ttl">⚔ ${esc(T('multi.introTitle'))}</div>${themeHtml}<div class="grid">${match.players.map((p, i) => `<div class="ic ${p.id === ME() ? 'me' : ''}" style="animation-delay:${0.25 + i * 0.38}s"><img src="${window.Story ? Story.sprite(p.face === 'park' ? 'park' : p.face, p.id === ME() ? 'smile' : 'neutral') : ''}" alt=""><b>${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span>${esc(sub(p))}</span></div>`).join('')}<div class="vs">VS</div></div><div class="tap">${esc(T('multi.introTap'))}</div>`;
+    layer.innerHTML = `<div class="ttl">⚔ ${esc(T('multi.introTitle'))}</div>${themeHtml}<div class="grid">${match.players.map((p, i) => `<div class="ic ${p.id === ME() ? 'me' : ''}" style="animation-delay:${0.25 + i * 0.38}s"><img src="${window.Story ? Story.sprite(p.face === 'park' ? 'park' : p.face, p.id === ME() ? 'smile' : 'neutral') : ''}" alt=""><b>${p.chr && M.MULTI.CHARS[p.chr] ? `${M.MULTI.CHARS[p.chr].icon} ` : ''}${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span>${sub(p)}</span></div>`).join('')}<div class="vs">VS</div></div><div class="tap">${esc(T('multi.introTap'))}</div>`;
     document.body.appendChild(layer);
     const timers = match.players.map((p, i) => setTimeout(() => { SFX.thud(); if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { /* no-op */ } }, 250 + i * 380 + 220));
     let over = false;
@@ -600,8 +611,8 @@
   // ---------- 온라인 난투 (3단계, www/api/match.js · js/net.js) ----------
   // 큐: 2초마다 서버에 묻는다. 같은 등급 ±1 → 30초 뒤 ±2 → 60초 뒤 봇 채움(서버가 정한다). 매치가 잡히면 서버 시드로 내 판을 만든다
   let queueTimer = null, netTimer = null, netBusy = false;
-  function showQueue() {
-    const P = Profile.get(), nm = (P.campaign || {}).name || T('lv.nameDefault'), face = MULTI.FACES[Math.floor(Math.random() * MULTI.FACES.length)];
+  function showQueue(chr) {
+    const P = Profile.get(), nm = (P.campaign || {}).name || T('lv.nameDefault'), face = MULTI.FACES[Math.floor(Math.random() * MULTI.FACES.length)]; chr = chr || (P.multi || {}).chr;
     const render = st => {
       const line = !st ? T('multi.qConnecting') : st.error ? T('multi.qError') : T('multi.qWaiting', { n: st.inQueue || 1, s: st.waited || 0 });
       const rk = st && st.rank ? `<div class="d" style="text-align:center">${esc(T('multi.rankName.' + st.rank))} · ELO ${st.elo}</div>` : '';
@@ -611,7 +622,7 @@
     const stopQueue = () => { if (queueTimer) clearInterval(queueTimer); queueTimer = null; };
     render(null);
     const ask = async () => {
-      const st = await NET.queue(P.pid, nm, face);
+      const st = await NET.queue(P.pid, nm, face, chr);
       if (!queueTimer) return;
       if (st && st.status === 'ready') { stopQueue(); if (st.match.players.length) { P.multi = Object.assign(P.multi || {}, { elo: (st.match.players.find(x => x.pid === P.pid) || {}).elo, rank: null }); Profile.save(); } startOnline(st.match, nm); return; }
       render(st || { error: true });
@@ -621,20 +632,20 @@
   // ----- 친구 초대 (4단계): 코드 6자 · 2~4명 · 남은 자리는 봇 · ELO 미반영 -----
   let roomTimer = null;
   const stopRoom = () => { if (roomTimer) clearInterval(roomTimer); roomTimer = null; };
-  function showInvite() {
+  function showInvite(chr) {
     const body = `<div class="qwait"><p>${T('multi.invSub')}</p><div class="pkrow"><button class="btn gold" id="inv-make">${T('multi.invMake')}</button><button class="btn" id="inv-join">${T('multi.invJoin')}</button></div><div id="inv-in" hidden style="margin-top:8px"><input id="inv-code" maxlength="6" placeholder="ABC123" style="width:8em;text-transform:uppercase;font:inherit;padding:6px;text-align:center"> <button class="btn small primary" id="inv-go">${T('multi.invGo')}</button><div class="d" id="inv-err" style="color:var(--red)"></div></div></div>`;
     const m = modal(T('title.invite'), body, [{ label: T('btn.cancel'), onClick: showTitle }]);
-    const P = Profile.get(), nm = (P.campaign || {}).name || T('lv.nameDefault'), face = MULTI.FACES[Math.floor(Math.random() * MULTI.FACES.length)];
-    m.querySelector('#inv-make').onclick = async () => { SFX.click(); const r = await NET.invite(P.pid, nm, face); if (!r || r.error) return toast(T('multi.qError')); showRoom(r.code, nm, face); };
+    const P = Profile.get(), nm = (P.campaign || {}).name || T('lv.nameDefault'), face = MULTI.FACES[Math.floor(Math.random() * MULTI.FACES.length)]; chr = chr || (P.multi || {}).chr;
+    m.querySelector('#inv-make').onclick = async () => { SFX.click(); const r = await NET.invite(P.pid, nm, face, chr); if (!r || r.error) return toast(T('multi.qError')); showRoom(r.code, nm, face); };
     m.querySelector('#inv-join').onclick = () => { SFX.click(); m.querySelector('#inv-in').hidden = false; m.querySelector('#inv-code').focus(); };
-    m.querySelector('#inv-go').onclick = async () => { const code = m.querySelector('#inv-code').value.trim().toUpperCase(); if (!/^[A-Z2-9]{6}$/.test(code)) { m.querySelector('#inv-err').textContent = T('multi.invBadCode'); return; } SFX.click(); const r = await NET.join(P.pid, nm, face, code); if (!r || r.error) { m.querySelector('#inv-err').textContent = T(r && r.error === 'full' ? 'multi.invFull' : r && r.error === 'started' ? 'multi.invStarted' : 'multi.invNoRoom'); return; } showRoom(code, nm, face); };
+    m.querySelector('#inv-go').onclick = async () => { const code = m.querySelector('#inv-code').value.trim().toUpperCase(); if (!/^[A-Z2-9]{6}$/.test(code)) { m.querySelector('#inv-err').textContent = T('multi.invBadCode'); return; } SFX.click(); const r = await NET.join(P.pid, nm, face, code, chr); if (!r || r.error) { m.querySelector('#inv-err').textContent = T(r && r.error === 'full' ? 'multi.invFull' : r && r.error === 'started' ? 'multi.invStarted' : 'multi.invNoRoom'); return; } showRoom(code, nm, face); };
   }
   function showRoom(code, nm, face) {
     const P = Profile.get();
     const render = st => {
       if (!st || st.status === 'gone') { stopRoom(); modal(T('title.invite'), `<div class="qwait"><p>${T('multi.invGone')}</p></div>`, [{ label: T('btn.close'), onClick: showTitle }]); return; }
       const host = st.host === P.pid;
-      const rows = st.players.map(p => `<div class="mrow"><span class="nm"><img class="face" src="${window.Story ? Story.sprite(p.face, 'neutral') : ''}" style="width:24px;height:24px;image-rendering:pixelated;vertical-align:middle;margin-right:6px">${esc(p.me ? T('multi.you') : p.name)}${p.pid === st.host ? ` <small style="color:var(--gold)">${T('multi.invHost')}</small>` : ''}</span></div>`).join('');
+      const rows = st.players.map(p => `<div class="mrow"><span class="nm"><img class="face" src="${window.Story ? Story.sprite(p.face, 'neutral') : ''}" style="width:24px;height:24px;image-rendering:pixelated;vertical-align:middle;margin-right:6px">${p.chr && M.MULTI.CHARS[p.chr] ? M.MULTI.CHARS[p.chr].icon + ' ' : ''}${esc(p.me ? T('multi.you') : p.name)}${p.pid === st.host ? ` <small style="color:var(--gold)">${T('multi.invHost')}</small>` : ''}</span></div>`).join('');
       const empty = Math.max(0, st.max - st.players.length);
       const body = `<div class="qwait"><div class="d">${T('multi.invCodeLbl')}</div><div class="big-num" id="inv-code-big" style="letter-spacing:4px">${code}</div><div class="d" style="color:var(--dim)">${T('multi.invShare')}</div></div><div class="mtable">${rows}${empty ? `<div class="mrow" style="color:var(--dim)"><span class="nm">${T('multi.invBots', { n: empty })}</span></div>` : ''}</div><div class="d" style="text-align:center;color:var(--dim)">${T('multi.invUnrated')}</div>`;
       const btns = [{ label: T('btn.cancel'), onClick: () => { stopRoom(); NET.roomLeave(P.pid, code); showTitle(); } }];
@@ -665,7 +676,7 @@
   function bubble(pid, text) { bubbles[pid] = { text, until: Date.now() + 2400 }; drawBubbles(); setTimeout(drawBubbles, 2450); }
   function drawBubbles() { const now = Date.now(); for (const pid in bubbles) { const el = portraitEl(pid), b = bubbles[pid]; if (!el) continue; let i = el.querySelector('.bubble'); if (b.until <= now) { if (i) i.remove(); delete bubbles[pid]; continue; } if (!i) { i = document.createElement('i'); i.className = 'bubble'; el.appendChild(i); } i.textContent = b.text; } }
   function startOnline(sm, nm) {
-    match = MULTI.newOnline(sm, Profile.get().pid, { name: nm, botNames: T('multi.botNames').split('·') });
+    match = MULTI.newOnline(sm, Profile.get().pid, { name: nm, charNames: charNames(), botNames: T('multi.botNames').split('·') });
     game = match.players[0].game; lastRank = myRank();
     closeModal(); netStart(); showMatchIntro(() => { startPlay(); slamStrip(); });
   }
@@ -692,7 +703,7 @@
   async function netFinish() {
     const on = match.online; if (!on || on.sent) return; on.sent = true;
     const g = game, f = MULTI.fingerprint(g);
-    await NET.finish(on.mid, on.pid, on.pid, { cash: f.cash, rep: f.rep, day: f.day, days: MULTI.totalDays(g), win: g.phase === 'win' }, { seed: g.seed, scenario: g.cfg.scenario, company: g.cfg.company, perks: [], companyName: g.cfg.companyName, pid: g.cfg.pid }, g.actLog);
+    await NET.finish(on.mid, on.pid, on.pid, { cash: f.cash, rep: f.rep, day: f.day, days: MULTI.totalDays(g), win: g.phase === 'win' }, { seed: g.seed, scenario: g.cfg.scenario, company: g.cfg.company, perks: [], companyName: g.cfg.companyName, pid: g.cfg.pid, mchar: g.cfg.mchar || null }, g.actLog);
     if (on.host) for (const p of match.players) if (p.bot && p.game) { const bf = MULTI.fingerprint(p.game); await NET.finish(on.mid, on.pid, p.id, { cash: bf.cash, rep: bf.rep, day: bf.day, days: MULTI.totalDays(p.game), win: p.game.phase === 'win' }); }
     netSync(true);
   }
@@ -747,7 +758,7 @@
   }
   function renderMultiStrip() {
     const el = $('#multi-strip'); if (!el) return;
-    el.hidden = !match; if (!match) return;
+    el.hidden = !match; const rc = $('#race'); if (rc) rc.hidden = !match; if (!match) return;
     const rows = MULTI.standings(match);
     el.innerHTML = match.players.map(p => {
       const r = rows.find(x => x.p === p);
@@ -758,12 +769,13 @@
       return `<div class="mp ${p.human ? 'me' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
         <img class="face" src="${faceOf(p, r)}" alt="">
         <span class="stamp">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : ''}</span>
-        <b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
+        ${p.chr && M.MULTI.CHARS[p.chr] ? `<span class="cic">${M.MULTI.CHARS[p.chr].icon}</span>` : ''}<b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
         <span class="reps">${reps}</span><span class="rk">${T('multi.day', { n: r.day })}${repairs ? ' 🏗' + (repairs > 1 ? repairs : '') : ''}${g.shields ? ' 🛡' : ''}</span>
         ${miniWarehouse(r)}
         <span class="repline" style="grid-column:1 / -1">★<b class="repnum">${r.repFinal != null ? r.repFinal : r.rep}</b>${r.penalty ? `<small style="color:var(--red)">−${r.penalty}</small>` : ''}</span></div>`;
     }).join('');
     el.querySelectorAll('.mp').forEach(d => d.onclick = () => { SFX.click(); showOpponent(match.players[+d.dataset.id]); });
+    renderRace(rows);
     // 평판 숫자는 굴러간다 — 카드가 통째로 다시 그려져도 직전 값에서 이어서
     if (stripRep.m !== match) { stripRep.m = match; stripRep.v = {}; }
     for (const p of match.players) { const r = rows.find(x => x.p === p), v = r.repFinal != null ? r.repFinal : r.rep, was = stripRep.v[p.id], card = portraitEl(p.id);
@@ -777,6 +789,22 @@
       pkEl.innerHTML = [...new Set(ids)].map(id => { const pk = M.MULTI.PERKS[id]; const n = ids.filter(x => x === id).length; return `<a class="pk ${pk.family}" data-mperk="${id}">${pk.icon}${n > 1 ? `<small>×${n}</small>` : ''}</a>`; }).join('');
       pkEl.querySelectorAll('[data-mperk]').forEach(a => a.onclick = () => { const pk = M.MULTI.PERKS[a.dataset.mperk]; SFX.click(); toast(`${pk.icon} ${pk.name} — ${pk.desc}`, 2400); }); }
     const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.textContent = parts.join(' · '); }
+  }
+  // 레이스 트랙 — 78일 위를 넷의 말이 달린다. 비대칭 시계가 이 게임의 특이점인데 D+12 숫자만으론 안 보였다 (유저: "시간이 흐르는 걸 보이게")
+  // 먼저 마감한 사람 자리에 🏁 — 그 뒤로는 아직 달리는 사람에게 남은 날마다 상자가 하나씩 밀려온다(MULTI.finishDump)
+  function renderRace(rows) {
+    const el = $('#race'); if (!el) return;
+    el.hidden = !match; if (!match) return;
+    const g = game, days = MULTI.totalDays(g) || 78; let acc = 0; const ticks = [];
+    for (let c = 1; c < g.rules.months; c++) { acc += g.turns(c); ticks.push(`<i class="tk" style="left:${(acc / days * 100).toFixed(1)}%"></i>`); }
+    const ff = match.firstFinish;
+    const marks = match.players.map((p, i) => { const r = rows.find(x => x.p === p); const d = Math.min(days, r.day || 0);
+      return `<span class="rm ${p.id === ME() ? 'me' : ''} ${!r.alive ? 'dead' : r.done ? 'done' : ''}" style="left:${(d / days * 100).toFixed(1)}%;--i:${i}" data-id="${p.id}"><img src="${faceOf(p, r)}" alt="">${ff && ff.id === p.id ? '<u>🏁</u>' : ''}</span>`; }).join('');
+    const my = rows.find(x => x.p.id === ME()), lead = rows.filter(x => x.p.id !== ME() && x.alive).reduce((m, x) => Math.max(m, x.day - my.day), -99);
+    const gap = lead > 0 ? `<em class="gap">${T('multi.raceBehind', { n: lead })}</em>` : '';
+    el.innerHTML = `${ticks.join('')}${marks}<b class="fin">🏁</b>${gap}`;
+    const strip = $('#multi-strip'); if (strip) el.style.top = (strip.offsetTop + strip.offsetHeight + 4) + 'px';
+    el.querySelectorAll('.rm').forEach(d => d.onclick = () => { const p = match.players.find(x => String(x.id) === d.dataset.id); if (p) { SFX.click(); showOpponent(p); } });
   }
   // ---------- 연출 (8장): 발사 궤적 · 피격 비네트 · 방패 · 보수공사 · 배너 ----------
   const ME = () => match ? match.players[0].id : 0;
@@ -834,7 +862,7 @@
       if (e.type === 'attackIn') steps.push(e.blocked
         ? { from: e.from, icon: traitIcon(e.trait), text: `→ ${T('multi.you')} · ${T('trait.blk.' + e.blocked)}`, cls: 'ok', run: () => { if (e.blocked === 'shield') shieldFx(ME()); SFX.select(); } }
         : { from: e.from, icon: traitIcon(e.trait), text: `→ ${T('multi.you')} · ${shortDetail(e.detail)}`, cls: 'bad', run: () => { faceHit[ME()] = Date.now() + 4000; document.body.classList.remove('mhit'); void document.body.offsetWidth; document.body.classList.add('mhit'); SFX.penalty(); scene.shake(.3); hitFx(e.trait); } });
-      if (e.type === 'pushIn') steps.push({ from: e.from, icon: '📦', text: `+${e.n} → ${T('multi.you')}`, cls: 'bad', run: () => { SFX.thud(); scene.shake(.2); glow(e.ids.map(id => `.ptile[data-id="${id}"]`).join(','), 'fx-new'); } });
+      if (e.type === 'pushIn') steps.push({ from: e.from, icon: e.dump ? '🏁' : '📦', text: `${e.dump ? '🏁 ' : ''}+${e.n} → ${T('multi.you')}`, cls: 'bad', run: () => { SFX.thud(); scene.shake(.2); glow(e.ids.map(id => `.ptile[data-id="${id}"]`).join(','), 'fx-new'); } });
       if (e.type === 'repairIn') steps.push({ from: e.from, icon: '🏗', text: T('multi.repairInToast', { size: e.storage.vol, days: e.storage.turns }), cls: 'bad', run: () => { SFX.thud(); scene.shake(.45); glow('#multi-status', 'fx-bad'); } });
       if (e.type === 'repairBlast') steps.push({ from: ME(), icon: '🏗', text: T('multi.repairBlastToast', { n: e.stolen }), cls: 'bad', run: () => { SFX.discard(); scene.shake(.6); scene.mope(); } });
       if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
@@ -844,6 +872,7 @@
   // 공격 효과가 닿은 곳을 잠깐 빛낸다 — ⏱ 은 택배 칩 전부, 🔒 는 상태 줄, 🚧 는 계약 줄
   function glow(sel, cls) { document.querySelectorAll(sel).forEach(el => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 1100); }); }
   function hitFx(trait) {
+    if (!game) return;   // 연출은 1초씩 밀려 오므로 그 사이 판이 닫혔을 수 있다
     if (trait === 't_hurry') glow(game.parcels.filter(p => p.hurried === game.totalTurn).map(p => `.ptile[data-id="${p.id}"]`).join(',') || '.ptile', 'fx-bad');
     else if (trait === 't_seal') glow('#multi-status', 'fx-bad');
     else if (trait === 't_road') glow('#contract-strip .contract', 'fx-bad');
@@ -953,7 +982,7 @@
     if (settled) rows = settled.rows.map(x => { const p = match.players.find(q => q.id === x.pid) || { id: x.pid, name: x.pid }; return Object.assign({ p, name: p.name, human: p.human, alive: x.alive, done: true, day: x.day, cash: x.cash, rep: x.rep, repFinal: x.repFinal != null ? x.repFinal : x.rep, penalty: x.penalty || 0, rank: x.rank, verified: x.verified }, {}); });
     const me = rows.find(x => x.p.id === ME());
     if (!r.fanfare) { r.fanfare = true; if (me.rank === 1) { SFX.win(); BGM.oneShot('fanfare'); } else if (!me.alive) { SFX.over(); setTimeout(() => BGM.oneShot('gameover'), 300); } else SFX.levelup(); }
-    const P = Profile.get(); if (!r.profiled) { r.profiled = true; P.multi = P.multi || { played: 0, wins: 0, best: 0 }; P.multi.played++; if (me.rank === 1) P.multi.wins++; P.multi.best = Math.max(P.multi.best || 0, me.alive ? (me.repFinal != null ? me.repFinal : me.rep) : 0); Profile.save(); }
+    const P = Profile.get(); if (!r.profiled) { r.profiled = true; P.multi = P.multi || {}; P.multi.played = (P.multi.played || 0) + 1; if (me.rank === 1) P.multi.wins = (P.multi.wins || 0) + 1; P.multi.best = Math.max(P.multi.best || 0, me.alive ? (me.repFinal != null ? me.repFinal : me.rep) : 0); Profile.save(); }
     const table = `<div class="mtable">${rows.map(x => `<div class="mrow ${x.human ? 'me' : ''} ${x.alive ? '' : 'dead'}"><b class="rank">${x.rank}</b><span class="nm">${esc(x.p.id === ME() ? T('multi.you') : x.name)}</span><span class="st">${x.alive ? T('multi.done') : T('multi.closed')} · ${T('multi.day', { n: x.day })}</span><span class="rep" style="font-weight:bold;font-size:16px">★${x.repFinal != null ? x.repFinal : x.rep}${x.penalty ? `<small style="color:var(--red);font-size:11px"> −${x.penalty}</small>` : ''}</span></div>`).join('')}</div>`;
     const body = `<div class="big-num">${T('multi.rank', { n: me.rank })}</div><p style="text-align:center;color:var(--dim)">${esc(I18n.text(r.reason))}</p>${table}
       <div class="kv"><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${game.mperks.map(id => M.MULTI.PERKS[id].icon).join('') || T('common.none')}</span><span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;
@@ -961,7 +990,7 @@
     const eloLine = on ? (settled ? (settled.rated && settled.elo[on.pid] ? `<div class="d" style="text-align:center;color:var(--gold)">${T('multi.eloLine', { a: settled.elo[on.pid].before, b: settled.elo[on.pid].elo, d: (settled.elo[on.pid].delta >= 0 ? '+' : '') + settled.elo[on.pid].delta, rank: esc(T('multi.rankName.' + settled.elo[on.pid].rank)) })}</div>` : `<div class="d" style="text-align:center;color:var(--dim)">${T(settled.void ? 'multi.unverified' : 'multi.unrated')}</div>`) : `<div class="d" style="text-align:center;color:var(--dim)">${T('multi.waitingOthers')}</div>`) : '';
     if (settled && settled.elo[on.pid]) { const P = Profile.get(); P.multi = Object.assign(P.multi || {}, { elo: settled.elo[on.pid].elo, rank: settled.elo[on.pid].rank }); Profile.save(); }
     const m = modal(me.alive ? T('multi.resultWin', { rank: me.rank }) : T('multi.resultOver', { rank: me.rank }), eloLine + cheer + body,
-      [{ label: T('res.toTitle'), onClick: () => { closeModal(); netStop(); if (on) Store.remove(MULTI_KEY); match = null; game = null; showTitle(); } }, { label: T('multi.again'), cls: 'primary', onClick: () => { closeModal(); netStop(); if (on) { Store.remove(MULTI_KEY); showQueue(); } else startMulti(); } }]);
+      [{ label: T('res.toTitle'), onClick: () => { closeModal(); netStop(); if (on) Store.remove(MULTI_KEY); match = null; game = null; showTitle(); } }, { label: T('multi.again'), cls: 'primary', onClick: () => { closeModal(); netStop(); if (on) { Store.remove(MULTI_KEY); showCharPick(showQueue); } else showCharPick(startMulti); } }]);
     m.classList.add('mres');
     m.querySelectorAll('[data-cheer]').forEach(b => b.onclick = () => { SFX.click(); sendCheer(b.dataset.cheer); bubble(ME(), b.dataset.cheer); });
     if (settled && on) { const el = m.querySelector('.d[style*="--gold"]'); if (el) { el.style.cursor = 'pointer'; el.onclick = () => showEloBoard(showMultiResult); } }

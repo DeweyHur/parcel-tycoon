@@ -52,7 +52,7 @@
     feeMult: 1, feeFixed: null, feeDelta: 0,
     cycleOffset: 0, noRepEnd: false, noFacilities: false, gameoverStress: D.GAMEOVER_STRESS, year: 0, noDualAttrs: false, dualAttrBonus: 0, customerClaimMult: {}, noHolidays: false,
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
-    multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, latePenaltyDiv: 3,
+    multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, finishDump: false, pushMult: 1, freshNoSpoil: false,
     shopDay: false, noCycleMarket: false, autoSummary: false,
     repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
@@ -174,7 +174,7 @@
       if (c.noHolidays) mods.push({ noHolidays: true });   // 테스트·시뮬레이터: 공휴일 없이 돌리기
       for (const p of c.perks) if (M.PERKS[p]) mods.push(M.PERKS[p].mods);
       // 멀티 「난투」: 시나리오·회사 위에 멀티 규칙 셋을 덮고, 런 중에 고른 퍽(3택1)을 그 위에 얹는다
-      if (c.multi && M.MULTI) { mods.push(M.MULTI.mods); if (c.mtheme && M.MULTI.THEMES && M.MULTI.THEMES[c.mtheme]) mods.push(M.MULTI.THEMES[c.mtheme].mods || {}); for (const p of c.mperks || []) if (M.MULTI.PERKS[p] && M.MULTI.PERKS[p].mods) mods.push(M.MULTI.PERKS[p].mods); }
+      if (c.multi && M.MULTI) { mods.push(M.MULTI.mods); if (c.mtheme && M.MULTI.THEMES && M.MULTI.THEMES[c.mtheme]) mods.push(M.MULTI.THEMES[c.mtheme].mods || {}); if (c.mchar && M.MULTI.CHARS && M.MULTI.CHARS[c.mchar]) mods.push(M.MULTI.CHARS[c.mchar].mods || {}); for (const p of c.mperks || []) if (M.MULTI.PERKS[p] && M.MULTI.PERKS[p].mods) mods.push(M.MULTI.PERKS[p].mods); }
       this.rules = mergeMods(mods);
       this.scenario = sc; this.company = co;
     }
@@ -719,15 +719,15 @@
     // 상대가 만차로 밀어 넣은 택배 — 다음 날 아침 내 창고에 n 개가 더 들어온다(일반, 1~2칸, 기한 짧게)
     receivePush(x) {
       if (this.phase === 'over' || this.phase === 'win') return false;
-      this._act('push', { x: { n: x.n, from: x.from == null ? null : x.from, fromName: x.fromName || '' } });
-      this.inbox.push({ push: true, n: x.n, from: x.from, fromName: x.fromName }); return true;
+      this._act('push', { x: Object.assign({ n: x.n, from: x.from == null ? null : x.from, fromName: x.fromName || '' }, x.dump ? { dump: true } : {}) });
+      this.inbox.push({ push: true, n: x.n, from: x.from, fromName: x.fromName, dump: !!x.dump }); return true;
     }
     _applyPush(x) {
       const n = Math.max(1, Math.round(x.n || 1)), ids = [];
       for (let i = 0; i < n; i++) { const p = this._spawnParcel({ type: 'normal', size: 1 + (this.rng.next() < 0.4 ? 1 : 0), customer: 'anon' }); if (!p) continue; p.deadline = Math.min(p.deadline, 3); p.deadline0 = p.deadline0 || p.deadline; p.pushed = true; this.parcels.push(p); ids.push(p.id); }
       this._assignCold();
-      this.say('log.pushIn', { from: x.fromName || '', n: ids.length });
-      this.emit('pushIn', { n: ids.length, from: x.from, fromName: x.fromName, ids });
+      this.say(x.dump ? 'log.dumpIn' : 'log.pushIn', { from: x.fromName || '', n: ids.length });
+      this.emit('pushIn', { n: ids.length, from: x.from, fromName: x.fromName, ids, dump: !!x.dump });
     }
     receiveRepair(b) {
       if (this.phase === 'over' || this.phase === 'win') return { ok: false };
@@ -1035,7 +1035,7 @@
       { let free = (this.warehouse.frozen || 0) - this.frozenUsed(); for (const s of nxt) if (s.type === 'frozen') { if (s.size > free) frozenOver++; else free -= s.size; } }
       for (const p of this.parcels) {
         if (!p.overdue && !p.noDeadline && p.deadline - 1 <= 0) overdue++;
-        if (p.type === 'fresh' && !p.inCold && (heat || (p.warm || 0) + 1 >= R.warmLimit)) spoil++;
+        if (p.type === 'fresh' && !p.inCold && !R.freshNoSpoil && (heat || (p.warm || 0) + 1 >= R.warmLimit)) spoil++;
         if (this._attrs(p).includes('frozen') && !p.inFrozen) spoil++;
       }
       return { used: this.usedVolume() + incoming, cap: this.warehouse.cap, incoming, count: nxt.length, overdue, spoil, frozenOver, monthEnd: this.turn >= this.turns() };   // 사이클 길이는 12~14 — 고정 13 을 쓰면 14일짜리 사이클에서 '월말 정산'이 하루 일찍 떴다
@@ -1659,7 +1659,7 @@
         let daysDone = 0; for (let c = 1; c < m; c++) daysDone += this.turns(c);
         // 트레잇: 대본에 박는다(매치 공유) — 누가 기한 안에 내보내느냐가 운이지, 무엇이 붙었느냐는 넷이 같다
         const TR = (M.MULTI && M.MULTI.TRAITS) || {}, total = this.totalDays(), prog = total ? daysDone / total : 0;
-        const rate = R.traits ? R.traitRate[0] + (R.traitRate[1] - R.traitRate[0]) * prog : 0;
+        const rate = R.traits ? (R.traitRate[0] + (R.traitRate[1] - R.traitRate[0]) * prog) : 0;
         const atkW = {}, bonW = {}; for (const k in TR) (TR[k].kind === 'attack' ? atkW : bonW)[k] = TR[k].weight;
         const gen = () => { const sp = this._genParcelSpec(ratio, m, cw); const r = sp.type !== 'normal' ? rate * (R.specialTraitMult || 1) : 0; if (r && this.rng.next() < r) sp.trait = this.rng.weighted(this.rng.next() < R.attackShare ? atkW : bonW); return sp; };   // 트레잇은 특수 물품에만(×2.2) — 일반엔 안 붙는다. 초반엔 공격이 없어도 된다 (유저)
         const organicTurns = this.rng.shuffle([...Array(turns).keys()]).slice(0, Math.min(turns, D.GROWTH.organicArrivals));
@@ -1919,7 +1919,7 @@
       const chainMult = chainLevel >= 2 ? 1 + (chainLevel - 1) * D.LOAD_CHAIN.step : 1;
       let chainBonus = 0, pushed = 0;
       // 난투: 만차는 돈이 아니라 **밀어내기** — 연속 만차 2회째부터(1·2·3개) 상대 창고에 택배를 밀어 넣는다 (유저: "만차가 돈 올려주지 말고 일부 택배를 상대에게")
-      if (R.chainPush && chainQualified && chainLevel >= 2) { pushed = chainLevel - 1; this.outbox.push({ type: 'push', n: pushed }); this.emit('pushOut', { n: pushed }); this.stats.pushed = (this.stats.pushed || 0) + pushed; if (chainLevel >= D.LOAD_CHAIN.max) this.loadChain = 0; }   // 최대에서 밀고 나면 처음부터
+      if (R.chainPush && chainQualified && chainLevel >= 2) { pushed = (chainLevel - 1) * (R.pushMult || 1); this.outbox.push({ type: 'push', n: pushed }); this.emit('pushOut', { n: pushed }); this.stats.pushed = (this.stats.pushed || 0) + pushed; if (chainLevel >= D.LOAD_CHAIN.max) this.loadChain = 0; }   // 최대에서 밀고 나면 처음부터
       if (chainMult > 1 && !R.chainPush) {
         const beforeChain = revenue;
         revenue = Math.round(revenue * chainMult);
@@ -2082,7 +2082,7 @@
         // 통관 대기: 기한은 통관 뒤 시작
         if (p.customs > 0) { if (isCold && !p.inCold) p.coldDuringCustoms = false; p.customs--; continue; }
         // 신선: 냉장 구역 밖이면 폭염 즉시 / warmLimit턴 뒤 폐기. 안이면 기한만 진행(냉동고 퍽·냉장 L3는 기한 정지)
-        if (isCold && !p.inCold) { p.warm = (p.warm || 0) + 1; if (heat || p.warm >= R.warmLimit) { discard.push([p, MSG(heat ? 'why.heatSpoil' : 'why.warmSpoil')]); continue; } }
+        if (isCold && !p.inCold && !R.freshNoSpoil) { p.warm = (p.warm || 0) + 1; if (heat || p.warm >= R.warmLimit) { discard.push([p, MSG(heat ? 'why.heatSpoil' : 'why.warmSpoil')]); continue; } }
         else if (isCold) p.warm = 0;
         if (isFrozen && !p.inFrozen) { discard.push([p, MSG('why.outsideFrozen')]); continue; }
         const freeze = (isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer))) || (R.multi && this.freshFreezeUntil >= this.totalTurn);   // 난투 🧊 얼음: 모든 기한 정지(신선만 멈추면 너무 약하다 — 유저)

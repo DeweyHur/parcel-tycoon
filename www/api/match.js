@@ -93,12 +93,16 @@ async function saveMatch(S, m) { await S.call([['SET', 'm:' + m.id, JSON.stringi
 
 const shuffled = a => a.slice().sort(() => Math.random() - 0.5);
 // 봇 자리. nid = 이름 번호 — 클라이언트가 자기 언어의 이름표(multi.botNames)에서 고른다. name 은 서버 로그·폴백용
-function mkBot(i, faces) { const nid = Math.floor(Math.random() * BOT_NAMES.length); return { pid: 'bot' + i, name: BOT_NAMES[nid], nid, face: faces[i % faces.length] || 'rep', elo: ELO_START, bot: true, strat: STRATS[i % STRATS.length] }; }
+function mkBot(i, faces, chr) { const nid = Math.floor(Math.random() * BOT_NAMES.length); return { pid: 'bot' + i, name: chr || BOT_NAMES[nid], nid, chr: chr || null, face: faces[i % faces.length] || 'rep', elo: ELO_START, bot: true, strat: STRATS[i % STRATS.length] }; }
+// 캐릭터(META.MULTI.CHARS): 사람은 큐에 들어올 때 고른 것, 봇은 남은 것 중 랜덤 — 한 매치에 같은 캐릭터는 없다
+const validChr = c => typeof c === 'string' && MULTI.CHAR_IDS().includes(c) ? c : null;
 async function createMatch(S, humans, opts) {
   const t = now();
-  const players = humans.map((x, i) => ({ pid: x.pid, name: x.name, face: x.face, elo: x.elo, bot: false, host: i === 0 }));
+  const taken = new Set(), free = shuffled(MULTI.CHAR_IDS());
+  const chrOf = x => { let c = validChr(x.chr); if (!c || taken.has(c)) c = free.find(k => !taken.has(k)) || null; if (c) taken.add(c); return c; };   // 먼저 들어온 사람이 이긴다 — 겹치면 뒷사람이 남은 것에서
+  const players = humans.map((x, i) => ({ pid: x.pid, name: x.name, face: x.face, chr: chrOf(x), elo: x.elo, bot: false, host: i === 0 }));
   const faces = MULTI.FACES.filter(f => !players.some(p => p.face === f));
-  for (let i = players.length; i < PLAYERS; i++) players.push(mkBot(i, faces));
+  for (let i = players.length; i < PLAYERS; i++) players.push(mkBot(i, faces, chrOf({})));
   const m = Object.assign({ id: mkId(), seed: rndInt(2147483647), players, created: t, rated: players.filter(p => !p.bot).length >= 2, cycle: 0 }, opts || {});
   await saveMatch(S, m);
   await S.call(humans.map(x => ['SET', 'mp:' + x.pid, m.id, 'EX', TTL]));
@@ -114,7 +118,7 @@ async function roomView(S, code, pid) {
   const started = (await S.call([['GET', 'invm:' + code]]))[0];
   if (started) { const m = await loadMatch(S, started); if (m && m.players.some(p => p.pid === pid)) return { status: 'ready', match: m, code }; }
   const room = await roomOf(S, code); if (!room) return { status: 'gone', code };
-  return { status: 'room', code, host: room[0].pid, players: room.map(x => ({ pid: x.pid, name: x.name, face: x.face, me: x.pid === pid })), max: PLAYERS };
+  return { status: 'room', code, host: room[0].pid, players: room.map(x => ({ pid: x.pid, name: x.name, face: x.face, chr: x.chr || null, me: x.pid === pid })), max: PLAYERS };
 }
 // ----- 매칭 큐 -----
 // 큐는 해시 mq: pid → { pid, name, face, elo, at }. 폴링(queue op)마다 짝을 맞춰 본다 — 서버리스엔 타이머가 없다
@@ -184,11 +188,11 @@ async function route(S, m, from, ev, snaps) {
 
 // ----- ELO -----
 // 순위: 생존 > 잔액 > 평판 > 늦게 죽은 순. 사람끼리 모든 쌍을 1:1 로. 봇 쌍·미검증 판은 안 센다
-// 승부는 **평판**: 생존 > 최종 평판 > 잔액. 먼저 마감한 사람(m.firstFinish) 빼고는 그때 남은 날 ÷ latePenaltyDiv 만큼 평판 페널티
+// 승부는 **평판**: 생존 > 최종 평판 > 잔액. 먼저 마감한 사람(m.firstFinish)은 남들에게 남은 날마다 상자를 하나씩 밀어 넣는다(finishDump, 각자 제 판에서 로그로) — 평판 페널티는 없다
 function rankRows(m, results) {
-  const div = M.MULTI.mods.latePenaltyDiv || 3, ff = m.firstFinish;
+  const ff = m.firstFinish, dump = !!M.MULTI.mods.finishDump;
   const rows = m.players.map(p => { const r = Object.assign({ pid: p.pid, bot: p.bot }, results[p.pid] || { cash: -1e9, rep: 0, day: 0, days: 78, win: false, alive: false });
-    const pen = ff && ff.pid !== p.pid && ff.days[p.pid] != null ? Math.max(0, Math.ceil(((r.days || 78) - ff.days[p.pid]) / div)) : 0;
+    const pen = !dump && ff && ff.pid !== p.pid && ff.days[p.pid] != null ? Math.max(0, Math.ceil(((r.days || 78) - ff.days[p.pid]) / 3)) : 0;
     return Object.assign(r, { penalty: pen, repFinal: Math.max(0, (r.rep || 0) - pen) }); });
   rows.sort((a, b) => ((b.alive ? 1 : 0) - (a.alive ? 1 : 0)) || (a.alive ? (b.repFinal - a.repFinal) || (b.cash - a.cash) : (b.day - a.day) || (b.cash - a.cash)));
   rows.forEach((r, i) => r.rank = i + 1);
@@ -222,7 +226,7 @@ async function handle(S, d, ip) {
     if (cur) { const m = await loadMatch(S, cur); if (m && !m.settled) return [200, { status: 'ready', match: m }]; await S.call([['DEL', 'mp:' + d.pid]]); }
     const inQ = J((await S.call([['HGET', 'mq', d.pid]]))[0]);
     const elo = (await getElo(S, d.pid)).elo;
-    const entry = { pid: d.pid, name: cleanName(d.name), face: MULTI.FACES.includes(d.face) ? d.face : 'park', elo, at: inQ ? inQ.at : now() };
+    const entry = { pid: d.pid, name: cleanName(d.name), face: MULTI.FACES.includes(d.face) ? d.face : 'park', chr: validChr(d.chr), elo, at: inQ ? inQ.at : now() };
     await S.call([['HSET', 'mq', d.pid, JSON.stringify(entry)], ['EXPIRE', 'mq', TTL]]);
     const m = await matchmake(S);
     if (m && m.players.some(p => p.pid === d.pid)) return [200, { status: 'ready', match: m }];
@@ -239,7 +243,7 @@ async function handle(S, d, ip) {
   }
   if (op === 'invite') {   // 방 만들기
     if (!validPid(d.pid)) return [400, { error: 'pid' }];
-    const code = mkCode(), entry = { pid: d.pid, name: cleanName(d.name), face: MULTI.FACES.includes(d.face) ? d.face : 'park', elo: (await getElo(S, d.pid)).elo, at: now() };
+    const code = mkCode(), entry = { pid: d.pid, name: cleanName(d.name), face: MULTI.FACES.includes(d.face) ? d.face : 'park', chr: validChr(d.chr), elo: (await getElo(S, d.pid)).elo, at: now() };
     await S.call([['HSET', 'inv:' + code, d.pid, JSON.stringify(entry)], ['EXPIRE', 'inv:' + code, 3600]]);
     return [200, await roomView(S, code, d.pid)];
   }
@@ -248,7 +252,7 @@ async function handle(S, d, ip) {
     const room = await roomOf(S, d.code); if (!room) return [404, { error: 'noroom' }];
     if ((await S.call([['GET', 'invm:' + d.code]]))[0]) return [409, { error: 'started' }];
     if (room.length >= PLAYERS && !room.some(x => x.pid === d.pid)) return [409, { error: 'full' }];
-    const entry = { pid: d.pid, name: cleanName(d.name), face: MULTI.FACES.includes(d.face) ? d.face : 'park', elo: (await getElo(S, d.pid)).elo, at: room.find(x => x.pid === d.pid) ? room.find(x => x.pid === d.pid).at : now() };
+    const entry = { pid: d.pid, name: cleanName(d.name), face: MULTI.FACES.includes(d.face) ? d.face : 'park', chr: validChr(d.chr), elo: (await getElo(S, d.pid)).elo, at: room.find(x => x.pid === d.pid) ? room.find(x => x.pid === d.pid).at : now() };
     await S.call([['HSET', 'inv:' + d.code, d.pid, JSON.stringify(entry)]]);
     return [200, await roomView(S, d.code, d.pid)];
   }
@@ -290,7 +294,7 @@ async function handle(S, d, ip) {
     if (!own.has(d.for || d.pid)) return [403, { error: 'notown' }];
     const pid = d.for || d.pid, r = d.result || {}, bot = pid !== d.pid;
     let verified = bot;   // 봇 결과는 호스트를 믿는다(봇 쌍은 ELO 에 안 든다). 사람은 재실행으로
-    if (!bot && d.cfg && Array.isArray(d.log)) { try { verified = MULTI.verify(Object.assign({}, d.cfg, { seed: m.seed, prep: false, mtheme: MULTI.themeOf(m.seed) }), d.log, { cash: r.cash, rep: r.rep, day: r.day, phase: r.win ? 'win' : 'over' }).ok; } catch (e) { verified = false; } }
+    if (!bot && d.cfg && Array.isArray(d.log)) { try { const vr = MULTI.verify(Object.assign({}, d.cfg, { seed: m.seed, prep: false, mtheme: MULTI.themeOf(m.seed), mchar: (m.players.find(p => p.pid === pid) || {}).chr || null }), d.log, { cash: r.cash, rep: r.rep, day: r.day, phase: r.win ? 'win' : 'over' }); verified = vr.ok; } catch (e) { verified = false; } }   // 시드·테마·캐릭터는 서버가 아는 것으로 덮는다 — 클라이언트 cfg 를 믿지 않는다
     const rec = { cash: Math.round(+r.cash || 0), rep: Math.round(+r.rep || 0), day: Math.round(+r.day || 0), days: Math.round(+r.days || 78), win: !!r.win, alive: !!r.win, verified, at: now() };
     // 먼저 마감한 사람: 그 순간 남들의 일차(스냅샷)를 적어 둔다 — 나머지는 남은 날만큼 평판 페널티
     if (rec.win && !m.firstFinish) { const snaps = await snapshots(S, m); const days = {}; for (const p of m.players) if (p.pid !== pid) days[p.pid] = (snaps[p.pid] || {}).day || 1; m.firstFinish = { pid, days, at: now() }; await saveMatch(S, m); }

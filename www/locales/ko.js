@@ -410,6 +410,7 @@
     'log.attackIn': '{from}의 {icon} {name} 피격 — {detail}',
     'log.attackBlocked': '{from}의 {icon} {name} — {how}',
     'log.pushIn': '📦 {from}의 만차 — 택배 {n}개가 밀려 들어왔다',
+    'log.dumpIn': '🏁 {from} 마감 — 남은 날 상자 +{n}',
     'log.repairIn': '🏗 보수공사 시작 — {size}칸 점거, {days}일 뒤 옆 창고로 (못 치움)',
     'log.repairOut': '🏗 공사팀이 옆 창고로 옮겨 갔다 ({size}칸으로 커져서)',
     'log.repairBlast': '🏗 대공사 — 밀려난 짐 {n}개 도난',
@@ -439,6 +440,8 @@
     'multi.strat.greedy': '공격파',
     'multi.strat.saver': '신중파',
     'multi.introMe': '내 창고',
+    'multi.chrTitle': '누구로 뛸까',
+    'multi.raceBehind': '{n}일 뒤',
     'trait.blk.shield': '🛡 막음',
     'trait.blk.roof': '🏠 막음',
     'err.repairStuck': '🏗 공사 중인 자리는 못 치운다 — 며칠 뒤 옆 창고로 옮겨 간다',
@@ -2316,6 +2319,14 @@
       "t_truck": { "name": "덤 트럭", "desc": "다음 호출 트럭 +1" },
       "t_return": { "name": "되돌리기", "desc": "내 창고의 🏗 1개를 보낸 사람에게" },
       "t_focus": { "name": "한 방", "desc": "다음 공격을 1위 한 명에게만, 효과 ×3" }
+    },
+    "CHARS": {
+      "hangil": { "name": "한길", "desc": "트럭 한 칸 더" },
+      "bigshot": { "name": "큰손", "desc": "만차 밀어내기 ×2" },
+      "dawn": { "name": "새벽", "desc": "신선이 안 상함" },
+      "dock": { "name": "도크", "desc": "창고 +4칸" },
+      "easy": { "name": "느긋", "desc": "모든 기한 +1일" },
+      "bolt": { "name": "번개", "desc": "내 공격 효과 ×2" }
     },
     "THEMES": {
       "spring": { "name": "봄날", "desc": "특별한 건 없다 — 실력 승부" },
