@@ -155,6 +155,7 @@ async function route(S, m, from, ev, snaps) {
   const out = [];
   if (ev.type === 'attackOut') {
     let tg = others;
+    if (ev.to != null) tg = tg.filter(t => t.pid === ev.to);   // 🪞 반사
     if (ev.focus) { const top = others.slice().sort((a, b) => ((snaps[b.pid].rep || 0) - (snaps[a.pid].rep || 0)) || ((snaps[b.pid].cash || 0) - (snaps[a.pid].cash || 0)))[0]; tg = top ? [top] : []; }   // 🎯 는 평판 1위(승부가 평판이라)
     if (ev.trait === 't_repair') {
       if (repairs >= M.MULTI.REPAIR.max || !tg.length) return [{ type: 'repairFizzle', from, to: null }];

@@ -653,7 +653,8 @@
       const tr = p.trait && this.traitDef(p.trait); if (!tr || p.overdue) return;
       const R = this.rules;
       if (tr.kind === 'bonus') {
-        if (p.trait === 't_buzz') this.addRep((M.MULTI.BUZZ || 1) * (this._mixMult || 1), MSG('why.trait', { icon: tr.icon }));
+        if (p.trait === 't_buzz') this.addRep((M.MULTI.BUZZ || 1) * this.traitPower(p), MSG('why.trait', { icon: tr.icon }));
+        else if (p.trait === 't_reflect') this.reflectNext = Math.min(2, (this.reflectNext || 0) + 1);
         else if (p.trait === 't_shield') this.shields = Math.min(M.MULTI.SHIELD_MAX, this.shields + 1);
         else if (p.trait === 't_ice') this.freshFreezeUntil = this.totalTurn + M.MULTI.TEMP_DAYS;
         else if (p.trait === 't_pack') this._capMod(3, M.MULTI.TEMP_DAYS, 't_pack');
@@ -669,7 +670,7 @@
       const echo = this.trackEcho(), n = 1 + (echo && this.rng.next() < echo ? 1 : 0);   // ⚔ 공격 트랙: 메아리
       for (let i = 0; i < n; i++) {
         const clr = this.clearedToday(p) ? (M.MULTI.FAM_RULES.intl.clearMult || 2) : 1;   // 🛃 통관 끝난 날: ×2
-        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1) * clr * (this._mixMult || 1), focus: this.focusNext, size: p.trait === 't_repair' ? Math.min(M.MULTI.REPAIR.maxSize, M.MULTI.REPAIR.size + R.repairGrow + this.repairProgressBonus() + (clr > 1 ? 2 : 0)) : 0, cleared: clr > 1 };
+        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1) * clr * this.traitPower(p), focus: this.focusNext, size: p.trait === 't_repair' ? Math.min(M.MULTI.REPAIR.maxSize, M.MULTI.REPAIR.size + R.repairGrow + this.repairProgressBonus() + (clr > 1 ? 2 : 0)) : 0, cleared: clr > 1 };
         this.outbox.push(atk); this.emit('attackOut', atk);
       }
       this.focusNext = false;
@@ -693,6 +694,7 @@
       const k = Math.max(1, Math.round(a.mult || 1));
       let blocked = null;
       if (R.dodgeProb && this.rng.next() < R.dodgeProb) blocked = 'dodge';
+      else if (this.reflectNext > 0 && a.from != null && !a.reflected) { this.reflectNext--; blocked = 'reflect'; this.outbox.push({ type: 'attackOut', trait: a.trait, mult: a.mult || 1, to: a.from, reflected: true }); }   // 🪞 반사: 보낸 사람에게 그대로
       else if (this.shields > 0) { this.shields--; blocked = 'shield'; }
       else if (a.trait === 't_rain' && R.rainImmune) blocked = 'roof';
       let detail = '';
@@ -736,7 +738,9 @@
     // 🛒 장사: 평판 계단이 짧아지고(상점이 자주) 상점 카드가 는다
     repStepNow() { const R = this.rules, S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; return S && R.multi ? Math.max(Math.min(S.stepMin, R.repStep), R.repStep - S.step * this.trackLv('shop')) : R.repStep; }
     shopCards() { const S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; return S && this.rules.multi ? Math.min(S.cardsMax, 3 + Math.floor(this.trackLv('shop') / S.cardsPer)) : 3; }
-    traitPool(type) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? null : type; const pair = key && TT[key]; if (!pair) return []; return this.traitUnlocks.includes(key) ? pair.slice() : [pair[0]]; }
+    traitPool(type) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? null : type; const pair = key && TT[key]; if (!pair) return []; return pair.slice(); }   // 둘 다 처음부터 — 한 가지만 계속 받던 것
+    // 트레잇 세기: 🔗 조합 배수 × (강화 카드 +1) × (🧊 숙성 +일수)
+    traitPower(p) { let k = 1 + (this.traitUnlocks.includes(p.type) ? 1 : 0) + (p.aged || 0); return k * (this._mixMult || 1); }
     _resolveTrait(sp) { const pool = this.traitPool(sp.type).filter(t => this.traitDef(t)); if (!pool.length) return null; return pool[this.rng.int(pool.length)]; }
     _repairNext(b) { const B = M.MULTI.REPAIR; return { size: Math.min(B.maxSize, this.storageVol(b) + 1), days: Math.max(1, b.turns - 1), hops: (b.hops || 0) + 1, from: this.cfg.pid != null ? this.cfg.pid : null }; }
     // 상대가 만차로 밀어 넣은 택배 — 다음 날 아침 내 창고에 n 개가 더 들어온다(일반, 1~2칸, 기한 짧게)
@@ -2142,6 +2146,7 @@
       const heat = this.isHeatTurn(), wx = this.weatherNow(), snow = wx === 'snow', wet = (wx === 'rain' || wx === 'storm') && !R.tent;
       for (const p of this.parcels) {
         p.age++;
+        if (p.trait && (p.inCold || p.inFrozen) && this.ownsFam('frozen')) { const F = M.MULTI.FAM_RULES.frozen; p.aged = Math.min(F.ageMax, (p.aged || 0) + F.agePerDay); }   // 🧊 숙성
         const isCold = this._attrs(p).includes('cold'), isFrozen = this._attrs(p).includes('frozen');
         if (p.outdoor && wet && !isCold && !isFrozen && !p.wet) { p.wet = true; reasons.push(MSG('r.wet', { short: D.PARCEL_TYPES[p.type].short, size: p.size })); }
         if (p.customs > 0 && p.outdoor) p.outdoorDuringCustoms = true;
@@ -2154,7 +2159,7 @@
         if (isCold && !p.inCold && !R.freshNoSpoil) { p.warm = (p.warm || 0) + 1; if (heat || p.warm >= R.warmLimit) { discard.push([p, MSG(heat ? 'why.heatSpoil' : 'why.warmSpoil')]); continue; } }
         else if (isCold) p.warm = 0;
         if (isFrozen && !p.inFrozen) { discard.push([p, MSG('why.outsideFrozen')]); continue; }
-        const freeze = (isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer))) || (R.multi && this.freshFreezeUntil >= this.totalTurn) || (isFrozen && p.inFrozen && this.ownsFam('frozen'));   // 🧊 냉동 비축: 냉동실 안은 기한 정지   // 난투 🧊 얼음: 모든 기한 정지(신선만 멈추면 너무 약하다 — 유저)
+        const freeze = (isCold && (freezeFresh || snow || (p.inCold && R.freezer && p.age <= R.freezer))) || (R.multi && this.freshFreezeUntil >= this.totalTurn)   // 난투 🧊 얼음: 모든 기한 정지(신선만 멈추면 너무 약하다 — 유저)
         const grace = this.returnGraceFor(p);
         // 무기한(첫 사이클)은 기한도 안 줄고 초과도 반송도 없다 — else 로 새면 바로 반송 처리로 빠진다
         if (p.noDeadline) continue;

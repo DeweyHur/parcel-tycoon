@@ -112,6 +112,7 @@
         if (o.type === 'attackOut') {
           let tg = targetsOf(match, p.id);
           if (o.focus) { const top = standings(match).find(r => r.alive && !r.done && r.p.id !== p.id); tg = top ? [top.p] : []; }
+          if (o.to != null) tg = tg.filter(t => t.id === o.to);   // 🪞 반사: 보낸 사람 한 명
           if (o.trait === 't_repair') {
             if (repairsInPlay(match) >= M.MULTI.REPAIR.max || !tg.length) { match.news.push({ type: 'repairFizzle', from: p.id }); continue; }
             const t = tg[Math.floor(mrand(match) * tg.length)];
