@@ -1167,6 +1167,11 @@ t('멀티: 매치 라우팅 — 공격은 한 명: 조준(탭)한 상대, 없으
   const j = MULTI.fromJSON(JSON.parse(JSON.stringify(MULTI.toJSON(m)))); assert.equal(j.players[1].game.inbox.length, 1); assert.ok(j.players[0].face);
 });
 
+t('멀티: 예보와 실제 도착이 같다 — 받아 줄 계약이 없는 특수 물품은 예보에서도 일반', () => {
+  const g = MG(311); g.firstShopDone = true; let bad = 0, n = 0;
+  for (let d = 0; d < 14 && g.phase === 'play'; d++) { const up = g.upcoming()[0]; const want = (up.specs || []).map(s => s.type).sort().join(); g.parcels = []; g.wait([]); if (g.repShop) g.closeRepShop(); const got = g.parcels.filter(p => !p.pushed).map(p => p.type).sort().join(); if (!up.specs) continue; n++; if (want !== got) bad++; }   // 사이클 넘어가는 날은 예보가 비어 있다(다음 보름 대본은 그때 짠다)
+  assert.equal(bad, 0, bad + '/' + n + '일 어긋남');
+});
 t('멀티 1:1: 기본 매치는 둘(나 + 봇 하나) · 공격·조합 상자·보수공사는 늘 그 상대에게 · 결과 두 줄', () => {
   const m = MULTI.newMatch({ seed: 303, name: 'H' }); assert.equal(m.players.length, 2); const [h, o] = m.players.map(p => p.game);
   h.outbox.push({ type: 'attackOut', trait: 't_hurry', mult: 1 }, { type: 'push', n: 2, all: true }); MULTI.route(m); assert.equal(o.inbox.length, 2);

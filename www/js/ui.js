@@ -2889,7 +2889,7 @@
       const last = Math.max(2, ...roll.map(x => x.day));
       return `<span class="camp-up">${Array.from({ length: last }, (_, k) => { const d = k + 1, slot = g.turn + d - 1; if (slot >= g.turns()) return '';
         const r = roll.find(x => x.day === d);
-        const u = { turn: slot + 1, specs: g.schedule[slot] || [], weather: g.weatherAt ? g.weatherAt(slot + 1) : null, heat: g.weatherAt && g.weatherAt(slot + 1) === 'heat', off: g.isOffTurn && g.isOffTurn(slot + 1) };
+        const u = { turn: slot + 1, specs: (g.schedule[slot] || []).map(sp => g._gateSpec ? g._gateSpec(sp) : sp), weather: g.weatherAt ? g.weatherAt(slot + 1) : null, heat: g.weatherAt && g.weatherAt(slot + 1) === 'heat', off: g.isOffTurn && g.isOffTurn(slot + 1) };
         return dayChip(g, u, dayName(d), r ? r.specs : []); }).join('')}</span>`; })() : '';
     // 이미 돌고 있는 캠페인과 겹치면 효과 반감 — 📦·⭐ 에 반영하고 「겹침 ½」 딱지
     const cp = g && g.phase === 'play' ? g.campaignPlan(id) : null, half = cp && cp.stack > 0;

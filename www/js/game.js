@@ -1057,7 +1057,7 @@
     canSelfDeliver() { return this.phase === 'play' && this.selfEligible().length > 0; }
     // 대기했을 때 다음 턴 예상: 창고 사용량, 기한 초과·부패 예정
     forecast() {
-      const R = this.rules, nxt = this.schedule[this.turn] || [];
+      const R = this.rules, nxt = (this.schedule[this.turn] || []).map(sp => this._gateSpec(sp));
       let incoming = 0; for (const s of nxt) { let sz = s.size + R.sizeDelta; if (s.size >= 4) sz += R.bigSizeDelta + R.storeBigDelta; incoming += Math.max(1, sz); }
       let overdue = 0, spoil = 0, frozenOver = 0;
       const heat = this.isHeatTurn();
@@ -1824,7 +1824,7 @@
       // 난투: 받아 주는 계약이 없는 특수 물품은 일반으로 온다(트레잇도 없이) — 계약을 사야 그 물품과 그 트레잇이 열린다 (유저)
       const R = this.rules;
       if (R.typeTraits) specs = specs.map(sp => sp.trait ? Object.assign({}, sp, { trait: this._resolveTrait(sp) }) : sp);   // 대본의 트레잇은 '붙었다'는 표시 — 무엇이 붙는지는 물품 종류(와 내 언락)가 정한다
-      if (R.contractGated) specs = specs.map(sp => { if (sp.type === 'normal') return sp; const attrs = D.PARCEL_TYPES[sp.type].attrs || []; const ok = this.typeOpen(sp.type) && this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: sp.type, size: sp.size, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)) && (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile'))); return ok ? sp : Object.assign({}, sp, { type: 'normal', attrs: null, trait: null, size: Math.min(sp.size, 2) }); });
+      if (R.contractGated) specs = specs.map(sp => this._gateSpec(sp));
       // 난투: 내가 연 특수 물품은 내 몫이 더 온다 — 일반 입고 일부가 그 물품으로 바뀐다(열린 종류마다 ownCargo). 대본은 넷이 같지만 계약을 산 사람에겐 그 짐이 온다
       // (유저: "거인을 가졌는데 거인 화물이 안 옴" — 공유 대본에서 대형은 5% 남짓이라 계약을 사도 며칠씩 빈 차였다)
       if (R.ownCargo && R.typeFamilies) { const open = Object.keys(M.MULTI.TYPE_FAMILIES || {}).filter(t => this.typeOpen(t)); if (open.length) { let frz = 0, cld = 0; specs = specs.map(sp => { if (sp.type !== 'normal' || this.rng.next() >= R.ownCargo * open.length) return sp; const t = open[this.rng.int(open.length)], T0 = D.PARCEL_TYPES[t], attrs = T0.attrs || []; const fits = (T0.sizes || [1]).filter(z => this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: t, size: z, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)))); const room = attrs.includes('frozen') ? (this.warehouse.frozen || 0) - this.parcels.filter(q => this._attrs(q).includes('frozen')).reduce((a, q) => a + q.size, 0) - frz : attrs.includes('cold') ? (this.warehouse.cold || 0) - this.coldUsed() - cld : Infinity;   // 냉동·신선은 들어갈 자리가 있을 때만 — 냉동실 4칸에 냉동이 쏟아져 즉시 폐기되던 것
@@ -1855,11 +1855,13 @@
     // 이번 사이클 대본의 하루 평균 입고 칸수 (봇·장 보기 판단용)
     totalDays() { let n = 0; for (let c = 1; c <= this.rules.months; c++) n += this.turns(c); return n; }
     parcelsPerDay() { const n = this.turns() || 1; return this.schedule.reduce((a, t) => a + t.reduce((b, s) => b + this._specCells(s), 0), 0) / n; }
+    // 난투: 받아 줄 계약이 없는 특수 물품은 일반(≤2칸)으로 온다 — 도착할 때와 예보가 같은 규칙을 쓴다 (유저: "예측엔 물품이 보이는데 실제 도착 안 함")
+    _gateSpec(sp) { if (!this.rules.contractGated || !sp || sp.type === 'normal') return sp; const attrs = D.PARCEL_TYPES[sp.type].attrs || []; const ok = this.typeOpen(sp.type) && this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: sp.type, size: sp.size, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)) && (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile'))); return ok ? sp : Object.assign({}, sp, { type: 'normal', attrs: null, trait: null, size: Math.min(sp.size, 2) }); }
     upcoming() {
       const out = [];
       for (let i = 0; i < this.rules.upcomingTurns; i++) {
         const t = this.turn + i;
-        if (t < this.turns()) out.push({ turn: t + 1, specs: this.schedule[t], heat: this.weatherAt(t + 1) === 'heat', burst: this.isRushTurn(t + 1), off: this.isOffTurn(t + 1), events: this.eventsAt(t + 1).map(e => e.id), weather: i < this.rules.forecastTurns ? this.weatherAt(t + 1) : null });
+        if (t < this.turns()) out.push({ turn: t + 1, specs: this.rules.contractGated && this.schedule[t] ? this.schedule[t].map(sp => this._gateSpec(sp)) : this.schedule[t], heat: this.weatherAt(t + 1) === 'heat', burst: this.isRushTurn(t + 1), off: this.isOffTurn(t + 1), events: this.eventsAt(t + 1).map(e => e.id), weather: i < this.rules.forecastTurns ? this.weatherAt(t + 1) : null });
         else out.push({ turn: t + 1, specs: null, weather: null });
       }
       return out;
