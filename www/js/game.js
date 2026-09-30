@@ -1512,32 +1512,33 @@
       if (this.rules.multi && M.MULTI.TRACKS && !this.firstShopDone) { this.firstShopDone = true; const first = this._trackContractItems(); if (first.length >= 2) { if (this.rules.noMoney) for (const it of first) it.price = 0; return first; } }
       // 퍽 카드는 없다(유저: "그 이상한 퍽들도 없애고 그냥 마켓 아이템들이 평판 올라가면 뜨는 거야") — 장 매물에서 랜덤 3장. 돈이 없는 규칙이면 값 0 · 하나만 고른다
       const pool = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill' && (it.kind !== 'enh' || this.enhTarget(it.enh) >= 0) && (it.kind !== 'enh' || this._optUseful(it.enh)) && !(it.kind === 'enh' && it.enh === 'seal' && this.rules.multi && !this.contracts.some(c => c && this.trustLevel(c.carrier) < 3))).concat(this._traitUnlockItems(), this._shopUpItems()));   // 붙일 계약이 없는 강화는 안 뜬다
-      const goods = this.rules.multi ? this._rarityPick(pool, this.shopCards()) : pool.slice(0, this.shopCards());
+      const goods = this.rules.multi ? this._themedShop(pool, this.shopCards()) : pool.slice(0, this.shopCards());
       if (this.rules.noMoney) for (const it of goods) it.price = 0;
       return goods;
     }
     // 레어도 (유저: "아이템마다 레어도를 둬서 특정 마일스톤엔 좋은 아이템이 오고, 상점을 강화하는 아이템도") — 일반 · 레어(계약·트레잇 강화) · 에픽(상점 강화)
-    itemRarity(it) { return it.kind === 'shopUp' ? 'epic' : it.kind === 'contract' || it.kind === 'traitUnlock' ? 'rare' : 'common'; }
-    shopMilestone() { const k = (M.MULTI && M.MULTI.SHOP_MILESTONE) || 3; return this.rules.multi && this.repTier > 0 && this.repTier % k === 0; }
-    _shopUpItems() { if (!this.rules.multi) return []; const out = []; if ((this.shopExtra || 0) < 2) out.push({ kind: 'shopUp', up: 'shelf', price: 0, sold: false }); if (!this.shopVip) out.push({ kind: 'shopUp', up: 'vip', price: 0, sold: false }); return out; }
-    _rarityPick(pool, n) {
+    // 상점은 한 번에 한 종류 (유저: "계약 상점 · 강화 상점 · 업그레이드 상점 · 상점업글 상점 · 프리미엄 상점 — 한 종류만, 레어도 표시")
+    //   정비소(강화·광고권, 일반) · 거래처 소개소(새 계약, 레어) · 승급 심사(계약 승급·트레잇 강화, 레어) · 상인 조합(상점 강화, 에픽) · 심야 경매장(섞어서 레어 이상, 전설 — 마일스톤·우대권)
+    shopCatOf(it) { return it.kind === 'shopUp' ? 'guild' : it.kind === 'traitUnlock' || (it.kind === 'contract' && it.switchFrom != null) ? 'promo' : it.kind === 'contract' ? 'broker' : 'garage'; }
+    _themedShop(pool, n) {
       for (const it of pool) it.rarity = this.itemRarity(it);
-      const ms = this.shopMilestone(), W = { common: 6, rare: 3, epic: 1 }, out = [];
-      let left = ms ? pool.filter(it => it.rarity !== 'common') : pool.filter(it => it.rarity !== 'epic' || true);
-      if (ms && left.length < n) left = left.concat(pool.filter(it => it.rarity === 'common'));   // 좋은 게 모자라면 일반으로 채운다
-      const take = pred => { const i = left.findIndex(pred); if (i >= 0) out.push(left.splice(i, 1)[0]); };
-      if (ms) take(it => it.rarity === 'epic');                       // 마일스톤: 에픽 한 장 보장
-      if (this.shopVip && !out.some(it => it.rarity !== 'common')) take(it => it.rarity !== 'common');   // 💎 VIP: 레어 이상 한 장
-      while (out.length < n && left.length) { const w = {}; left.forEach((it, i) => { w[i] = W[it.rarity] * (ms && it.rarity === 'common' ? 0.2 : 1); }); const i = +this.rng.weighted(w); out.push(left.splice(i, 1)[0]); }
-      if (ms) for (const it of out) it.milestone = true;
-      return this.rng.shuffle(out);
+      const S = M.MULTI.SHOPS, byCat = {}; for (const it of pool) (byCat[this.shopCatOf(it)] = byCat[this.shopCatOf(it)] || []).push(it);
+      let cat;
+      if (this.shopMilestone() || this.nextPremium) { this.nextPremium = false; cat = 'auction'; }
+      else { const w = {}; for (const k of Object.keys(byCat)) if (S[k] && S[k].weight) w[k] = S[k].weight; cat = Object.keys(w).length ? this.rng.weighted(w) : 'garage'; }
+      this.repShopCat = cat;
+      if (cat === 'auction') { const good = pool.filter(it => it.rarity !== 'common'); const out = this.rng.shuffle(good.length >= n ? good : good.concat(pool.filter(it => it.rarity === 'common'))).slice(0, n); for (const it of out) it.milestone = true; return out; }
+      return this.rng.shuffle(byCat[cat] || []).slice(0, n);
     }
+    itemRarity(it) { return it.kind === 'shopUp' ? 'epic' : it.kind === 'contract' || it.kind === 'traitUnlock' ? 'rare' : 'common'; }
+    shopMilestone() { const k = Math.max(2, ((M.MULTI && M.MULTI.SHOP_MILESTONE) || 3) - (this.shopVip ? 1 : 0)); return this.rules.multi && this.repTier > 0 && this.repTier % k === 0; }
+    _shopUpItems() { if (!this.rules.multi) return []; const out = []; if ((this.shopExtra || 0) < 2) out.push({ kind: 'shopUp', up: 'shelf', price: 0, sold: false }); if (!this.shopVip) out.push({ kind: 'shopUp', up: 'vip', price: 0, sold: false }); if (!this.nextPremium) out.push({ kind: 'shopUp', up: 'pass', price: 0, sold: false }); return out; }
     buyRepShop(i, target) {
       const sh = this.repShop; if (!sh) return { ok: false, msg: T('err.cannotCallNow') };
       const it = sh.items[i]; if (!it || it.sold) return { ok: false, msg: T('err.sold') };
       if (this.cash < (it.kind === 'perk' ? it.price : this.contractPrice ? (it.kind === 'contract' ? this.contractPrice(it) : it.price) : it.price)) return { ok: false, msg: T('err.noCash') };
       this._act('rbuy', { i, s: target == null ? null : target });
-      if (it.kind === 'shopUp') { it.sold = true; sh.bought++; if (it.up === 'shelf') this.shopExtra = (this.shopExtra || 0) + 1; else if (it.up === 'vip') this.shopVip = true; this.say('log.shopUp', { name: T('shopUp.' + it.up) }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, shopUp: it.up }; }
+      if (it.kind === 'shopUp') { it.sold = true; sh.bought++; if (it.up === 'shelf') this.shopExtra = (this.shopExtra || 0) + 1; else if (it.up === 'vip') this.shopVip = true; else if (it.up === 'pass') this.nextPremium = true; this.say('log.shopUp', { name: T('shopUp.' + it.up) }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, shopUp: it.up }; }
       if (it.kind === 'traitUnlock') { it.sold = true; sh.bought++; if (!this.traitUnlocks.includes(it.ptype)) this.traitUnlocks.push(it.ptype); this.say('log.traitUnlock', { type: D.PARCEL_TYPES[it.ptype].name, icon: (this.traitDef(it.trait) || {}).icon || '' }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, unlock: it.ptype }; }
       if (it.kind === 'perk') { this.cash -= it.price; this.run.spent += it.price; it.sold = true; sh.bought++; this._applyPerk(it.perk); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, perk: it.perk }; }
       // 장 매물은 buy() 로 — 잠깐 상점을 마켓으로 세워 두고 판다(로그는 rbuy 하나)

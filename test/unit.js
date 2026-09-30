@@ -1188,10 +1188,13 @@ t('멀티 계열 단계: 등급 + 신뢰 Lv 마다 계열 규칙이 세진다 �
   for (let k = 0; k < 3; k++) { const p = mk(); assert.ok(g.dawnReady(g.contracts[1], [p]), '새벽 ' + (k + 1) + '번째'); g.callCarrier(1, [p.id]); }
   const q = mk(); assert.ok(!g.dawnReady(g.contracts[1], [q]), '네 번째는 없다');
 });
-t('멀티 평판 상점: 레어도 — 3단계마다 특별 상점(일반 없음·에픽 보장) · 🗄 진열대 +1장 · 💎 VIP 레어 보장 · 인장 = 신뢰 Lv +1', () => {
-  const g = MG(71); g.firstShopDone = true; g.repTier = 3; const it = g._drawRepShop(); assert.ok(it.length >= 3 && it.every(x => x.rarity !== 'common') && it.some(x => x.rarity === 'epic'), JSON.stringify(it.map(x => x.kind + ':' + x.rarity)));
+t('멀티 평판 상점: 한 번에 한 종류 — 정비소·소개소·승급 심사·상인 조합 · 3단계마다 심야 경매장(레어 이상) · 🗄 진열대 · 💳 단골 카드(경매 2단계마다) · 🎟 초대장 · 인장 = 신뢰 Lv +1', () => {
+  const g = MG(71); g.firstShopDone = true;
+  for (let t = 1; t <= 8; t++) { if (t % 3 === 0) continue; g.repTier = t; const it = g._drawRepShop(); const cats = new Set(it.map(x => g.shopCatOf(x))); assert.ok(cats.size === 1 && cats.has(g.repShopCat), t + ' ' + g.repShopCat + ' ' + [...cats]); }
+  g.repTier = 3; const au = g._drawRepShop(); assert.equal(g.repShopCat, 'auction'); assert.ok(au.every(x => x.rarity !== 'common'), '경매장은 레어 이상');
   g.repTier = 4; const n0 = g.shopCards(); g.repShop = { items: [{ kind: 'shopUp', up: 'shelf', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.equal(g.shopCards(), n0 + 1, '진열대 +1장');
-  g.repShop = { items: [{ kind: 'shopUp', up: 'vip', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.ok(g.shopVip); for (let k = 0; k < 5; k++) { g.repTier = 4 + k * 3 + 1; assert.ok(g._drawRepShop().some(x => x.rarity !== 'common'), 'VIP: 레어 이상 한 장'); }
+  g.repShop = { items: [{ kind: 'shopUp', up: 'vip', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); g.repTier = 4; assert.ok(g.shopMilestone(), '단골 카드: 2단계마다 경매');
+  g.repShop = { items: [{ kind: 'shopUp', up: 'pass', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); g.repTier = 5; g._drawRepShop(); assert.equal(g.repShopCat, 'auction', '초대장 → 다음은 경매장');
   const c = g.contracts.find(Boolean), lv = g.trustLevel(c.carrier); g.repShop = { items: [{ kind: 'enh', enh: 'seal', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0, g.contracts.indexOf(c)); assert.equal(g.trustLevel(c.carrier), lv + 1, '인장 = 신뢰 Lv +1');
 });
 t('멀티 평판: 택배마다 +1 · ⚡ 긴급은 혼자(또는 직배) 보내면 +4 더, 섞으면 그 호출은 절반 · 한 종류 특수로 꽉 채우면 트레잇 ×2 · 첫 상점은 금방', () => {

@@ -377,7 +377,14 @@
     },
     MIX: { streakMax: 3, maxMult: 4 },
     HOT: { at: 0.8, mult: 2 },
-    REP: { perParcel: 1, rush: 4 }, CLEAR_N: 2, SHOP_MILESTONE: 3,   // 평판: 택배마다 +1 · ⚡ 긴급을 혼자(또는 직배) 보내면 +4 더 — 섞으면 그 호출은 절반
+    REP: { perParcel: 1, rush: 4 }, CLEAR_N: 2, SHOP_MILESTONE: 3,
+    SHOPS: {   // 평판 상점은 한 번에 한 종류 — 레어도는 상점의 것 (auction 은 마일스톤·우대권으로만)
+      garage:  { icon: '🔧', rarity: 'common', weight: 4 },
+      broker:  { icon: '🤝', rarity: 'rare', weight: 3 },
+      promo:   { icon: '📈', rarity: 'rare', weight: 3 },
+      guild:   { icon: '🏪', rarity: 'epic', weight: 1 },
+      auction: { icon: '🌙', rarity: 'legend' },
+    },   // 평판: 택배마다 +1 · ⚡ 긴급을 혼자(또는 직배) 보내면 +4 더 — 섞으면 그 호출은 절반
     FULL_MULT: 2,                     // 한 종류 특수로만 꽉 채운 차 → 그 트레잇 ×2   // 🔥 만석: 80% 넘게 찬 창고에 떨어진 상자 ×2 — 찰 때까지 기다렸다 쏘는 게 이득   // 🔗 조합: 배수 = 종류 수 + 연쇄 − 1 (최대 ×4), 연쇄는 3까지. 조합 아닌 호출이면 연쇄는 끊긴다
     HURRY_N: 3, SEAL: 6, BUZZ: 2, CAP_FLOOR: 0.7, BLAST_MAX: 2,   // 창고는 공격으로 70% 아래로 안 줄고, 대공사는 두 개까지만 턴다 — 한 방이 창고를 비우면 손맛이 없다   // 공격 세기: 독촉은 3개를 오늘 안에 · 봉인 −6칸 · 입소문 평판 +2
     // 물품 종류마다 트레잇 두 개 — 처음부터 둘 중 하나가 붙는다. 평판 상점의 「{종류} 트레잇 강화」 카드는 그 종류 트레잇 세기 +1
