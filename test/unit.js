@@ -937,6 +937,18 @@ t('포워더(항공·철도·해상)는 무역 고객(🛃 짐을 맡기는 화�
 // ----- 멀티 「난투」 (docs/MULTIPLAYER_DESIGN.md · 1단계) -----
 const MULTI = require('../www/js/multi.js'), BOT = require('../www/js/bot.js');
 const MG = (seed, extra) => new Game(Object.assign({ multi: true, seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false }, extra || {}));
+t('멀티: 한길(대량)도 🌾 농산물을 싣는다 · ⚠ 는 어느 차든 싣되 깨질 수 있고, 조심(파손 계열)만 안 깨진다', () => {
+  const g = MG(1), bulk = g.contracts.find(c => c && D.CARRIERS[c.carrier].family === 'bulk');
+  assert.ok(bulk, '시작 한길');
+  const pp = (type, size) => ({ type, size, attrs: D.PARCEL_TYPES[type].attrs, customs: 0 });
+  assert.ok(g.canHandle(bulk, pp('produce', 2)), '한길이 2칸 농산물을 싣는다');
+  assert.ok(!g.canHandle(bulk, pp('fresh', 1)), '신선은 여전히 냉장 계열');
+  const f = pp('fragile', 1), careful = g._makeContract('fragile0'), cold = g._makeContract('cold0'), intl = g._makeContract('intl0'), giant = g._makeContract('large0');
+  assert.ok(g.canHandle(bulk, f) && g.canHandle(cold, f) && g.canHandle(intl, f), '한길·냉장·관세도 ⚠ 를 싣는다');
+  assert.ok(g.breakProb(bulk, f) > 0 && g.breakProb(cold, f) > 0 && g.breakProb(intl, f) > 0, '다만 깨질 수 있다');
+  assert.equal(g.breakProb(careful, f), 0, '조심은 안 깨진다');
+  assert.ok(g.breakProb(giant, f) > 0 && g.breakProb(giant, f) < g.breakProb(bulk, f), '완충 능력만 있는 차(거인)는 위험이 줄 뿐');
+});
 t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4 · 시작 차는 작다', () => {
   const g = MG(1), R = g.rules;
   assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) === R.truckCap.bulkBase) && g.simulMax(g.contracts.find(Boolean)) === 1, '시작 한길은 4칸 한 대');
@@ -1005,7 +1017,7 @@ t('멀티: 🔥 만석 — 80% 넘게 찬 창고에 떨어진 상자는 두 배 
 });
 t('멀티: 적재는 일반 + 제 물품 — 특약·복합 능력마다 한 종류씩 더 · 거인 두 번째 차는 대형을 실을 때만', () => {
   const g = MG(401); const takes = k => { const c = g._makeContract(k); return ['normal', 'fresh', 'produce', 'fragile', 'intl', 'large', 'frozen'].filter(t => g.canHandle(c, { type: t, size: t === 'intl' || t === 'large' ? 3 : 1, attrs: D.PARCEL_TYPES[t].attrs, customs: 0 })); };
-  assert.deepEqual(takes('large0'), ['normal', 'large']); assert.deepEqual(takes('intl0'), ['normal', 'intl']); assert.deepEqual(takes('cold0'), ['normal', 'fresh']); assert.deepEqual(takes('fragile0'), ['normal', 'produce', 'fragile']);
+  assert.deepEqual(takes('large0'), ['normal', 'fragile', 'large']); assert.deepEqual(takes('intl0'), ['normal', 'fragile', 'intl']); assert.deepEqual(takes('cold0'), ['normal', 'fresh', 'fragile']);   // ⚠ 는 어느 차든 싣는다(깨질 수 있다) assert.deepEqual(takes('fragile0'), ['normal', 'produce', 'fragile']);
   assert.ok(takes('cold2').includes('frozen'), '복합 능력(냉동칸)은 +1'); const c = g._makeContract('intl0'); c.enh.opts = ['optCold']; assert.ok(g.canHandle(c, { type: 'fresh', size: 1, attrs: ['cold'], customs: 0 }), '보냉 특약 = 신선 +1');
   const L = g._makeContract('large0'); assert.equal(g.maxTrucks(L, [{ type: 'normal' }]), 1);
   { const h = MG(402); h.parcels = []; const Lc = h._makeContract('large0'); for (let i = 0; i < 5; i++) h.parcels.push(h._spawnParcel({ type: 'normal', size: 2, customer: 'anon' })); const r = h.autoPick(Lc, h.eligibleParcels(Lc), 2); const vol = r.ids.map(id => h.parcels.find(p => p.id === id).size).reduce((a, b) => a + b, 0); assert.ok(vol <= h.vehicleCap(Lc), '일반만이면 한 대 분량만 고른다 ' + vol); } assert.equal(g.maxTrucks(L, [{ type: 'large' }, { type: 'normal' }]), 2);

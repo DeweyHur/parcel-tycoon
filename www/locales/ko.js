@@ -158,7 +158,7 @@
     'multi.famUp.cold': '🌅 새벽 출발 하루 {n}번',
     'multi.famUp.frozen': '🧊 숙성 최대 +{n}',
     'multi.famUp.intl': '🛃 통관 끝난 날 ×{n}',
-    'multi.famUp.fragile': '⚠ 무사고 개당 ★+{n}',
+    'multi.famUp.fragile': '⚠ 파손 전문 개당 ★+{n}',
     'multi.famUp.large': '🧹 뒷정리 {n}개',
     'multi.sealDesc': '고른 계약의 신뢰 Lv +1',
     'shopUp.shelf': '진열대 확장',
@@ -2371,7 +2371,7 @@
       "frozen": { "name": "숙성", "desc": "냉장·냉동실 안 트레잇 택배는 하루마다 세기 +1(최대 +2) · 조합 연쇄 +1" },
       "large": { "name": "덩치", "desc": "대형을 실으면 트럭 두 대 · 조합에 끼면 4칸 상자" },
       "intl": { "name": "보세 구역", "desc": "통관 대기 0칸 · 통관 끝난 날 트레잇 ×2" },
-      "fragile": { "name": "무사고", "desc": "파손품 안 깨고 보내면 평판 +1" }
+      "fragile": { "name": "파손 전문", "desc": "조심 운송(파손 계열)은 파손품이 깨지지 않는다 · 파손품을 기한 안에 보내면 개당 평판 +1" }
     },
     "CHARS": {
       "hangil": { "name": "한길", "desc": "트럭 한 칸 더" },

@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, finishDump: false, pushMult: 1, freshNoSpoil: false,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, repPerParcel: false, traitPerCall: false, traitAll: false, repStepGrow: 0, repStepMax: 0, repFirstGap: 0, famRules: false, strictCarry: false, ownCargo: 0, ownCargoMax: 1, typeSizes: null, maxTrucks: 0, repKeepTier: false, pushFlat: 0, mixCombo: false, truckCap: null, famTrucks: null, theftMaxDay: 0,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, repPerParcel: false, traitPerCall: false, traitAll: false, repStepGrow: 0, repStepMax: 0, repFirstGap: 0, famRules: false, strictCarry: false, fragileAnywhere: false, ownCargo: 0, ownCargoMax: 1, typeSizes: null, maxTrucks: 0, repKeepTier: false, pushFlat: 0, mixCombo: false, truckCap: null, famTrucks: null, theftMaxDay: 0,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, repairs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, repairGrow: 0, attackMult: 1,
@@ -1294,6 +1294,10 @@
       // 일반 전용(대량) 차도 ⚠ 는 싣는다 — 파손 능력이 없으니 깨질 확률을 안고(breakProb). 규칙 문구 「능력 없는 업체로 보내면 파손 확률」 그대로
       if (car.onlyPlain && attrs.filter(a => D.GATING_ATTRS.includes(a) && a !== 'fragile').length) return false;
       // 난투(strictCarry): 계약은 **일반 + 제 물품**만 — 특약·복합 능력(계열 기본 능력 밖의 것)마다 한 종류씩 더 (유저: "코끼리 보세 등등이 실을 수 있는 게 너무 똑같아")
+      // 난투(fragileAnywhere): ⚠ 파손품은 어느 계열 차든 싣는다 — 다만 깨질 수 있다(breakProb). 조심(파손 계열)만 안 깨진다
+      // (유저: "한길도 파손은 보내지만 파손이 되는 거지 왜 완전 바보로 바뀌었지 · 냉장이나 관세도 파손 위험이 있는데 조심은 그걸 극도로 줄여 주는 걸로")
+      const fragileOnly = this.rules.fragileAnywhere && attrs.length === 1 && attrs[0] === 'fragile';
+      if (fragileOnly) return true;
       if (this.rules.strictCarry && p.type && p.type !== 'normal') { const own = (M.MULTI.CARRY_OWN || {})[car.family] || []; if (!own.includes(p.type)) { const base = (D.FAMILIES[car.family] || {}).caps || [], AT = M.MULTI.CARRY_ATTR || {}; if (!caps.some(a => !base.includes(a) && AT[a] === p.type)) return false; } }
       if (car.allowAttrs && attrs.some(a => D.GATING_ATTRS.includes(a) && !car.allowAttrs.includes(a) && !caps.includes(a))) return false;   // 특약(보냉·완충)으로 붙인 능력은 설비 제한도 푼다 — 통관 차에 보냉 특약을 붙여도 신선을 못 싣던 것
       if (need && !need.some(a => attrs.includes(a))) { if (!(this.rules.normalAnywhere && !attrs.length)) return false; }   // 난투: 전문 차도 일반은 싣는다 — "파손은 싣는데 일반은 못 싣는 건 상식상 애매" (유저)
@@ -1341,7 +1345,13 @@
       return { attrs, sizeMin: car.sizeMin, sizeMax: max };
     }
     // ⚠ 파손 확률: 능력에 fragile이 없으면
-    breakProb(c, p) { const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs; if (!attrs.includes('fragile') || this.contractCaps(c).includes('fragile')) return 0; return Math.min(0.95, D.BREAK_PROB * this.rules.breakMult * (this.customerPerk(p.customer, 'breakMult') || 1)); }
+    breakProb(c, p) {
+      const attrs = p.attrs || D.PARCEL_TYPES[p.type].attrs; if (!attrs.includes('fragile')) return 0;
+      const base = Math.min(0.95, D.BREAK_PROB * this.rules.breakMult * (this.customerPerk(p.customer, 'breakMult') || 1));
+      // 난투: 조심(파손 계열)만 깨지지 않는다. 완충 능력(특약·복합·대형 기본)은 위험을 줄일 뿐이다
+      if (this.rules.fragileAnywhere) { if (D.CARRIERS[c.carrier].family === 'fragile') return 0; return this.contractCaps(c).includes('fragile') ? Math.round(base * D.FRAGILE_PADDED_MULT * 100) / 100 : base; }
+      if (this.contractCaps(c).includes('fragile')) return 0; return base;
+    }
     eligibleParcels(c) { return this.parcels.filter(p => this.canHandle(c, p)); }
     // 급한 순 자동 선택. sorted 는 급한 순으로 정렬된 후보, maxTrucks 는 이번에 부를 수 있는 최대 대수.
     // 급한 것부터 담되 "마지막 차가 본전선(적재 80%)도 못 채우면 그 차는 통째로 뺀다".

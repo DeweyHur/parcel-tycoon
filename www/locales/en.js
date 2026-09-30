@@ -158,7 +158,7 @@
     'multi.famUp.cold': '🌅 dawn run {n}×/day',
     'multi.famUp.frozen': '🧊 aging up to +{n}',
     'multi.famUp.intl': '🛃 cleared-day ×{n}',
-    'multi.famUp.fragile': '⚠ safe fragile ★+{n}',
+    'multi.famUp.fragile': '⚠ fragile specialist ★+{n}',
     'multi.famUp.large': '🧹 sweep {n}',
     'multi.sealDesc': 'Chosen contract trust Lv +1',
     'shopUp.shelf': 'Bigger Shelf',
@@ -2370,7 +2370,7 @@
       "frozen": { "name": "Aging", "desc": "Trait parcels in cold/freezer grow +1 a day (max +2) · combo chain +1" },
       "large": { "name": "Heavyweight", "desc": "Two trucks when hauling large · 4-cell crates in a combo" },
       "intl": { "name": "Bonded zone", "desc": "Customs wait takes 0 cells · traits ×2 on clearance day" },
-      "fragile": { "name": "Zero breaks", "desc": "Fragile shipped intact: rep +1 each" }
+      "fragile": { "name": "Fragile specialist", "desc": "Fragile-family trucks never break ⚠ · each fragile parcel shipped on time: rep +1" }
     },
     "CHARS": {
       "hangil": { "name": "Hangil", "desc": "Trucks carry +1 cell" },
