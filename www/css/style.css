@@ -1246,3 +1246,20 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 #contract-strip .contract .cn .rank { flex: none; }
 
 #call-head .ch-top .enh-line { font-size: 10px; color: #c8c3e8; white-space: nowrap; } #call-head .ch-top .enh-line .eicon { margin-right: 1px; }
+
+.pkcard .fup { display: inline-block; color: #fff; font-weight: normal; margin-top: 2px; }
+.pkcard small { word-break: keep-all; }
+/* 평판 상점: 마켓처럼 가로 줄 — 아이콘 왼쪽, 이름·설명 오른쪽 (유저: "차라리 그냥 마켓처럼 가로로") */
+.pkrow.hlist { flex-direction: column; gap: 6px; max-height: 62vh; overflow-y: auto; }
+.pkrow.hlist .pkcard { flex: none; flex-direction: row; align-items: center; text-align: left; gap: 8px; padding: 6px 8px; }
+.pkrow.hlist .pkcard .ic { flex: none; width: 28px; text-align: center; font-size: 22px; }
+.pkrow.hlist .pkcard .pbody { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.pkrow.hlist .pkcard b { font-size: 13px; }
+.pkrow.hlist .pkcard small { font-size: 10px; line-height: 1.3; }
+.pkrow.hlist .pkcard .frule, .pkrow.hlist .pkcard .fup { font-size: 11px; }
+.pkrow.hlist .pkcard .now { font-size: 11px; padding: 0 5px; }
+.pkrow.hlist .pkcard em { font-size: 10px; }
+.pkrow.hlist .pkcard .now { margin-top: 2px; }
+.pkcard .rar { font-style: normal; font-size: 9px; padding: 0 4px; margin-right: 5px; vertical-align: 2px; color: #1b1a2e; }
+.pkcard.rar-rare .rar { background: #6fb8ff; } .pkcard.rar-epic .rar { background: #d59bff; }
+.pkcard.rar-epic { box-shadow: 0 0 0 1px #d59bff inset, 0 0 10px rgba(213,155,255,.35); }

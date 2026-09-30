@@ -746,7 +746,7 @@
     // 🛒 장사: 평판 계단이 짧아지고(상점이 자주) 상점 카드가 는다
     repStepNow() { const R = this.rules, S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; const base = R.repStepGrow ? Math.min(R.repStepMax || 99, R.repStep + R.repStepGrow * this.repTier) : R.repStep;   // 계단이 점점 길어진다 — 첫 상점은 빨리 (유저: "초반에 빨리 더 전문화 마켓")
       return S && R.multi ? Math.max(Math.min(S.stepMin, base), base - S.step * this.trackLv('shop')) : base; }
-    shopCards() { const S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; return S && this.rules.multi ? Math.min(S.cardsMax, 3 + Math.floor(this.trackLv('shop') / S.cardsPer)) : 3; }
+    shopCards() { const S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; return S && this.rules.multi ? Math.min(S.cardsMax + 2, Math.min(S.cardsMax, 3 + Math.floor(this.trackLv('shop') / S.cardsPer)) + (this.shopExtra || 0)) : 3; }
     traitPool(type) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? null : type; const pair = key && TT[key]; if (!pair) return []; return pair.slice(); }   // 둘 다 처음부터 — 한 가지만 계속 받던 것
     // 트레잇 세기: 🔗 조합 배수 × (강화 카드 +1) × (🧊 숙성 +일수)
     traitPower(p) { let k = 1 + (this.traitUnlocks.includes(p.type) ? 1 : 0) + (p.aged || 0); return k * (this._mixMult || 1) * (this._fullMult || 1); }
@@ -1504,22 +1504,40 @@
     }
     // 평판 상점(난투): 장 매물(계약 업그레이드·새 계약·강화·광고권)에서 랜덤 3장. 시간은 안 간다 (유저: "일정 수준 평판 달성 시 상점, 랜덤 픽 3개, 내 돈으로 산다")
     // 이 강화를 붙일 수 있는 슬롯(많이 나른 계약부터) — 없으면 −1. 특약은 받는 계약, 나머지는 빈 강화 칸
-    enhTarget(key) { const E = D.ENHANCEMENTS[key]; if (!E) return -1; let s = -1, max = -1; this.contracts.forEach((c, i) => { if (c && (E.kind !== 'opt' || this.optFits(key, c)) && (E.kind === 'trust' || this.enhUsed(c) < this.enhSlots(c)) && (c.delivered || 0) > max) { max = c.delivered || 0; s = i; } }); return s; }
+    enhTarget(key) { const E = D.ENHANCEMENTS[key]; if (!E) return -1; let s = -1, max = -1; this.contracts.forEach((c, i) => { if (c && (E.kind !== 'opt' || this.optFits(key, c)) && (E.kind === 'trust' || this.enhUsed(c) < this.enhSlots(c)) && !(E.kind === 'trust' && this.rules.multi && this.trustLevel(c.carrier) >= 3) && (c.delivered || 0) > max) { max = c.delivered || 0; s = i; } }); return s; }
     // 난투: 특약은 그 속성의 물품이 실제로 올 때만 판다 — 신선은 냉장 계열이 있어야 오는데, 냉장 계약이 있으면 보냉 특약이 필요 없다
     _optUseful(key) { const E = D.ENHANCEMENTS[key]; if (!E || E.kind !== 'opt' || !this.rules.typeFamilies) return true; return Object.keys(D.PARCEL_TYPES).some(t => (D.PARCEL_TYPES[t].attrs || []).includes(E.attr) && this.typeOpen(t) && this.contracts.some(c => c && this.optFits(key, c))); }
     _drawRepShop() {
       // 첫 상점은 트랙마다 새 계약 한 장씩 — 계열이 모두 다르다 (유저: "첫 마켓은 모두 계열이 다른 걸로")
       if (this.rules.multi && M.MULTI.TRACKS && !this.firstShopDone) { this.firstShopDone = true; const first = this._trackContractItems(); if (first.length >= 2) { if (this.rules.noMoney) for (const it of first) it.price = 0; return first; } }
       // 퍽 카드는 없다(유저: "그 이상한 퍽들도 없애고 그냥 마켓 아이템들이 평판 올라가면 뜨는 거야") — 장 매물에서 랜덤 3장. 돈이 없는 규칙이면 값 0 · 하나만 고른다
-      const goods = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill' && (it.kind !== 'enh' || this.enhTarget(it.enh) >= 0) && (it.kind !== 'enh' || this._optUseful(it.enh))).concat(this._traitUnlockItems())).slice(0, this.shopCards());   // 붙일 계약이 없는 강화는 안 뜬다
+      const pool = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill' && (it.kind !== 'enh' || this.enhTarget(it.enh) >= 0) && (it.kind !== 'enh' || this._optUseful(it.enh)) && !(it.kind === 'enh' && it.enh === 'seal' && this.rules.multi && !this.contracts.some(c => c && this.trustLevel(c.carrier) < 3))).concat(this._traitUnlockItems(), this._shopUpItems()));   // 붙일 계약이 없는 강화는 안 뜬다
+      const goods = this.rules.multi ? this._rarityPick(pool, this.shopCards()) : pool.slice(0, this.shopCards());
       if (this.rules.noMoney) for (const it of goods) it.price = 0;
       return goods;
+    }
+    // 레어도 (유저: "아이템마다 레어도를 둬서 특정 마일스톤엔 좋은 아이템이 오고, 상점을 강화하는 아이템도") — 일반 · 레어(계약·트레잇 강화) · 에픽(상점 강화)
+    itemRarity(it) { return it.kind === 'shopUp' ? 'epic' : it.kind === 'contract' || it.kind === 'traitUnlock' ? 'rare' : 'common'; }
+    shopMilestone() { const k = (M.MULTI && M.MULTI.SHOP_MILESTONE) || 3; return this.rules.multi && this.repTier > 0 && this.repTier % k === 0; }
+    _shopUpItems() { if (!this.rules.multi) return []; const out = []; if ((this.shopExtra || 0) < 2) out.push({ kind: 'shopUp', up: 'shelf', price: 0, sold: false }); if (!this.shopVip) out.push({ kind: 'shopUp', up: 'vip', price: 0, sold: false }); return out; }
+    _rarityPick(pool, n) {
+      for (const it of pool) it.rarity = this.itemRarity(it);
+      const ms = this.shopMilestone(), W = { common: 6, rare: 3, epic: 1 }, out = [];
+      let left = ms ? pool.filter(it => it.rarity !== 'common') : pool.filter(it => it.rarity !== 'epic' || true);
+      if (ms && left.length < n) left = left.concat(pool.filter(it => it.rarity === 'common'));   // 좋은 게 모자라면 일반으로 채운다
+      const take = pred => { const i = left.findIndex(pred); if (i >= 0) out.push(left.splice(i, 1)[0]); };
+      if (ms) take(it => it.rarity === 'epic');                       // 마일스톤: 에픽 한 장 보장
+      if (this.shopVip && !out.some(it => it.rarity !== 'common')) take(it => it.rarity !== 'common');   // 💎 VIP: 레어 이상 한 장
+      while (out.length < n && left.length) { const w = {}; left.forEach((it, i) => { w[i] = W[it.rarity] * (ms && it.rarity === 'common' ? 0.2 : 1); }); const i = +this.rng.weighted(w); out.push(left.splice(i, 1)[0]); }
+      if (ms) for (const it of out) it.milestone = true;
+      return this.rng.shuffle(out);
     }
     buyRepShop(i, target) {
       const sh = this.repShop; if (!sh) return { ok: false, msg: T('err.cannotCallNow') };
       const it = sh.items[i]; if (!it || it.sold) return { ok: false, msg: T('err.sold') };
       if (this.cash < (it.kind === 'perk' ? it.price : this.contractPrice ? (it.kind === 'contract' ? this.contractPrice(it) : it.price) : it.price)) return { ok: false, msg: T('err.noCash') };
       this._act('rbuy', { i, s: target == null ? null : target });
+      if (it.kind === 'shopUp') { it.sold = true; sh.bought++; if (it.up === 'shelf') this.shopExtra = (this.shopExtra || 0) + 1; else if (it.up === 'vip') this.shopVip = true; this.say('log.shopUp', { name: T('shopUp.' + it.up) }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, shopUp: it.up }; }
       if (it.kind === 'traitUnlock') { it.sold = true; sh.bought++; if (!this.traitUnlocks.includes(it.ptype)) this.traitUnlocks.push(it.ptype); this.say('log.traitUnlock', { type: D.PARCEL_TYPES[it.ptype].name, icon: (this.traitDef(it.trait) || {}).icon || '' }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, unlock: it.ptype }; }
       if (it.kind === 'perk') { this.cash -= it.price; this.run.spent += it.price; it.sold = true; sh.bought++; this._applyPerk(it.perk); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, perk: it.perk }; }
       // 장 매물은 buy() 로 — 잠깐 상점을 마켓으로 세워 두고 판다(로그는 rbuy 하나)
@@ -2742,7 +2760,7 @@
         else if (e.kind === 'cap') { c.enh.cap++; }
         else if (e.kind === 'regular') { c.enh.regular = (+c.enh.regular || 0) + 1; }
         else if (e.kind === 'holiday') { if (c.enh.holiday) return { ok: false, msg: T('err.enhHas') }; c.enh.holiday = true; }
-        else if (e.kind === 'trust') this._addTrust(c.carrier, e.value);
+        else if (e.kind === 'trust') { if (this.rules.multi) { const lv = this.trustLevel(c.carrier); this._addTrust(c.carrier, lv >= 3 ? 0 : Math.max(0, D.TRUST_LEVELS[lv + 1] - this.trustXp(c.carrier))); } else this._addTrust(c.carrier, e.value); }   // 난투: 인장 = 신뢰 Lv +1 (유저: "하나 고르는 것치고 보상이 너무 적다")
         else if (e.kind === 'opt') {
           const car = D.CARRIERS[c.carrier];
           if (this.contractCaps(c).includes(e.attr)) return { ok: false, msg: T('err.optHasAttr') };
