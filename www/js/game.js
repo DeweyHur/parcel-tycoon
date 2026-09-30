@@ -1332,6 +1332,8 @@
         return { take: sorted.filter(p => chosen.has(p.id)), v };
       };
       let trucks = Math.max(1, maxTrucks), r = fill(vcap * trucks), trimmed = false;
+      // 거인: 두 번째 차는 대형을 실을 때만 — 대형이 안 담겼으면 한 대로 다시 (유저: "말한 설명 아닌 것 같은데" — 1대인데 8/4 로 담겼다)
+      if (this.rules.famTrucks && trucks > 1 && this.maxTrucks(c, r.take) < trucks) { trucks = this.maxTrucks(c, r.take); r = fill(vcap * trucks); }
       // 부피 합이 맞아도 통째로 안 들어갈 수 있다(7칸 차 둘에 2칸짜리 일곱 = 14칸이지만 6+6 이 한계) — 넘치면 급하지 않은 것부터 덜어낸다
       const fits = take => this.packTrucks(c, take).length <= trucks;
       while (r.take.length && !fits(r.take)) { const drop = r.take.slice().reverse().find(p => !urgent(p)) || r.take[r.take.length - 1]; r.take = r.take.filter(p => p !== drop); r.v -= drop.size; }

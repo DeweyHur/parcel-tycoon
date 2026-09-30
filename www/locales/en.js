@@ -2338,7 +2338,7 @@
     "FAM_RULES": {
       "cold": { "name": "Dawn run", "desc": "Only today's fresh aboard: no day used" },
       "frozen": { "name": "Aging", "desc": "Trait parcels in cold/freezer grow +1 a day (max +2) · combo chain +1" },
-      "large": { "name": "Heavyweight", "desc": "In a combo, 4-cell crates fly · two trucks" },
+      "large": { "name": "Heavyweight", "desc": "Two trucks when hauling large · 4-cell crates in a combo" },
       "intl": { "name": "Bonded zone", "desc": "Customs wait takes 0 cells · traits ×2 on clearance day" },
       "fragile": { "name": "Zero breaks", "desc": "Fragile shipped intact: rep +1 each" }
     },

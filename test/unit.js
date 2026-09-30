@@ -1007,7 +1007,8 @@ t('멀티: 적재는 일반 + 제 물품 — 특약·복합 능력마다 한 종
   const g = MG(401); const takes = k => { const c = g._makeContract(k); return ['normal', 'fresh', 'produce', 'fragile', 'intl', 'large', 'frozen'].filter(t => g.canHandle(c, { type: t, size: t === 'intl' || t === 'large' ? 3 : 1, attrs: D.PARCEL_TYPES[t].attrs, customs: 0 })); };
   assert.deepEqual(takes('large0'), ['normal', 'large']); assert.deepEqual(takes('intl0'), ['normal', 'intl']); assert.deepEqual(takes('cold0'), ['normal', 'fresh']); assert.deepEqual(takes('fragile0'), ['normal', 'produce', 'fragile']);
   assert.ok(takes('cold2').includes('frozen'), '복합 능력(냉동칸)은 +1'); const c = g._makeContract('intl0'); c.enh.opts = ['optCold']; assert.ok(g.canHandle(c, { type: 'fresh', size: 1, attrs: ['cold'], customs: 0 }), '보냉 특약 = 신선 +1');
-  const L = g._makeContract('large0'); assert.equal(g.maxTrucks(L, [{ type: 'normal' }]), 1); assert.equal(g.maxTrucks(L, [{ type: 'large' }, { type: 'normal' }]), 2);
+  const L = g._makeContract('large0'); assert.equal(g.maxTrucks(L, [{ type: 'normal' }]), 1);
+  { const h = MG(402); h.parcels = []; const Lc = h._makeContract('large0'); for (let i = 0; i < 5; i++) h.parcels.push(h._spawnParcel({ type: 'normal', size: 2, customer: 'anon' })); const r = h.autoPick(Lc, h.eligibleParcels(Lc), 2); const vol = r.ids.map(id => h.parcels.find(p => p.id === id).size).reduce((a, b) => a + b, 0); assert.ok(vol <= h.vehicleCap(Lc), '일반만이면 한 대 분량만 고른다 ' + vol); } assert.equal(g.maxTrucks(L, [{ type: 'large' }, { type: 'normal' }]), 2);
 });
 t('멀티: 🔗 조합 — 한 차에 다른 특수 물품 둘 이상 → 트레잇 ×(종류 + 연쇄 − 1), 일반 상자가 전원에게 · 조합 아닌 호출이면 연쇄가 끊긴다 · 냉동이 끼면 연쇄 +1', () => {
   const g = MG(91); g.firstShopDone = true; g.schedule = g.schedule.map(() => []); g.parcels = [];
