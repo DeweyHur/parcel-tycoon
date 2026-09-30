@@ -1009,6 +1009,7 @@
       else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier]; const from = it.switchFrom != null && g.contracts.find(c => c && c.id === it.switchFrom); const tk = g.rules.multi && g.trackOf(it.carrier), TK = tk && M.MULTI.TRACKS[tk];
         icon = TK ? TK.icon : it.switchFrom != null ? '⬆' : '📄'; name = car.name; desc = `${from ? '⬆ ' : ''}🚚 ${T('fmt.cells', { n: g.vehicleCap({ carrier: it.carrier, grade: it.grade, enh: { cap: 0, capDelta: 0 }, opts: [] }) })} ${(car.caps || []).map(a => D.ATTRS[a] ? D.ATTRS[a].icon : '').join('')}`; fam = 'fam-' + (tk ? TRACK_CLS[tk] : 'eco');
         const FR = g.rules.famRules && (M.MULTI.FAM_RULES || {})[D.familyOf(it.carrier)]; if (FR && !from) desc += `<br><b class="frule">${FR.icon} ${esc(FR.name || '')}</b><br>${esc(FR.desc || '')}`;
+        { const fm = D.familyOf(it.carrier), U = g.rules.famRules && M.MULTI.FAM_UP && M.MULTI.FAM_UP[fm]; if (U && !U.trustOnly) { const st0 = g.famStep(fm), st1 = Math.max(st0, (car.tier || 0) + g.trustLevel(from ? from.carrier : it.carrier)), v0 = st0 < 0 ? null : g.famUp(fm, st0), v1 = g.famUp(fm, st1); desc += `<br><b class="fup">${v0 != null && v0 !== v1 ? famUpText(fm, v0) + ' → ' : ''}${famUpText(fm, v1)}</b>`; } }
         if (TK) { const gain = (car.tier || 0) + 1 - (from ? (D.CARRIERS[from.carrier].tier || 0) + 1 : 0), after = g.trackLv(tk) + gain; nw = familyTraits(D.familyOf(it.carrier)); tag = `${T('track.' + tk)} · ${trackFx(g, tk, after)}`; } }
       else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}` : T('mk.enhNoTarget'); }
       else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn }); desc = esc(T('multi.boostDesc', { icons: ((M.MULTI.TYPE_TRAITS || {})[it.ptype] || []).map(id => (M.MULTI.TRAITS[id] || {}).icon || '').join(' ') })); const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
@@ -1699,8 +1700,10 @@
   }
   // 단계별 효과 세 줄 — 이른 단계는 밝게, 아직인 단계는 흐리게. 호출 머리판 오른쪽 빈 자리에 선다
   // 난투 신뢰 문구: 칸 +n (+ 능력 특성이 있으면 그것도)
+  function famUpText(fam, n) { return T('multi.famUp.' + fam, { n }); }
   function trustText(carrier, lv) {
     if (!game || !game.rules.noMoney) return D.trustEffectText(carrier, lv);
+    { const fm = D.familyOf(carrier), U = game.rules.famRules && M.MULTI.FAM_UP && M.MULTI.FAM_UP[fm]; if (U) { const st = (U.trustOnly ? 0 : (D.CARRIERS[carrier].tier || 0)) + lv; const pk = (D.TRUST_PERKS[fm] || [])[lv - 1] || {}; const keep = Object.keys(pk).some(k => D.MULTI_TRUST_KEEP.includes(k) && k !== 'cap'); return famUpText(fm, game.famUp(fm, st)) + (keep ? ' · ' + D.trustEffectText(carrier, lv).split(' · ').filter(x => !/용량|cap/i.test(x)).join(' · ') : ''); } }
     const pk = (D.TRUST_PERKS[D.familyOf(carrier)] || [])[lv - 1] || {}; const keep = Object.keys(pk).some(k => D.MULTI_TRUST_KEEP.includes(k));
     return T('multi.trustCap', { n: lv }) + (keep ? ' · ' + D.trustEffectText(carrier, lv) : '');
   }

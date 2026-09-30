@@ -939,15 +939,15 @@ const MULTI = require('../www/js/multi.js'), BOT = require('../www/js/bot.js');
 const MG = (seed, extra) => new Game(Object.assign({ multi: true, seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false }, extra || {}));
 t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4 · 시작 차는 작다', () => {
   const g = MG(1), R = g.rules;
-  assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) === R.truckCap.bulkBase) && g.simulMax(g.contracts.find(Boolean)) === 1, '한길은 6칸 한 대 — 특수 계열(4칸)보다 크다: 일반을 치우는 전문화');
-  { const L = g._makeContract('large0'), I = g._makeContract('intl2'), B = g._makeContract('bulk2'); assert.equal(g.maxTrucks(L), 2, '거인만 두 대'); assert.equal(g.maxTrucks(I), 1); assert.equal(g.vehicleCap(I), 5, '관세도 4칸 + 두 등급에 한 칸'); assert.equal(g.vehicleCap(B), R.truckCap.bulkBase + 2 * (D.CARRIERS[B.carrier].tier || 0), '한길은 등급마다 +2칸'); }
+  assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) === R.truckCap.bulkBase) && g.simulMax(g.contracts.find(Boolean)) === 1, '시작 한길은 4칸 한 대');
+  { const L = g._makeContract('large0'), I = g._makeContract('intl2'), B = g._makeContract('bulk2'); assert.equal(g.maxTrucks(L), 2, '거인만 두 대'); assert.equal(g.maxTrucks(I), 1); assert.equal(g.vehicleCap(I), 4, '특수 계열은 등급이 올라도 4칸'); I.enh.cap = 2; I.enh.capDelta = -1; assert.equal(g.vehicleCap(I), 4, '적재 보강·특약도 칸을 안 바꾼다'); assert.equal(g.vehicleCap(B), 4 + (D.CARRIERS[B.carrier].tier || 0), '한길은 등급마다 +1칸 (4 5 6 7)'); }
   { const big = []; const types = new Set(); for (let m = 1; m <= 6; m++) for (const t of g._sharedSchedule(m)) for (const sp of t) { types.add(sp.type); if ((sp.type === 'fresh' || sp.type === 'frozen') && sp.size > 2) big.push(sp); } assert.equal(big.length, 0, '신선·냉동은 2칸까지'); assert.ok(['intl', 'large', 'frozen'].every(t => types.has(t)), '통관·대형·냉동도 대본에 있다(계약을 사면 열린다)'); }
   assert.ok(R.multi && R.months === 6 && R.noHolidays && R.noCalendarEvents && R.noWeekend && R.unlimitedCalls && R.noCallFee && R.payNow && R.noLoan && R.noInsurance && !R.shopDay && R.autoSummary && R.repDecides);
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
   assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk'], '한길만 들고 시작');
   { const specs = g.schedule.flat().filter(sp => sp.type !== 'normal'); assert.ok(specs.length > 0, '대본엔 특수 물품이 있고'); assert.ok(g.parcels.every(p => p.type === 'normal' || p.type === 'produce'), '받아 줄 계약이 없으면 일반으로 온다(농산물은 아무 차나 싣는다)'); }
   { let plain = 0; for (let c = 1; c <= 6; c++) for (const d of g._sharedSchedule(c)) for (const sp of d) if (sp.type === 'normal' && sp.trait) plain++; assert.equal(plain, 0, '일반엔 트레잇이 없다(특수 물품만)'); }
-  { const c = g.contracts[0], cap0 = g.vehicleCap(c); g.trust[c.carrier] = 60; assert.equal(g.vehicleCap(c), cap0 + 3, '난투 신뢰 Lv3 = 용량 +3'); assert.equal(g.trustPerk(c.carrier, 'feeMult'), null, '배차비 특성은 없다'); g.trust[c.carrier] = 0; }
+  { const c = g.contracts[0], cap0 = g.vehicleCap(c); g.trust[c.carrier] = 60; assert.equal(g.vehicleCap(c), cap0, '난투 신뢰는 칸을 안 바꾼다'); assert.equal(g.famUp('bulk'), 3, '한길 신뢰 Lv3 = 밀려온 상자 ★+3'); assert.equal(g.trustPerk(c.carrier, 'feeMult'), null, '배차비 특성은 없다'); g.trust[c.carrier] = 0; }
   assert.equal(g.monthEvents(1).length, 0); assert.equal(g.insurer, 'none');
 });
 t('멀티: 입고 대본은 매치 공유 — 같은 시드면 같은 짐, 평판이 달라도 같다', () => {
@@ -1178,6 +1178,15 @@ t('멀티: 예보와 실제 도착이 같다 — 받아 줄 계약이 없는 특
   const g = MG(311); g.firstShopDone = true; let bad = 0, n = 0;
   for (let d = 0; d < 14 && g.phase === 'play'; d++) { const up = g.upcoming()[0]; const want = (up.specs || []).map(s => s.type).sort().join(); g.parcels = []; g.wait([]); if (g.repShop) g.closeRepShop(); const got = g.parcels.filter(p => !p.pushed).map(p => p.type).sort().join(); if (!up.specs) continue; n++; if (want !== got) bad++; }   // 사이클 넘어가는 날은 예보가 비어 있다(다음 보름 대본은 그때 짠다)
   assert.equal(bad, 0, bad + '/' + n + '일 어긋남');
+});
+t('멀티 계열 단계: 등급 + 신뢰 Lv 마다 계열 규칙이 세진다 — 🌅 새벽 하루 n번 · 🧊 숙성 상한 · 🛃 ×n · ⚠ ★+n · 🧹 n개 · 📦 한길은 신뢰만', () => {
+  const g = MG(61); g.contracts = [g._makeContract('bulk0'), g._makeContract('cold0'), null, null];
+  assert.equal(g.famUp('cold'), 1); assert.equal(g.famUp('frozen'), 2, '계약이 없으면 기본값'); assert.equal(g.famUp('bulk'), 0);
+  g.contracts[1] = g._makeContract('cold2'); assert.equal(g.famUp('cold'), 3, '등급 2 → 하루 세 번');
+  g.contracts[0] = g._makeContract('bulk3'); assert.equal(g.vehicleCap(g.contracts[0]), 7, '한길 4 5 6 7'); assert.equal(g.famUp('bulk'), 0, '한길은 등급이 칸이라 신뢰만 센다');
+  g.parcels = []; g.dawnDay = -1; const mk = () => { const p = g._spawnParcel({ type: 'fresh', size: 1, customer: 'anon' }); p.arrivalTurn = g.totalTurn; g.parcels.push(p); return p; };
+  for (let k = 0; k < 3; k++) { const p = mk(); assert.ok(g.dawnReady(g.contracts[1], [p]), '새벽 ' + (k + 1) + '번째'); g.callCarrier(1, [p.id]); }
+  const q = mk(); assert.ok(!g.dawnReady(g.contracts[1], [q]), '네 번째는 없다');
 });
 t('멀티 평판: 택배마다 +1 · ⚡ 긴급은 혼자(또는 직배) 보내면 +4 더, 섞으면 그 호출은 절반 · 한 종류 특수로 꽉 채우면 트레잇 ×2 · 첫 상점은 금방', () => {
   const g = MG(501); g.schedule = g.schedule.map(() => []); g.parcels = [];

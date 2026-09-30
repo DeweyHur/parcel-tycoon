@@ -339,13 +339,13 @@
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
       unlimitedCalls: true, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true, noFacilities: true, priceMult: 1.8, noMoney: true, traitSameDay: false,
-      truckCap: { base: 4, bulkBase: 6, bulkPerTier: 2, perTwoTiers: 1 }, maxTrucks: 1, famTrucks: { large: 2 },   // 차는 4칸 한 대 — 한길만 등급마다 +2칸(일반을 치우는 전문화), 특수는 두 등급에 +1, 거인(대형)만 두 대 (유저: "최대 처리 4칸으로 보고")
+      truckCap: { base: 4, bulkBase: 4, bulkPerTier: 1, perTwoTiers: 0, fixed: true }, maxTrucks: 1, famTrucks: { large: 2 },   // 차는 4칸 한 대 — 한길만 등급마다 +2칸(일반을 치우는 전문화), 특수는 두 등급에 +1, 거인(대형)만 두 대 (유저: "최대 처리 4칸으로 보고")
       typeMaxSize: { fresh: 2, frozen: 2, intl: 4, large: 4 }, typeOverride: { normal: 80, fresh: 5, produce: 3, fragile: 4, intl: 3, large: 3, frozen: 3 },   // 여섯 종류가 처음부터 대본에 있다(계약을 사면 열리게) — 기본 표엔 통관·대형·냉동이 0 이라 사도 안 왔다   // 큰 택배는 받아 주는 계약(차 크기)이 있을 때만 온다 — contractGated 가 크기까지 본다. 코끼리(대형)를 사면 4칸이 온다 noLateShipPenalty: true,
       startFamilies: ['bulk'], contractGated: true, specialTraitMult: 2.2, normalAnywhere: true, typeTraits: true, noRush: false,   // 한길만 들고 시작 · 계약을 사야 그 특수 물품(과 트레잇)이 온다 · 특수 물품엔 트레잇 ×2.2   // 배차 한도 없음(유저: "평판으로 바뀌니 배차 한도는 없애는 게 맞다") 대신 차가 작다 — 시작 한길 4칸 · 신선 2칸 · 파손 2칸   // 장 값은 비싸게 — 살 게 시설뿐이던 때 돈이 남아돌았다(유저). 계약·강화·충전 전부 ×1.8   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 보수공사으로 돌아온다)
       repStep: 3, repStepGrow: 3, repStepMax: 20, repFirstGap: 3, repPerParcel: true, noSelf: true, traitPerCall: true, traitAll: true, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
-      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.3, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true, strictCarry: true, ownCargo: 0.08, ownCargoMax: 0.2, typeSizes: { large: [3, 4], intl: [2, 3, 4] },   // 내 몫은 종류마다 8%, 다 합쳐 20% 까지 — 일반이 대다수 (유저: "왜 네 칸짜리만 와") · 대형은 3~4칸 ("4칸은 애매, 3~4칸이 와야 쌓는 맛")
+      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.15, dayArrivalsRate: 0.013, typeFamilies: true, famRules: true, strictCarry: true, ownCargo: 0.08, ownCargoMax: 0.2, typeSizes: { large: [3, 4], intl: [2, 3, 4] },   // 내 몫은 종류마다 8%, 다 합쳐 20% 까지 — 일반이 대다수 (유저: "왜 네 칸짜리만 와") · 대형은 3~4칸 ("4칸은 애매, 3~4칸이 와야 쌓는 맛")
       callsMult: 1, repKeepTier: true, pushFlat: 1, theftMaxDay: 2,   // 연 특수 물품마다 일반 입고의 12% 가 그 물품으로
         // 1.8·+2%/일: 첫 사이클 창고 30%대 → 끝에 넘친다 (유저: "아무리 비워도 창고가 비지를 않아" — 2.6·+1% 는 첫날부터 한 번 호출 용량과 입고가 같았다)
       finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 5개쯤(+만차 밀어내기). 전문 차도 일반을 실어 여유가 커서 2.6(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
@@ -397,6 +397,16 @@
     // 🛒 장사: 평판 상점이 더 자주·더 넓게 · ⚔ 공격: 공격이 한 번 더(메아리) · 🛡 방어: 매일 아침 방패
     // 계열 규칙 — 계열마다 그 계열만의 규칙 하나 (유저: "냉장/통관/냉동/대형 모두 더 전문화, 개성 있게"). 이름·설명은 locales meta.MULTI.FAM_RULES[fam]
     // 냉장 = 템포 · 냉동 = 비축 · 대형 = 덩치 · 통관 = 지연 폭탄 · 파손 = 무사고
+    // 계열 단계(등급 + 신뢰 Lv)마다 그 계열만의 규칙이 한 칸씩 세진다 — 칸은 한길만 는다 (유저: "한길은 4 5 6 7, 나머지는 적재 용량 안 늘게 · 더 특색 있는 업그레이드")
+    //   한길은 등급이 칸(4→7)이라 신뢰만 센다
+    FAM_UP: {
+      bulk:    { base: 0, max: 3, trustOnly: true },   // 📦 밀려온 상자를 실으면 개당 ★+n (떠넘겨진 짐을 치우는 차)
+      cold:    { base: 1, max: 6 },   // 🌅 새벽 출발 하루 n번
+      frozen:  { base: 2, max: 7 },   // 🧊 숙성 최대 +n
+      intl:    { base: 2, max: 5 },   // 🛃 통관 끝난 날 ×n
+      fragile: { base: 1, max: 6 },   // ⚠ 무사고 개당 ★+n
+      large:   { base: 2, max: 7 },   // 🧹 뒷정리 n개
+    },
     FAM_RULES: {
       cold:    { icon: '🌅' },   // 새벽 출발: 오늘 들어온 신선만 실은 냉장 호출은 하루를 쓰지 않는다(하루 한 번)
       frozen:  { icon: '🧊', agePerDay: 1, ageMax: 2 },   // 숙성: 냉장·냉동실 안의 트레잇 택배는 하루마다 세기 +1(최대 +2) — 기한은 그대로 간다 (유저: "기한이 없는 건 별 도움이 안 돼") · 조합에 끼면 연쇄 +1
