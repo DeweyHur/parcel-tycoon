@@ -1147,6 +1147,8 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 #mperks .pk.eco { border-color: var(--gold, #ffd166); } #mperks .pk.def { border-color: #7ad3ff; } #mperks .pk.atk { border-color: var(--red, #ff6b6b); }
 #mperks .pk small { position: absolute; right: -3px; bottom: -4px; font-size: 9px; color: #fff; background: #000; padding: 0 2px; line-height: 1.1; }
 #mperks:not([hidden]) ~ #multi-status { left: auto; right: 6px; max-width: 60%; }
+#multi-status:not([hidden]) { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+#multi-status > span { white-space: nowrap; line-height: 13px; }
 .ptile .tb.attack { box-shadow: 0 0 0 1px var(--red, #ff6b6b), 0 0 6px rgba(255,107,107,.7); color: #ffb3b3; }
 #mintro { position: fixed; inset: 0; z-index: 60; background: radial-gradient(ellipse at center, #2a2746 0%, #100f1c 70%); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; color: #fff; cursor: pointer; animation: fadeIn .25s; }
 #mintro.out { opacity: 0; transition: opacity .28s; }
@@ -1237,3 +1239,10 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 #contract-strip .contract .cn .tl.max { background: var(--gold, #ffd166); }
 #contract-strip .contract .txp { position: absolute; left: 8px; bottom: 1px; width: 78px; height: 3px; background: #0c0b16; pointer-events: none; }
 #contract-strip .contract .txp i { display: block; height: 100%; background: #8fe3a0; }
+#contract-strip .contract .txp { overflow: hidden; }
+#contract-strip .contract .txp b { position: absolute; top: 0; height: 100%; background: #fff6a8; animation: txpGain .7s ease-in-out infinite alternate; }
+@keyframes txpGain { from { opacity: .25; } to { opacity: 1; } }
+#contract-strip .contract .cn .cnm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#contract-strip .contract .cn .rank { flex: none; }
+
+#call-head .ch-top .enh-line { font-size: 10px; color: #c8c3e8; white-space: nowrap; } #call-head .ch-top .enh-line .eicon { margin-right: 1px; }

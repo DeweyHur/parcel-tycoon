@@ -658,7 +658,10 @@
         else if (p.trait === 't_reflect') this.reflectNext = Math.min(2, (this.reflectNext || 0) + 1);
         else if (p.trait === 't_shield') this.shields = Math.min(M.MULTI.SHIELD_MAX, this.shields + 1);
         else if (p.trait === 't_ice') this.freshFreezeUntil = this.totalTurn + M.MULTI.TEMP_DAYS;
-        else if (p.trait === 't_pack') this._capMod(3, M.MULTI.TEMP_DAYS, 't_pack');
+        else if (p.trait === 't_clear') {   // 🧹 뒷정리: 대형 트럭이 나가며 일반 상자를 같이 싣고 간다 — 밀려온 것부터 (유저: "압축 3일은 이상하고 테마에 안 맞음")
+          const n = (M.MULTI.CLEAR_N || 2) * this.traitPower(p), pick = this.parcels.filter(x => x.type === 'normal' && !x.trait && !x.rush).sort((a, b) => (b.pushed ? 1 : 0) - (a.pushed ? 1 : 0) || a.deadline - b.deadline).slice(0, n);
+          if (pick.length) { this.parcels = this.parcels.filter(x => !pick.includes(x)); if (R.repPerParcel) this.addRep(pick.length * M.MULTI.REP.perParcel, MSG('why.trait', { icon: tr.icon })); this.emit('traitClear', { n: pick.length, ids: pick.map(x => x.id) }); }
+        }
         else if (p.trait === 't_truck') this.freeTruckNext = true;
         else if (p.trait === 't_return') { const b = this.storage.find(x => x.kind === 'repair'); if (b) { this.storage.splice(this.storage.indexOf(b), 1); this.outbox.push({ type: 'repairMove', repair: this._repairNext(b), to: b.from, back: true }); this._assignCold(); } }
         else if (p.trait === 't_focus') this.focusNext = true;
@@ -1104,7 +1107,7 @@
     vehicleCap(c) {
       const R = this.rules;
       // 난투(truckCap): 차는 계열 불문 4칸에서 시작 — 한길(일반)만 등급마다 크게 자라고, 특수 계열은 두 등급에 한 칸. 관세 8~12칸이 모든 계열의 상위 호환이던 것 (유저)
-      const TC = R.truckCap, tier = D.CARRIERS[c.carrier].tier || 0, baseCap = TC ? TC.base + (FAM(c.carrier) === 'bulk' ? TC.bulkPerTier * tier : Math.floor(tier / 2) * TC.perTwoTiers) : D.CARRIERS[c.carrier].cap;
+      const TC = R.truckCap, tier = D.CARRIERS[c.carrier].tier || 0, baseCap = TC ? (FAM(c.carrier) === 'bulk' ? (TC.bulkBase || TC.base) + TC.bulkPerTier * tier : TC.base + Math.floor(tier / 2) * TC.perTwoTiers) : D.CARRIERS[c.carrier].cap;
       let cap = baseCap + c.enh.cap + c.enh.capDelta + (famVal(R.carrierCapDelta, c.carrier) || 0) + (this.trustPerk(c.carrier, 'cap') || 0);
       if (!TC) for (const id in this.customers || {}) { const cc = this.customerPerk(id, 'carrierCap'); const d = famVal(cc, c.carrier); if (d) cap += d; }
       // 칸 보너스는 호출마다 칸 수를 바꾼다 — 캠페인에서는 통째로 꺼 둔다 (levels.js FLAGS: capBonus)
@@ -1565,7 +1568,7 @@
     tableMonth(c) { return this.monthIndex(c) + (this.rules.monthOffset || 0); }
     // 튜토리얼 대본(1~3개월차). 「인수인계」로 시작한 런에서만 (docs/STORY_TUTORIAL_DESIGN.md 부록 I)
     // 이 런에서 그 기능이 켜져 있는가. 캠페인 레벨 밖(자유 런)은 전부 켜져 있다 (levels.js FLAGS)
-    shows(k) { if (k === 'chain' && this.rules.multi) return true;   /* 난투는 연속 만차가 본체 연출이다 */ if ((D.DISABLED_FEATURES || []).includes(k)) return false; if (k === 'calls' && this.rules.unlimitedCalls) return false;   /* 멀티: 배차 눈금·충전 자체가 없다 */ return !this._shows || this._shows.has(k); }
+    shows(k) { if (k === 'chain' && this.rules.multi) return true; if (k === 'self' && this.rules.noSelf) return false;   /* 난투: 직배 없음 (유저: "난투에서 직배는 별로 의미없는듯") */   /* 난투는 연속 만차가 본체 연출이다 */ if ((D.DISABLED_FEATURES || []).includes(k)) return false; if (k === 'calls' && this.rules.unlimitedCalls) return false;   /* 멀티: 배차 눈금·충전 자체가 없다 */ return !this._shows || this._shows.has(k); }
     // 상호: 레벨 1을 끝내면 플레이어가 붙인 이름이 회사 이름을 대신한다
     companyName() { return this.cfg.companyName || this.company.name; }
     // 준비 마켓은 아직 사이클 0 이다 — 그 장의 대본(사이클 1)을 보게 한다
@@ -2082,6 +2085,7 @@
     }
     // 직접 배송(대기 턴의 부가 행동): 고른 택배를 배송비를 내고 처리. 보상 그대로. wait()에서 호출
     selfDeliver(ids) {
+      if (this.rules.noSelf) return { ok: false, err: 'noSelf' };
       if (this.phase !== 'play') return { ok: false, msg: T('err.cannotShipNow') };
       const R = this.rules;
       const chosen = (ids || []).map(id => this.parcels.find(p => p.id === id)).filter(p => p && this.selfCan(p));

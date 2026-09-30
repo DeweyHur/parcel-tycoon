@@ -829,7 +829,7 @@
       pkEl.innerHTML = tks.map(k => `<a class="pk ${TRACK_CLS[k]}" data-track="${k}">${M.MULTI.TRACKS[k].icon}<small>${game.trackLv(k)}</small></a>`).join('') + [...new Set(ids)].map(id => { const pk = M.MULTI.PERKS[id]; const n = ids.filter(x => x === id).length; return `<a class="pk ${pk.family}" data-mperk="${id}">${pk.icon}${n > 1 ? `<small>×${n}</small>` : ''}</a>`; }).join('');
       pkEl.querySelectorAll('[data-track]').forEach(a => a.onclick = () => { const k = a.dataset.track; SFX.click(); toast(`${M.MULTI.TRACKS[k].icon} ${T('track.' + k)} ${game.trackLv(k)} — ${trackFx(game, k, game.trackLv(k))}`, 2400); });
       pkEl.querySelectorAll('[data-mperk]').forEach(a => a.onclick = () => { const pk = M.MULTI.PERKS[a.dataset.mperk]; SFX.click(); toast(`${pk.icon} ${pk.name} — ${pk.desc}`, 2400); }); }
-    const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.textContent = parts.join(' · '); }
+    const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.innerHTML = parts.map(x => `<span>${esc(x)}</span>`).join(''); }   // 항목마다 한 덩어리 — 줄이 바뀌어도 아이콘과 설명이 갈라지지 않게 (유저: "아이콘 설명 좀 라인 맞춰서")
   }
   // 레이스 트랙 — 78일 위를 넷의 말이 달린다. 비대칭 시계가 이 게임의 특이점인데 D+12 숫자만으론 안 보였다 (유저: "시간이 흐르는 걸 보이게")
   // 먼저 마감한 사람 자리에 🏁 — 그 뒤로는 아직 달리는 사람에게 남은 날마다 상자가 하나씩 밀려온다(MULTI.finishDump)
@@ -1225,7 +1225,7 @@
     const g = game, R = g.rules;
     // 재고는 늘 펼쳐져 있다 — 상자 격자가 곧 창고이고, 차를 부르면 그대로 고르는 판이 된다
     const pk = ensurePick();
-    $('#invest-btn').hidden = !(g.shows('invest') && g.campaignOpen());   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다
+    $('#invest-btn').hidden = !(g.shows('invest') && g.campaignOpen()) || (g.rules.multi && !g.ownedMedia().length && !(g.campaignRuns || []).length);   // 난투: 광고권이 있을 때만 (유저: "정산마켓에서 살 수 있는 거 아님 · 쓸데없는 설명")   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다
     // 돌고 있는 캠페인은 버튼에 매체 아이콘 + 남은 날(물량이 아직 들어오는 날 수)로 — 📰2 📻3
     { const act = (g.campaignRuns || []).filter(r => r.m === g.month && r.end > g.turn), ib = $('#invest-btn');
       ib.classList.toggle('active', act.length > 0);
@@ -1333,8 +1333,9 @@
       const callsHtml = g.offFor(c) ? `<span class="off">${g.roadblockDay === g.totalTurn && g.contracts[g.roadblockSlot] === c ? '🚧' : T('hud.off')}</span>` : !g.shows('calls') || R.unlimitedCalls ? '' : spare ? T('hud.spare') : callPips;
       const netHtml = spent || !pv.n ? '<span class="per">—</span>' : R.noMoney ? (() => { const ps = elig.filter(p => pv.ids ? pv.ids.includes(p.id) : true), d = R.repPerParcel ? g.callRep(ps, false) : g.repDeltaFor(ps); return `<span class="per ${d >= 0 ? 'good' : 'bad'}">★${d >= 0 ? '+' : ''}${d}</span>`; })() : `<span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>`;
       // 신뢰도: 이름 옆 Lv, 이름 밑 경험치 한 줄 (유저: "신뢰도를 물류 선택 아이템에서 보여주면 좋겠다. 경험치랑") — 줄 높이는 그대로
-      const tr = g.shows('trust') ? (() => { const lv = g.trustLevel(c.carrier), nx = g.trustNext(c.carrier), pct = nx ? Math.round(100 * Math.min(1, nx.have / Math.max(1, nx.need))) : 100; return { lv, pct, tip: nx ? `${nx.have}/${nx.need}` : 'MAX' }; })() : null;
-      btn.innerHTML = `<span class="cn">${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${tr ? `<b class="tl${tr.pct >= 100 ? ' max' : ''}" title="${esc(T('common.trust'))} ${tr.tip}">Lv${tr.lv}</b>` : ''}</span>${tr ? `<span class="txp"><i style="width:${tr.pct}%"></i></span>` : ''}${takesDots(g, c, true)}<span class="cl">${spent ? '' : cells}</span>${netHtml}<span class="calls ${spent ? 'zero' : ''}">${callsHtml}</span>`;
+      // 게이지는 이번 레벨 구간 안에서 0 부터 (유저: "레벨 1로 넘어가면 exp 게이지가 0부터") · 고른 물류면 이번 호출로 오를 양이 반짝인다
+      const tr = g.shows('trust') ? (() => { const lv = g.trustLevel(c.carrier), nx = g.trustNext(c.carrier); if (!nx) return { lv, pct: 100, gain: 0, tip: 'MAX' }; const lo = D.TRUST_LEVELS[lv] || 0, span = Math.max(1, nx.need - lo), cur = Math.max(0, nx.have - lo), pct = Math.round(100 * Math.min(1, cur / span)); let gain = 0; if (pk && pk.i === i && pv.n) { const ps = elig.filter(p => pv.ids ? pv.ids.includes(p.id) : true); const xp = g.trustGainPreview(c, ps).xp; if (xp > 0) gain = Math.round(100 * Math.min(1, (cur + xp) / span)) - pct; } return { lv, pct, gain, tip: `${cur}/${span}` }; })() : null;
+      btn.innerHTML = `<span class="cn">${car.badge && car.badge !== '🚚' ? car.badge : ''}<span class="cnm">${esc(car.short)}</span>${gradeBadge(c.grade)}${tr ? `<b class="tl${tr.pct >= 100 ? ' max' : ''}" title="${esc(T('common.trust'))} ${tr.tip}">Lv${tr.lv}</b>` : ''}</span>${tr ? `<span class="txp"><i style="width:${tr.pct}%"></i>${tr.gain > 0 ? `<b style="left:${tr.pct}%;width:${tr.gain}%"></b>` : ''}</span>` : ''}${takesDots(g, c, true)}<span class="cl">${spent ? '' : cells}</span>${netHtml}<span class="calls ${spent ? 'zero' : ''}">${callsHtml}</span>`;
     }
     const sc = $('#cself');
     if (sc) {
@@ -1491,19 +1492,19 @@
     const g = game, p = g.parcels.find(x => x.id === id); if (!p) return;
     const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], lv = g.customerLevel(p.customer || 'anon');
     const claim = Math.round(((p.reward != null ? p.reward : game.baseReward(p.type, p.baseSize))) * cu.claimMult * g.rules.claimMult * (g.rules.customerClaimMult[p.customer] || 1));
-    const attrRows = a.map(k => `<div class="d">${D.ATTRS[k].icon} <b>${D.ATTRS[k].name}</b> — ${T('attr.' + k)}</div>`).join('') + (p.rush ? `<div class="d" style="color:var(--gold)">${T('pd.rush', { a: D.RUSH_CARGO.sameDay, b: '½' })}</div>` : '');
+    const attrRows = a.map(k => `<div class="d">${D.ATTRS[k].icon} <b>${D.ATTRS[k].name}</b> — ${T('attr.' + k)}</div>`).join('') + (p.rush ? `<div class="d" style="color:var(--gold)">${g.rules.repPerParcel ? T('pd.rushMulti', { n: M.MULTI.REP.perParcel + M.MULTI.REP.rush }) : T('pd.rush', { a: D.RUSH_CARGO.sameDay, b: '½' })}</div>` : '');
     // 못 싣는 계약 줄은 읽을 이유가 없다 — 실을 수 있는 것만 보여 주고,
     // 하나도 없을 때만 전부 펼쳐 "왜 안 실리는지"를 답한다
     const anyOk = g.contracts.some(c => c && g.canHandle(c, p));
-    const rows = g.contracts.map(c => { if (!c || (anyOk && !g.canHandle(c, p))) return ''; const car = D.CARRIERS[c.carrier]; const ok = g.canHandle(c, p), bp = ok ? g.breakProb(c, p) : 0, can = g.canCall(c); const why = !ok ? T(p.size > g.contractSizeMax(c) || p.size < car.sizeMin ? 'pd.sizeOut' : car.onlyPlain ? 'pd.plainOnly' : car.need ? 'pd.notSpecial' : a.includes('frozen') ? 'pd.noFrozenCap' : p.customs > 0 ? 'self.customsWait' : 'pd.no') : ''; const spec = ok && g.isSpecialist(car, p.type) && t.bonus; return `<div class="ttrow ${ok ? 'on' : ''}"><span class="lv">${car.badge || '🚚'}</span><span class="ef">${esc(car.short)}${gradeBadge(c.grade)} ${ok ? `${spec ? `<span style="color:var(--gold)">${T('pd.specialBonus', { n: t.bonus })}</span> ` : ''}${bp ? `<span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(bp * 100) })}</span>` : ''}${!can ? `<span style="color:var(--dim)">(${T('pd.cannotCall')})</span>` : ''}` : `<span style="color:var(--dim)">${why}</span>`}</span><span class="st">${ok ? T('fmt.calls', { n: c.calls }) : '—'}</span></div>`; }).join('');
+    const rows = g.contracts.map(c => { if (!c || (anyOk && !g.canHandle(c, p))) return ''; const car = D.CARRIERS[c.carrier]; const ok = g.canHandle(c, p), bp = ok ? g.breakProb(c, p) : 0, can = g.canCall(c); const why = !ok ? T(p.size > g.contractSizeMax(c) || p.size < car.sizeMin ? 'pd.sizeOut' : car.onlyPlain ? 'pd.plainOnly' : car.need ? 'pd.notSpecial' : a.includes('frozen') ? 'pd.noFrozenCap' : p.customs > 0 ? 'self.customsWait' : 'pd.no') : ''; const spec = ok && !g.rules.noMoney && g.isSpecialist(car, p.type) && t.bonus; return `<div class="ttrow ${ok ? 'on' : ''}"><span class="lv">${car.badge || '🚚'}</span><span class="ef">${esc(car.short)}${gradeBadge(c.grade)} ${ok ? `${spec ? `<span style="color:var(--gold)">${T('pd.specialBonus', { n: t.bonus })}</span> ` : ''}${bp ? `<span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(bp * 100) })}</span>` : ''}${!can ? `<span style="color:var(--dim)">(${T('pd.cannotCall')})</span>` : ''}` : `<span style="color:var(--dim)">${why}</span>`}</span><span class="st">${ok ? T('fmt.calls', { n: c.calls }) : '—'}</span></div>`; }).join('');
     const selfOk = g.selfCan(p), selfWhy = g.selfBlockReason(p);
-    const body = `<div class="parcel pd-top" style="margin-bottom:6px"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${g.shows('customers') ? `<span class="cust">${cu.icon}</span>` : ''}<span class="nm">${esc(t.name)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })} · ${T('pd.baseReward', { n: p.reward })}</div><div class="st">${parcelStatus(p)}</div></div>
+    const body = `<div class="parcel pd-top" style="margin-bottom:6px"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${g.shows('customers') ? `<span class="cust">${cu.icon}</span>` : ''}<span class="nm">${esc(t.name)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })}${g.rules.noMoney ? '' : ` · ${T('pd.baseReward', { n: p.reward })}`}</div><div class="st">${parcelStatus(p)}</div></div>
       ${g.shows('customers') ? `<div class="d">${T('company.customers')} <b>${cu.icon} ${esc(cu.name)}</b>${p.customer !== 'anon' ? ` · ${T('cust.trustLv', { n: lv })} ${T('pd.perPiece', { n: M.CUSTOMER_BONUS[lv] })}` : ''}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}</div>` : ''}
       ${p.wet || p.outdoor ? `<div class="d">${[p.wet ? T('pd.wet') : '', p.outdoor ? T('pd.outdoor') : ''].filter(Boolean).join(' · ')}</div>` : ''}
       ${p.trait && M.MULTI.TRAITS[p.trait] ? `<div class="d" style="color:${M.MULTI.TRAITS[p.trait].kind === 'attack' ? 'var(--red)' : 'var(--gold)'}">${T('multi.traitLine', { icon: M.MULTI.TRAITS[p.trait].icon, name: esc(M.MULTI.TRAITS[p.trait].name), desc: esc(M.MULTI.TRAITS[p.trait].desc) })} <small>(${T(M.MULTI.TRAITS[p.trait].kind === 'attack' ? 'pd.traitAtk' : 'pd.traitBon')})</small></div>` : ''}
       ${attrRows}
       ${g.contracts.some(c => c && g.canHandle(c, p) && g.breakProb(c, p) === 0) || (selfOk && !g.selfBreakProb(p)) ? '' : `<div class="d" style="color:var(--orange);margin-top:6px">${g.contracts.filter(Boolean).length >= D.CONTRACT_SLOTS && optFor(g, p) ? T('pd.needOpt', { name: optFor(g, p) }) : famNames(p) ? T('pd.needFamily', { list: famNames(p) }) : T('pd.needNothing')}</div>`}
-      <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('pd.contracts')}</div><div class="ttrack">${rows || `<div class="d">${T('pd.noContract')}</div>`}${g.shows('self') ? `<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">${T('pd.selfRow')} ${selfOk ? T('pd.selfCost', { cost: g.selfCost(p) }) + (g.selfBreakProb(p) ? ` <span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(g.selfBreakProb(p) * 100) })}</span>` : '') : `<span style="color:var(--dim)">${esc(selfWhy || T('pd.no'))}</span>`}</span><span class="st">${selfOk ? T('pd.ok') : '—'}</span></div>` : ''}</div>`;
+      <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('pd.contracts')}</div><div class="ttrack">${rows || `<div class="d">${T('pd.noContract')}</div>`}${g.shows('self') ? `<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">${T('pd.selfRow')} ${selfOk ? (g.rules.noMoney ? '' : T('pd.selfCost', { cost: g.selfCost(p) })) + (g.selfBreakProb(p) ? ` <span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(g.selfBreakProb(p) * 100) })}</span>` : '') : `<span style="color:var(--dim)">${esc(selfWhy || T('pd.no'))}</span>`}</span><span class="st">${selfOk ? T('pd.ok') : '—'}</span></div>` : ''}</div>`;
     modal(`${t.name} ${T('fmt.cells', { n: p.size })}`, body, [{ label: T('btn.close'), onClick: closeModal }]);
     storyCheck({ kind: 'modal', modal: 'parcel', parcel: p });
   }
@@ -1781,7 +1782,7 @@
     if (p.customs > 0) return { key: `cu${p.customs}|${p.deadline}`, urg: p.customs + p.deadline, cls: 'cu', dot: dotOf(p.customs + p.deadline), label: `${T('ps.customsShort', { n: p.customs, delayed: p.customsDelayed ? '+' : '' })}<br>${T('ps.deadline', { n: p.deadline })}` };   // 두 줄로 — 한 줄이면 좁은 머리칸에서 글자가 세로로 쪼개졌다
     if (p.overdue) { const ri = game ? game.returnIn(p) : null; return { key: 'od', urg: -1, cls: 'od', dot: 'r', label: T('ps.overdue', { ret: ri != null ? ` · ${T('ps.returnIn', { n: ri })}` : '' }) }; }
     // ⚡ 오늘 들어온 긴급은 맨 윗줄. 놓친 것은 초과 줄로 (반송까지 남은 날이 보인다)
-    if (p.rush && game && game.rushToday(p)) return { key: 'rush', urg: -5, cls: 'rush', dot: 'r', label: T('ps.rushToday', { x: D.RUSH_CARGO.sameDay }) };
+    if (p.rush && game && game.rushToday(p)) return { key: 'rush', urg: -5, cls: 'rush', dot: 'r', label: game.rules.repPerParcel ? T('ps.rushMulti', { n: M.MULTI.REP.perParcel + M.MULTI.REP.rush }) : T('ps.rushToday', { x: D.RUSH_CARGO.sameDay }) };
     if (p.noDeadline) return { key: 'nd', urg: 90, cls: 'nd', dot: 'g', label: T('ps.noDue') };
     return { key: `d${p.deadline}`, urg: p.deadline, cls: dotOf(p.deadline), dot: dotOf(p.deadline), label: T('ps.deadline', { n: p.deadline }) };
   }
@@ -1985,7 +1986,7 @@
     const FRc = game.rules.famRules && (M.MULTI.FAM_RULES || {})[D.familyOf(c.carrier)];   // 계열 규칙 — 호출 창에서도 보이게
     // 🌅 새벽 출발을 쓸 수 있으면 그 이름이 버튼 — 누르면 오늘 온 신선만 골라 준다
     const dawnIds = game.famRule(c, 'cold') && game.dawnDay !== game.totalTurn ? elig.filter(p => p.type === 'fresh' && p.arrivalTurn === game.totalTurn).map(p => p.id) : [];
-    head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}${FRc ? (dawnIds.length ? ` <button type="button" class="frule dawnpick${game.dawnReady(c, selP) ? ' on' : ''}" title="${esc(FRc.desc || '')}">${FRc.icon} ${esc(FRc.name || '')}</button>` : ` <small class="frule" title="${esc(FRc.desc || '')}">${FRc.icon} ${esc(FRc.name || '')}</small>`) : ''}${tbtn ? `<span class="tbtn">${tbtn}</span>` : ''}</div>${gauge}${hint}${money}${riskLine}${trust}`;
+    head.innerHTML = `<div class="ch-top"><b>${car.badge || '🚚'} ${esc(game.contractName(c))}</b>${caps}${FRc ? (dawnIds.length ? ` <button type="button" class="frule dawnpick${game.dawnReady(c, selP) ? ' on' : ''}" title="${esc(FRc.desc || '')}">${FRc.icon} ${esc(FRc.name || '')}</button>` : ` <small class="frule" title="${esc(FRc.desc || '')}">${FRc.icon} ${esc(FRc.name || '')}</small>`) : ''}${tbtn ? `<span class="tbtn">${tbtn}</span>` : ''}${(() => { const en = enhNames(game, c); return en.length ? ` <small class="enh-line">${en.join(' · ')}</small>` : ''; })()}</div>${gauge}${hint}${money}${riskLine}${trust}`;
     // 신뢰 줄은 꾹 누르면 단계표(다음 단계·효과)가 나온다
     { const tl = head.querySelector('.trustline'); if (tl) bindHold(tl, () => showContractDetail(c)); }
     { const dp = head.querySelector('.dawnpick'); if (dp) dp.onclick = () => { SFX.click(); cm.sel = new Set(dawnIds); cm.auto = false; renderAll(); }; }
@@ -2687,7 +2688,7 @@
       const at = (P[t].attrs || []).map(a => (D.ATTRS[a] || {}).icon || '').join('');
       return `<tr><td>${sw(t)}</td><td><b>${esc(P[t].short || P[t].name)}</b> ${at}</td><td class="hv-sz">${P[t].sizes.join('·')}</td><td>${T('hv.kind.' + t)}</td></tr>`;
     }).join('');
-    const kind = `<table class="hv-tbl"><tr><th></th><th></th><th>${T('hv.kind.size')}</th><th></th></tr>${kinds}</table>` + row('⚡', T('pd.rush', { a: D.RUSH_CARGO.sameDay, b: '½' }));
+    const kind = `<table class="hv-tbl"><tr><th></th><th></th><th>${T('hv.kind.size')}</th><th></th></tr>${kinds}</table>` + row('⚡', game && game.rules.repPerParcel ? T('pd.rushMulti', { n: M.MULTI.REP.perParcel + M.MULTI.REP.rush }) : T('pd.rush', { a: D.RUSH_CARGO.sameDay, b: '½' }));
     // 4. 기한 · 신뢰 · 평판
     const L = D.TRUST_LEVELS, G = D.REP_GAIN;
     const tbar = pct => `<span class="trust"><small>${esc(T('common.trust'))}</small><b class="tlv">Lv1</b><span class="tbar"><i style="width:${pct}%"></i><i class="gain" style="width:20%"></i></span><small class="tnum">8<b class="arrow">→</b>10</small></span>`;

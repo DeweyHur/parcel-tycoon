@@ -339,13 +339,13 @@
       months: 6, calendar: 'kr', startMonth: 4,        // 석 달 = 6사이클. 달력은 시각만(명절·달력 이벤트 없음)
       noHolidays: true, noCalendarEvents: true, noWeekend: true,
       unlimitedCalls: true, noCallFee: true, payNow: true, noLoan: true, noBankrupt: true, noRepEnd: true, noFacilities: true, priceMult: 1.8, noMoney: true, traitSameDay: false,
-      truckCap: { base: 4, bulkPerTier: 2, perTwoTiers: 1 }, maxTrucks: 1, famTrucks: { large: 2 },   // 차는 4칸 한 대 — 한길만 등급마다 +2칸(일반을 치우는 전문화), 특수는 두 등급에 +1, 거인(대형)만 두 대 (유저: "최대 처리 4칸으로 보고")
+      truckCap: { base: 4, bulkBase: 6, bulkPerTier: 2, perTwoTiers: 1 }, maxTrucks: 1, famTrucks: { large: 2 },   // 차는 4칸 한 대 — 한길만 등급마다 +2칸(일반을 치우는 전문화), 특수는 두 등급에 +1, 거인(대형)만 두 대 (유저: "최대 처리 4칸으로 보고")
       typeMaxSize: { fresh: 2, frozen: 2, intl: 4, large: 4 }, typeOverride: { normal: 80, fresh: 5, produce: 3, fragile: 4, intl: 3, large: 3, frozen: 3 },   // 여섯 종류가 처음부터 대본에 있다(계약을 사면 열리게) — 기본 표엔 통관·대형·냉동이 0 이라 사도 안 왔다   // 큰 택배는 받아 주는 계약(차 크기)이 있을 때만 온다 — contractGated 가 크기까지 본다. 코끼리(대형)를 사면 4칸이 온다 noLateShipPenalty: true,
       startFamilies: ['bulk'], contractGated: true, specialTraitMult: 2.2, normalAnywhere: true, typeTraits: true, noRush: false,   // 한길만 들고 시작 · 계약을 사야 그 특수 물품(과 트레잇)이 온다 · 특수 물품엔 트레잇 ×2.2   // 배차 한도 없음(유저: "평판으로 바뀌니 배차 한도는 없애는 게 맞다") 대신 차가 작다 — 시작 한길 4칸 · 신선 2칸 · 파손 2칸   // 장 값은 비싸게 — 살 게 시설뿐이던 때 돈이 남아돌았다(유저). 계약·강화·충전 전부 ×1.8   // 평판 0 도 폐업이 아니다 — 평판이 곧 점수라 바닥은 그냥 꼴찌(중도 탈락은 판을 깬다)   // 배차는 **횟수**(눈금·장에서 충전), 배차비는 없다 — 유저: "배차비 못 내는 게 너무 깬다, 그냥 횟수로". 결제는 즉시(어음 없음)
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 보수공사으로 돌아온다)
-      repStep: 3, repStepGrow: 3, repStepMax: 20, repFirstGap: 3, repPerParcel: true, traitPerCall: true, traitAll: true, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
-      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.15, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true, strictCarry: true, ownCargo: 0.08, ownCargoMax: 0.2, typeSizes: { large: [3, 4], intl: [2, 3, 4] },   // 내 몫은 종류마다 8%, 다 합쳐 20% 까지 — 일반이 대다수 (유저: "왜 네 칸짜리만 와") · 대형은 3~4칸 ("4칸은 애매, 3~4칸이 와야 쌓는 맛")
+      repStep: 3, repStepGrow: 3, repStepMax: 20, repFirstGap: 3, repPerParcel: true, noSelf: true, traitPerCall: true, traitAll: true, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
+      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.3, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true, strictCarry: true, ownCargo: 0.08, ownCargoMax: 0.2, typeSizes: { large: [3, 4], intl: [2, 3, 4] },   // 내 몫은 종류마다 8%, 다 합쳐 20% 까지 — 일반이 대다수 (유저: "왜 네 칸짜리만 와") · 대형은 3~4칸 ("4칸은 애매, 3~4칸이 와야 쌓는 맛")
       callsMult: 1, repKeepTier: true, pushFlat: 1, theftMaxDay: 2,   // 연 특수 물품마다 일반 입고의 12% 가 그 물품으로
         // 1.8·+2%/일: 첫 사이클 창고 30%대 → 끝에 넘친다 (유저: "아무리 비워도 창고가 비지를 않아" — 2.6·+1% 는 첫날부터 한 번 호출 용량과 입고가 같았다)
       finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 5개쯤(+만차 밀어내기). 전문 차도 일반을 실어 여유가 커서 2.6(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
@@ -368,7 +368,7 @@
       t_buzz:   { kind: 'bonus', icon: '⭐', weight: 18 },    // 평판 +BUZZ
       t_shield: { kind: 'bonus', icon: '🛡', weight: 16 },    // 다음 공격 1회 무효(최대 2겹)
       t_ice:    { kind: 'bonus', icon: '🧊', weight: 12 },    // 신선 부패 정지 3일
-      t_pack:   { kind: 'bonus', icon: '📦', weight: 14 },    // 창고 +3칸, 3일
+      t_clear:  { kind: 'bonus', icon: '🧹', weight: 14 },    // 뒷정리: 일반 상자 2개(×세기)를 같이 싣고 나간다 — 밀려온 것부터
       t_truck:  { kind: 'bonus', icon: '🚚', weight: 14 },    // 다음 호출 트럭 +1
       t_return: { kind: 'bonus', icon: '🔄', weight: 12 },    // 들고 있는 보수공사 1개를 보낸 사람에게 반송
       t_focus:  { kind: 'bonus', icon: '🎯', weight: 12 },    // 다음 공격 트레잇을 1위 한 명에게만 ×3
@@ -377,7 +377,7 @@
     },
     MIX: { streakMax: 3, maxMult: 4 },
     HOT: { at: 0.8, mult: 2 },
-    REP: { perParcel: 1, rush: 4 },   // 평판: 택배마다 +1 · ⚡ 긴급을 혼자(또는 직배) 보내면 +4 더 — 섞으면 그 호출은 절반
+    REP: { perParcel: 1, rush: 4 }, CLEAR_N: 2,   // 평판: 택배마다 +1 · ⚡ 긴급을 혼자(또는 직배) 보내면 +4 더 — 섞으면 그 호출은 절반
     FULL_MULT: 2,                     // 한 종류 특수로만 꽉 채운 차 → 그 트레잇 ×2   // 🔥 만석: 80% 넘게 찬 창고에 떨어진 상자 ×2 — 찰 때까지 기다렸다 쏘는 게 이득   // 🔗 조합: 배수 = 종류 수 + 연쇄 − 1 (최대 ×4), 연쇄는 3까지. 조합 아닌 호출이면 연쇄는 끊긴다
     HURRY_N: 3, SEAL: 6, BUZZ: 2, CAP_FLOOR: 0.7, BLAST_MAX: 2,   // 창고는 공격으로 70% 아래로 안 줄고, 대공사는 두 개까지만 턴다 — 한 방이 창고를 비우면 손맛이 없다   // 공격 세기: 독촉은 3개를 오늘 안에 · 봉인 −6칸 · 입소문 평판 +2
     // 물품 종류마다 트레잇 두 개 — 처음부터 둘 중 하나가 붙는다. 평판 상점의 「{종류} 트레잇 강화」 카드는 그 종류 트레잇 세기 +1
@@ -386,7 +386,7 @@
       fresh:   ['t_hurry', 't_road'],     // ⚔ 신선(냉장 계열): ⏱ 독촉 → 🚧 통제
       intl:    ['t_repair', 't_seal'],    // ⚔ 통관: 🏗 보수공사 → 🔒 봉인
       frozen:  ['t_reflect', 't_ice'],    // 🛡 냉동: 🪞 반사 · 🧊 얼음 — 방패는 🛡 방어 트랙이 매일 주니 겹쳤다 (유저: "똑같은 트레잇만 받으니 도움도 안 돼")
-      large:   ['t_pack', 't_focus'],     // 🛡 대형: 📦 압축 → 🎯 한 방 (덩치로 누르는 계열이라 마지막은 압박)
+      large:   ['t_clear', 't_focus'],     // 🛡 대형: 🧹 뒷정리 → 🎯 한 방 (덩치로 누르는 계열이라 마지막은 압박)
       produce: ['t_buzz', 't_deal'],      // 🛒 농산물(파손 계열): ⭐ 입소문 → 🛒 단골
       // 파손(fragile)엔 트레잇이 없다 — 깨질 위험 자체가 그 물품의 성격 (유저). 일반도 없음(난투엔 긴급 자체가 없다)
     },

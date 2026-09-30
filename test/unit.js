@@ -939,8 +939,8 @@ const MULTI = require('../www/js/multi.js'), BOT = require('../www/js/bot.js');
 const MG = (seed, extra) => new Game(Object.assign({ multi: true, seed, scenario: 'kr_summer', company: 'local', perks: [], prep: false }, extra || {}));
 t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결제·보험 없음·시작 창고 +4 · 시작 차는 작다', () => {
   const g = MG(1), R = g.rules;
-  assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) === R.truckCap.base) && g.simulMax(g.contracts.find(Boolean)) === 1, '차는 4칸 한 대(배차 무제한 대신)');
-  { const L = g._makeContract('large0'), I = g._makeContract('intl2'), B = g._makeContract('bulk2'); assert.equal(g.maxTrucks(L), 2, '거인만 두 대'); assert.equal(g.maxTrucks(I), 1); assert.equal(g.vehicleCap(I), 5, '관세도 4칸 + 두 등급에 한 칸'); assert.equal(g.vehicleCap(B), 8, '한길은 등급마다 +2칸'); }
+  assert.ok(g.contracts.filter(Boolean).every(c => g.vehicleCap(c) === R.truckCap.bulkBase) && g.simulMax(g.contracts.find(Boolean)) === 1, '한길은 6칸 한 대 — 특수 계열(4칸)보다 크다: 일반을 치우는 전문화');
+  { const L = g._makeContract('large0'), I = g._makeContract('intl2'), B = g._makeContract('bulk2'); assert.equal(g.maxTrucks(L), 2, '거인만 두 대'); assert.equal(g.maxTrucks(I), 1); assert.equal(g.vehicleCap(I), 5, '관세도 4칸 + 두 등급에 한 칸'); assert.equal(g.vehicleCap(B), R.truckCap.bulkBase + 2 * (D.CARRIERS[B.carrier].tier || 0), '한길은 등급마다 +2칸'); }
   { const big = []; const types = new Set(); for (let m = 1; m <= 6; m++) for (const t of g._sharedSchedule(m)) for (const sp of t) { types.add(sp.type); if ((sp.type === 'fresh' || sp.type === 'frozen') && sp.size > 2) big.push(sp); } assert.equal(big.length, 0, '신선·냉동은 2칸까지'); assert.ok(['intl', 'large', 'frozen'].every(t => types.has(t)), '통관·대형·냉동도 대본에 있다(계약을 사면 열린다)'); }
   assert.ok(R.multi && R.months === 6 && R.noHolidays && R.noCalendarEvents && R.noWeekend && R.unlimitedCalls && R.noCallFee && R.payNow && R.noLoan && R.noInsurance && !R.shopDay && R.autoSummary && R.repDecides);
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
@@ -1128,9 +1128,9 @@ t('멀티: 보너스 트레잇은 그날 출고할 때 나에게 — ⭐ 평판 
   const b = mk(2, 't_buzz'); const rep = g.rep; let r = g.callCarrier(si, [b.id]);
   assert.ok(r.ok); assert.ok(g.rep >= rep + M.MULTI.BUZZ, '⭐ 입소문 +2');
   const c = mk(3, 't_shield'), d = mk(4, 't_shield'), e = mk(5, 't_shield'); g.callCarrier(si, [c.id, d.id, e.id]); assert.equal(g.shields, 1, '트레잇은 호출마다 종류당 한 번 — 셋을 실어도 🛡 한 겹');
-  const cap = g.warehouse.cap; const f = mk(6, 't_pack'), h = mk(7, 't_truck'); g.callCarrier(si, [f.id, h.id]); assert.equal(g.warehouse.cap, cap + 3); assert.ok(g.freeTruckNext);
+  { const a1 = mk(20), a2 = mk(21), a3 = mk(22); a2.pushed = true; a3.pushed = true; g.repShop = null; g.repCapV = 999; const f = mk(6, 't_clear'), rp = g.rep; g.callCarrier(si, [f.id]); assert.ok(!g.parcels.includes(a2) && !g.parcels.includes(a3) && g.parcels.includes(a1), '🧹 뒷정리: 밀려온 상자부터 둘'); assert.ok(g.rep >= rp + 3, '같이 나간 상자도 평판 +1 ' + [rp, g.rep, g.repCap(), !!g.repShop]); }
+  const h = mk(7, 't_truck'); g.callCarrier(si, [h.id]); assert.ok(g.freeTruckNext);
   const fee = g.callFee(g.contracts[si], 1); assert.equal(fee, 0, '덤 트럭이면 한 대는 공짜');
-  for (let i = 0; i < 4; i++) g.wait([]); assert.equal(g.warehouse.cap, cap, '3일 뒤 임시 칸은 사라진다');
   const od = mk(8, 't_buzz'); od.overdue = true; const rep2 = g.rep; g.callCarrier(si, [od.id]); assert.ok(g.rep <= rep2, '기한을 넘긴 택배의 트레잇은 불발');
   const left = mk(9, 't_shield'); const plain = P(99, 'normal', 1); g.parcels.push(plain); g.wait([]); assert.ok(g.parcels.includes(left) && g.parcels.includes(plain), '트레잇 택배는 모아 둘 수 있다 — 🔗 조합으로 터뜨리려고 (그날 사라지지 않는다)');
 });
