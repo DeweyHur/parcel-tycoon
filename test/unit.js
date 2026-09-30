@@ -946,7 +946,7 @@ t('멀티: 규칙 셋 — 석 달·명절 없음·배차 무제한·즉시 결�
   assert.equal(g.warehouse.cap, M.COMPANIES.local.warehouse.cap + 4);
   assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk'], '한길만 들고 시작');
   { const specs = g.schedule.flat().filter(sp => sp.type !== 'normal'); assert.ok(specs.length > 0, '대본엔 특수 물품이 있고'); assert.ok(g.parcels.every(p => p.type === 'normal' || p.type === 'produce'), '받아 줄 계약이 없으면 일반으로 온다(농산물은 아무 차나 싣는다)'); }
-  { let plain = 0; for (let c = 1; c <= 6; c++) for (const d of g._sharedSchedule(c)) for (const sp of d) if (sp.type === 'normal' && (sp.trait || sp.rush)) plain++; assert.equal(plain, 0, '일반엔 트레잇도 ⚡ 긴급도 없다(특수 물품만)'); }
+  { let plain = 0; for (let c = 1; c <= 6; c++) for (const d of g._sharedSchedule(c)) for (const sp of d) if (sp.type === 'normal' && sp.trait) plain++; assert.equal(plain, 0, '일반엔 트레잇이 없다(특수 물품만)'); }
   { const c = g.contracts[0], cap0 = g.vehicleCap(c); g.trust[c.carrier] = 60; assert.equal(g.vehicleCap(c), cap0 + 3, '난투 신뢰 Lv3 = 용량 +3'); assert.equal(g.trustPerk(c.carrier, 'feeMult'), null, '배차비 특성은 없다'); g.trust[c.carrier] = 0; }
   assert.equal(g.monthEvents(1).length, 0); assert.equal(g.insurer, 'none');
 });
@@ -1064,7 +1064,7 @@ t('멀티: 계열 규칙 — 🌅 새벽 출발 · 🧊 냉동 비축·연쇄 +2
   // 🛃 통관: 대기 중 0칸 · 대기 중엔 트레잇이 안 사라진다 · 끝난 날 ×2
   { const g = fresh(); g.contracts[1] = g._makeContract('intl0'); const u0 = g.usedVolume(); const x = add(g, { type: 'intl', size: 4, trait: 't_seal' }); assert.ok(x.customs > 0); assert.equal(g.usedVolume(), u0, '보세 0칸');
     let n = 0; while (x.customs > 0 && n++ < 5) g.wait([]); assert.ok(g.parcels.includes(x), '대기 중 트레잇 택배는 남는다'); assert.ok(g.clearedToday(x), '오늘 통관 끝');
-    g.outbox = []; g.callCarrier(1, [x.id]); const o = g.outbox.find(q => q.type === 'attackOut'); assert.ok(o && o.mult === 2 && o.cleared, '×2'); }
+    g.outbox = []; g.callCarrier(1, [x.id]); const o = g.outbox.find(q => q.type === 'attackOut'); assert.ok(o && o.mult >= 2 && o.cleared, '×2'); }
   // ⚠ 파손: 파손 계열로 기한 안에 → 평판 +1
   { const g = fresh(); g.contracts[1] = g._makeContract('fragile0'); const f = add(g, { type: 'fragile', size: 1 }); g.rep = 10; const before = g.rep; g.callCarrier(1, [f.id]); assert.ok(g.rep >= before + 1, '무사고 평판'); }
 });
@@ -1075,7 +1075,7 @@ t('멀티: 전문화 트랙 — 첫 상점은 트랙마다 새 계약(계열이 
   assert.ok(!g.typeOpen('produce') && !g.typeOpen('fresh'), '한길만으로는 특수 물품이 안 열린다');
   const si = it.findIndex(x => g.trackOf(x.carrier) === 'shop'); const empty = g.contracts.findIndex(c => !c);
   assert.ok(g.buyRepShop(si, empty).ok); assert.equal(g.trackLv('shop'), 1); assert.ok(g.typeOpen('produce') && g.typeOpen('fragile') && !g.typeOpen('fresh'), '파손 계열이 농산물·파손을 연다');
-  assert.equal(g.repStepNow(), M.MULTI.mods.repStep - 1, '🛒 계단 −1'); const c1 = g.repCap(); g.addRep(99); assert.equal(g.repCap(), c1 + M.MULTI.mods.repStep - 1, '다음 계단이 짧다'); assert.equal(g.repFloor(), c1);
+  { const R = g.rules, base = Math.min(R.repStepMax, R.repStep + R.repStepGrow * g.repTier); assert.equal(g.repStepNow(), Math.max(Math.min(M.MULTI.TRACKS.shop.stepMin, base), base - 1), '🛒 계단 −1'); } const st1 = g.repStepNow(), c1 = g.repCap(); g.addRep(99); assert.equal(g.repCap(), c1 + st1, '다음 계단(🛒 로 짧아진)'); assert.equal(g.repFloor(), c1);
   if (g.repShop) g.closeRepShop();
   assert.ok(g.repShop == null || g.closeRepShop());
   const e2 = g.contracts.findIndex(c => !c); g.contracts[e2] = g._makeContract('frozen0'); assert.equal(g.trackShields(), 1); g.shields = 0; g.schedule = g.schedule.map(() => []); g.wait([]); if (g.repShop) g.closeRepShop(); assert.ok(g.shields >= 1, '🛡 매일 아침 방패');
@@ -1127,7 +1127,7 @@ t('멀티: 보너스 트레잇은 그날 출고할 때 나에게 — ⭐ 평판 
   const mk = (id, tr) => { const p = g._spawnParcel({ type: 'normal', size: 1, customer: 'anon', trait: tr }); g.parcels.push(p); return p; };
   const b = mk(2, 't_buzz'); const rep = g.rep; let r = g.callCarrier(si, [b.id]);
   assert.ok(r.ok); assert.ok(g.rep >= rep + M.MULTI.BUZZ, '⭐ 입소문 +2');
-  const c = mk(3, 't_shield'), d = mk(4, 't_shield'), e = mk(5, 't_shield'); g.callCarrier(si, [c.id, d.id, e.id]); assert.equal(g.shields, 2);
+  const c = mk(3, 't_shield'), d = mk(4, 't_shield'), e = mk(5, 't_shield'); g.callCarrier(si, [c.id, d.id, e.id]); assert.equal(g.shields, 1, '트레잇은 호출마다 종류당 한 번 — 셋을 실어도 🛡 한 겹');
   const cap = g.warehouse.cap; const f = mk(6, 't_pack'), h = mk(7, 't_truck'); g.callCarrier(si, [f.id, h.id]); assert.equal(g.warehouse.cap, cap + 3); assert.ok(g.freeTruckNext);
   const fee = g.callFee(g.contracts[si], 1); assert.equal(fee, 0, '덤 트럭이면 한 대는 공짜');
   for (let i = 0; i < 4; i++) g.wait([]); assert.equal(g.warehouse.cap, cap, '3일 뒤 임시 칸은 사라진다');
@@ -1178,6 +1178,16 @@ t('멀티: 예보와 실제 도착이 같다 — 받아 줄 계약이 없는 특
   const g = MG(311); g.firstShopDone = true; let bad = 0, n = 0;
   for (let d = 0; d < 14 && g.phase === 'play'; d++) { const up = g.upcoming()[0]; const want = (up.specs || []).map(s => s.type).sort().join(); g.parcels = []; g.wait([]); if (g.repShop) g.closeRepShop(); const got = g.parcels.filter(p => !p.pushed).map(p => p.type).sort().join(); if (!up.specs) continue; n++; if (want !== got) bad++; }   // 사이클 넘어가는 날은 예보가 비어 있다(다음 보름 대본은 그때 짠다)
   assert.equal(bad, 0, bad + '/' + n + '일 어긋남');
+});
+t('멀티 평판: 택배마다 +1 · ⚡ 긴급은 혼자(또는 직배) 보내면 +4 더, 섞으면 그 호출은 절반 · 한 종류 특수로 꽉 채우면 트레잇 ×2 · 첫 상점은 금방', () => {
+  const g = MG(501); g.schedule = g.schedule.map(() => []); g.parcels = [];
+  const mk = s => { const p = g._spawnParcel(Object.assign({ customer: 'anon' }, s)); g.parcels.push(p); return p; };
+  const a = mk({ type: 'normal', size: 1 }), b = mk({ type: 'normal', size: 1 }), r = mk({ type: 'normal', size: 1, rush: true });
+  assert.equal(g.callRep([a, b]), 2); assert.equal(g.callRep([r]), 1 + M.MULTI.REP.rush, '긴급 혼자'); assert.equal(g.callRep([a, b, r]), 1, '섞으면 절반(3→1)'); assert.equal(g.callRep([r], true), 1 + M.MULTI.REP.rush, '직배도 긴급');
+  assert.ok(g.repCap() - g.rep <= g.rules.repFirstGap, '첫 상점은 몇 개만 보내면');
+  const h = MG(502); h.schedule = h.schedule.map(() => []); h.parcels = []; const si = h.contracts.findIndex(c => !c); h.contracts[si] = h._makeContract('cold0'); const cap = h.vehicleCap(h.contracts[si]);
+  const fr = []; for (let v = 0; v < cap; v++) { const p = h._spawnParcel({ type: 'fresh', size: 1, customer: 'anon', trait: 't_hurry' }); h.parcels.push(p); fr.push(p); } h._assignCold(); h.outbox = [];
+  h.callCarrier(si, fr.map(p => p.id)); const o = h.outbox.filter(x => x.type === 'attackOut'); assert.equal(o.length, 1, '종류당 한 번'); assert.equal(o[0].mult, M.MULTI.FULL_MULT, '만차 ×2');
 });
 t('멀티 1:1: 기본 매치는 둘(나 + 봇 하나) · 공격·조합 상자·보수공사는 늘 그 상대에게 · 결과 두 줄', () => {
   const m = MULTI.newMatch({ seed: 303, name: 'H' }); assert.equal(m.players.length, 2); const [h, o] = m.players.map(p => p.game);

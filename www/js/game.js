@@ -54,7 +54,7 @@
     // 멀티플레이 「난투」 (docs/MULTIPLAYER_DESIGN.md · META.MULTI.mods). 개인 런은 전부 꺼져 있다
     multi: false, noCalendarEvents: false, noWeekend: false, unlimitedCalls: false, noCallFee: false, payNow: false, noLoan: false, repDecides: false, finishDump: false, pushMult: 1, freshNoSpoil: false,
     shopDay: false, noCycleMarket: false, autoSummary: false,
-    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, famRules: false, strictCarry: false, ownCargo: 0, ownCargoMax: 1, typeSizes: null, maxTrucks: 0, repKeepTier: false, pushFlat: 0, mixCombo: false, truckCap: null, famTrucks: null, theftMaxDay: 0,
+    repStep: 0, perkPick: false, noRepUnlock: false, repShop: false, cycleRefill: false, noMoney: false, traitSameDay: false, maxParcelSize: 0, typeMaxSize: null, noLateShipPenalty: false, startFamilies: null, contractGated: false, specialTraitMult: 1, normalAnywhere: false, typeTraits: false, noRush: false, typeFamilies: false, repPerParcel: false, traitPerCall: false, traitAll: false, repStepGrow: 0, repStepMax: 0, repFirstGap: 0, famRules: false, strictCarry: false, ownCargo: 0, ownCargoMax: 1, typeSizes: null, maxTrucks: 0, repKeepTier: false, pushFlat: 0, mixCombo: false, truckCap: null, famTrucks: null, theftMaxDay: 0,
     sharedSchedule: false, fixedCustLevel: null, dayArrivalsRate: 0, finalRushMult: 1, fuelRate: 0,
     finalRushReward: 0, freeTrucksPerCycle: 0, earlyRepBonus: 0, rushRepBonus: 0, cleanRepBonus: 0, returnGraceDelta: 0,
     traits: false, traitRate: [0, 0], attackShare: 0.4, repairs: false, chainPush: false, shieldPassive: 0, rainImmune: false, dodgeProb: 0, attackEcho: 0, repairGrow: 0, attackMult: 1,
@@ -149,6 +149,7 @@
       // 평판이 처음 열리는 장은 상한보다 낮게 시작한다 — 가득 찬 막대로 시작하면 채울 게 없다
       if (this.level && this.level.startRep != null) this.rep = Math.min(this.rep, this.level.startRep);
       else if (!this.level) this.rep = Math.round(this.rules.gameoverStress * D.START_REP);
+      if (this.rules.repFirstGap && this.rules.repStep) this.repCapV = this.rep + this.rules.repFirstGap;   // 첫 상점은 몇 개만 보내면 뜬다
       this._initCompany();
       this._initCustomers();
       this.insurer = this.rules.noInsurance ? 'none' : (cfg.insurer && M.INSURERS[cfg.insurer] ? cfg.insurer : 'none');
@@ -736,11 +737,19 @@
     trackEcho() { const A = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.atk; return Math.min(1, (this.rules.attackEcho || 0) + (A ? A.echo * this.trackLv('atk') : 0)); }
     trackShields() { const S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.def; const lv = this.trackLv('def'); return S && lv ? Math.min(S.shieldMax, Math.ceil(lv / S.shieldPer)) : 0; }
     // 🛒 장사: 평판 계단이 짧아지고(상점이 자주) 상점 카드가 는다
-    repStepNow() { const R = this.rules, S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; return S && R.multi ? Math.max(Math.min(S.stepMin, R.repStep), R.repStep - S.step * this.trackLv('shop')) : R.repStep; }
+    repStepNow() { const R = this.rules, S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; const base = R.repStepGrow ? Math.min(R.repStepMax || 99, R.repStep + R.repStepGrow * this.repTier) : R.repStep;   // 계단이 점점 길어진다 — 첫 상점은 빨리 (유저: "초반에 빨리 더 전문화 마켓")
+      return S && R.multi ? Math.max(Math.min(S.stepMin, base), base - S.step * this.trackLv('shop')) : base; }
     shopCards() { const S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; return S && this.rules.multi ? Math.min(S.cardsMax, 3 + Math.floor(this.trackLv('shop') / S.cardsPer)) : 3; }
     traitPool(type) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? null : type; const pair = key && TT[key]; if (!pair) return []; return pair.slice(); }   // 둘 다 처음부터 — 한 가지만 계속 받던 것
     // 트레잇 세기: 🔗 조합 배수 × (강화 카드 +1) × (🧊 숙성 +일수)
-    traitPower(p) { let k = 1 + (this.traitUnlocks.includes(p.type) ? 1 : 0) + (p.aged || 0); return k * (this._mixMult || 1); }
+    traitPower(p) { let k = 1 + (this.traitUnlocks.includes(p.type) ? 1 : 0) + (p.aged || 0); return k * (this._mixMult || 1) * (this._fullMult || 1); }
+    // 트레잇은 호출마다 종류당 한 번(traitPerCall) — 몇 개를 실었든. 한 종류로만 꽉 채운 차(만차)면 강화(FULL_MULT) (유저: "한 특수를 만차로 실어 보내면 그 트레잇이 강화된 상태로")
+    _fireTraitsPerCall(chosen, full) {
+      const groups = {}; for (const p of chosen) if (p.trait && !p.overdue) (groups[p.trait] = groups[p.trait] || []).push(p);
+      const kinds = Object.keys(groups), fired = [];
+      for (const t of kinds) { const rep = groups[t].slice().sort((a, b) => (b.aged || 0) - (a.aged || 0))[0]; const solo = full && kinds.length === 1 && rep.type !== 'normal' && chosen.every(p => p.type === rep.type); this._fullMult = solo ? (M.MULTI.FULL_MULT || 2) : 1; this._fireTrait(rep); fired.push({ type: rep.type, trait: rep.trait, full: solo }); if (solo) this.emit('fullTrait', { type: rep.type, trait: rep.trait }); }
+      this._fullMult = 0; return fired;
+    }
     _resolveTrait(sp) { const pool = this.traitPool(sp.type).filter(t => this.traitDef(t)); if (!pool.length) return null; return pool[this.rng.int(pool.length)]; }
     _repairNext(b) { const B = M.MULTI.REPAIR; return { size: Math.min(B.maxSize, this.storageVol(b) + 1), days: Math.max(1, b.turns - 1), hops: (b.hops || 0) + 1, from: this.cfg.pid != null ? this.cfg.pid : null }; }
     // 상대가 만차로 밀어 넣은 택배 — 다음 날 아침 내 창고에 n 개가 더 들어온다(일반, 1~2칸, 기한 짧게)
@@ -1007,6 +1016,26 @@
       return { xp: sum, early, half, late };
     }
     // 이 호출로 오르내릴 평판 — 같은 점수를 REP_GAIN.earlyDiv 로 나눠 ±earlyMax 안에서 (0 을 향해 반올림)
+    // 난투 평판(repPerParcel): 보낸 택배마다 조금씩 · ⚡ 긴급은 그것만 실은 차(또는 직배)로 보내면 크게 — 다른 짐과 섞으면 그 호출은 평판 절반
+    // (유저: "평판은 처리하는 물품별로 조금씩 오르다 긴급은 더 강하게. 긴급으로 처리하려면 그 택배만 실어야 하고 혹은 직배, 아니면 절반")
+    callRep(ps, self) {
+      if (!this.rules.repPerParcel) return this.repDeltaFor(ps);
+      const P = M.MULTI.REP, ok = (ps || []).filter(p => p && !p.overdue), rush = ok.filter(p => this.rushToday(p));
+      let rep = ok.length * P.perParcel;
+      if (rush.length) { if (self || ps.length === 1) rep += P.rush * rush.length; else rep = Math.floor(rep / 2); }
+      return rep;
+    }
+    // 호출 미리보기 태그 — ⚡ 단독/섞임, 한 특수 만차(특약 ×2)
+    callTags(ps, cap) {
+      const R = this.rules, out = { rushSolo: false, rushMixed: false, full: null };
+      if (!R.repPerParcel || !ps || !ps.length) return out;
+      const rush = ps.some(p => p && !p.overdue && this.rushToday(p));
+      if (rush) { if (ps.length === 1) out.rushSolo = true; else out.rushMixed = true; }
+      const t = ps[0].type, vol = ps.reduce((s, p) => s + p.size, 0);
+      if (R.traitPerCall && t !== 'normal' && ps.every(p => p.type === t) && ps.some(p => p.trait && !p.overdue) && vol >= cap) out.full = t;
+      return out;
+    }
+    callRepMixed(ps) { return !!(this.rules.repPerParcel && ps.length > 1 && ps.some(p => p && this.rushToday(p))); }
     repDeltaFor(parcels) {
       const G = D.REP_GAIN, s = this.trustScore(parcels || []).xp;
       const d = Math.trunc(s / (G.earlyDiv || 5));
@@ -1827,7 +1856,7 @@
       let specs = this.schedule[this.turn - 1] || [];
       // 난투: 받아 주는 계약이 없는 특수 물품은 일반으로 온다(트레잇도 없이) — 계약을 사야 그 물품과 그 트레잇이 열린다 (유저)
       const R = this.rules;
-      if (R.typeTraits) specs = specs.map(sp => sp.trait ? Object.assign({}, sp, { trait: this._resolveTrait(sp) }) : sp);   // 대본의 트레잇은 '붙었다'는 표시 — 무엇이 붙는지는 물품 종류(와 내 언락)가 정한다
+      if (R.typeTraits) specs = specs.map(sp => sp.trait || (R.traitAll && sp.type !== 'normal') ? Object.assign({}, sp, { trait: this._resolveTrait(sp) }) : sp);   // traitAll: 특수 물품은 전부 제 트레잇을 단다(트레잇은 호출마다 종류당 한 번이라 개수가 아니다)   // 대본의 트레잇은 '붙었다'는 표시 — 무엇이 붙는지는 물품 종류(와 내 언락)가 정한다
       if (R.contractGated) specs = specs.map(sp => this._gateSpec(sp));
       // 난투: 내가 연 특수 물품은 내 몫이 더 온다 — 일반 입고 일부가 그 물품으로 바뀐다(열린 종류마다 ownCargo). 대본은 넷이 같지만 계약을 산 사람에겐 그 짐이 온다
       // (유저: "거인을 가졌는데 거인 화물이 안 옴" — 공유 대본에서 대형은 5% 남짓이라 계약을 사도 며칠씩 빈 차였다)
@@ -1978,7 +2007,7 @@
       let chainBonus = 0, pushed = 0;
       // 난투: 만차는 돈이 아니라 **밀어내기** — 연속 만차 2회째부터(1·2·3개) 상대 창고에 택배를 밀어 넣는다 (유저: "만차가 돈 올려주지 말고 일부 택배를 상대에게")
       if (R.chainPush && chainQualified && chainLevel >= 2) { pushed = (R.pushFlat ? Math.min(R.pushFlat, chainLevel - 1) : chainLevel - 1) * (R.pushMult || 1); const big = this.famRule(c, 'large'); this.outbox.push(Object.assign({ type: 'push', n: pushed }, big ? { big: true } : {})); this.emit('pushOut', { n: pushed }); this.stats.pushed = (this.stats.pushed || 0) + pushed; if (chainLevel >= D.LOAD_CHAIN.max) this.loadChain = 0; }   // 최대에서 밀고 나면 처음부터
-      if (chainMult > 1 && !R.chainPush) {
+      if (chainMult > 1 && !R.chainPush && !R.mixCombo) {
         const beforeChain = revenue;
         revenue = Math.round(revenue * chainMult);
         chainBonus = revenue - beforeChain;
@@ -1998,7 +2027,7 @@
       // 신뢰와 평판: 얼마나 일찍 보냈나 (기한 맞춰 보내면 0, 늦으면 깎인다)
       xp = this.trustGainPreview(c, chosen).xp;
       this._addTrust(c.carrier, xp);
-      let repD = this.repDeltaFor(chosen);
+      let repD = this.callRep(chosen, false);
       if (repD > 0 && R.earlyRepBonus) repD += R.earlyRepBonus;   // 멀티 퍽: 일찍 보낸 호출의 평판 보너스
       if (repD > 0 && R.rushRepBonus && this.month >= R.months) repD += R.rushRepBonus;   // 멀티 퍽: 마지막 보름 호출 평판 보너스
       if (repD) this.addRep(repD, MSG(repD > 0 ? 'why.repEarly' : 'why.repLate'));
@@ -2041,7 +2070,7 @@
           this.emit('mix', mix);
         } else this.mixStreak = 0;
       }
-      for (const p of chosen) this._fireTrait(p);
+      if (R.traitPerCall) this._fireTraitsPerCall(chosen, deliveredVolume >= vcap * trucks); else for (const p of chosen) this._fireTrait(p);
       this._mixMult = 0;
       if (safeFragile) this.addRep(safeFragile * (M.MULTI.FAM_RULES.fragile.rep || 1), MSG('why.famRule', { icon: M.MULTI.FAM_RULES.fragile.icon }));
       this.say('log.call', { name: this.contractName(c), count: chosen.length, revenue, delay: delay ? MSG('log.callDelay', { delay }) : '', broken: broken ? MSG('log.callBroken', { broken }) : '', refund: refunded ? MSG('log.callRefund') : '', calls: c.calls, fee });
@@ -2062,7 +2091,7 @@
       if (R.payNow && !R.noMoney && this.cash < cost) return { ok: false, msg: T('err.noCashFee', { fee: cost, cash: this.cash }) };
       if (R.payNow) this.cash -= cost; else this.feesDue += cost;
       this.monthStats.spent += cost; this.run.spent += cost; this.monthStats.selfCost = (this.monthStats.selfCost || 0) + cost;
-      let revenue = 0, broken = 0;
+      let revenue = 0, broken = 0; const done = [];
       for (const p of chosen) {
         const bp = this.selfBreakProb(p);
         if (bp > 0 && this.rng.next() < bp) {
@@ -2081,8 +2110,11 @@
         this.stats.deliveredByType[p.type]++;
         this.parcels.splice(this.parcels.indexOf(p), 1);
         this.emit('deliver', { parcel: p, reward: r });
-        this._fireTrait(p);
+        if (!R.traitPerCall) this._fireTrait(p);
+        done.push(p);
       }
+      if (R.traitPerCall) this._fireTraitsPerCall(done, false);
+      if (R.repPerParcel) { const d = this.callRep(done, true); if (d) this.addRep(d, MSG('why.repEarly')); }   // 직배: ⚡ 긴급은 여기서도 긴급으로 친다
       revenue = Math.round(revenue * R.revenueMult);
       this.cash += revenue;
       const ok = chosen.length - broken;
