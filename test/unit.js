@@ -1003,6 +1003,12 @@ t('멀티: 🔥 만석 — 80% 넘게 찬 창고에 떨어진 상자는 두 배 
   g.parcels.push(g._spawnParcel({ type: 'fresh', size: 1, customer: 'anon', trait: 't_hurry' }), g._spawnParcel({ type: 'fresh', size: 1, customer: 'anon', trait: 't_hurry' })); g.reflectNext = 1;
   const sn = MULTI.snapOf(g); assert.ok(sn.stock.some(x => x.i === '⏱' && x.n === 2 && x.a), JSON.stringify(sn.stock)); assert.equal(sn.reflect, 1);
 });
+t('멀티: 적재는 일반 + 제 물품 — 특약·복합 능력마다 한 종류씩 더 · 거인 두 번째 차는 대형을 실을 때만', () => {
+  const g = MG(401); const takes = k => { const c = g._makeContract(k); return ['normal', 'fresh', 'produce', 'fragile', 'intl', 'large', 'frozen'].filter(t => g.canHandle(c, { type: t, size: t === 'intl' || t === 'large' ? 3 : 1, attrs: D.PARCEL_TYPES[t].attrs, customs: 0 })); };
+  assert.deepEqual(takes('large0'), ['normal', 'large']); assert.deepEqual(takes('intl0'), ['normal', 'intl']); assert.deepEqual(takes('cold0'), ['normal', 'fresh']); assert.deepEqual(takes('fragile0'), ['normal', 'produce', 'fragile']);
+  assert.ok(takes('cold2').includes('frozen'), '복합 능력(냉동칸)은 +1'); const c = g._makeContract('intl0'); c.enh.opts = ['optCold']; assert.ok(g.canHandle(c, { type: 'fresh', size: 1, attrs: ['cold'], customs: 0 }), '보냉 특약 = 신선 +1');
+  const L = g._makeContract('large0'); assert.equal(g.maxTrucks(L, [{ type: 'normal' }]), 1); assert.equal(g.maxTrucks(L, [{ type: 'large' }, { type: 'normal' }]), 2);
+});
 t('멀티: 🔗 조합 — 한 차에 다른 특수 물품 둘 이상 → 트레잇 ×(종류 + 연쇄 − 1), 일반 상자가 전원에게 · 조합 아닌 호출이면 연쇄가 끊긴다 · 냉동이 끼면 연쇄 +1', () => {
   const g = MG(91); g.firstShopDone = true; g.schedule = g.schedule.map(() => []); g.parcels = [];
   const s = g.contracts.findIndex(c => !c); g.contracts[s] = g._makeContract('cold2');   // 냉동칸 딸린 냉장차 — 신선·냉동을 같이 싣는다
@@ -1052,7 +1058,7 @@ t('멀티: 계열 규칙 — 🌅 새벽 출발 · 🧊 냉동 비축·연쇄 +2
   { const g = fresh(); g.contracts[1] = g._makeContract('frozen0'); g.warehouse.frozen = Math.max(4, g.warehouse.frozen || 0); const f = add(g, { type: 'frozen', size: 1, trait: 't_ice' }); assert.ok(f.inFrozen); const d0 = f.deadline; g.wait([]); g.wait([]); g.wait([]); assert.equal(f.aged, 2, '🧊 숙성: 하루마다 +1, 최대 +2'); assert.ok(f.deadline < d0, '기한은 그대로 간다'); assert.equal(g.traitPower(f), 3);
     const cap = g.vehicleCap(g.contracts[1]); const ns = []; for (let i = 0; i < cap; i++) ns.push(add(g, { type: 'normal', size: 1 })); g.loadChain = 0; g.callCarrier(1, ns.map(p => p.id), 1); assert.equal(g.loadChain, 2, '연쇄 +2'); }
   // 🦣 대형: 대형 하나 = 트럭 만차 · 밀어내기는 4칸 상자
-  { const g = fresh(); g.contracts[1] = g._makeContract('large0'); const L = add(g, { type: 'large', size: 4 }), F = add(g, { type: 'fragile', size: 1 }); const r = g.callCarrier(1, [L.id, F.id], 2); assert.ok(r.ok && r.mix, r.msg); assert.ok(g.outbox.some(o => o.type === 'push' && o.big && o.all), '조합에 대형이 끼면 4칸 상자가 전원에게');
+  { const g = fresh(); g.contracts[1] = g._makeContract('large2'); const L = add(g, { type: 'large', size: 4 }), F = add(g, { type: 'fresh', size: 1 }); const r = g.callCarrier(1, [L.id, F.id], 2);   // 냉장 대형차(복합 능력)라 신선도 받는다 assert.ok(r.ok && r.mix, r.msg); assert.ok(g.outbox.some(o => o.type === 'push' && o.big && o.all), '조합에 대형이 끼면 4칸 상자가 전원에게');
     const v = fresh(); v.receivePush({ n: 1, from: 9, big: true }); v.wait([]); const box = v.parcels.find(p => p.pushed); assert.ok(box && box.size === 4); assert.ok(v.contracts.some(c => c && v.canHandle(c, box)), '4칸 차면 한길도 싣는다'); }
   // 🛃 통관: 대기 중 0칸 · 대기 중엔 트레잇이 안 사라진다 · 끝난 날 ×2
   { const g = fresh(); g.contracts[1] = g._makeContract('intl0'); const u0 = g.usedVolume(); const x = add(g, { type: 'intl', size: 4, trait: 't_seal' }); assert.ok(x.customs > 0); assert.equal(g.usedVolume(), u0, '보세 0칸');

@@ -1015,7 +1015,7 @@
       else { icon = '🎁'; name = it.name || it.kind; }
       return `<button class="btn pkcard ${fam} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><b>${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${tag ? `<em>${esc(tag)}</em>` : ''}${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
     const body = `<div class="pkrow">${sh.items.map(card).join('')}</div>${g.rules.noMoney ? '' : `<div class="d" style="text-align:right;color:var(--gold)">${g.cash}c</div>`}`;
-    const m = modal(sh.bonus ? T('multi.bonusShopTitle', { n: sh.items.length }) : sh.items.every(it => it.kind === 'contract' && it.switchFrom == null && g.rules.multi && g.trackOf(it.carrier)) ? T('multi.firstShopTitle') : T('multi.repShopTitle', { n: sh.items.length }), body, [{ label: T('btn.close'), cls: 'primary', onClick: () => { g.closeRepShop(); closeModal(); game.takeEvents(); saveGame(); renderAll(); checkPhase(); } }]);
+    const m = modal(sh.bonus ? T('multi.bonusShopTitle', { n: sh.items.length }) : sh.items.every(it => it.kind === 'contract' && it.switchFrom == null && g.rules.multi && g.trackOf(it.carrier)) ? T('multi.firstShopTitle') : T('multi.repShopTitle', { n: sh.items.length }), body, g.rules.noMoney && sh.items.some(it => !it.sold && !(it.kind === 'enh' && slotFor(it) < 0)) ? null : [{ label: T('btn.close'), cls: 'primary', onClick: () => { g.closeRepShop(); closeModal(); game.takeEvents(); saveGame(); renderAll(); checkPhase(); } }]);   // 난투: 닫기 없음 — 하나는 꼭 고른다(고를 게 없을 때만 닫기) (유저)
     // 새 계약인데 빈 슬롯이 없으면 무엇을 내보낼지 고른다 (유저: "빈 슬롯 없으면 교체를 고르게")
     const pickReplace = (it, i) => {
       const body = `<p style="font-size:12px;color:var(--dim)">${T('multi.pickOut')}</p>` + g.contracts.map((c, si) => c ? `<div class="card" data-s="${si}"><div class="t"><span>${esc(g.contractName(c))}${gradeBadge(c.grade)}</span></div><div class="d">${T('fmt.cells', { n: g.vehicleCap(c) })} · ${enhNames(g, c).join(' · ') || T('common.none')}</div></div>` : '').join('');
@@ -1331,7 +1331,9 @@
       // 세로 목록 한 줄: 이름 · 싣는 색 · 적재 눈금 · 순수익 · 배차 눈금. 글자는 최소로 — 자세한 건 꾹 누르면
       const callsHtml = g.offFor(c) ? `<span class="off">${g.roadblockDay === g.totalTurn && g.contracts[g.roadblockSlot] === c ? '🚧' : T('hud.off')}</span>` : !g.shows('calls') || R.unlimitedCalls ? '' : spare ? T('hud.spare') : callPips;
       const netHtml = spent || !pv.n ? '<span class="per">—</span>' : R.noMoney ? (() => { const d = g.repDeltaFor(elig.filter(p => pv.ids ? pv.ids.includes(p.id) : true)); return `<span class="per ${d >= 0 ? 'good' : 'bad'}">★${d >= 0 ? '+' : ''}${d}</span>`; })() : `<span class="per ${pv.net >= 0 ? 'good' : 'bad'}">${(pv.net >= 0 ? '+' : '−') + Math.abs(pv.net)}c</span>`;
-      btn.innerHTML = `<span class="cn">${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}</span>${takesDots(g, c, true)}<span class="cl">${spent ? '' : cells}</span>${netHtml}<span class="calls ${spent ? 'zero' : ''}">${callsHtml}</span>`;
+      // 신뢰도: 이름 옆 Lv, 이름 밑 경험치 한 줄 (유저: "신뢰도를 물류 선택 아이템에서 보여주면 좋겠다. 경험치랑") — 줄 높이는 그대로
+      const tr = g.shows('trust') ? (() => { const lv = g.trustLevel(c.carrier), nx = g.trustNext(c.carrier), pct = nx ? Math.round(100 * Math.min(1, nx.have / Math.max(1, nx.need))) : 100; return { lv, pct, tip: nx ? `${nx.have}/${nx.need}` : 'MAX' }; })() : null;
+      btn.innerHTML = `<span class="cn">${car.badge && car.badge !== '🚚' ? car.badge : ''}${esc(car.short)}${gradeBadge(c.grade)}${tr ? `<b class="tl${tr.pct >= 100 ? ' max' : ''}" title="${esc(T('common.trust'))} ${tr.tip}">Lv${tr.lv}</b>` : ''}</span>${tr ? `<span class="txp"><i style="width:${tr.pct}%"></i></span>` : ''}${takesDots(g, c, true)}<span class="cl">${spent ? '' : cells}</span>${netHtml}<span class="calls ${spent ? 'zero' : ''}">${callsHtml}</span>`;
     }
     const sc = $('#cself');
     if (sc) {
@@ -1950,9 +1952,9 @@
     if (!pick) { head.hidden = foot.hidden = true; head.innerHTML = foot.innerHTML = ''; lastCallCtx = null; return; }
     if (pick.i === SELF) return renderSelfBar(head, foot);
     const cm = pick, i = cm.i, c = game.contracts[i];
-    const car = D.CARRIERS[c.carrier], vcap = game.vehicleCap(c), simul = game.simulMax(c), fee = game.truckFee(c);
+    const car = D.CARRIERS[c.carrier], vcap = game.vehicleCap(c), fee = game.truckFee(c);
     const elig = game.eligibleParcels(c);
-    const selP = [...cm.sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean);
+    const selP = [...cm.sel].map(id => game.parcels.find(p => p.id === id)).filter(Boolean), simul = game.simulMax(c, selP);   // 거인은 대형을 실어야 두 대
     const vol = selP.reduce((s, p) => s + p.size, 0);
     const packed = game.packTrucks(c, selP), need = Math.max(1, packed.length);
     const trucks = Math.min(need, simul);   // 담은 만큼 붙는다(두 대까지) — 더하기·빼기 버튼 없음
@@ -1973,7 +1975,7 @@
     const tgt = game.rules.multi && match ? MULTI.aimOf(match, ME()) : null, fires = selP.some(p => p.trait && !p.overdue && (M.MULTI.TRAITS[p.trait] || {}).kind === 'attack') || (mp && mp.mult);
     const aimLine = tgt && fires ? (() => { const f = MULTI.fillOf(tgt), hot = f >= M.MULTI.HOT.at, boxes = mp && mp.mult ? Math.max(1, mp.mult - 1) * (hot ? M.MULTI.HOT.mult : 1) : 0; return `<div class="chain-preview aimto ${hot ? 'hot' : ''}">→ 🎯 ${esc(tgt.name)} ${Math.round(f * 100)}%${boxes ? ` · 📦${boxes}${hot ? ' 🔥' : ''}` : ''}</div>`; })() : '';   // 누구에게 · 얼마나 — 만석이면 🔥
     const mixLine = mp && mp.mult ? `<div class="chain-preview mix">🔗 ${mp.kinds.map(t => esc(D.PARCEL_TYPES[t].short || t)).join('+')} ×${mp.mult}</div>` : '';
-    const money = mixLine + aimLine + `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, D.LOAD_CHAIN.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
+    const money = mixLine + aimLine + `${game.rules.chainPush && game.shows('chain') && chain.count >= 1 && fill >= D.LOAD_CHAIN.minFill ? `<div class="chain-preview">📦 ${Math.min(chain.count || 0, D.LOAD_CHAIN.max - 1)} →</div>` : chain.count >= 2 && game.shows('chain') && !game.rules.chainPush && !game.rules.mixCombo ? `<div class="chain-preview">⚡ ${T('chain.preview', { n: chain.count, mult: chain.mult.toFixed(2), bonus: chainIncome - baseIncome })}</div>` : ''}${rush && game.shows('rush') ? `<div class="rush-preview">🔥 ${T('rush.preview', { mult: D.RUSH.bonus, bonus: income - chainIncome })}</div>` : ''}`;
     const riskSel = selP.filter(p => game.breakProb(c, p) > 0);
     const riskLine = riskSel.length ? `<div class="riskline">${game.rules.noMoney ? T('call.riskShort', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100) }) : T('call.riskLine', { n: riskSel.length, pct: Math.round(game.breakProb(c, riskSel[0]) * 100), loss: Math.round(riskSel.reduce((s, p) => s + game.breakProb(c, p) * game.baseReward(p.type, p.baseSize), 0)) })}</div>` : '';
     const caps = !game.shows('attrs') ? '' : `<span class="caps">${T('call.caps')} ${game.contractCaps(c).length ? attrIcons(game.contractCaps(c)) : T('common.none')} · ${T('call.size', { min: car.sizeMin, max: game.contractSizeMax(c) })}${car.delay ? ` · ${T('call.payLater', { n: Math.max(0, car.delay - (game.trustLevel(c) >= 3 ? 1 : 0)) })}` : ''}</span>`;

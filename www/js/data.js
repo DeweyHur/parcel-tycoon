@@ -121,7 +121,7 @@
       fresh:   { attrs: ['cold'],    sizes: [1, 2, 4],  deadline: 3, bonus: 15, reward: { 1: 22, 2: 60, 4: 90, 7: 130 }, sizeWeight: { 1: 30 }, color: 0x5ee0d8, css: '#5ee0d8' },
       produce: { attrs: ['produce'], sizes: [2, 4],  deadline: 4, bonus: 10, reward: { 1: 35, 2: 50, 4: 75, 7: 110 }, color: 0x9acd5a, css: '#9acd5a' },
       fragile: { attrs: ['fragile'], sizes: [1, 2, 4],  deadline: 5, bonus: 20, reward: { 1: 20, 2: 60, 4: 95, 7: 135 }, sizeWeight: { 1: 30 }, color: 0xf0a04b, css: '#f0a04b' },
-      intl:    { attrs: ['customs'], sizes: [4, 7],  deadline: 5, bonus: 25, reward: { 1: 50, 2: 75, 4: 110, 7: 150 }, color: 0x6c8cff, css: '#6c8cff' },
+      intl:    { attrs: ['customs'], sizes: [4, 7],  deadline: 5, bonus: 25, reward: { 1: 50, 2: 75, 3: 95, 4: 110, 7: 150 }, color: 0x6c8cff, css: '#6c8cff' },
       large:   { attrs: [],          sizes: [4, 7],  deadline: 6, bonus: 30, reward: { 1: 45, 2: 65, 3: 85, 4: 100, 7: 140 }, color: 0xb08bd8, css: '#b08bd8' },
       frozen:  { attrs: ['frozen'],  sizes: [1, 2, 4],  deadline: 5, bonus: 25, reward: { 1: 22, 2: 70, 4: 105, 7: 145 }, sizeWeight: { 1: 30 }, color: 0x9ad7ff, css: '#9ad7ff' },
     },

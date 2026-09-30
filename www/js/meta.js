@@ -345,7 +345,7 @@
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 보수공사으로 돌아온다)
       repStep: 4, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
-      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.15, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true, ownCargo: 0.08, ownCargoMax: 0.2, typeSizes: { large: [3, 4] },   // 내 몫은 종류마다 8%, 다 합쳐 20% 까지 — 일반이 대다수 (유저: "왜 네 칸짜리만 와") · 대형은 3~4칸 ("4칸은 애매, 3~4칸이 와야 쌓는 맛")
+      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.15, dayArrivalsRate: 0.02, typeFamilies: true, famRules: true, strictCarry: true, ownCargo: 0.08, ownCargoMax: 0.2, typeSizes: { large: [3, 4], intl: [2, 3, 4] },   // 내 몫은 종류마다 8%, 다 합쳐 20% 까지 — 일반이 대다수 (유저: "왜 네 칸짜리만 와") · 대형은 3~4칸 ("4칸은 애매, 3~4칸이 와야 쌓는 맛")
       callsMult: 1, repKeepTier: true, pushFlat: 1, theftMaxDay: 2,   // 연 특수 물품마다 일반 입고의 12% 가 그 물품으로
         // 1.8·+2%/일: 첫 사이클 창고 30%대 → 끝에 넘친다 (유저: "아무리 비워도 창고가 비지를 않아" — 2.6·+1% 는 첫날부터 한 번 호출 용량과 입고가 같았다)
       finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 5개쯤(+만차 밀어내기). 전문 차도 일반을 실어 여유가 커서 2.6(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
@@ -402,6 +402,9 @@
       intl:    { icon: '🛃', clearMult: 2 },   // 보세 구역: 통관 대기 짐은 0칸 · 통관 끝난 날 보내면 트레잇 ×2 (대기 중엔 트레잇이 안 사라진다)
       fragile: { icon: '⚠', rep: 1 },       // 무사고: 파손 계열로 파손품을 기한 안에 보내면 개당 평판 +1
     },
+    // 난투 적재(strictCarry): 계열마다 제 물품 — 나머지는 특약·복합 능력(계열 기본 밖의 능력)으로 하나씩
+    CARRY_OWN: { cold: ['fresh'], frozen: ['frozen'], fragile: ['fragile', 'produce'], intl: ['intl'], large: ['large'] },
+    CARRY_ATTR: { cold: 'fresh', frozen: 'frozen', fragile: 'fragile', customs: 'intl' },
     TRACKS: {
       shop: { icon: '🛒', families: ['fragile'], cardsPer: 2, cardsMax: 5, step: 1, stepMin: 3 },   // 상점 카드 +1/2레벨(최대 5장) · 평판 계단 −1/레벨(최소 4)
       atk:  { icon: '⚔', families: ['cold', 'intl'], echo: 0.25 },                                 // 공격 메아리 +25%/레벨(최대 100%)

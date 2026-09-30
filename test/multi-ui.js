@@ -56,12 +56,13 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   ok('상한 도달 → 등급 +1 · 상한 +6 · 상점 3장', offer.items && offer.items.length === 3 && offer.tier >= 1 && offer.cap === 20 + PT_STEP * offer.tier, JSON.stringify(offer));
   await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(500); await idle();   // 다음 마감에서 checkPhase 가 상점을 띄운다
   let t = await modalText();
+  ok('평판 상점엔 닫기 버튼이 없다(하나는 꼭 고른다)', !(await page.$('#modal .foot .btn')));
   ok('평판 상점 팝업 — 값 없는 카드 3장', /상점|전문화/.test(t) && (await page.$$('.pkcard')).length === 3 && !/\d+c\b/.test(t), t.slice(0, 80).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-04-perk.png` });
   const picked = await page.evaluate(() => { const g = PT.game; const sh = g.repShop; const i = sh.items.findIndex(it => it.kind === 'contract' && it.switchFrom != null || it.kind === 'adTicket'); const cash = g.cash; const b = document.querySelector(`.pkcard[data-i="${i}"]`); if (b) b.click(); return { i, kind: i >= 0 && sh.items[i].kind, cash, after: g.cash, sold: i >= 0 && sh.items[i].sold, closed: g.repShop !== sh, price: /\d+c/.test(document.body.textContent.slice(0, 0)) }; }); await page.waitForTimeout(400);
   ok('카드 하나 고르면 → 돈 안 들고 · 그 상점은 닫힌다', picked.i < 0 || (picked.after === picked.cash && picked.sold && picked.closed), JSON.stringify(picked));
   // 닫기 — 평판이 넘쳐 있으면(테스트는 +99) 닫자마자 다음 계단 상점이 이어진다. 다 닫으면 플레이
-  let tiers = 0; for (let k = 0; k < 20 && await page.evaluate(() => !!PT.game.repShop); k++) { tiers++; await page.evaluate(() => [...document.querySelectorAll('#modal .foot .btn')].pop().click()); await page.waitForTimeout(250); }
+  let tiers = 0; for (let k = 0; k < 20 && await page.evaluate(() => !!PT.game.repShop); k++) { tiers++; await page.evaluate(() => { const rp = document.querySelector('#modal .card[data-s]'); if (rp) return rp.click(); const c = document.querySelector('#modal .pkcard:not([disabled])'); if (c) return c.click(); const b = [...document.querySelectorAll('#modal .foot .btn')].pop(); if (b) b.click(); }); await page.waitForTimeout(250); }   // 난투 상점엔 닫기가 없다 — 하나씩 고르며 넘긴다
   await idle();
   const closed = await page.evaluate(() => ({ shop: !!PT.game.repShop, phase: PT.game.phase, modal: !!document.querySelector('#modal .pkcard'), tier: PT.game.repTier, rep: PT.game.rep, cap: PT.game.repCap() }));
   ok('닫기 → 넘친 평판만큼 계단이 이어지고, 다 닫으면 플레이 계속', !closed.shop && closed.phase === 'play' && !closed.modal && closed.rep < closed.cap + 1, JSON.stringify(Object.assign({ tiers }, closed)));
