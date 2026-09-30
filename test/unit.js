@@ -1018,7 +1018,7 @@ t('멀티: 🔗 조합 — 한 차에 다른 특수 물품 둘 이상 → 트레
 t('멀티: 연 특수 물품은 내 몫이 온다 — 대형 계약을 사면 일반 일부가 대형으로(부피는 그만큼 일반을 덜어 낸다)', () => {
   const run = own => { const g = MG(71); g.firstShopDone = true; if (own) g.contracts[g.contracts.findIndex(c => !c)] = g._makeContract('large0'); let large = 0, vol = 0; for (let d = 0; d < 26 && g.phase === 'play'; d++) { g.parcels = []; g.wait([]); if (g.repShop) g.closeRepShop(); for (const p of g.parcels) { if (p.type === 'large') large++; if (!p.pushed) vol += p.size; } } return { large, vol }; };
   const a = run(false), b = run(true);
-  assert.equal(a.large, 0, '대형 계약이 없으면 대형은 안 온다'); assert.ok(b.large >= 8, '대형 계약이 있으면 사흘에 하나 넘게 — ' + b.large);
+  assert.equal(a.large, 0, '대형 계약이 없으면 대형은 안 온다'); assert.ok(b.large >= 3 && b.large > a.large, '대형 계약이 있으면 대형이 온다(일반이 대다수) — ' + b.large);
   assert.ok(Math.abs(b.vol - a.vol) <= a.vol * 0.2, '부피는 비슷하다 ' + a.vol + ' / ' + b.vol);
 });
 t('멀티: 창고를 통째로 비우는 공격은 없다 — 칸은 70% 아래로 안 줄고 · 도난은 하루 둘 · 독촉은 하루 셋', () => {

@@ -24,7 +24,7 @@ window.Scene3D = (function () {
   };
   const SIGN = { bg: '#2a2740', line: '#0f0e1a', hi: '#3d3a5c', alt: '#eef6ff', unit: 0.036, scale: 2 };
   const STORAGE_COLOR = 0x8c7bc0;   // 맡아 둔 짐(보관 계약) — 내 택배와 헷갈리지 않게 보라빛
-  const FOOT = { 1: [1, 1, 0.65], 2: [2, 1, 0.78], 4: [2, 2, 1.18], 7: [3, 2, 1.85] }; // [w, d, h] — 화면에서 상자 크기와 적재량을 즉시 읽을 수 있게 높이를 강조한다.
+  const FOOT = { 1: [1, 1, 0.65], 2: [2, 1, 0.78], 3: [3, 1, 0.95], 4: [2, 2, 1.18], 7: [3, 2, 1.85] };   // 3칸 = 난투 대형 // [w, d, h] — 화면에서 상자 크기와 적재량을 즉시 읽을 수 있게 높이를 강조한다.
   const TRUCK_PARK = 6.6, TRUCK_DOCK = 4.9, TRUCK_GONE = 12;
   // 계열별 차 도색 (캡 · 띠 · 짐칸)
   const TRUCK_PAINT = {
@@ -565,7 +565,7 @@ window.Scene3D = (function () {
       while (this.ghosts.children.length) this.ghosts.remove(this.ghosts.children[0]);
       let z = 0.4; // 도크(노란 선) 위에 세로로
       for (const s of specs) {
-        const vis = s.size >= 7 ? 7 : s.size >= 4 ? 4 : s.size >= 2 ? 2 : 1; const [w, d, h] = FOOT[vis];
+        const vis = s.size >= 7 ? 7 : s.size >= 4 ? 4 : s.size >= 3 ? 3 : s.size >= 2 ? 2 : 1; const [w, d, h] = FOOT[vis];
         const m = new THREE.Mesh(new THREE.BoxGeometry(d * CELL - 0.08, h, w * CELL - 0.08), new THREE.MeshLambertMaterial({ color: D.PARCEL_TYPES[s.type].color, transparent: true, opacity: 0.5 }));
         m.position.set(5.05, h / 2 + 0.1, z + w * CELL / 2); this.ghosts.add(m);
         const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })); m.add(e);
@@ -639,7 +639,7 @@ window.Scene3D = (function () {
       if (rest.length) { const m = this._pack(rest, R, R.tiers[R.tiers.length - 1]); for (const p of rest) out.set(p.id, m.get(p.id)); }
       return out;
     }
-    _visSize(p) { return p.size >= 7 ? 7 : p.size >= 4 ? 4 : p.size >= 2 ? 2 : 1; }
+    _visSize(p) { return p.size >= 7 ? 7 : p.size >= 4 ? 4 : p.size >= 3 ? 3 : p.size >= 2 ? 2 : 1; }
     _valueTier(p) {
       if (p.storage) return 0;
       const reward = p.reward || 0;

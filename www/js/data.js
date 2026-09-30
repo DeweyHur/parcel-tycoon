@@ -108,7 +108,7 @@
     },
 
     // 크기 등장 비율 (1 소형, 2 중형, 4 대형, 7 초대형)
-    SIZE_WEIGHT: { 1: 55, 2: 33, 4: 10, 7: 2 },
+    SIZE_WEIGHT: { 1: 55, 2: 33, 3: 14, 4: 10, 7: 2 },   // 3칸은 난투 대형(typeSizes)만 쓴다
 
     // 속성(attrs): 창고에서 벌어지는 일. cold=❄ 냉장 구역 밖이면 다음 턴 폐기 / fragile=⚠ 능력 없는 업체면 파손 확률 / customs=🛃 통관 대기 중 처리 불가 / frozen=🧊 냉동 구역 밖이면 즉시 폐기
     ATTRS: { cold: { icon: '❄' }, fragile: { icon: '⚠' }, customs: { icon: '🛃' }, frozen: { icon: '🧊' }, produce: { icon: '🌾' } },
@@ -122,7 +122,7 @@
       produce: { attrs: ['produce'], sizes: [2, 4],  deadline: 4, bonus: 10, reward: { 1: 35, 2: 50, 4: 75, 7: 110 }, color: 0x9acd5a, css: '#9acd5a' },
       fragile: { attrs: ['fragile'], sizes: [1, 2, 4],  deadline: 5, bonus: 20, reward: { 1: 20, 2: 60, 4: 95, 7: 135 }, sizeWeight: { 1: 30 }, color: 0xf0a04b, css: '#f0a04b' },
       intl:    { attrs: ['customs'], sizes: [4, 7],  deadline: 5, bonus: 25, reward: { 1: 50, 2: 75, 4: 110, 7: 150 }, color: 0x6c8cff, css: '#6c8cff' },
-      large:   { attrs: [],          sizes: [4, 7],  deadline: 6, bonus: 30, reward: { 1: 45, 2: 65, 4: 100, 7: 140 }, color: 0xb08bd8, css: '#b08bd8' },
+      large:   { attrs: [],          sizes: [4, 7],  deadline: 6, bonus: 30, reward: { 1: 45, 2: 65, 3: 85, 4: 100, 7: 140 }, color: 0xb08bd8, css: '#b08bd8' },
       frozen:  { attrs: ['frozen'],  sizes: [1, 2, 4],  deadline: 5, bonus: 25, reward: { 1: 22, 2: 70, 4: 105, 7: 145 }, sizeWeight: { 1: 30 }, color: 0x9ad7ff, css: '#9ad7ff' },
     },
     // ⚡ 긴급 화물(새벽배송): 일반 택배에 붙는 표시. 기한은 들어온 날 하루(deadline 1) — 그날 내보내면 보상 ×2,
