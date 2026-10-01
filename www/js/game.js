@@ -1528,8 +1528,8 @@
     }
     // 레어도 (유저: "아이템마다 레어도를 둬서 특정 마일스톤엔 좋은 아이템이 오고, 상점을 강화하는 아이템도") — 일반 · 레어(계약·트레잇 강화) · 에픽(상점 강화)
     // 상점은 한 번에 한 종류 (유저: "계약 상점 · 강화 상점 · 업그레이드 상점 · 상점업글 상점 · 프리미엄 상점 — 한 종류만, 레어도 표시")
-    //   정비소(강화·광고권, 일반) · 거래처 소개소(새 계약, 레어) · 승급 심사(계약 승급·트레잇 강화, 레어) · 상인 조합(상점 강화, 에픽) · 심야 경매장(섞어서 레어 이상, 전설 — 마일스톤·우대권)
-    shopCatOf(it) { return it.kind === 'shopUp' ? 'guild' : it.kind === 'traitUnlock' || (it.kind === 'contract' && it.switchFrom != null) ? 'promo' : it.kind === 'contract' ? 'broker' : 'garage'; }
+    //   정비소(강화·트레잇 강화·광고권, 일반) · 거래처 소개소(새 계약, 레어) · 재계약 협상(계약을 윗급으로, 레어) · 상인 조합(상점 강화, 에픽) · 심야 경매장(섞어서 레어 이상, 전설 — 마일스톤·우대권)
+    shopCatOf(it) { return it.kind === 'shopUp' ? 'guild' : it.kind === 'contract' && it.switchFrom != null ? 'promo' : it.kind === 'contract' ? 'broker' : 'garage'; }   // 트레잇 강화는 강화 — 정비소 (유저: "재계약에 강화가 나왔는데?")
     _themedShop(pool, n) {
       for (const it of pool) it.rarity = this.itemRarity(it);
       const S = M.MULTI.SHOPS, byCat = {}; for (const it of pool) (byCat[this.shopCatOf(it)] = byCat[this.shopCatOf(it)] || []).push(it);

@@ -173,7 +173,7 @@
     'shopUp.pass.d': 'Next shop is the Night Auction',
     'shop.garage': 'Garage',
     'shop.broker': 'Broker',
-    'shop.promo': 'Promotion Board',
+    'shop.promo': 'Contract Renewal',
     'shop.guild': 'Merchant Guild',
     'shop.auction': 'Night Auction',
     'rar.common': 'COMMON',
