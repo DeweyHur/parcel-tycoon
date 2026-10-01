@@ -380,8 +380,7 @@
     REP: { perParcel: 1, rush: 4 }, CLEAR_N: 2, SHOP_MILESTONE: 3,
     SHOPS: {   // 평판 상점은 한 번에 한 종류 — 레어도는 상점의 것 (auction 은 마일스톤·우대권으로만)
       garage:  { icon: '🔧', rarity: 'common', weight: 4 },
-      broker:  { icon: '🤝', rarity: 'rare', weight: 3 },
-      promo:   { icon: '📝', rarity: 'rare', weight: 3 },
+      broker:  { icon: '🤝', rarity: 'rare', weight: 5 },   // 새 계약 + 윗급 재계약 — 카드마다 레어도(등급 0 일반 · 1 레어 · 2 에픽 · 3 전설)
       guild:   { icon: '🏪', rarity: 'epic', weight: 1 },
       auction: { icon: '🌙', rarity: 'legend' },
     },   // 평판: 택배마다 +1 · ⚡ 긴급을 혼자(또는 직배) 보내면 +4 더 — 섞으면 그 호출은 절반

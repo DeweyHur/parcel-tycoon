@@ -172,7 +172,7 @@
     'shopUp.pass': '경매 초대장',
     'shopUp.pass.d': '다음 상점은 심야 경매장',
     'shop.garage': '정비소',
-    'shop.broker': '거래처 소개소',
+    'shop.broker': '거래처 협상',
     'shop.promo': '재계약 협상',
     'shop.guild': '상인 조합',
     'shop.auction': '심야 경매장',

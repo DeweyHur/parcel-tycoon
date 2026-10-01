@@ -1200,9 +1200,10 @@ t('멀티 계열 단계: 등급 + 신뢰 Lv 마다 계열 규칙이 세진다 �
   for (let k = 0; k < 3; k++) { const p = mk(); assert.ok(g.dawnReady(g.contracts[1], [p]), '새벽 ' + (k + 1) + '번째'); g.callCarrier(1, [p.id]); }
   const q = mk(); assert.ok(!g.dawnReady(g.contracts[1], [q]), '네 번째는 없다');
 });
-t('멀티 평판 상점: 한 번에 한 종류 — 정비소·소개소·재계약 협상·상인 조합 · 3단계마다 심야 경매장(레어 이상) · 🗄 진열대 · 💳 단골 카드(경매 2단계마다) · 🎟 초대장 · 인장 = 신뢰 Lv +1', () => {
+t('멀티 평판 상점: 한 번에 한 종류 — 정비소·거래처 협상(새 계약·윗급, 윗급일수록 귀함)·상인 조합 · 3단계마다 심야 경매장(레어 이상) · 🗄 진열대 · 💳 단골 카드(경매 2단계마다) · 🎟 초대장 · 인장 = 신뢰 Lv +1', () => {
   const g = MG(71); g.firstShopDone = true;
   for (let t = 1; t <= 8; t++) { if (t % 3 === 0) continue; g.repTier = t; const it = g._drawRepShop(); const cats = new Set(it.map(x => g.shopCatOf(x))); assert.ok(cats.size === 1 && cats.has(g.repShopCat), t + ' ' + g.repShopCat + ' ' + [...cats]); }
+  assert.equal(g.itemRarity({ kind: 'contract', carrier: 'cold0' }), 'common'); assert.equal(g.itemRarity({ kind: 'contract', carrier: 'cold2' }), 'epic'); assert.equal(g.shopCatOf({ kind: 'contract', carrier: 'cold1', switchFrom: 1 }), 'broker', '윗급도 같은 상점');
   g.repTier = 3; const au = g._drawRepShop(); assert.equal(g.repShopCat, 'auction'); assert.ok(au.every(x => x.rarity !== 'common'), '경매장은 레어 이상');
   g.repTier = 4; const n0 = g.shopCards(); g.repShop = { items: [{ kind: 'shopUp', up: 'shelf', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.equal(g.shopCards(), n0 + 1, '진열대 +1장');
   g.repShop = { items: [{ kind: 'shopUp', up: 'vip', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); g.repTier = 4; assert.ok(g.shopMilestone(), '단골 카드: 2단계마다 경매');

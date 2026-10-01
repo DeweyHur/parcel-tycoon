@@ -1529,7 +1529,7 @@
     // 레어도 (유저: "아이템마다 레어도를 둬서 특정 마일스톤엔 좋은 아이템이 오고, 상점을 강화하는 아이템도") — 일반 · 레어(계약·트레잇 강화) · 에픽(상점 강화)
     // 상점은 한 번에 한 종류 (유저: "계약 상점 · 강화 상점 · 업그레이드 상점 · 상점업글 상점 · 프리미엄 상점 — 한 종류만, 레어도 표시")
     //   정비소(강화·트레잇 강화·광고권, 일반) · 거래처 소개소(새 계약, 레어) · 재계약 협상(계약을 윗급으로, 레어) · 상인 조합(상점 강화, 에픽) · 심야 경매장(섞어서 레어 이상, 전설 — 마일스톤·우대권)
-    shopCatOf(it) { return it.kind === 'shopUp' ? 'guild' : it.kind === 'contract' && it.switchFrom != null ? 'promo' : it.kind === 'contract' ? 'broker' : 'garage'; }   // 트레잇 강화는 강화 — 정비소 (유저: "재계약에 강화가 나왔는데?")
+    shopCatOf(it) { return it.kind === 'shopUp' ? 'guild' : it.kind === 'contract' ? 'broker' : 'garage'; }   // 트레잇 강화는 강화 — 정비소 (유저: "재계약에 강화가 나왔는데?")
     _themedShop(pool, n) {
       for (const it of pool) it.rarity = this.itemRarity(it);
       const S = M.MULTI.SHOPS, byCat = {}; for (const it of pool) (byCat[this.shopCatOf(it)] = byCat[this.shopCatOf(it)] || []).push(it);
@@ -1538,9 +1538,13 @@
       else { const w = {}; for (const k of Object.keys(byCat)) if (S[k] && S[k].weight) w[k] = S[k].weight; cat = Object.keys(w).length ? this.rng.weighted(w) : 'garage'; }
       this.repShopCat = cat;
       if (cat === 'auction') { const good = pool.filter(it => it.rarity !== 'common'); const out = this.rng.shuffle(good.length >= n ? good : good.concat(pool.filter(it => it.rarity === 'common'))).slice(0, n); for (const it of out) it.milestone = true; return out; }
-      return this.rng.shuffle(byCat[cat] || []).slice(0, n);
+      const list = byCat[cat] || [];
+      if (cat === 'broker') { const W = { common: 6, rare: 3, epic: 1.5, legend: 0.7 }, left = list.slice(), out = []; while (out.length < n && left.length) { const w = {}; left.forEach((it, i) => { w[i] = W[it.rarity] || 1; }); out.push(left.splice(+this.rng.weighted(w), 1)[0]); } return out; }   // 윗급일수록 드물게
+      return this.rng.shuffle(list).slice(0, n);
     }
-    itemRarity(it) { return it.kind === 'shopUp' ? 'epic' : it.kind === 'contract' || it.kind === 'traitUnlock' ? 'rare' : 'common'; }
+    // 계약은 윗급일수록 귀하다 (유저: "계약을 늘리는 것과 윗급으로 올리는 건 같은 상점 · 윗급으로 갈수록 레어도가 올라가게")
+    itemRarity(it) { if (it.kind === 'shopUp') return 'epic'; if (it.kind === 'contract') return ['common', 'rare', 'epic', 'legend'][Math.min(3, D.CARRIERS[it.carrier].tier || 0)]; return it.kind === 'traitUnlock' ? 'rare' : 'common'; }
+    rarityRank(r) { return ['common', 'rare', 'epic', 'legend'].indexOf(r); }
     shopMilestone() { const k = Math.max(2, ((M.MULTI && M.MULTI.SHOP_MILESTONE) || 3) - (this.shopVip ? 1 : 0)); return this.rules.multi && this.repTier > 0 && this.repTier % k === 0; }
     _shopUpItems() { if (!this.rules.multi) return []; const out = []; if ((this.shopExtra || 0) < 2) out.push({ kind: 'shopUp', up: 'shelf', price: 0, sold: false }); if (!this.shopVip) out.push({ kind: 'shopUp', up: 'vip', price: 0, sold: false }); if (!this.nextPremium) out.push({ kind: 'shopUp', up: 'pass', price: 0, sold: false }); return out; }
     buyRepShop(i, target) {

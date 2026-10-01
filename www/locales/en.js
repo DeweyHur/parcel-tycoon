@@ -172,7 +172,7 @@
     'shopUp.pass': 'Auction Invite',
     'shopUp.pass.d': 'Next shop is the Night Auction',
     'shop.garage': 'Garage',
-    'shop.broker': 'Broker',
+    'shop.broker': 'Carrier Deals',
     'shop.promo': 'Contract Renewal',
     'shop.guild': 'Merchant Guild',
     'shop.auction': 'Night Auction',
