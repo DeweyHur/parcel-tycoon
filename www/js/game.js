@@ -1537,7 +1537,7 @@
       if (this.shopMilestone() || this.nextPremium) { this.nextPremium = false; cat = 'auction'; }
       else { const w = {}; for (const k of Object.keys(byCat)) if (S[k] && S[k].weight) w[k] = S[k].weight; cat = Object.keys(w).length ? this.rng.weighted(w) : 'garage'; }
       this.repShopCat = cat;
-      if (cat === 'auction') { const good = pool.filter(it => it.rarity !== 'common'); const out = this.rng.shuffle(good.length >= n ? good : good.concat(pool.filter(it => it.rarity === 'common'))).slice(0, n); for (const it of out) it.milestone = true; return out; }
+      if (cat === 'auction') { const sh = this.rng.shuffle(pool.slice()); sh.sort((x, y) => this.rarityRank(y.rarity) - this.rarityRank(x.rarity)); const out = this.rng.shuffle(sh.slice(0, n)); for (const it of out) it.milestone = true; return out; }   // 경매장: 지금 나올 수 있는 것 중 가장 귀한 것부터
       const list = byCat[cat] || [];
       if (cat === 'broker') { const W = { common: 6, rare: 3, epic: 1.5, legend: 0.7 }, left = list.slice(), out = []; while (out.length < n && left.length) { const w = {}; left.forEach((it, i) => { w[i] = W[it.rarity] || 1; }); out.push(left.splice(+this.rng.weighted(w), 1)[0]); } return out; }   // 윗급일수록 드물게
       return this.rng.shuffle(list).slice(0, n);
