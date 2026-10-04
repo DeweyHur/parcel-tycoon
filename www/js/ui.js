@@ -1604,7 +1604,7 @@
       { const pp = { type: t, size, attrs: T2.attrs, customs: 0 }; return size != null && g.selfCan(pp) && !g.selfBreakProb(pp); }
     });
     return Object.keys(D.PARCEL_TYPES).filter(open).filter(t => {
-      const T2 = D.PARCEL_TYPES[t], size = T2.sizes.find(sz => sz >= D.CARRIERS[c.carrier].sizeMin && sz <= g.contractSizeMax(c));
+      const T2 = D.PARCEL_TYPES[t], size = T2.sizes.find(sz => sz >= (g.rules.truckCap ? 1 : D.CARRIERS[c.carrier].sizeMin) && sz <= g.contractSizeMax(c));   // 난투: 거인 차도 작은 짐을 싣는다 — 색 점에도 일반이 보여야
       if (size == null) return false;
       const pp = { type: t, size, attrs: T2.attrs, customs: T2.attrs.includes('customs') ? 1 : 0 };
       return g.canHandle(c, pp) && !g.breakProb(c, pp);      // 깨질 위험이 있으면 '받는다'고 할 수 없다
