@@ -362,17 +362,26 @@
       // 공격 — 넷뿐, 하나하나 세게 (유저: "신선 −1 같은 소소한 어택보다 강렬한 어택 · 정보가 너무 많은 게 안 좋다")
       t_repair:   { kind: 'attack', icon: '🏗', weight: 30 },   // 보수공사(3칸, 못 치움, 옆 창고로) → REPAIR
       t_hurry:  { kind: 'attack', icon: '⏱', weight: 25 },   // 창고 안 모든 택배 기한 −HURRY
-      t_road:   { kind: 'attack', icon: '🚧', weight: 20 },   // 다음 날 호출 불가
-      t_seal:   { kind: 'attack', icon: '🔒', weight: 25 },   // 창고 상한 −SEAL 칸, 3일
+      t_road:   { kind: 'attack', icon: '🚧', weight: 20, cd: 2 },   // 다음 날 호출 불가
+      t_seal:   { kind: 'attack', icon: '🔒', weight: 25, cd: 3 },   // 창고 상한 −SEAL 칸, 3일
       // 보너스
       t_buzz:   { kind: 'bonus', icon: '⭐', weight: 18 },    // 평판 +BUZZ
       t_shield: { kind: 'bonus', icon: '🛡', weight: 16 },    // 다음 공격 1회 무효(최대 2겹)
-      t_ice:    { kind: 'bonus', icon: '🧊', weight: 12 },    // 신선 부패 정지 3일
+      t_ice:    { kind: 'bonus', icon: '🧊', weight: 12, cd: 5 },    // 신선 부패 정지 3일
       t_clear:  { kind: 'bonus', icon: '🧹', weight: 14 },    // 뒷정리: 일반 상자 2개(×세기)를 같이 싣고 나간다 — 밀려온 것부터
       t_truck:  { kind: 'bonus', icon: '🚚', weight: 14 },    // 다음 호출 트럭 +1
       t_return: { kind: 'bonus', icon: '🔄', weight: 12 },    // 들고 있는 보수공사 1개를 보낸 사람에게 반송
       t_focus:  { kind: 'bonus', icon: '🎯', weight: 12 },    // 다음 공격 트레잇을 1위 한 명에게만 ×3
-      t_deal:   { kind: 'bonus', icon: '🛒', weight: 12 },
+      t_deal:   { kind: 'bonus', icon: '🛒', weight: 12, cd: 8 },
+      // 계열마다 넷 — 첫 장은 처음부터, 나머지는 상점에서 모은다. 그 종류를 보내면 모은 것이 전부 터진다 (유저: "특화된 더 많은 트레잇 · 모으는 의미")
+      t_flood:  { kind: 'attack', icon: '🌊', weight: 0 },          // 물량 떠넘기기: 상대 창고에 일반 상자 FLOOD_N
+      t_customs:{ kind: 'attack', icon: '🛃', weight: 0, cd: 2 },   // 통관 걸기: 상대 택배 CUSTOMS_N 개 통관 대기 2일
+      t_claim:  { kind: 'attack', icon: '💢', weight: 0 },          // 클레임: 상대 평판 −CLAIM
+      t_crush:  { kind: 'attack', icon: '🦣', weight: 0, cd: 2 },   // 덩치 밀기: 상대에게 4칸 상자
+      t_fort:   { kind: 'bonus', icon: '🏰', weight: 0, cd: 5 },    // 증축: 창고 +1칸(영구)
+      t_extend: { kind: 'bonus', icon: '💨', weight: 0 },           // 속달: 가장 급한 택배 2개 기한 +1
+      t_regular:{ kind: 'bonus', icon: '🤝', weight: 0 },           // 단골 관리: 모든 계약 신뢰 경험치 +1
+      t_tip:    { kind: 'bonus', icon: '💝', weight: 0 },           // 웃돈: 다음 호출 평판 ×2
       t_reflect:{ kind: 'bonus', icon: '🪞', weight: 12 },    // 🪞 반사: 다음에 받는 공격을 보낸 사람에게 되돌린다(최대 2)    // 🛒 단골: 평판 상점이 한 번 더 열린다(계단과 무관)
     },
     MIX: { streakMax: 3, maxMult: 4 },
@@ -388,14 +397,16 @@
     HURRY_N: 3, SEAL: 6, BUZZ: 2, CAP_FLOOR: 0.7, BLAST_MAX: 2,   // 창고는 공격으로 70% 아래로 안 줄고, 대공사는 두 개까지만 턴다 — 한 방이 창고를 비우면 손맛이 없다   // 공격 세기: 독촉은 3개를 오늘 안에 · 봉인 −6칸 · 입소문 평판 +2
     // 물품 종류마다 트레잇 두 개 — 처음부터 둘 중 하나가 붙는다. 평판 상점의 「{종류} 트레잇 강화」 카드는 그 종류 트레잇 세기 +1
     // 전문화 트랙(TRACKS)을 따라 묶었다 — 한 계열의 두 트레잇은 같은 성격이다 (유저: "어떤 트레잇이 주로 나오는지 보여서 어떤 전문화를 택할지")
-    TYPE_TRAITS: {
-      fresh:   ['t_hurry', 't_road'],     // ⚔ 신선(냉장 계열): ⏱ 독촉 → 🚧 통제
-      intl:    ['t_repair', 't_seal'],    // ⚔ 통관: 🏗 보수공사 → 🔒 봉인
-      frozen:  ['t_reflect', 't_ice'],    // 🛡 냉동: 🪞 반사 · 🧊 얼음 — 방패는 🛡 방어 트랙이 매일 주니 겹쳤다 (유저: "똑같은 트레잇만 받으니 도움도 안 돼")
-      large:   ['t_clear', 't_focus'],     // 🛡 대형: 🧹 뒷정리 → 🎯 한 방 (덩치로 누르는 계열이라 마지막은 압박)
-      produce: ['t_buzz', 't_deal'],      // 🛒 농산물(파손 계열): ⭐ 입소문 → 🛒 단골
-      // 파손(fragile)엔 트레잇이 없다 — 깨질 위험 자체가 그 물품의 성격 (유저). 일반도 없음(난투엔 긴급 자체가 없다)
+    TYPE_TRAITS: {   // [처음부터, 모으는 것 …] — 한 계열의 넷은 같은 성격(트랙)
+      fresh:   ['t_hurry', 't_road', 't_flood', 't_extend'],      // ⚔ 신선(냉장): ⏱ 독촉 · 🚧 통제 · 🌊 떠넘기기 · 💨 속달 — 템포
+      intl:    ['t_repair', 't_seal', 't_customs', 't_claim'],    // ⚔ 통관: 🏗 보수공사 · 🔒 봉인 · 🛃 통관 걸기 · 💢 클레임 — 묶어 두기
+      frozen:  ['t_reflect', 't_ice', 't_shield', 't_fort'],      // 🛡 냉동: 🪞 반사 · 🧊 얼음 · 🛡 방패 · 🏰 증축 — 버티기
+      large:   ['t_clear', 't_focus', 't_return', 't_crush'],     // 🛡 대형: 🧹 뒷정리 · 🎯 한 방 · 🔄 되돌리기 · 🦣 덩치 밀기 — 받아치기
+      produce: ['t_buzz', 't_deal', 't_regular', 't_tip'],        // 🛒 농산물(파손 계열): ⭐ 입소문 · 🛒 단골 · 🤝 단골 관리 · 💝 웃돈 — 평판
+      // 파손(fragile)엔 트레잇이 없다 — 깨질 위험 자체가 그 물품의 성격 (유저)
     },
+    SET: { fullAt: 3, fullMult: 3 },   // 한 종류 트레잇을 셋 모으면 만차 ×3(둘까진 ×2) · 넷 다 모으면 그 종류 세기 +1
+    FLOOD_N: 2, CUSTOMS_N: 2, CLAIM: 2, COMPOSITE: 0.3,   // 복합 화물: 연 종류가 둘 이상이면 내 몫 짐의 30% 가 두 종류를 겸한다
     // 난투에서 특수 물품을 '여는' 계열 — 능력으로 실을 수 있어도 이 계열 계약이 있어야 그 물품이 온다(없으면 일반으로).
     // 계열 = 트랙이 되려면 한 물품이 두 계열에 걸치면 안 된다: 농산물은 냉장도 싣지만 파손 계열이 연다
     TYPE_FAMILIES: { fresh: ['cold'], produce: ['fragile'], fragile: ['fragile'], frozen: ['frozen'], intl: ['intl'], large: ['large'] },

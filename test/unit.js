@@ -1092,7 +1092,7 @@ t('멀티: 전문화 트랙 — 첫 상점은 트랙마다 새 계약(계열이 
   assert.ok(g.repShop == null || g.closeRepShop());
   const e2 = g.contracts.findIndex(c => !c); g.contracts[e2] = g._makeContract('frozen0'); assert.equal(g.trackShields(), 1); g.shields = 0; g.schedule = g.schedule.map(() => []); g.wait([]); if (g.repShop) g.closeRepShop(); assert.ok(g.shields >= 1, '🛡 매일 아침 방패');
   const e3 = g.contracts.findIndex(c => !c); g.contracts[e3] = g._makeContract('cold0'); assert.equal(g.trackEcho(), M.MULTI.TRACKS.atk.echo, '⚔ 메아리');
-  assert.deepEqual(M.MULTI.TYPE_TRAITS.produce, ['t_buzz', 't_deal']);
+  assert.deepEqual(M.MULTI.TYPE_TRAITS.produce.slice(0, 2), ['t_buzz', 't_deal']);
   g.repShop = null; g.openBonusShop(); assert.ok(g.repShop && g.repShop.bonus, '🛒 단골 → 상점 한 번 더'); g.openBonusShop(); assert.equal(g.pendingShops, 1, '떠 있으면 닫힌 뒤에'); g.closeRepShop(); assert.ok(g.repShop && g.repShop.bonus && !g.pendingShops);
   assert.ok(cap0 > 0);
 });
@@ -1199,6 +1199,29 @@ t('멀티 계열 단계: 등급 + 신뢰 Lv 마다 계열 규칙이 세진다 �
   g.parcels = []; g.dawnDay = -1; const mk = () => { const p = g._spawnParcel({ type: 'fresh', size: 1, customer: 'anon' }); p.arrivalTurn = g.totalTurn; g.parcels.push(p); return p; };
   for (let k = 0; k < 3; k++) { const p = mk(); assert.ok(g.dawnReady(g.contracts[1], [p]), '새벽 ' + (k + 1) + '번째'); g.callCarrier(1, [p.id]); }
   const q = mk(); assert.ok(!g.dawnReady(g.contracts[1], [q]), '네 번째는 없다');
+});
+t('멀티 트레잇 수집: 계열마다 넷 · 첫 장은 처음부터 · 상점에서 모으면 그 종류를 보낼 때 전부 터진다 · 셋이면 만차 ×3 · 넷이면 세기 +1 · 센 것은 며칠에 한 번', () => {
+  const g = MG(81); g.parcels = []; g.schedule = g.schedule.map(() => []); g.contracts = [g._makeContract('bulk0'), g._makeContract('fragile0'), null, null]; g.repShop = null; g.repCapV = 999;
+  for (const k of Object.keys(M.MULTI.TYPE_TRAITS)) assert.equal(M.MULTI.TYPE_TRAITS[k].length, 4, k); for (const k of Object.keys(M.MULTI.TYPE_TRAITS)) for (const t of M.MULTI.TYPE_TRAITS[k]) assert.ok(M.MULTI.TRAITS[t] && M.MULTI.TRAITS[t].name, t + ' 이름');
+  assert.deepEqual(g.ownedTraits('produce'), ['t_buzz']);
+  const items = g._traitUnlockItems(); const it = items.find(x => x.ptype === 'produce'); assert.ok(it && it.trait !== 't_buzz', '아직 없는 것 한 장');
+  g.repShop = { items: [{ kind: 'traitUnlock', ptype: 'produce', trait: 't_tip', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.deepEqual(g.ownedTraits('produce'), ['t_buzz', 't_tip']);
+  const mk = () => { const p = g._spawnParcel({ type: 'produce', size: 2, customer: 'anon', trait: 't_buzz' }); g.parcels.push(p); return p; };
+  const a = mk(), rep = g.rep; g.callCarrier(1, [a.id]); assert.ok(g.rep >= rep + 1 + M.MULTI.BUZZ, '⭐'); assert.ok(g.tipNext, '💝 도 같이 터진다');
+  const b = mk(), r2 = g.rep; g.callCarrier(1, [b.id]); assert.ok(g.rep - r2 >= 2 * 1 + M.MULTI.BUZZ, '💝 웃돈: 이번 호출 평판 ×2');
+  g.traitSet.produce = ['t_tip', 't_regular']; assert.equal(g.firePlan([mk(), mk()], true)[0].mult, 3, '셋 모으면 만차 ×3'); g.traitSet.produce = ['t_tip', 't_regular', 't_deal']; assert.ok(g.traitMaster('produce')); assert.equal(g.traitPower({ type: 'produce' }), 2, '넷 다 모으면 세기 +1');
+  g.parcels = []; g.traitSet.produce = ['t_deal']; g.repShop = null; const c1 = mk(); g.callCarrier(1, [c1.id]); assert.ok(g.repShop && g.repShop.bonus, '🛒 단골'); g.repShop = null; g.pendingShops = 0; const c2 = mk(); g.callCarrier(1, [c2.id]); assert.ok(!g.repShop, '단골은 며칠에 한 번');
+  const v = MG(82); v.schedule = v.schedule.map(() => []); v.parcels = [P(1, 'normal', 1), P(2, 'normal', 1), P(3, 'normal', 1)]; const n0 = v.parcels.length, r0 = v.rep;
+  v.receiveAttack({ trait: 't_customs', mult: 1, from: 9 }); v.receiveAttack({ trait: 't_claim', mult: 1, from: 9 }); v.receiveAttack({ trait: 't_flood', mult: 1, from: 9 }); v.receiveAttack({ trait: 't_crush', mult: 1, from: 9 }); v.wait([]);
+  assert.ok(v.parcels.filter(p => p.held).length === M.MULTI.CUSTOMS_N, '🛃 둘이 묶인다'); assert.ok(v.rep <= r0 - M.MULTI.CLAIM + 1, '💢'); assert.ok(v.parcels.filter(p => p.pushed).length >= M.MULTI.FLOOD_N + 1, '🌊 + 🦣'); assert.ok(v.parcels.some(p => p.pushed && p.size === 4), '🦣 4칸');
+});
+t('멀티 복합 화물: 두 종류를 겸한다 — 둘 다 실을 차가 있어야 오고 · 보내면 두 계열 트레잇이 같이 · 혼자서도 🔗 조합 · 평판 두 몫', () => {
+  const g = MG(83); g.parcels = []; g.schedule = g.schedule.map(() => []); g.contracts = [g._makeContract('bulk0'), g._makeContract('cold0'), g._makeContract('fragile0'), null]; g.repShop = null; g.repCapV = 999;
+  const p = g._spawnParcel({ type: 'fresh', type2: 'produce', size: 1, customer: 'anon', attrs: ['cold', 'produce'], trait: 't_hurry' }); g.parcels.push(p); g._assignCold();
+  assert.deepEqual(g.typesOf(p), ['fresh', 'produce']); assert.equal(g.mixPreview([p]).kinds.length, 2, '혼자서도 조합');
+  assert.deepEqual(g.firePlan([p], false).map(x => x.type).sort(), ['fresh', 'produce']);
+  assert.equal(g.callRep([p], false), 2, '두 몫');
+  assert.ok(!g.canHandle(g.contracts[1], p), '냉장차만으론 농산물을 겸한 짐을 못 싣는다(특약이 있어야)');
 });
 t('멀티 평판 상점: 한 번에 한 종류 — 정비소·거래처 협상(새 계약·윗급, 윗급일수록 귀함)·상인 조합 · 3단계마다 심야 경매장(레어 이상) · 🗄 진열대 · 💳 단골 카드(경매 2단계마다) · 🎟 초대장 · 인장 = 신뢰 Lv +1', () => {
   const g = MG(71); g.firstShopDone = true;

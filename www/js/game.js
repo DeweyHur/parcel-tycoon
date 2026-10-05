@@ -110,7 +110,7 @@
       this.mperks = (cfg.mperks || []).slice(); this.perkOffer = null; this.repShop = null;   // 난투: 평판 상한에 닿으면 3장 랜덤 상점(repShop) — 퍽·계약·강화를 돈으로   // 멀티: 평판 등급업마다 3택1로 고른 퍽 · 지금 떠 있는 카드 3장
       // 멀티 2단계: 상대에게서 온 공격 큐(다음 날로 넘길 때 적용) · 나가는 것(공격·보수공사 이사, multi.js 가 라우팅) · 방패 · 임시 칸 · 한 방 · 덤 트럭
       this.actLog = [];   // 멀티 3단계: 입력 로그 — 서버가 같은 시드로 다시 돌려 검증한다 (MULTI.replay)
-      this.inbox = []; this.outbox = []; this.shields = 0; this.capMods = []; this.focusNext = false; this.freeTruckNext = false; this.freshFreezeUntil = 0; this.roadblockDay = 0; this.roadblockSlot = -1; this.traitUnlocks = [];   // 난투: 산 트레잇 언락(물품 종류별 두 번째 트레잇)
+      this.inbox = []; this.outbox = []; this.shields = 0; this.capMods = []; this.focusNext = false; this.freeTruckNext = false; this.freshFreezeUntil = 0; this.roadblockDay = 0; this.roadblockSlot = -1; this.traitUnlocks = []; this.traitSet = {}; this.traitCd = {};   // 난투: 산 트레잇 언락(물품 종류별 두 번째 트레잇)
       this.month = 0; this.turn = 0;
       // 런의 해. 시나리오(rules.year)나 cfg 가 지정하면 그 해, 아니면 시작한 해를 찍어 세이브에 고정한다.
       // 로그라이크라 해마다 요일·영업일 수가 달라지는 건 그대로 받는다 — 인수인계(대본)만 해를 고정한다.
@@ -653,6 +653,7 @@
     _fireTrait(p) {
       const tr = p.trait && this.traitDef(p.trait); if (!tr || p.overdue) return;
       const R = this.rules;
+      if (tr.cd) { if ((this.traitCd[p.trait] || 0) > this.totalTurn) return; this.traitCd[p.trait] = this.totalTurn + tr.cd; }   // 센 것은 며칠에 한 번
       if (tr.kind === 'bonus') {
         if (p.trait === 't_buzz') this.addRep((M.MULTI.BUZZ || 1) * this.traitPower(p), MSG('why.trait', { icon: tr.icon }));
         else if (p.trait === 't_reflect') this.reflectNext = Math.min(2, (this.reflectNext || 0) + 1);
@@ -665,6 +666,10 @@
         else if (p.trait === 't_truck') this.freeTruckNext = true;
         else if (p.trait === 't_return') { const b = this.storage.find(x => x.kind === 'repair'); if (b) { this.storage.splice(this.storage.indexOf(b), 1); this.outbox.push({ type: 'repairMove', repair: this._repairNext(b), to: b.from, back: true }); this._assignCold(); } }
         else if (p.trait === 't_focus') this.focusNext = true;
+        else if (p.trait === 't_fort') { this.warehouse.cap += this.traitPower(p); this._assignCold(); }   // 🏰 증축(영구)
+        else if (p.trait === 't_extend') { const ps = this.parcels.filter(x => !x.overdue && !x.noDeadline).sort((a, b) => a.deadline - b.deadline).slice(0, 2 * this.traitPower(p)); for (const x of ps) x.deadline += 1; }
+        else if (p.trait === 't_regular') { for (const c of this.contracts) if (c) this._addTrust(c.carrier, this.traitPower(p), true); }
+        else if (p.trait === 't_tip') this.tipNext = true;
         else if (p.trait === 't_deal') this.openBonusShop();
         this.say('log.traitBonus', { icon: tr.icon, name: tr.name });
         this.emit('traitBonus', { trait: p.trait, parcel: p });
@@ -704,12 +709,15 @@
       let detail = '';
       if (!blocked) {
         if (a.trait === 't_rain') { let n = 0; for (const p of this.outdoorParcels()) { if (!p.wet) { p.wet = true; n++; } p.deadline = Math.max(0, p.deadline - k); } detail = MSG('trait.d.rain', { n }); }
-        else if (a.trait === 't_claim') { this.addRep(-k, MSG('why.attack', { icon: tr.icon })); detail = MSG('trait.d.claim', { n: k }); }
+        else if (a.trait === 't_claim') { this.addRep(-(M.MULTI.CLAIM || 1) * Math.min(3, k), MSG('why.attack', { icon: tr.icon })); detail = MSG('trait.d.claim', { n: (M.MULTI.CLAIM || 1) * Math.min(3, k) }); }
         else if (a.trait === 't_rat') { let n = 0; for (const p of this.parcels.filter(x => this._attrs(x).includes('cold')).slice(0, k)) { this._discardParcel(p, MSG('why.attack', { icon: tr.icon }), 1, 'discard'); n++; } detail = MSG('trait.d.rat', { n }); }
         else if (a.trait === 't_hurry') {   // ⏱ 독촉: 전부가 아니라 몇 개만 — 오늘 안에 보내야 한다(기한 1) (유저: "기한 줄이는 것도 치명적, 하나당 몇 개만 바로 보내게")
           if (this.hurryDay !== this.totalTurn) { this.hurryDay = this.totalTurn; this.hurryN = 0; } const n = Math.max(0, (M.MULTI.HURRY_N || 3) * Math.min(2, k) - this.hurryN); const cand = this.rng.shuffle(this.parcels.filter(p => !p.overdue && !p.noDeadline && p.deadline > 1)).slice(0, n);
           for (const p of cand) { p.deadline = 1; p.hurried = this.totalTurn; } this.hurryN += cand.length;   // 하루에 독촉 받는 택배는 최대 3개(×2 한 방이면 6) — 여러 명이 쏴도 겹치지 않는다
           detail = MSG('trait.d.hurry', { n: cand.length }); }
+        else if (a.trait === 't_flood') { this._applyPush({ n: (M.MULTI.FLOOD_N || 2) * Math.min(2, k), from: a.from, fromName: a.fromName }); detail = MSG('trait.d.flood', { n: (M.MULTI.FLOOD_N || 2) * Math.min(2, k) }); }
+        else if (a.trait === 't_crush') { this._applyPush({ n: Math.min(2, k), big: true, from: a.from, fromName: a.fromName }); detail = MSG('trait.d.crush', { n: Math.min(2, k) }); }
+        else if (a.trait === 't_customs') { const cand = this.rng.shuffle(this.parcels.filter(p => !p.overdue && !(p.customs > 0))).slice(0, (M.MULTI.CUSTOMS_N || 2) * Math.min(2, k)); for (const p of cand) { p.customs = 2; p.held = this.totalTurn; } detail = MSG('trait.d.customs', { n: cand.length }); }
         else if (a.trait === 't_road') {   // 🚧 계약 하나만 막힌다(랜덤). 계약이 하나뿐이면 무효 — 전부 막히면 치명적 (유저)
           const slots = this.contracts.map((c, i) => c ? i : -1).filter(i => i >= 0);
           if (slots.length >= 2) { this.roadblockDay = this.totalTurn; this.roadblockSlot = slots[this.rng.int(slots.length)]; detail = MSG('trait.d.road', { name: this.contractName(this.contracts[this.roadblockSlot]) }); }
@@ -747,17 +755,32 @@
     repStepNow() { const R = this.rules, S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; const base = R.repStepGrow ? Math.min(R.repStepMax || 99, R.repStep + R.repStepGrow * this.repTier) : R.repStep;   // 계단이 점점 길어진다 — 첫 상점은 빨리 (유저: "초반에 빨리 더 전문화 마켓")
       return S && R.multi ? Math.max(Math.min(S.stepMin, base), base - S.step * this.trackLv('shop')) : base; }
     shopCards() { const S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; return S && this.rules.multi ? Math.min(S.cardsMax + 2, Math.min(S.cardsMax, 3 + Math.floor(this.trackLv('shop') / S.cardsPer)) + (this.shopExtra || 0)) : 3; }
-    traitPool(type) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? null : type; const pair = key && TT[key]; if (!pair) return []; return pair.slice(); }   // 둘 다 처음부터 — 한 가지만 계속 받던 것
-    // 트레잇 세기: 🔗 조합 배수 × (강화 카드 +1) × (🧊 숙성 +일수)
-    traitPower(p) { let k = 1 + (this.traitUnlocks.includes(p.type) ? 1 : 0) + (p.aged || 0); return k * (this._mixMult || 1) * (this._fullMult || 1); }
-    // 트레잇은 호출마다 종류당 한 번(traitPerCall) — 몇 개를 실었든. 한 종류로만 꽉 채운 차(만차)면 강화(FULL_MULT) (유저: "한 특수를 만차로 실어 보내면 그 트레잇이 강화된 상태로")
+    traitPool(type) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? null : type; const pool = key && TT[key]; return pool ? pool.filter(t => this.traitDef(t)) : []; }
+    // 모은 트레잇 — 첫 장은 처음부터, 나머지는 상점에서 (traitSet). 그 종류를 보내면 모은 것이 전부 터진다
+    ownedTraits(type) { const pool = this.traitPool(type); if (!pool.length) return []; const own = (this.traitSet && this.traitSet[type]) || []; return pool.filter((t, i) => i === 0 || own.includes(t)); }
+    traitMaster(type) { const pool = this.traitPool(type); return pool.length > 1 && this.ownedTraits(type).length >= pool.length; }
+    typesOf(p) { return p.type2 ? [p.type, p.type2] : [p.type]; }
+    // 트레잇 세기: 🔗 조합 배수 × (넷 다 모으면 +1) × (🧊 숙성 +일수) × 만차
+    traitPower(p) { let k = 1 + (this.traitMaster(p.type) || this.traitUnlocks.includes(p.type) ? 1 : 0) + (p.aged || 0); return k * (this._mixMult || 1) * (this._fullMult || 1); }
+    // 이 짐을 보내면 무엇이 터지나 — [{ type, traits[], full, mult }] (호출 미리보기와 실제 발동이 같은 판단을 쓴다)
+    firePlan(chosen, full) {
+      const byType = {}; for (const p of chosen) if (p && p.trait && !p.overdue && p.type !== 'normal') for (const t of this.typesOf(p)) if (this.traitPool(t).length) (byType[t] = byType[t] || []).push(p);
+      const kinds = Object.keys(byType), S = (M.MULTI && M.MULTI.SET) || {};
+      return kinds.map(t => { const solo = !!full && kinds.length === 1 && chosen.every(p => p.type === t && !p.type2); const own = this.ownedTraits(t); return { type: t, traits: own, ps: byType[t], full: solo, mult: solo ? (own.length >= (S.fullAt || 3) ? (S.fullMult || 3) : (M.MULTI.FULL_MULT || 2)) : 1 }; });
+    }
+    // 트레잇은 호출마다 종류당 한 번(traitPerCall) — 몇 개를 실었든. 그 종류로 모은 트레잇이 전부 터진다. 한 종류로만 꽉 채운 차(만차)면 ×2, 셋 모았으면 ×3
     _fireTraitsPerCall(chosen, full) {
-      const groups = {}; for (const p of chosen) if (p.trait && !p.overdue) (groups[p.trait] = groups[p.trait] || []).push(p);
-      const kinds = Object.keys(groups), fired = [];
-      for (const t of kinds) { const rep = groups[t].slice().sort((a, b) => (b.aged || 0) - (a.aged || 0))[0]; const solo = full && kinds.length === 1 && rep.type !== 'normal' && chosen.every(p => p.type === rep.type); this._fullMult = solo ? (M.MULTI.FULL_MULT || 2) : 1; this._fireTrait(rep); fired.push({ type: rep.type, trait: rep.trait, full: solo }); if (solo) this.emit('fullTrait', { type: rep.type, trait: rep.trait }); }
+      const fired = [];
+      // 일반에 붙은 트레잇(대본·시험용)은 예전처럼 트레잇마다 한 번
+      { const g = {}; for (const p of chosen) if (p.trait && !p.overdue && p.type === 'normal') (g[p.trait] = g[p.trait] || p); for (const t of Object.keys(g)) { this._fullMult = 1; this._fireTrait(g[t]); fired.push({ type: 'normal', trait: t, full: false }); } }
+      for (const pl of this.firePlan(chosen, full)) {
+        const rep = pl.ps.slice().sort((a, b) => (b.aged || 0) - (a.aged || 0))[0];
+        for (const id of pl.traits) { this._fullMult = pl.mult; this._fireTrait(Object.assign({}, rep, { trait: id, type: pl.type })); fired.push({ type: pl.type, trait: id, full: pl.full }); }
+        if (pl.full) this.emit('fullTrait', { type: pl.type, trait: pl.traits[0], mult: pl.mult });
+      }
       this._fullMult = 0; return fired;
     }
-    _resolveTrait(sp) { const pool = this.traitPool(sp.type).filter(t => this.traitDef(t)); if (!pool.length) return null; return pool[this.rng.int(pool.length)]; }
+    _resolveTrait(sp) { const own = this.ownedTraits(sp.type); return own.length ? own[0] : null; }
     _repairNext(b) { const B = M.MULTI.REPAIR; return { size: Math.min(B.maxSize, this.storageVol(b) + 1), days: Math.max(1, b.turns - 1), hops: (b.hops || 0) + 1, from: this.cfg.pid != null ? this.cfg.pid : null }; }
     // 상대가 만차로 밀어 넣은 택배 — 다음 날 아침 내 창고에 n 개가 더 들어온다(일반, 1~2칸, 기한 짧게)
     receivePush(x) {
@@ -1028,7 +1051,7 @@
     callRep(ps, self) {
       if (!this.rules.repPerParcel) return this.repDeltaFor(ps);
       const P = M.MULTI.REP, ok = (ps || []).filter(p => p && !p.overdue), rush = ok.filter(p => this.rushToday(p));
-      let rep = ok.length * P.perParcel;
+      let rep = ok.reduce((n, p) => n + (p.type2 ? 2 : 1), 0) * P.perParcel;   // 복합 화물은 두 몫
       if (rush.length) { if (self || ps.length === 1) rep += P.rush * rush.length; else rep = Math.floor(rep / 2); }
       return rep;
     }
@@ -1039,7 +1062,7 @@
       const rush = ps.some(p => p && !p.overdue && this.rushToday(p));
       if (rush) { if (ps.length === 1) out.rushSolo = true; else out.rushMixed = true; }
       const t = ps[0].type, vol = ps.reduce((s, p) => s + p.size, 0);
-      if (R.traitPerCall && t !== 'normal' && ps.every(p => p.type === t) && ps.some(p => p.trait && !p.overdue) && vol >= cap) out.full = t;
+      if (R.traitPerCall && t !== 'normal' && ps.every(p => p.type === t && !p.type2) && ps.some(p => p.trait && !p.overdue) && vol >= cap) out.full = t;
       return out;
     }
     callRepMixed(ps) { return !!(this.rules.repPerParcel && ps.length > 1 && ps.some(p => p && this.rushToday(p))); }
@@ -1189,7 +1212,7 @@
       return s.ready && trucks >= D.RUSH.minTrucks && fill >= D.RUSH.minFill && used > 0 && volume / used >= D.RUSH.clearShare;
     }
     // 🔗 조합 미리보기(호출 창): 이 짐들을 같이 보내면 몇 종 · 배수 몇
-    mixPreview(ps) { if (!this.rules.mixCombo) return null; const kinds = [...new Set(ps.filter(p => p && p.type !== 'normal' && !p.pushed).map(p => p.type))]; if (kinds.length < 2) return { kinds, mult: 0, streak: this.mixStreak || 0 }; const st = Math.min(M.MULTI.MIX.streakMax, (this.mixStreak || 0) + 1 + (kinds.includes('frozen') && this.ownsFam('frozen') ? 1 : 0)); return { kinds, mult: Math.min(M.MULTI.MIX.maxMult, kinds.length + st - 1), streak: st }; }
+    mixPreview(ps) { if (!this.rules.mixCombo) return null; const kinds = [...new Set(ps.filter(p => p && p.type !== 'normal' && !p.pushed).flatMap(p => this.typesOf(p)))]; if (kinds.length < 2) return { kinds, mult: 0, streak: this.mixStreak || 0 }; const st = Math.min(M.MULTI.MIX.streakMax, (this.mixStreak || 0) + 1 + (kinds.includes('frozen') && this.ownsFam('frozen') ? 1 : 0)); return { kinds, mult: Math.min(M.MULTI.MIX.maxMult, kinds.length + st - 1), streak: st }; }
     chainState() {
       const C = D.LOAD_CHAIN;
       const level = Math.min(this.loadChain || 0, C.max);
@@ -1298,7 +1321,7 @@
       // (유저: "한길도 파손은 보내지만 파손이 되는 거지 왜 완전 바보로 바뀌었지 · 냉장이나 관세도 파손 위험이 있는데 조심은 그걸 극도로 줄여 주는 걸로")
       const fragileOnly = this.rules.fragileAnywhere && attrs.length === 1 && attrs[0] === 'fragile';
       if (fragileOnly) return true;
-      if (this.rules.strictCarry && p.type && p.type !== 'normal') { const own = (M.MULTI.CARRY_OWN || {})[car.family] || []; if (!own.includes(p.type)) { const base = (D.FAMILIES[car.family] || {}).caps || [], AT = M.MULTI.CARRY_ATTR || {}; if (!caps.some(a => !base.includes(a) && AT[a] === p.type)) return false; } }
+      if (this.rules.strictCarry && p.type && p.type !== 'normal') for (const ty of (p.type2 ? [p.type, p.type2] : [p.type])) { if (ty === 'fragile' && this.rules.fragileAnywhere) continue; const own = (M.MULTI.CARRY_OWN || {})[car.family] || []; if (!own.includes(ty)) { const base = (D.FAMILIES[car.family] || {}).caps || [], AT = M.MULTI.CARRY_ATTR || {}; if (!caps.some(a => !base.includes(a) && AT[a] === ty)) return false; } }   // 복합 화물은 두 종류를 다 실을 수 있어야
       if (car.allowAttrs && attrs.some(a => D.GATING_ATTRS.includes(a) && !car.allowAttrs.includes(a) && !caps.includes(a))) return false;   // 특약(보냉·완충)으로 붙인 능력은 설비 제한도 푼다 — 통관 차에 보냉 특약을 붙여도 신선을 못 싣던 것
       if (need && !need.some(a => attrs.includes(a))) { if (!(this.rules.normalAnywhere && !attrs.length)) return false; }   // 난투: 전문 차도 일반은 싣는다 — "파손은 싣는데 일반은 못 싣는 건 상식상 애매" (유저)
       if (attrs.includes('frozen') && !caps.includes('frozen')) return false;
@@ -1553,7 +1576,7 @@
       if (this.cash < (it.kind === 'perk' ? it.price : this.contractPrice ? (it.kind === 'contract' ? this.contractPrice(it) : it.price) : it.price)) return { ok: false, msg: T('err.noCash') };
       this._act('rbuy', { i, s: target == null ? null : target });
       if (it.kind === 'shopUp') { it.sold = true; sh.bought++; if (it.up === 'shelf') this.shopExtra = (this.shopExtra || 0) + 1; else if (it.up === 'vip') this.shopVip = true; else if (it.up === 'pass') this.nextPremium = true; this.say('log.shopUp', { name: T('shopUp.' + it.up) }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, shopUp: it.up }; }
-      if (it.kind === 'traitUnlock') { it.sold = true; sh.bought++; if (!this.traitUnlocks.includes(it.ptype)) this.traitUnlocks.push(it.ptype); this.say('log.traitUnlock', { type: D.PARCEL_TYPES[it.ptype].name, icon: (this.traitDef(it.trait) || {}).icon || '' }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, unlock: it.ptype }; }
+      if (it.kind === 'traitUnlock') { it.sold = true; sh.bought++; { const set = this.traitSet[it.ptype] = this.traitSet[it.ptype] || []; if (!set.includes(it.trait)) set.push(it.trait); } this.say('log.traitUnlock', { type: D.PARCEL_TYPES[it.ptype].name, icon: (this.traitDef(it.trait) || {}).icon || '' }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, unlock: it.ptype }; }
       if (it.kind === 'perk') { this.cash -= it.price; this.run.spent += it.price; it.sold = true; sh.bought++; this._applyPerk(it.perk); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, perk: it.perk }; }
       // 장 매물은 buy() 로 — 잠깐 상점을 마켓으로 세워 두고 판다(로그는 rbuy 하나)
       const saved = { market: this.market, phase: this.phase };
@@ -1881,7 +1904,7 @@
       reward = Math.round(reward * (1 + ((this.growth && this.growth.branding) || 0) * D.GROWTH.branding.reward));
       if (spec.rewardDelta && spec.rewardDelta[spec.type]) reward += spec.rewardDelta[spec.type];
       { const dl = this.bizMode() && customer !== 'anon' && this.dealFor(customer); if (dl) reward = Math.round(reward * dl.rate); }   // 계약 단가
-      const p = { id: this.nextId++, type: spec.type, size, baseSize: spec.size, reward, premium: !!spec.premium, rush: !!spec.rush, ad: !!spec.ad, attrs, customer, trait: tr || null,
+      const p = { id: this.nextId++, type: spec.type, type2: spec.type2 || null, size, baseSize: spec.size, reward, premium: !!spec.premium, rush: !!spec.rush, ad: !!spec.ad, attrs, customer, trait: tr || null,
         deadline: Math.max(1, t.deadline + (R.deadlineDelta[spec.type] || 0) + R.deadlineAll + (attrs.includes('cold') ? R.freshExtra : 0) + (this.customerPerk(customer, 'deadlineDelta') || 0) + (spec.deadlineDelta || 0)), overdue: false, inCold: false, inFrozen: false, age: 0, warm: 0, customs: 0, arrivalTurn: (this.totalTurn || 0) + 1,
         // 첫 사이클에는 기한을 붙이지 않는다 — '차를 꽉 채워 보낸다'를 먼저 익히고, 기한은 그 다음에 배운다 (levels.js noDeadlineCycles)
         noDeadline: this.month <= (R.noDeadlineCycles || 0) && !spec.rush };
@@ -1901,7 +1924,9 @@
       // 난투: 내가 연 특수 물품은 내 몫이 더 온다 — 일반 입고 일부가 그 물품으로 바뀐다(열린 종류마다 ownCargo). 대본은 넷이 같지만 계약을 산 사람에겐 그 짐이 온다
       // (유저: "거인을 가졌는데 거인 화물이 안 옴" — 공유 대본에서 대형은 5% 남짓이라 계약을 사도 며칠씩 빈 차였다)
       if (R.ownCargo && R.typeFamilies) { const open = Object.keys(M.MULTI.TYPE_FAMILIES || {}).filter(t => this.typeOpen(t)); if (open.length) { let frz = 0, cld = 0; specs = specs.map(sp => { if (sp.type !== 'normal' || this.rng.next() >= Math.min(R.ownCargoMax || 1, R.ownCargo * open.length)) return sp; const t = open[this.rng.int(open.length)], T0 = D.PARCEL_TYPES[t], attrs = T0.attrs || []; const fits = ((R.typeSizes && R.typeSizes[t]) || T0.sizes || [1]).filter(z => this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: t, size: z, attrs, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)))); const room = attrs.includes('frozen') ? (this.warehouse.frozen || 0) - this.parcels.filter(q => this._attrs(q).includes('frozen')).reduce((a, q) => a + q.size, 0) - frz : attrs.includes('cold') ? (this.warehouse.cold || 0) - this.coldUsed() - cld : Infinity;   // 냉동·신선은 들어갈 자리가 있을 때만 — 냉동실 4칸에 냉동이 쏟아져 즉시 폐기되던 것
-        const fit2 = fits.filter(z => z <= room); if (!fit2.length) return sp; fits.length = 0; fits.push(...fit2); const w = {}; for (const z of fits) w[z] = (T0.sizeWeight && T0.sizeWeight[z]) || D.SIZE_WEIGHT[z] || 1; const z = +this.rng.weighted(w); if (attrs.includes('frozen')) frz += z; else if (attrs.includes('cold')) cld += z; this.cargoDebt = (this.cargoDebt || 0) + z - sp.size; return Object.assign({}, sp, { type: t, attrs: null, size: z, trait: null, own: true }); }); }
+        const fit2 = fits.filter(z => z <= room); if (!fit2.length) return sp; fits.length = 0; fits.push(...fit2); const w = {}; for (const z of fits) w[z] = (T0.sizeWeight && T0.sizeWeight[z]) || D.SIZE_WEIGHT[z] || 1; const z = +this.rng.weighted(w); if (attrs.includes('frozen')) frz += z; else if (attrs.includes('cold')) cld += z; this.cargoDebt = (this.cargoDebt || 0) + z - sp.size; // 복합 화물: 연 종류가 둘 이상이고 둘 다 실을 차가 있으면 일부는 두 종류를 겸한다 (유저: "파손 가능 + 냉장 같은 느낌")
+        let t2 = null, attrs2 = null; if (open.length >= 2 && this.rng.next() < (M.MULTI.COMPOSITE || 0)) { const A2 = x => D.PARCEL_TYPES[x].attrs || []; const cand = open.filter(x => x !== t && A2(x).length && !(attrs.includes('cold') && A2(x).includes('frozen')) && !(attrs.includes('frozen') && A2(x).includes('cold')) && !A2(x).includes('cold') && !A2(x).includes('frozen')); if (cand.length) { const c2 = cand[this.rng.int(cand.length)], un = [...new Set(attrs.concat(A2(c2)))]; if (this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: t, type2: c2, size: z, attrs: un, customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)))) { t2 = c2; attrs2 = un; } } }
+        return Object.assign({}, sp, { type: t, type2: t2, attrs: attrs2, size: z, trait: R.traitAll ? (this.ownedTraits(t)[0] || (t2 && this.ownedTraits(t2)[0]) || null) : null, own: true }); }); }
         // 부피는 그대로 — 커진 만큼 그날(모자라면 다음 날) 일반 입고를 덜어 낸다. 대형 4칸이 오면 일반 두어 개가 안 온다
         const kept = []; for (const sp of specs) { if (this.cargoDebt > 0 && sp.type === 'normal' && !sp.trait) { this.cargoDebt -= sp.size; continue; } kept.push(sp); } specs = kept; }
       const arrived = specs.map(s => this._spawnParcel(s));
@@ -2069,6 +2094,7 @@
       xp = this.trustGainPreview(c, chosen).xp;
       this._addTrust(c.carrier, xp);
       let repD = this.callRep(chosen, false);
+      if (this.tipNext) { this.tipNext = false; if (repD > 0) repD *= 2; }   // 💝 웃돈: 지난 호출이 걸어 둔 것
       if (repD > 0 && R.earlyRepBonus) repD += R.earlyRepBonus;   // 멀티 퍽: 일찍 보낸 호출의 평판 보너스
       if (repD > 0 && R.rushRepBonus && this.month >= R.months) repD += R.rushRepBonus;   // 멀티 퍽: 마지막 보름 호출 평판 보너스
       if (repD) this.addRep(repD, MSG(repD > 0 ? 'why.repEarly' : 'why.repLate'));
@@ -2097,7 +2123,7 @@
       // 🔗 조합(난투): 한 차에 서로 다른 특수 물품을 같이 실으면 트레잇이 합쳐져 세진다 — 종류 수 k, 연달아 조합하면 연쇄 +1 (유저: "한 차가 특약을 얻어서 동시에 다른 종류를 보내면 머징한 기능이 날아가는 거")
       let mix = null;
       if (R.mixCombo) {
-        const kinds = [...new Set(chosen.filter(p => p.type !== 'normal' && !p.pushed).map(p => p.type))];
+        const kinds = [...new Set(chosen.filter(p => p.type !== 'normal' && !p.pushed).flatMap(p => this.typesOf(p)))];
         if (kinds.length >= 2) {
           this.mixStreak = Math.min(M.MULTI.MIX.streakMax, (this.mixStreak || 0) + 1 + (kinds.includes('frozen') && this.ownsFam('frozen') ? 1 : 0));   // 🧊 냉동이 끼면 연쇄 +1 더
           const mult = Math.min(M.MULTI.MIX.maxMult, kinds.length + this.mixStreak - 1);
@@ -2871,8 +2897,9 @@
     // 트레잇 언락 카드: 내가 받는 물품 종류 중 아직 안 연 것 (유저: "마켓에 해당 특수 물품에 붙는 트레잇을 언락하는 것도")
     _traitUnlockItems() {
       const TT = M.MULTI.TYPE_TRAITS || {}; if (!this.rules.typeTraits) return [];
-      const keys = Object.keys(TT).filter(k => !this.traitUnlocks.includes(k) && this.typeOpen(k) && (this.contracts.some(c => c && this._carrierAccepts(D.CARRIERS[c.carrier], { type: k, size: 1, attrs: D.PARCEL_TYPES[k].attrs || [], customs: 0 }, this.contractCaps(c), this.contractSizeMax(c), this.contractNeed(c)) && (!(D.PARCEL_TYPES[k].attrs || []).includes('fragile') || this.contractCaps(c).includes('fragile')))));
-      return keys.map(k => ({ kind: 'traitUnlock', ptype: k, trait: TT[k][1], price: 0, name: k, sold: false }));
+      const out = [];
+      for (const k of Object.keys(TT)) { if (!this.typeOpen(k)) continue; const own = this.ownedTraits(k), left = this.traitPool(k).filter(t => !own.includes(t)); if (!left.length) continue; out.push({ kind: 'traitUnlock', ptype: k, trait: left[this.rng.int(left.length)], price: 0, name: k, sold: false }); }   // 연 종류마다 아직 없는 트레잇 한 장
+      return out;
     }
     _shopItems() {
       const R = this.rules, items = [], mult = D.PRICE_MULT[Math.min(12, this.tableMonth(this.month))] * R.itemPriceMult * R.priceMult;

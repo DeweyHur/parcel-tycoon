@@ -1266,3 +1266,6 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 #modal h2 .rarb { font-style: normal; font-size: 10px; padding: 1px 6px; margin-left: 6px; vertical-align: 3px; color: #1b1a2e; background: #c9c4dc; }
 #modal h2 .rarb.rar-rare { background: #6fb8ff; } #modal h2 .rarb.rar-epic { background: #d59bff; } #modal h2 .rarb.rar-legend { background: linear-gradient(90deg, #ffd166, #ff9f6b); }
 .pkcard .rar { background: #c9c4dc; } .pkcard.rar-legend .rar { background: linear-gradient(90deg, #ffd166, #ff9f6b); } .pkcard.rar-legend { box-shadow: 0 0 0 1px #ffd166 inset, 0 0 12px rgba(255,209,102,.4); }
+.ptile.comp i { background: linear-gradient(135deg, var(--c) 0 50%, var(--c2) 50% 100%) !important; }
+.ptile .tb small { font-size: 8px; margin-left: 1px; }
+.money-chip.fire { letter-spacing: 1px; border-color: var(--gold, #ffd166); }

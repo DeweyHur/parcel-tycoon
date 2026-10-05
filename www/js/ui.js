@@ -907,7 +907,7 @@
       if (e.type === 'pushIn') steps.push({ from: e.from, icon: e.dump ? '🏁' : '📦', text: `${e.dump ? '🏁 ' : ''}+${e.n} → ${T('multi.you')}${e.hot ? ' 🔥×2' : ''}`, cls: 'bad', run: () => { SFX.thud(); scene.shake(.2); glow(e.ids.map(id => `.ptile[data-id="${id}"]`).join(','), 'fx-new'); } });
       if (e.type === 'repairIn') steps.push({ from: e.from, icon: '🏗', text: T('multi.repairInToast', { size: e.storage.vol, days: e.storage.turns }), cls: 'bad', run: () => { SFX.thud(); scene.shake(.45); glow('#multi-status', 'fx-bad'); } });
       if (e.type === 'repairBlast') steps.push({ from: ME(), icon: '🏗', text: T('multi.repairBlastToast', { n: e.stolen }), cls: 'bad', run: () => { SFX.discard(); scene.shake(.6); scene.mope(); } });
-      if (e.type === 'fullTrait') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${T('burst.full')}`, 2); }
+      if (e.type === 'fullTrait') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${T('burst.full', { n: e.mult || 2 })}`, 2); }
       if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
     }
     if (steps.length) playSteps(steps);
@@ -987,7 +987,7 @@
   // 이 계열이 여는 물품들의 트레잇 [기본 → 언락] 아이콘
   function familyTraits(fam) {
     const TF = M.MULTI.TYPE_FAMILIES || {}, TT = M.MULTI.TYPE_TRAITS || {}, ic = id => (M.MULTI.TRAITS[id] || {}).icon || '';
-    return Object.keys(TF).filter(t => TF[t].includes(fam) && TT[t]).map(t => TT[t].map(ic).join('→')).join(' ');
+    return Object.keys(TF).filter(t => TF[t].includes(fam) && TT[t]).map(t => TT[t].map(ic).join('')).join(' ');
   }
   function showRepShop() {
     const g = game, sh = g.repShop; if (!sh) return;
@@ -1014,7 +1014,7 @@
         if (TK) { const gain = (car.tier || 0) + 1 - (from ? (D.CARRIERS[from.carrier].tier || 0) + 1 : 0), after = g.trackLv(tk) + gain; nw = familyTraits(D.familyOf(it.carrier)); tag = `${T('track.' + tk)} · ${trackFx(g, tk, after)}`; } }
       else if (it.kind === 'shopUp') { icon = it.up === 'vip' ? '💳' : it.up === 'pass' ? '🎟' : '🗄'; name = T('shopUp.' + it.up); desc = T('shopUp.' + it.up + '.d'); fam = 'fam-eco'; }
       else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.kind === 'trust' && g.rules.multi ? T('multi.sealDesc') : E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}` : T('mk.enhNoTarget'); }
-      else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn }); desc = esc(T('multi.boostDesc', { icons: ((M.MULTI.TYPE_TRAITS || {})[it.ptype] || []).map(id => (M.MULTI.TRAITS[id] || {}).icon || '').join(' ') })); const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
+      else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn, name: tr.name || '' }); const own = g.ownedTraits(it.ptype), all = g.traitPool(it.ptype).length; desc = `${esc(tr.desc || '')}<br>${T('multi.traitHave', { have: own.length + 1, all })}${own.length + 1 === 3 ? ' — ' + T('multi.traitSet3') : own.length + 1 === all ? ' — ' + T('multi.traitSet4') : ''}`; nw = own.map(id => (M.MULTI.TRAITS[id] || {}).icon || '').join('') + ' ＋ ' + (tr.icon || ''); const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
       else if (it.kind === 'adTicket') { const A = D.AD_MEDIA[it.media]; icon = A ? A.icon : '📣'; name = it.name || T('media.ticket', { name: T('media.' + it.media) }); desc = T('media.ticketOnce'); fam = 'fam-atk'; }
       else { icon = '🎁'; name = it.name || it.kind; }
       return `<button class="btn pkcard ${fam} ${it.rarity && (it.milestone || it.kind === 'contract') && !isFirst ? 'rar-' + it.rarity : ''} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><span class="pbody"><b>${it.rarity && (it.milestone || it.kind === 'contract') && !isFirst ? `<i class="rar">${T('rar.' + it.rarity)}</i>` : ''}${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${tag ? `<em>${esc(tag)}</em>` : ''}</span>${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
@@ -1493,6 +1493,15 @@
     }
     return null;
   }
+  // 이 택배를 보내면 터지는 트레잇 — 그 종류로 모은 것 전부 (복합 화물은 두 종류 다) + 모은 수 / 세트 효과
+  function traitLines(g, p) {
+    const TR = M.MULTI.TRAITS, line = id => `<div class="d" style="color:${TR[id].kind === 'attack' ? 'var(--red)' : 'var(--gold)'}">${T('multi.traitLine', { icon: TR[id].icon, name: esc(TR[id].name), desc: esc(TR[id].desc) })}</div>`;
+    if (!p.trait || !TR[p.trait]) return '';
+    if (!g.rules.multi || p.type === 'normal') return line(p.trait);
+    let out = p.type2 ? `<div class="d" style="color:var(--gold)">${T('pd.composite')}</div>` : '';
+    for (const ty of g.typesOf(p)) { const own = g.ownedTraits(ty), all = g.traitPool(ty).length; if (!own.length) continue; out += `<div class="d"><b>${esc(D.PARCEL_TYPES[ty].name)}</b> <small>${T('multi.traitHave', { have: own.length, all })}${own.length < 3 ? ' · ' + T('multi.traitSet3') : own.length < all ? ' · ' + T('multi.traitSet4') : ''}</small></div>` + own.map(line).join(''); }
+    return out;
+  }
   function showParcelDetail(id) {
     const g = game, p = g.parcels.find(x => x.id === id); if (!p) return;
     const t = ptype(p), a = attrsOf(p), cu = M.CUSTOMERS[p.customer || 'anon'], lv = g.customerLevel(p.customer || 'anon');
@@ -1506,11 +1515,11 @@
     const body = `<div class="parcel pd-top" style="margin-bottom:6px"><div class="sw" style="background:${t.css}"></div><div>${urgDot(p)}${g.shows('customers') ? `<span class="cust">${cu.icon}</span>` : ''}<span class="nm">${esc(t.name)}</span>${attrIcons(a)} ${T('fmt.cells', { n: p.size })}${g.rules.noMoney ? '' : ` · ${T('pd.baseReward', { n: p.reward })}`}</div><div class="st">${parcelStatus(p)}</div></div>
       ${g.shows('customers') ? `<div class="d">${T('company.customers')} <b>${cu.icon} ${esc(cu.name)}</b>${p.customer !== 'anon' ? ` · ${T('cust.trustLv', { n: lv })} ${T('pd.perPiece', { n: M.CUSTOMER_BONUS[lv] })}` : ''}${cu.rule ? `<br><span style="color:var(--gold)">${esc(cu.rule.text)}</span>` : ''}</div>` : ''}
       ${p.wet || p.outdoor ? `<div class="d">${[p.wet ? T('pd.wet') : '', p.outdoor ? T('pd.outdoor') : ''].filter(Boolean).join(' · ')}</div>` : ''}
-      ${p.trait && M.MULTI.TRAITS[p.trait] ? `<div class="d" style="color:${M.MULTI.TRAITS[p.trait].kind === 'attack' ? 'var(--red)' : 'var(--gold)'}">${T('multi.traitLine', { icon: M.MULTI.TRAITS[p.trait].icon, name: esc(M.MULTI.TRAITS[p.trait].name), desc: esc(M.MULTI.TRAITS[p.trait].desc) })} <small>(${T(M.MULTI.TRAITS[p.trait].kind === 'attack' ? 'pd.traitAtk' : 'pd.traitBon')})</small></div>` : ''}
+      ${traitLines(g, p)}
       ${attrRows}
       ${g.contracts.some(c => c && g.canHandle(c, p) && g.breakProb(c, p) === 0) || (selfOk && !g.selfBreakProb(p)) ? '' : `<div class="d" style="color:var(--orange);margin-top:6px">${g.contracts.filter(Boolean).length >= D.CONTRACT_SLOTS && optFor(g, p) ? T('pd.needOpt', { name: optFor(g, p) }) : famNames(p) ? T('pd.needFamily', { list: famNames(p) }) : T('pd.needNothing')}</div>`}
       <div style="font-size:12px;color:var(--gold);margin:8px 0 3px">${T('pd.contracts')}</div><div class="ttrack">${rows || `<div class="d">${T('pd.noContract')}</div>`}${g.shows('self') ? `<div class="ttrow ${selfOk ? 'on' : ''}"><span class="lv">🚚</span><span class="ef">${T('pd.selfRow')} ${selfOk ? (g.rules.noMoney ? '' : T('pd.selfCost', { cost: g.selfCost(p) })) + (g.selfBreakProb(p) ? ` <span style="color:var(--orange)">${T('pd.breakRisk', { pct: Math.round(g.selfBreakProb(p) * 100) })}</span>` : '') : `<span style="color:var(--dim)">${esc(selfWhy || T('pd.no'))}</span>`}</span><span class="st">${selfOk ? T('pd.ok') : '—'}</span></div>` : ''}</div>`;
-    modal(`${t.name} ${T('fmt.cells', { n: p.size })}`, body, [{ label: T('btn.close'), onClick: closeModal }]);
+    modal(`${t.name}${p.type2 ? ' + ' + D.PARCEL_TYPES[p.type2].name : ''} ${T('fmt.cells', { n: p.size })}`, body, [{ label: T('btn.close'), onClick: closeModal }]);
     storyCheck({ kind: 'modal', modal: 'parcel', parcel: p });
   }
   function showSceneInspect(hit) {
@@ -1816,8 +1825,8 @@
     const ic = tileIcons(p);
     const cells = Array.from({ length: p.size }, (_, k) => `<i>${ic[k] ? `<span>${ic[k]}</span>` : ''}</i>`).join('');
     const vb = p.rush ? `<b class="vb rushb${game.rushToday(p) ? ' now' : ''}">⚡</b>` : valueTier(p) ? `<b class="vb">${valueTier(p) === 3 ? '✦' : valueTier(p) === 2 ? '◆' : '▲'}</b>` : '';
-    const tr = p.trait && M.MULTI.TRAITS[p.trait]; const tb = tr ? `<b class="tb ${tr.kind}${game.clearedToday(p) ? ' x2' : ''}" title="${esc(tr.name)}">${tr.kind === 'attack' ? '⚔' : ''}${tr.icon}${game.clearedToday(p) ? '×2' : ''}</b>` : '';   // 🛃 통관 끝난 날: ×2
-    return `<button type="button" class="${cls}${tr ? ' trait' : ''}" data-id="${p.id}" style="--c:${t.css}" title="${esc(tip)}" aria-label="${esc(tip)}">${cells}${vb}${tb}</button>`;
+    const tr = p.trait && M.MULTI.TRAITS[p.trait]; const tb = tr ? `<b class="tb ${tr.kind}${game.clearedToday(p) ? ' x2' : ''}" title="${esc(tr.name)}">${tr.kind === 'attack' ? '⚔' : ''}${tr.icon}${(() => { const n = game.rules.multi && p.type !== 'normal' ? game.typesOf(p).reduce((k, ty) => k + game.ownedTraits(ty).length, 0) : 1; return n > 1 ? `<small>${n}</small>` : ''; })()}${game.clearedToday(p) ? '×2' : ''}</b>` : '';   // 🛃 통관 끝난 날: ×2
+    return `<button type="button" class="${cls}${tr ? ' trait' : ''}${p.type2 ? ' comp' : ''}" data-id="${p.id}" style="--c:${t.css}${p.type2 ? `;--c2:${D.PARCEL_TYPES[p.type2].css}` : ''}" title="${esc(tip)}" aria-label="${esc(tip)}">${cells}${vb}${tb}</button>`;
   }
   function renderStock(container, parcels, s) {
     if (!parcels.length) { container.innerHTML = `<div id="empty">${T('hud.emptyWarehouse')}</div>`; return; }
@@ -1978,7 +1987,7 @@
     const tbtn = '';
     // 난투(noMoney): 수익·비용·순수익 대신 평판 한 줄 — 돈은 없다, 평판만 (유저: "배차비 순수익 이런 거 다 없애고 평판 관리만")
     const repD = game.rules.noMoney ? (game.rules.repPerParcel ? game.callRep(selP, false) : game.repDeltaFor(selP)) : 0, ctag = game.callTags ? game.callTags(selP, cap) : {};
-    const gauge = game.rules.noMoney ? `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip net">★<b>${repD >= 0 ? '+' : ''}${repD}</b></span>${game.dawnReady(c, selP) ? `<span class="money-chip dawn">${T('call.dawn')}</span>` : ''}${ctag.rushSolo ? `<span class="money-chip good">${T('call.rushSolo')}</span>` : ''}${ctag.rushMixed ? `<span class="money-chip cost">${T('call.rushMixed')}</span>` : ''}${ctag.full ? `<span class="money-chip good">${T('call.full', { i: (() => { const tp = selP.find(p => p.trait); return tp ? traitIcon(tp.trait) : '' })() })}</span>` : ''}</div></div>` : `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
+    const gauge = game.rules.noMoney ? `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip net">★<b>${repD >= 0 ? '+' : ''}${repD}</b></span>${game.dawnReady(c, selP) ? `<span class="money-chip dawn">${T('call.dawn')}</span>` : ''}${ctag.rushSolo ? `<span class="money-chip good">${T('call.rushSolo')}</span>` : ''}${ctag.rushMixed ? `<span class="money-chip cost">${T('call.rushMixed')}</span>` : ''}${(() => { if (!game.rules.traitPerCall) return ''; const pl = game.firePlan(selP, vol >= cap); return pl.length ? `<span class="money-chip fire">${pl.map(x => x.traits.map(id => (M.MULTI.TRAITS[id] || {}).icon || '').join('') + (x.mult > 1 ? `×${x.mult}` : '')).join(' ')}</span>` : ''; })()}${ctag.full ? `<span class="money-chip good">${T('call.full', { i: (() => { const tp = selP.find(p => p.trait); return tp ? traitIcon(tp.trait) : '' })() })}</span>` : ''}</div></div>` : `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
     const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
     const mp = game.mixPreview(selP);   // 🔗 조합 미리보기: 두 종류 이상이면 합쳐진 한 방
     const tgt = game.rules.multi && match ? MULTI.aimOf(match, ME()) : null, fires = selP.some(p => p.trait && !p.overdue && (M.MULTI.TRAITS[p.trait] || {}).kind === 'attack') || (mp && mp.mult);
