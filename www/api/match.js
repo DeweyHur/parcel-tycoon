@@ -298,7 +298,7 @@ async function handle(S, d, ip) {
     if (!own.has(d.for || d.pid)) return [403, { error: 'notown' }];
     const pid = d.for || d.pid, r = d.result || {}, bot = pid !== d.pid;
     let verified = bot;   // 봇 결과는 호스트를 믿는다(봇 쌍은 ELO 에 안 든다). 사람은 재실행으로
-    if (!bot && d.cfg && Array.isArray(d.log)) { try { const vr = MULTI.verify(Object.assign({}, d.cfg, { seed: m.seed, prep: false, mtheme: MULTI.themeOf(m.seed), mchar: (m.players.find(p => p.pid === pid) || {}).chr || null }), d.log, { cash: r.cash, rep: r.rep, day: r.day, phase: r.win ? 'win' : 'over' }); verified = vr.ok; } catch (e) { verified = false; } }   // 시드·테마·캐릭터는 서버가 아는 것으로 덮는다 — 클라이언트 cfg 를 믿지 않는다
+    if (!bot && d.cfg && Array.isArray(d.log)) { try { const vr = MULTI.verify(Object.assign({}, d.cfg, { seed: m.seed, prep: false, mtheme: MULTI.themeOf(m.seed), mchar: (m.players.find(p => p.pid === pid) || {}).chr || null, mload: M.MULTI.LOADOUT && d.cfg.mload ? MULTI.cleanLoad(d.cfg.mload) : null }), d.log, { cash: r.cash, rep: r.rep, day: r.day, phase: r.win ? 'win' : 'over' }); verified = vr.ok; } catch (e) { verified = false; } }   // 시드·테마·캐릭터는 서버가 아는 것으로 덮는다 — 클라이언트 cfg 를 믿지 않는다
     const rec = { cash: Math.round(+r.cash || 0), rep: Math.round(+r.rep || 0), day: Math.round(+r.day || 0), days: Math.round(+r.days || 78), win: !!r.win, alive: !!r.win, verified, at: now() };
     // 먼저 마감한 사람: 그 순간 남들의 일차(스냅샷)를 적어 둔다 — 나머지는 남은 날만큼 평판 페널티
     if (rec.win && !m.firstFinish) { const snaps = await snapshots(S, m); const days = {}; for (const p of m.players) if (p.pid !== pid) days[p.pid] = (snaps[p.pid] || {}).day || 1; m.firstFinish = { pid, days, at: now() }; await saveMatch(S, m); }

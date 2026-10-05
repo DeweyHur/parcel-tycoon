@@ -110,7 +110,7 @@
       this.mperks = (cfg.mperks || []).slice(); this.perkOffer = null; this.repShop = null;   // 난투: 평판 상한에 닿으면 3장 랜덤 상점(repShop) — 퍽·계약·강화를 돈으로   // 멀티: 평판 등급업마다 3택1로 고른 퍽 · 지금 떠 있는 카드 3장
       // 멀티 2단계: 상대에게서 온 공격 큐(다음 날로 넘길 때 적용) · 나가는 것(공격·보수공사 이사, multi.js 가 라우팅) · 방패 · 임시 칸 · 한 방 · 덤 트럭
       this.actLog = [];   // 멀티 3단계: 입력 로그 — 서버가 같은 시드로 다시 돌려 검증한다 (MULTI.replay)
-      this.inbox = []; this.outbox = []; this.shields = 0; this.capMods = []; this.focusNext = false; this.freeTruckNext = false; this.freshFreezeUntil = 0; this.roadblockDay = 0; this.roadblockSlot = -1; this.traitUnlocks = []; this.traitSet = {}; this.traitCd = {};   // 난투: 산 트레잇 언락(물품 종류별 두 번째 트레잇)
+      this.inbox = []; this.outbox = []; this.shields = 0; this.capMods = []; this.focusNext = false; this.freeTruckNext = false; this.freshFreezeUntil = 0; this.roadblockDay = 0; this.roadblockSlot = -1; this.traitUnlocks = []; this.traitSet = {}; this.traitCd = {}; this.traitLv = {}; this.mstats = { ship: {}, fire: {} }; if (this.cfg.mload) this.firstShopDone = true;   // 난투: 산 트레잇 언락(물품 종류별 두 번째 트레잇)
       this.month = 0; this.turn = 0;
       // 런의 해. 시나리오(rules.year)나 cfg 가 지정하면 그 해, 아니면 시작한 해를 찍어 세이브에 고정한다.
       // 로그라이크라 해마다 요일·영업일 수가 달라지는 건 그대로 받는다 — 인수인계(대본)만 해를 고정한다.
@@ -193,7 +193,8 @@
         wh = { ...((cy && cy.warehouse) || (lc && lc.warehouse) || co.warehouse) };
         contracts = (cy && cy.contracts) || (lc && lc.contracts) || co.contracts;
       }
-      if (R.startFamilies) contracts = contracts.filter(s => R.startFamilies.includes(FAM(s.carrier)));   // 난투: 한길(대량)만 들고 시작 — 나머지는 평판 상점에서 (유저)
+      if (R.startFamilies) contracts = contracts.filter(s => R.startFamilies.includes(FAM(s.carrier)));
+      if (R.multi && this.cfg.mload) { contracts = contracts.slice(); for (const f of this.cfg.mload.fams || []) { const k = D.centerFor(f, 0); if (k && !contracts.some(c => FAM(c.carrier) === f)) contracts.push({ carrier: k, grade: 'normal' }); } }   // 셋업: 한길 + 고른 계열 둘로 시작 — 판 중엔 새 계약이 없다   // 난투: 한길(대량)만 들고 시작 — 나머지는 평판 상점에서 (유저)
       // 앞 장을 망쳐도(확장을 못 샀어도) 그 장의 대본이 성립하도록 바닥값을 보장한다.
       // 냉장·냉동 칸도 같이 봐야 한다 — 칸만 보장하고 냉장을 안 보장하면 ❄·🧊 가 갈 데가 없다.
       if (this.level && this.level.minCap != null) wh.cap = Math.max(wh.cap, this.level.minCap);
@@ -653,7 +654,8 @@
     _fireTrait(p) {
       const tr = p.trait && this.traitDef(p.trait); if (!tr || p.overdue) return;
       const R = this.rules;
-      if (tr.cd) { if ((this.traitCd[p.trait] || 0) > this.totalTurn) return; this.traitCd[p.trait] = this.totalTurn + tr.cd; }   // 센 것은 며칠에 한 번
+      if (tr.cd) { if ((this.traitCd[p.trait] || 0) > this.totalTurn) return; this.traitCd[p.trait] = this.totalTurn + Math.max(1, tr.cd - ((this.traitLv || {})[p.trait] || 0)); }
+      if (this.mstats) this.mstats.fire[p.trait] = (this.mstats.fire[p.trait] || 0) + 1;   // 센 것은 며칠에 한 번
       if (tr.kind === 'bonus') {
         if (p.trait === 't_buzz') this.addRep((M.MULTI.BUZZ || 1) * this.traitPower(p), MSG('why.trait', { icon: tr.icon }));
         else if (p.trait === 't_reflect') this.reflectNext = Math.min(2, (this.reflectNext || 0) + 1);
@@ -757,16 +759,16 @@
     shopCards() { const S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; return S && this.rules.multi ? Math.min(S.cardsMax + 2, Math.min(S.cardsMax, 3 + Math.floor(this.trackLv('shop') / S.cardsPer)) + (this.shopExtra || 0)) : 3; }
     traitPool(type) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? null : type; const pool = key && TT[key]; return pool ? pool.filter(t => this.traitDef(t)) : []; }
     // 모은 트레잇 — 첫 장은 처음부터, 나머지는 상점에서 (traitSet). 그 종류를 보내면 모은 것이 전부 터진다
-    ownedTraits(type) { const pool = this.traitPool(type); if (!pool.length) return []; const own = (this.traitSet && this.traitSet[type]) || []; return pool.filter((t, i) => i === 0 || own.includes(t)); }
+    ownedTraits(type) { const pool = this.traitPool(type); if (!pool.length) return []; if (this.cfg.mload) { const eq = (this.cfg.mload.traits || {})[type]; return eq ? pool.filter(t => eq.includes(t)) : []; } const own = (this.traitSet && this.traitSet[type]) || []; return pool.filter((t, i) => i === 0 || own.includes(t)); }
     traitMaster(type) { const pool = this.traitPool(type); return pool.length > 1 && this.ownedTraits(type).length >= pool.length; }
     typesOf(p) { return p.type2 ? [p.type, p.type2] : [p.type]; }
     // 트레잇 세기: 🔗 조합 배수 × (넷 다 모으면 +1) × (🧊 숙성 +일수) × 만차
-    traitPower(p) { let k = 1 + (this.traitMaster(p.type) || this.traitUnlocks.includes(p.type) ? 1 : 0) + (p.aged || 0); return k * (this._mixMult || 1) * (this._fullMult || 1); }
+    traitPower(p) { let k = 1 + (this.traitMaster(p.type) || this.traitUnlocks.includes(p.type) ? 1 : 0) + ((this.traitLv || {})[p.trait] || 0) + (p.aged || 0); return k * (this._mixMult || 1) * (this._fullMult || 1); }
     // 이 짐을 보내면 무엇이 터지나 — [{ type, traits[], full, mult }] (호출 미리보기와 실제 발동이 같은 판단을 쓴다)
     firePlan(chosen, full) {
       const byType = {}; for (const p of chosen) if (p && p.trait && !p.overdue && p.type !== 'normal') for (const t of this.typesOf(p)) if (this.traitPool(t).length) (byType[t] = byType[t] || []).push(p);
       const kinds = Object.keys(byType), S = (M.MULTI && M.MULTI.SET) || {};
-      return kinds.map(t => { const solo = !!full && kinds.length === 1 && chosen.every(p => p.type === t && !p.type2); const own = this.ownedTraits(t); return { type: t, traits: own, ps: byType[t], full: solo, mult: solo ? (own.length >= (S.fullAt || 3) ? (S.fullMult || 3) : (M.MULTI.FULL_MULT || 2)) : 1 }; });
+      return kinds.map(t => { const solo = !!full && kinds.length === 1 && chosen.every(p => p.type === t && !p.type2); const own = this.ownedTraits(t); const big = this.cfg.mload ? own.length > 0 && own.every(id => (this.traitLv[id] || 0) >= 1) : own.length >= (S.fullAt || 3); return { type: t, traits: own, ps: byType[t], full: solo, mult: solo ? (big ? (S.fullMult || 3) : (M.MULTI.FULL_MULT || 2)) : 1 }; });
     }
     // 트레잇은 호출마다 종류당 한 번(traitPerCall) — 몇 개를 실었든. 그 종류로 모은 트레잇이 전부 터진다. 한 종류로만 꽉 채운 차(만차)면 ×2, 셋 모았으면 ×3
     _fireTraitsPerCall(chosen, full) {
@@ -1554,6 +1556,7 @@
     //   정비소(강화·트레잇 강화·광고권, 일반) · 거래처 소개소(새 계약, 레어) · 재계약 협상(계약을 윗급으로, 레어) · 상인 조합(상점 강화, 에픽) · 심야 경매장(섞어서 레어 이상, 전설 — 마일스톤·우대권)
     shopCatOf(it) { return it.kind === 'shopUp' ? 'guild' : it.kind === 'contract' ? 'broker' : 'garage'; }   // 트레잇 강화는 강화 — 정비소 (유저: "재계약에 강화가 나왔는데?")
     _themedShop(pool, n) {
+      if (this.cfg.mload) pool = pool.filter(it => !(it.kind === 'contract' && it.switchFrom == null));   // 셋업: 판 중엔 새 계약이 없다 — 윗급 재계약만
       for (const it of pool) it.rarity = this.itemRarity(it);
       const S = M.MULTI.SHOPS, byCat = {}; for (const it of pool) (byCat[this.shopCatOf(it)] = byCat[this.shopCatOf(it)] || []).push(it);
       let cat;
@@ -1563,10 +1566,10 @@
       if (cat === 'auction') { const sh = this.rng.shuffle(pool.slice()); sh.sort((x, y) => this.rarityRank(y.rarity) - this.rarityRank(x.rarity)); const out = this.rng.shuffle(sh.slice(0, n)); for (const it of out) it.milestone = true; return out; }   // 경매장: 지금 나올 수 있는 것 중 가장 귀한 것부터
       const list = byCat[cat] || [];
       if (cat === 'broker') { const W = { common: 6, rare: 3, epic: 1.5, legend: 0.7 }, left = list.slice(), out = []; while (out.length < n && left.length) { const w = {}; left.forEach((it, i) => { w[i] = W[it.rarity] || 1; }); out.push(left.splice(+this.rng.weighted(w), 1)[0]); } return out; }   // 윗급일수록 드물게
-      return this.rng.shuffle(list).slice(0, n);
+      return this.rng.shuffle(list.length ? list : pool).slice(0, n);
     }
     // 계약은 윗급일수록 귀하다 (유저: "계약을 늘리는 것과 윗급으로 올리는 건 같은 상점 · 윗급으로 갈수록 레어도가 올라가게")
-    itemRarity(it) { if (it.kind === 'shopUp') return 'epic'; if (it.kind === 'contract') return ['common', 'rare', 'epic', 'legend'][Math.min(3, D.CARRIERS[it.carrier].tier || 0)]; return it.kind === 'traitUnlock' ? 'rare' : 'common'; }
+    itemRarity(it) { if (it.kind === 'shopUp') return 'epic'; if (it.kind === 'traitUp') return ['common', 'rare', 'epic'][Math.min(2, (this.traitLv || {})[it.trait] || 0)]; if (it.kind === 'contract') return ['common', 'rare', 'epic', 'legend'][Math.min(3, D.CARRIERS[it.carrier].tier || 0)]; return it.kind === 'traitUnlock' ? 'rare' : 'common'; }
     rarityRank(r) { return ['common', 'rare', 'epic', 'legend'].indexOf(r); }
     shopMilestone() { const k = Math.max(2, ((M.MULTI && M.MULTI.SHOP_MILESTONE) || 3) - (this.shopVip ? 1 : 0)); return this.rules.multi && this.repTier > 0 && this.repTier % k === 0; }
     _shopUpItems() { if (!this.rules.multi) return []; const out = []; if ((this.shopExtra || 0) < 2) out.push({ kind: 'shopUp', up: 'shelf', price: 0, sold: false }); if (!this.shopVip) out.push({ kind: 'shopUp', up: 'vip', price: 0, sold: false }); if (!this.nextPremium) out.push({ kind: 'shopUp', up: 'pass', price: 0, sold: false }); return out; }
@@ -1576,6 +1579,7 @@
       if (this.cash < (it.kind === 'perk' ? it.price : this.contractPrice ? (it.kind === 'contract' ? this.contractPrice(it) : it.price) : it.price)) return { ok: false, msg: T('err.noCash') };
       this._act('rbuy', { i, s: target == null ? null : target });
       if (it.kind === 'shopUp') { it.sold = true; sh.bought++; if (it.up === 'shelf') this.shopExtra = (this.shopExtra || 0) + 1; else if (it.up === 'vip') this.shopVip = true; else if (it.up === 'pass') this.nextPremium = true; this.say('log.shopUp', { name: T('shopUp.' + it.up) }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, shopUp: it.up }; }
+      if (it.kind === 'traitUp') { it.sold = true; sh.bought++; this.traitLv[it.trait] = (this.traitLv[it.trait] || 0) + 1; this.say('log.traitUp', { icon: (this.traitDef(it.trait) || {}).icon || '', name: (this.traitDef(it.trait) || {}).name || '', n: this.traitLv[it.trait] }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, traitUp: it.trait }; }
       if (it.kind === 'traitUnlock') { it.sold = true; sh.bought++; { const set = this.traitSet[it.ptype] = this.traitSet[it.ptype] || []; if (!set.includes(it.trait)) set.push(it.trait); } this.say('log.traitUnlock', { type: D.PARCEL_TYPES[it.ptype].name, icon: (this.traitDef(it.trait) || {}).icon || '' }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, unlock: it.ptype }; }
       if (it.kind === 'perk') { this.cash -= it.price; this.run.spent += it.price; it.sold = true; sh.bought++; this._applyPerk(it.perk); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, perk: it.perk }; }
       // 장 매물은 buy() 로 — 잠깐 상점을 마켓으로 세워 두고 판다(로그는 rbuy 하나)
@@ -2137,6 +2141,7 @@
           this.emit('mix', mix);
         } else this.mixStreak = 0;
       }
+      if (this.mstats) for (const p of chosen) if (!p.overdue) for (const ty of this.typesOf(p)) this.mstats.ship[ty] = (this.mstats.ship[ty] || 0) + 1;
       if (R.traitPerCall) this._fireTraitsPerCall(chosen, deliveredVolume >= vcap * trucks); else for (const p of chosen) this._fireTrait(p);
       this._mixMult = 0;
       if (pushedBulk && this.famUp('bulk') > 0) this.addRep(pushedBulk * this.famUp('bulk'), MSG('why.famRule', { icon: '📦' }));
@@ -2898,6 +2903,7 @@
     _traitUnlockItems() {
       const TT = M.MULTI.TYPE_TRAITS || {}; if (!this.rules.typeTraits) return [];
       const out = [];
+      if (this.cfg.mload) { const mx = (M.MULTI.LOADOUT || {}).upMax || 3; for (const ty of Object.keys(this.cfg.mload.traits || {})) { const cand = this.ownedTraits(ty).filter(id => (this.traitLv[id] || 0) < mx); if (cand.length) out.push({ kind: 'traitUp', ptype: ty, trait: cand[this.rng.int(cand.length)], price: 0, name: ty, sold: false }); } return out; }   // 셋업: 상점은 장착한 트레잇의 강화만
       for (const k of Object.keys(TT)) { if (!this.typeOpen(k)) continue; const own = this.ownedTraits(k), left = this.traitPool(k).filter(t => !own.includes(t)); if (!left.length) continue; out.push({ kind: 'traitUnlock', ptype: k, trait: left[this.rng.int(left.length)], price: 0, name: k, sold: false }); }   // 연 종류마다 아직 없는 트레잇 한 장
       return out;
     }

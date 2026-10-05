@@ -113,7 +113,7 @@
         return `<button class="btn cta cont" id="t-continue">${T('title.continue')}<small class="cont-sub">${where}</small></button>`; })() : ''}
       ${demoLocked() ? `<button class="btn gold" id="t-demo">${T('demo.cta')}</button>` : ''}
       <button class="btn gold" id="t-new">${T('title.new')}</button>
-      <button class="btn" id="t-multi">⚔ ${T('title.multi')}</button>
+      <div class="trow"><button class="btn" id="t-multi">⚔ ${T('title.multi')}</button><button class="btn" id="t-mcodex">📖 ${T('title.mcodex')}</button></div>
       ${NET.enabled() ? `<div class="trow"><button class="btn" id="t-online">🌐 ${T('title.online')}${P.multi && P.multi.rank ? ` <small style="color:var(--dim)">${esc(T('multi.rankName.' + P.multi.rank))} · ${P.multi.elo}</small>` : ''}</button><button class="btn" id="t-invite">👥 ${T('title.invite')}</button></div>` : ''}
       <button class="btn" id="t-codex">${T('title.codex')} <small style="color:var(--dim)">${T('title.codexSub', { a: nUnlocked, b: nTotal, c: Object.keys(P.achievements).filter(achShown).length, d: Object.keys(M.ACHIEVEMENTS).filter(achShown).length })}</small></button>
       ${BUILD.api ? `<button class="btn" id="t-rank">${T('title.rank')}</button>` : ''}
@@ -127,9 +127,10 @@
     m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort'), showTitle); return; }   /* 취소하면 타이틀로 — closeModal 만 하면 뒤에 판이 없어 까만 화면이 남았다 */ showScenarioSelect(); };
     // 인수인계는 캠페인으로 강제된다 — 끝낸 뒤 타이틀에는 다시 보이지 않는다
     const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
-    m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); showCharPick(startMulti); };
-    const iv = m.querySelector('#t-invite'); if (iv) iv.onclick = () => { SFX.resume(); SFX.select(); showCharPick(showInvite); };
-    const on = m.querySelector('#t-online'); if (on) on.onclick = () => { SFX.resume(); SFX.select(); showCharPick(showQueue); };
+    m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); showCharPick(chr => showLoadout(() => startMulti(chr))); };
+    { const cx = m.querySelector('#t-mcodex'); if (cx) cx.onclick = () => { SFX.resume(); SFX.select(); showMultiCodex(showTitle); }; }
+    const iv = m.querySelector('#t-invite'); if (iv) iv.onclick = () => { SFX.resume(); SFX.select(); showCharPick(chr => showLoadout(() => showInvite(chr))); };
+    const on = m.querySelector('#t-online'); if (on) on.onclick = () => { SFX.resume(); SFX.select(); showCharPick(chr => showLoadout(() => showQueue(chr))); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex(companiesHidden() ? 'carriers' : 'companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
@@ -569,6 +570,48 @@
   // 1단계: 봇 3명과 로컬 매치. 서버·매칭·트레잇·보수공사는 다음 단계 — 여기서는 규칙 셋(장 하루 소모·배차 무제한·즉시 결제·퍽 3택1)과 상대 줄만
   // 캐릭터 고르기 — 난투(로컬·온라인·초대) 들어가기 전에 한 번. 6장 중 한 장, 고르는 순간 "이번 판은 이렇게 간다"가 생긴다 (유저: "캐릭터 = 창고 성격")
   const charNames = () => { const o = {}; for (const id of MULTI.CHAR_IDS()) o[id] = M.MULTI.CHARS[id].name || id; return o; };
+  // ----- 난투 셋업 · 도감 · 숙련 -----
+  const LOAD = () => M.MULTI.LOADOUT;
+  function multiStats() { const P = Profile.get(); return (P.multi && P.multi.stats) || {}; }
+  function myLoad() { const P = Profile.get(), st = multiStats(), raw = (P.multi && P.multi.load) || {}; const c = MULTI.cleanLoad(raw); for (const ty of Object.keys(c.traits)) { c.traits[ty] = c.traits[ty].filter(t => MULTI.unlocked(st, ty, t)); if (!c.traits[ty].length) c.traits[ty] = [M.MULTI.TYPE_TRAITS[ty][0]]; } return c; }
+  // 판이 끝나면 그 판의 배송·발동·완주를 숙련에 쌓는다 → 새로 열린 트레잇 id 들
+  function bankMultiStats(P, g) {
+    if (!g || !g.mstats || !LOAD()) return [];
+    const st = P.multi.stats = P.multi.stats || {}, before = allTraitIds().filter(x => MULTI.unlocked(st, x.type, x.id)).map(x => x.id);
+    for (const k of ['ship', 'fire']) { st[k] = st[k] || {}; for (const key of Object.keys(g.mstats[k] || {})) st[k][key] = (st[k][key] || 0) + g.mstats[k][key]; }
+    if (g.phase === 'win' && g.cfg.mload) { st.play = st.play || {}; for (const f of g.cfg.mload.fams) st.play[f] = (st.play[f] || 0) + 1; }
+    return allTraitIds().filter(x => MULTI.unlocked(st, x.type, x.id) && !before.includes(x.id)).map(x => x.id);
+  }
+  function allTraitIds() { const out = []; for (const f of Object.keys(LOAD().famType)) { const ty = LOAD().famType[f]; for (const id of M.MULTI.TYPE_TRAITS[ty] || []) out.push({ fam: f, type: ty, id }); } return out; }
+  function reqText(pr) { const r = pr.req; if (!r) return ''; const what = r.k === 'ship' ? T('mcx.reqShip', { type: D.PARCEL_TYPES[r.key].name, n: r.n }) : r.k === 'fire' ? T('mcx.reqFire', { icon: M.MULTI.TRAITS[r.key].icon, name: M.MULTI.TRAITS[r.key].name, n: r.n }) : T('mcx.reqPlay', { fam: D.FAMILIES[r.key].name, n: r.n }); return `${what} <b>${pr.have}/${pr.need}</b>`; }
+  // 계열 한 장: 규칙 + 트레잇 넷(잠긴 것은 🔒 과 과제·진행도). pick 이면 장착 칩이 눌린다
+  function famBlock(f, opts) {
+    const st = multiStats(), ty = LOAD().famType[f], FR = (M.MULTI.FAM_RULES || {})[f] || {}, tk = game ? null : null, eq = (opts && opts.eq) || [];
+    const rows = (M.MULTI.TYPE_TRAITS[ty] || []).map(id => { const tr = M.MULTI.TRAITS[id], pr = MULTI.unlockProgress(st, ty, id), on = eq.includes(id);
+      return `<div class="mtr ${pr.done ? '' : 'lock'} ${on ? 'on' : ''} ${tr.kind}" data-fam="${f}" data-t="${id}"><span class="ic">${pr.done ? tr.icon : '🔒'}</span><span class="tx"><b>${tr.icon} ${esc(tr.name)}</b><small>${esc(tr.desc || '')}</small>${pr.done ? '' : `<em>${reqText(pr)}</em>`}</span>${opts && opts.pick && pr.done ? `<i class="chk">${on ? '✔' : ''}</i>` : ''}</div>`; }).join('');
+    return `<div class="mfam ${opts && opts.sel ? 'sel' : ''}" data-fam="${f}"><div class="mfh"><b>${FR.icon || ''} ${esc(D.FAMILIES[f].name)}</b> <small>${esc(D.PARCEL_TYPES[ty].name)} · ${esc(FR.name || '')}</small>${opts && opts.pick ? `<i class="chk big">${opts.sel ? '✔' : ''}</i>` : ''}</div><div class="mfd">${esc(FR.desc || '')}</div>${opts && opts.sel === false ? '' : rows}</div>`;
+  }
+  // 도감: 계열마다 트레잇 넷 — 연 것 / 뭘 더 하면 열리는지
+  function showMultiCodex(back) {
+    const st = multiStats(), all = allTraitIds(), have = all.filter(x => MULTI.unlocked(st, x.type, x.id)).length;
+    const body = `<div class="d" style="margin-bottom:6px">${T('mcx.sub', { have, all: all.length })}</div><div class="mcx">${Object.keys(LOAD().famType).map(f => famBlock(f, {})).join('')}</div>`;
+    modal(T('title.mcodex'), body, [{ label: T('btn.close'), onClick: back || closeModal }]);
+  }
+  // 셋업: 특수 계열 둘 + 계열마다 트레잇 둘 — 고른 계열만 트레잇이 펼쳐진다
+  function showLoadout(done) {
+    const P = Profile.get(); P.multi = P.multi || {}; const L = LOAD(); if (!L) return done();
+    let cur = myLoad();
+    const draw = () => {
+      const ok = cur.fams.length === L.fams;
+      const body = `<div class="d" style="margin-bottom:6px">${T('mload.sub', { n: L.fams, k: L.slots })}</div><div class="mcx">${Object.keys(L.famType).map(f => { const sel = cur.fams.includes(f); return famBlock(f, { pick: true, sel, eq: cur.traits[L.famType[f]] || [] }); }).join('')}</div>`;
+      const m = modal(T('mload.title'), body, [{ label: T('btn.cancel'), onClick: showTitle }, { label: `${T('mload.go')} ${cur.fams.length}/${L.fams}`, cls: 'primary', disabled: !ok, onClick: () => { P.multi.load = cur; Profile.save(); closeModal(); done(); } }]);
+      const keep = m.querySelector('.body'), top = showLoadout._top || 0; keep.scrollTop = top;
+      const redraw = () => { showLoadout._top = m.querySelector('.body').scrollTop; draw(); };
+      m.querySelectorAll('.mfam .mfh').forEach(h => h.onclick = () => { SFX.select(); const f = h.parentNode.dataset.fam, ty = L.famType[f]; if (cur.fams.includes(f)) { cur.fams = cur.fams.filter(x => x !== f); delete cur.traits[ty]; } else { if (cur.fams.length >= L.fams) { const out = cur.fams.shift(); delete cur.traits[L.famType[out]]; } cur.fams.push(f); cur.traits[ty] = [M.MULTI.TYPE_TRAITS[ty][0]]; } redraw(); });
+      m.querySelectorAll('.mfam.sel .mtr:not(.lock)').forEach(r => r.onclick = () => { SFX.select(); const ty = L.famType[r.dataset.fam], id = r.dataset.t, eq = cur.traits[ty] = cur.traits[ty] || []; if (eq.includes(id)) { if (eq.length > 1) cur.traits[ty] = eq.filter(x => x !== id); } else { if (eq.length >= L.slots) eq.shift(); eq.push(id); } redraw(); });
+    };
+    showLoadout._top = 0; draw();
+  }
   function showCharPick(done) {
     const P = Profile.get(), last = P.multi && P.multi.chr;
     const cards = MULTI.CHAR_IDS().map(id => { const c = M.MULTI.CHARS[id]; return `<button class="btn pkcard chr ${id === last ? 'last' : ''}" data-id="${id}"><span class="ic">${c.icon}</span><b>${esc(c.name || id)}</b><small>${esc(c.desc || '')}</small></button>`; }).join('');
@@ -578,7 +621,7 @@
   function startMulti(chr) {
     netStop();
     const nm = (Profile.get().campaign || {}).name || T('lv.nameDefault');
-    match = MULTI.newMatch({ name: nm, chr: chr || (Profile.get().multi || {}).chr, charNames: charNames(), botNames: T('multi.botNames').split('·') });
+    match = MULTI.newMatch({ name: nm, load: myLoad(), chr: chr || (Profile.get().multi || {}).chr, charNames: charNames(), botNames: T('multi.botNames').split('·') });
     game = match.players[0].game; lastRank = myRank();
     closeModal(); showMatchIntro(() => { startPlay(); slamStrip(); });
   }
@@ -676,7 +719,7 @@
   function bubble(pid, text) { bubbles[pid] = { text, until: Date.now() + 2400 }; drawBubbles(); setTimeout(drawBubbles, 2450); }
   function drawBubbles() { const now = Date.now(); for (const pid in bubbles) { const el = portraitEl(pid), b = bubbles[pid]; if (!el) continue; let i = el.querySelector('.bubble'); if (b.until <= now) { if (i) i.remove(); delete bubbles[pid]; continue; } if (!i) { i = document.createElement('i'); i.className = 'bubble'; el.appendChild(i); } i.textContent = b.text; } }
   function startOnline(sm, nm) {
-    match = MULTI.newOnline(sm, Profile.get().pid, { name: nm, charNames: charNames(), botNames: T('multi.botNames').split('·') });
+    match = MULTI.newOnline(sm, Profile.get().pid, { name: nm, load: myLoad(), charNames: charNames(), botNames: T('multi.botNames').split('·') });
     game = match.players[0].game; lastRank = myRank();
     closeModal(); netStart(); showMatchIntro(() => { startPlay(); slamStrip(); });
   }
@@ -703,7 +746,7 @@
   async function netFinish() {
     const on = match.online; if (!on || on.sent) return; on.sent = true;
     const g = game, f = MULTI.fingerprint(g);
-    await NET.finish(on.mid, on.pid, on.pid, { cash: f.cash, rep: f.rep, day: f.day, days: MULTI.totalDays(g), win: g.phase === 'win' }, { seed: g.seed, scenario: g.cfg.scenario, company: g.cfg.company, perks: [], companyName: g.cfg.companyName, pid: g.cfg.pid, mchar: g.cfg.mchar || null }, g.actLog);
+    await NET.finish(on.mid, on.pid, on.pid, { cash: f.cash, rep: f.rep, day: f.day, days: MULTI.totalDays(g), win: g.phase === 'win' }, { seed: g.seed, scenario: g.cfg.scenario, company: g.cfg.company, perks: [], companyName: g.cfg.companyName, pid: g.cfg.pid, mchar: g.cfg.mchar || null, mload: g.cfg.mload || null }, g.actLog);
     if (on.host) for (const p of match.players) if (p.bot && p.game) { const bf = MULTI.fingerprint(p.game); await NET.finish(on.mid, on.pid, p.id, { cash: bf.cash, rep: bf.rep, day: bf.day, days: MULTI.totalDays(p.game), win: p.game.phase === 'win' }); }
     netSync(true);
   }
@@ -1014,10 +1057,11 @@
         if (TK) { const gain = (car.tier || 0) + 1 - (from ? (D.CARRIERS[from.carrier].tier || 0) + 1 : 0), after = g.trackLv(tk) + gain; nw = familyTraits(D.familyOf(it.carrier)); tag = `${T('track.' + tk)} · ${trackFx(g, tk, after)}`; } }
       else if (it.kind === 'shopUp') { icon = it.up === 'vip' ? '💳' : it.up === 'pass' ? '🎟' : '🗄'; name = T('shopUp.' + it.up); desc = T('shopUp.' + it.up + '.d'); fam = 'fam-eco'; }
       else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.kind === 'trust' && g.rules.multi ? T('multi.sealDesc') : E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}` : T('mk.enhNoTarget'); }
+      else if (it.kind === 'traitUp') { const tr = M.MULTI.TRAITS[it.trait] || {}, lv = (g.traitLv || {})[it.trait] || 0; icon = tr.icon || '🎴'; name = T('multi.upCard', { name: tr.name || '', n: lv + 1 }); desc = `${esc(tr.desc || '')}<br>${T(tr.cd ? 'multi.upDescCd' : 'multi.upDesc')}`; nw = `Lv${lv} → Lv${lv + 1}`; fam = 'fam-' + (tr.kind === 'attack' ? 'atk' : 'def'); }
       else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn, name: tr.name || '' }); const own = g.ownedTraits(it.ptype), all = g.traitPool(it.ptype).length; desc = `${esc(tr.desc || '')}<br>${T('multi.traitHave', { have: own.length + 1, all })}${own.length + 1 === 3 ? ' — ' + T('multi.traitSet3') : own.length + 1 === all ? ' — ' + T('multi.traitSet4') : ''}`; nw = own.map(id => (M.MULTI.TRAITS[id] || {}).icon || '').join('') + ' ＋ ' + (tr.icon || ''); const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
       else if (it.kind === 'adTicket') { const A = D.AD_MEDIA[it.media]; icon = A ? A.icon : '📣'; name = it.name || T('media.ticket', { name: T('media.' + it.media) }); desc = T('media.ticketOnce'); fam = 'fam-atk'; }
       else { icon = '🎁'; name = it.name || it.kind; }
-      return `<button class="btn pkcard ${fam} ${it.rarity && (it.milestone || it.kind === 'contract') && !isFirst ? 'rar-' + it.rarity : ''} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><span class="pbody"><b>${it.rarity && (it.milestone || it.kind === 'contract') && !isFirst ? `<i class="rar">${T('rar.' + it.rarity)}</i>` : ''}${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${tag ? `<em>${esc(tag)}</em>` : ''}</span>${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
+      return `<button class="btn pkcard ${fam} ${it.rarity && (it.milestone || it.kind === 'contract' || it.kind === 'traitUp') && !isFirst ? 'rar-' + it.rarity : ''} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><span class="pbody"><b>${it.rarity && (it.milestone || it.kind === 'contract' || it.kind === 'traitUp') && !isFirst ? `<i class="rar">${T('rar.' + it.rarity)}</i>` : ''}${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${tag ? `<em>${esc(tag)}</em>` : ''}</span>${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
     const body = `<div class="pkrow hlist">${sh.items.map(card).join('')}</div>${g.rules.noMoney ? '' : `<div class="d" style="text-align:right;color:var(--gold)">${g.cash}c</div>`}`;
     const first = sh.items.every(it => it.kind === 'contract' && it.switchFrom == null && g.rules.multi && g.trackOf(it.carrier)), SC = !sh.bonus && !first && g.rules.multi && g.repShopCat && M.MULTI.SHOPS ? M.MULTI.SHOPS[g.repShopCat] : null;
     const m = modal(sh.bonus ? T('multi.bonusShopTitle', { n: sh.items.length }) : first ? T('multi.firstShopTitle') : SC ? `${SC.icon} ${T('shop.' + g.repShopCat)}` : T('multi.repShopTitle', { n: sh.items.length }), body, g.rules.noMoney && sh.items.some(it => !it.sold && !(it.kind === 'enh' && slotFor(it) < 0)) ? null : [{ label: T('btn.close'), cls: 'primary', onClick: () => { g.closeRepShop(); closeModal(); game.takeEvents(); saveGame(); renderAll(); checkPhase(); } }]);   // 난투: 닫기 없음 — 하나는 꼭 고른다(고를 게 없을 때만 닫기) (유저)
@@ -1046,7 +1090,8 @@
     if (settled) rows = settled.rows.map(x => { const p = match.players.find(q => q.id === x.pid) || { id: x.pid, name: x.pid }; return Object.assign({ p, name: p.name, human: p.human, alive: x.alive, done: true, day: x.day, cash: x.cash, rep: x.rep, repFinal: x.repFinal != null ? x.repFinal : x.rep, penalty: x.penalty || 0, rank: x.rank, verified: x.verified }, {}); });
     const me = rows.find(x => x.p.id === ME());
     if (!r.fanfare) { r.fanfare = true; if (me.rank === 1) { SFX.win(); BGM.oneShot('fanfare'); } else if (!me.alive) { SFX.over(); setTimeout(() => BGM.oneShot('gameover'), 300); } else SFX.levelup(); }
-    const P = Profile.get(); if (!r.profiled) { r.profiled = true; P.multi = P.multi || {}; P.multi.played = (P.multi.played || 0) + 1; if (me.rank === 1) P.multi.wins = (P.multi.wins || 0) + 1; P.multi.best = Math.max(P.multi.best || 0, me.alive ? (me.repFinal != null ? me.repFinal : me.rep) : 0); Profile.save(); }
+    const P = Profile.get(); if (!r.profiled) { r.profiled = true; P.multi = P.multi || {}; P.multi.played = (P.multi.played || 0) + 1; if (me.rank === 1) P.multi.wins = (P.multi.wins || 0) + 1; P.multi.best = Math.max(P.multi.best || 0, me.alive ? (me.repFinal != null ? me.repFinal : me.rep) : 0); r.newUnlocks = bankMultiStats(P, game); Profile.save(); }
+    if (r.newUnlocks && r.newUnlocks.length && !r.unlockShown) { r.unlockShown = true; setTimeout(() => toast(T('mcx.newUnlock', { list: r.newUnlocks.map(id => `${M.MULTI.TRAITS[id].icon} ${M.MULTI.TRAITS[id].name}`).join(' · ') }), 3600), 600); }
     const table = `<div class="mtable">${rows.map(x => `<div class="mrow ${x.human ? 'me' : ''} ${x.alive ? '' : 'dead'}"><b class="rank">${x.rank}</b><span class="nm">${esc(x.p.id === ME() ? T('multi.you') : x.name)}</span><span class="st">${x.alive ? T('multi.done') : T('multi.closed')} · ${T('multi.day', { n: x.day })}</span><span class="rep" style="font-weight:bold;font-size:16px">★${x.repFinal != null ? x.repFinal : x.rep}${x.penalty ? `<small style="color:var(--red);font-size:11px"> −${x.penalty}</small>` : ''}</span></div>`).join('')}</div>`;
     const body = `<div class="big-num">${T('multi.rank', { n: me.rank })}</div><p style="text-align:center;color:var(--dim)">${esc(I18n.text(r.reason))}</p>${table}
       <div class="kv"><span>${T('res.callsWaits')}</span><span class="v">${r.calls} / ${r.waits}</span><span>${T('res.deliveredDiscarded')}</span><span class="v">${r.delivered} / ${r.discarded}</span><span>${T('company.perks')}</span><span class="v">${game.mperks.map(id => M.MULTI.PERKS[id].icon).join('') || T('common.none')}</span><span>${T('res.seed')}</span><span class="v">${r.seed}</span></div>`;

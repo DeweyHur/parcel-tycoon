@@ -1200,6 +1200,21 @@ t('멀티 계열 단계: 등급 + 신뢰 Lv 마다 계열 규칙이 세진다 �
   for (let k = 0; k < 3; k++) { const p = mk(); assert.ok(g.dawnReady(g.contracts[1], [p]), '새벽 ' + (k + 1) + '번째'); g.callCarrier(1, [p.id]); }
   const q = mk(); assert.ok(!g.dawnReady(g.contracts[1], [q]), '네 번째는 없다');
 });
+t('멀티 셋업: 한길 + 고른 계열 둘로 시작 · 장착한 트레잇만 터진다 · 판 중엔 새 계약 없음 · 상점은 강화(세기 +1 · 쿨다운 −1) · 숙련 과제로 언락', () => {
+  const load = MULTI.cleanLoad({ fams: ['cold', 'large', 'intl', 'nope'], traits: { fresh: ['t_road', 't_hurry', 't_flood'], large: ['zzz'] } });
+  assert.deepEqual(load.fams, ['cold', 'large']); assert.deepEqual(load.traits.fresh, ['t_road', 't_hurry'], '둘까지'); assert.deepEqual(load.traits.large, ['t_clear'], '없으면 첫 트레잇');
+  assert.equal(MULTI.cleanLoad(null).fams.length, 2); assert.deepEqual(MULTI.botLoad(5, 'bot1'), MULTI.botLoad(5, 'bot1'), '봇 셋업은 시드로 정해진다');
+  const m = MULTI.newMatch({ seed: 91, name: 'H', bots: 1, load }), g = m.players[0].game;
+  assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk', 'cold', 'large']);
+  assert.deepEqual(g.ownedTraits('fresh').sort(), ['t_hurry', 't_road']); assert.deepEqual(g.ownedTraits('intl'), [], '안 고른 계열은 없다');
+  g.repTier = 1; for (let k = 0; k < 6; k++) { g.repTier = k % 3 === 2 ? k + 2 : k + 1; assert.ok(g._drawRepShop().every(it => !(it.kind === 'contract' && it.switchFrom == null) && it.kind !== 'traitUnlock'), '새 계약·수집 카드는 안 뜬다'); }
+  const up = g._traitUnlockItems(); assert.ok(up.length && up.every(x => x.kind === 'traitUp' && g.ownedTraits(x.ptype).includes(x.trait)));
+  g.repShop = { items: [{ kind: 'traitUp', ptype: 'fresh', trait: 't_road', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.equal(g.traitLv.t_road, 1); assert.equal(g.traitPower({ type: 'fresh', trait: 't_road' }), 2, '세기 +1');
+  const st = {}; assert.ok(MULTI.unlocked(st, 'fresh', 't_hurry'), '첫 트레잇은 처음부터'); assert.ok(!MULTI.unlocked(st, 'fresh', 't_road'));
+  assert.deepEqual(MULTI.unlockProgress({ ship: { fresh: 12 } }, 'fresh', 't_road'), { done: false, have: 12, need: 30, req: { k: 'ship', n: 30, key: 'fresh' } });
+  assert.ok(MULTI.unlocked({ ship: { fresh: 30 } }, 'fresh', 't_road')); assert.ok(MULTI.unlocked({ fire: { t_hurry: 15 } }, 'fresh', 't_flood')); assert.ok(MULTI.unlocked({ play: { cold: 3 } }, 'fresh', 't_extend'));
+  g.parcels = []; const p = g._spawnParcel({ type: 'fresh', size: 1, customer: 'anon', trait: 't_hurry' }); g.parcels.push(p); g._assignCold(); g.callCarrier(1, [p.id]); assert.equal(g.mstats.ship.fresh, 1); assert.ok(g.mstats.fire.t_hurry >= 1);
+});
 t('멀티 트레잇 수집: 계열마다 넷 · 첫 장은 처음부터 · 상점에서 모으면 그 종류를 보낼 때 전부 터진다 · 셋이면 만차 ×3 · 넷이면 세기 +1 · 센 것은 며칠에 한 번', () => {
   const g = MG(81); g.parcels = []; g.schedule = g.schedule.map(() => []); g.contracts = [g._makeContract('bulk0'), g._makeContract('fragile0'), null, null]; g.repShop = null; g.repCapV = 999;
   for (const k of Object.keys(M.MULTI.TYPE_TRAITS)) assert.equal(M.MULTI.TYPE_TRAITS[k].length, 4, k); for (const k of Object.keys(M.MULTI.TYPE_TRAITS)) for (const t of M.MULTI.TYPE_TRAITS[k]) assert.ok(M.MULTI.TRAITS[t] && M.MULTI.TRAITS[t].name, t + ' 이름');

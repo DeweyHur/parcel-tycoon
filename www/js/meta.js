@@ -345,7 +345,7 @@
       shopDay: false, noCycleMarket: true, autoSummary: true, repShop: true, cycleRefill: true,   // 사이클 끝 장은 없다(유저: "상점을 없애면"). 대신 평판 상한에 닿을 때 랜덤 3장 상점(repShop), 배차는 보름마다 다시 찬다(cycleRefill). 정산은 자동, 팝업 없이 로그 한 줄. shopDay 는 「장 보러 간 날」 실험 규칙(꺼짐)
       noInsurance: true, storageOfferProb: 0, storageMax: 0,             // 보험·보관 계약 없음 (이삿짐은 2단계에서 보수공사으로 돌아온다)
       repStep: 3, repStepGrow: 5, repStepMax: 30, repFirstGap: 3, repPerParcel: true, noSelf: true, traitPerCall: true, traitAll: true, perkPick: true, noRepUnlock: true,                     // 평판 상한 도달 → 상한 +6 · 평판 상점(장 매물 랜덤 3장, 퍽 없음). 봇 판에서 석 달에 5~6번. 🛃·대형·🧊 는 안 온다(새 계약이 없으니 실을 곳도 없다)
-      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.15, dayArrivalsRate: 0.013, typeFamilies: true, famRules: true, strictCarry: true, fragileAnywhere: true, ownCargo: 0.08, ownCargoMax: 0.2, typeSizes: { large: [3, 4], intl: [2, 3, 4] },   // 내 몫은 종류마다 8%, 다 합쳐 20% 까지 — 일반이 대다수 (유저: "왜 네 칸짜리만 와") · 대형은 3~4칸 ("4칸은 애매, 3~4칸이 와야 쌓는 맛")
+      sharedSchedule: true, fixedCustLevel: 2, arrivalsMult: 1.0, dayArrivalsRate: 0.013, typeFamilies: true, famRules: true, strictCarry: true, fragileAnywhere: true, ownCargo: 0.06, ownCargoMax: 0.2, typeSizes: { large: [3, 4], intl: [2, 3, 4] },   // 내 몫은 종류마다 8%, 다 합쳐 20% 까지 — 일반이 대다수 (유저: "왜 네 칸짜리만 와") · 대형은 3~4칸 ("4칸은 애매, 3~4칸이 와야 쌓는 맛")
       callsMult: 1, repKeepTier: true, pushFlat: 1, theftMaxDay: 2,   // 연 특수 물품마다 일반 입고의 12% 가 그 물품으로
         // 1.8·+2%/일: 첫 사이클 창고 30%대 → 끝에 넘친다 (유저: "아무리 비워도 창고가 비지를 않아" — 2.6·+1% 는 첫날부터 한 번 호출 용량과 입고가 같았다)
       finalRushMult: 1.6,   // 입고 대본은 매치 공유. 첫날 하루 5개쯤(+만차 밀어내기). 전문 차도 일반을 실어 여유가 커서 2.6(유저: "첫 물량이 너무 적어") — 기본 ×2.1, 일차 비례는 완만하게(+1%/일), 마지막 보름 「마감 폭주」 ×1.6. 봇 판(test/multi-sim.js) 평판 89·반송 7
@@ -360,10 +360,10 @@
     // 원칙: 한 방은 반나절 손해를 넘지 않는다 — 죽이는 건 공격이 아니라 물량. 이름·설명은 locales meta.MULTI.TRAITS[id]
     TRAITS: {
       // 공격 — 넷뿐, 하나하나 세게 (유저: "신선 −1 같은 소소한 어택보다 강렬한 어택 · 정보가 너무 많은 게 안 좋다")
-      t_repair:   { kind: 'attack', icon: '🏗', weight: 30 },   // 보수공사(3칸, 못 치움, 옆 창고로) → REPAIR
-      t_hurry:  { kind: 'attack', icon: '⏱', weight: 25 },   // 창고 안 모든 택배 기한 −HURRY
-      t_road:   { kind: 'attack', icon: '🚧', weight: 20, cd: 2 },   // 다음 날 호출 불가
-      t_seal:   { kind: 'attack', icon: '🔒', weight: 25, cd: 3 },   // 창고 상한 −SEAL 칸, 3일
+      t_repair:   { kind: 'attack', icon: '🏗', weight: 30, cd: 6 },   // 보수공사(3칸, 못 치움, 옆 창고로) → REPAIR
+      t_hurry:  { kind: 'attack', icon: '⏱', weight: 25, cd: 4 },   // 창고 안 모든 택배 기한 −HURRY
+      t_road:   { kind: 'attack', icon: '🚧', weight: 20, cd: 5 },   // 다음 날 호출 불가
+      t_seal:   { kind: 'attack', icon: '🔒', weight: 25, cd: 5 },   // 창고 상한 −SEAL 칸, 3일
       // 보너스
       t_buzz:   { kind: 'bonus', icon: '⭐', weight: 18 },    // 평판 +BUZZ
       t_shield: { kind: 'bonus', icon: '🛡', weight: 16 },    // 다음 공격 1회 무효(최대 2겹)
@@ -374,10 +374,10 @@
       t_focus:  { kind: 'bonus', icon: '🎯', weight: 12 },    // 다음 공격 트레잇을 1위 한 명에게만 ×3
       t_deal:   { kind: 'bonus', icon: '🛒', weight: 12, cd: 8 },
       // 계열마다 넷 — 첫 장은 처음부터, 나머지는 상점에서 모은다. 그 종류를 보내면 모은 것이 전부 터진다 (유저: "특화된 더 많은 트레잇 · 모으는 의미")
-      t_flood:  { kind: 'attack', icon: '🌊', weight: 0 },          // 물량 떠넘기기: 상대 창고에 일반 상자 FLOOD_N
-      t_customs:{ kind: 'attack', icon: '🛃', weight: 0, cd: 2 },   // 통관 걸기: 상대 택배 CUSTOMS_N 개 통관 대기 2일
-      t_claim:  { kind: 'attack', icon: '💢', weight: 0 },          // 클레임: 상대 평판 −CLAIM
-      t_crush:  { kind: 'attack', icon: '🦣', weight: 0, cd: 2 },   // 덩치 밀기: 상대에게 4칸 상자
+      t_flood:  { kind: 'attack', icon: '🌊', weight: 0, cd: 4 },          // 물량 떠넘기기: 상대 창고에 일반 상자 FLOOD_N
+      t_customs:{ kind: 'attack', icon: '🛃', weight: 0, cd: 5 },   // 통관 걸기: 상대 택배 CUSTOMS_N 개 통관 대기 2일
+      t_claim:  { kind: 'attack', icon: '💢', weight: 0, cd: 4 },          // 클레임: 상대 평판 −CLAIM
+      t_crush:  { kind: 'attack', icon: '🦣', weight: 0, cd: 5 },   // 덩치 밀기: 상대에게 4칸 상자
       t_fort:   { kind: 'bonus', icon: '🏰', weight: 0, cd: 5 },    // 증축: 창고 +1칸(영구)
       t_extend: { kind: 'bonus', icon: '💨', weight: 0 },           // 속달: 가장 급한 택배 2개 기한 +1
       t_regular:{ kind: 'bonus', icon: '🤝', weight: 0 },           // 단골 관리: 모든 계약 신뢰 경험치 +1
@@ -405,8 +405,11 @@
       produce: ['t_buzz', 't_deal', 't_regular', 't_tip'],        // 🛒 농산물(파손 계열): ⭐ 입소문 · 🛒 단골 · 🤝 단골 관리 · 💝 웃돈 — 평판
       // 파손(fragile)엔 트레잇이 없다 — 깨질 위험 자체가 그 물품의 성격 (유저)
     },
+    // 셋업(판 전에 고른다): 한길 + 특수 계열 둘 · 계열마다 트레잇 둘 장착. 판 중엔 새 계약이 없고 상점은 강화만 (유저: "새 계약 체결을 없애고 내 셋업을 완료하고 들어가는 게 · 마켓에선 그 트레잇을 강화")
+    //   famType: 그 계열이 여는 트레잇 종류 · unlock: 풀의 2·3·4번째 트레잇을 여는 숙련 과제(1번째는 처음부터) — 그 종류 배송 · 첫 트레잇 발동 · 그 계열로 완주
+    LOADOUT: { fams: 2, slots: 2, upMax: 3, famType: { cold: 'fresh', intl: 'intl', frozen: 'frozen', large: 'large', fragile: 'produce' }, unlock: [null, { k: 'ship', n: 30 }, { k: 'fire', n: 15 }, { k: 'play', n: 3 }] },
     SET: { fullAt: 3, fullMult: 3 },   // 한 종류 트레잇을 셋 모으면 만차 ×3(둘까진 ×2) · 넷 다 모으면 그 종류 세기 +1
-    FLOOD_N: 2, CUSTOMS_N: 2, CLAIM: 2, COMPOSITE: 0.3,   // 복합 화물: 연 종류가 둘 이상이면 내 몫 짐의 30% 가 두 종류를 겸한다
+    FLOOD_N: 2, CUSTOMS_N: 2, CLAIM: 2, COMPOSITE: 0.5,   // 복합 화물: 연 종류가 둘 이상이면 내 몫 짐의 30% 가 두 종류를 겸한다
     // 난투에서 특수 물품을 '여는' 계열 — 능력으로 실을 수 있어도 이 계열 계약이 있어야 그 물품이 온다(없으면 일반으로).
     // 계열 = 트랙이 되려면 한 물품이 두 계열에 걸치면 안 된다: 농산물은 냉장도 싣지만 파손 계열이 연다
     TYPE_FAMILIES: { fresh: ['cold'], produce: ['fragile'], fragile: ['fragile'], frozen: ['frozen'], intl: ['intl'], large: ['large'] },

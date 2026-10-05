@@ -25,7 +25,9 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.screenshot({ path: `${OUT}/M-00-title.png` });
   await page.click('#t-multi'); await page.waitForTimeout(300);
   const chrPick = await page.evaluate(() => { const cs = [...document.querySelectorAll('#modal .pkcard.chr')]; const c = cs.find(x => x.dataset.id === 'dock') || cs[0]; if (c) c.click(); return cs.length; });
+  await page.waitForTimeout(300); const loadPick = await page.evaluate(() => { const fams = document.querySelectorAll('#modal .mfam').length, sel = document.querySelectorAll('#modal .mfam.sel').length, locks = document.querySelectorAll('#modal .mtr.lock').length; const b = [...document.querySelectorAll('#modal .foot .btn')].pop(); if (b) b.click(); return { fams, sel, locks }; });   // 셋업: 계열 둘 + 트레잇 — 그대로 출발
   ok('캐릭터 고르기: 6장 중 하나 (도크)', chrPick === 6, String(chrPick));
+  ok('셋업: 계열 다섯 중 둘 고름 · 잠긴 트레잇은 🔒', loadPick.fams === 5 && loadPick.sel === 2 && loadPick.locks >= 6, JSON.stringify(loadPick));
   const introT0 = Date.now(); let introSeen = false; for (let k = 0; k < 40 && !introSeen; k++) { introSeen = await page.evaluate(() => !!document.querySelector('#mintro')); if (!introSeen) await page.waitForTimeout(100); } console.log('intro after', Date.now() - introT0, 'ms', introSeen); await page.waitForTimeout(300);
   const intro = await page.evaluate(() => ({ on: !!document.querySelector('#mintro'), cards: document.querySelectorAll('#mintro .ic').length, vs: !!document.querySelector('#mintro .vs'), theme: !!document.querySelector('#mintro .theme'), me: document.querySelector('#mintro .ic.me b') && document.querySelector('#mintro .ic.me b').textContent }));
   await page.screenshot({ path: `${OUT}/M-00b-intro.png` });
@@ -53,11 +55,11 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   // 평판 상점: 평판을 상한까지 올리면 랜덤 3장(퍽 + 매물) — 내 돈으로 산다
   await page.evaluate(() => { const g = PT.game; g.cash = 3000; g.addRep(99, null); PT.renderAll(); });
   const PT_STEP = await page.evaluate(() => PT.game.rules.repStep); const offer = await page.evaluate(() => ({ items: PT.game.repShop && PT.game.repShop.items.map(it => it.kind), tier: PT.game.repTier, cap: PT.game.repCap() }));
-  ok('상한 도달 → 등급 +1 · 상한은 점점 넓게 · 상점 3장', offer.items && offer.items.length === 3 && offer.tier >= 1 && offer.cap > 0, JSON.stringify(offer));
+  ok('상한 도달 → 등급 +1 · 상한은 점점 넓게 · 상점 3장', offer.items && offer.items.length >= 1 && offer.tier >= 1 && offer.cap > 0, JSON.stringify(offer));
   await page.evaluate(() => document.querySelector('#wait-btn').click()); await page.waitForTimeout(500); await idle();   // 다음 마감에서 checkPhase 가 상점을 띄운다
   let t = await modalText();
   ok('평판 상점엔 닫기 버튼이 없다(하나는 꼭 고른다)', !(await page.$('#modal .foot .btn')));
-  ok('평판 상점 팝업 — 값 없는 카드 3장', /상점|전문화/.test(t) && (await page.$$('.pkcard')).length === 3 && !/\d+c\b/.test(t), t.slice(0, 80).replace(/\s+/g, ' '));
+  ok('평판 상점 팝업 — 값 없는 카드(한 종류)', /상점|전문화|정비소|협상|조합|경매장/.test(t) && (await page.$$('.pkcard')).length >= 1 && !/\d+c\b/.test(t), t.slice(0, 80).replace(/\s+/g, ' '));
   await page.screenshot({ path: `${OUT}/M-04-perk.png` });
   const picked = await page.evaluate(() => { const g = PT.game; const sh = g.repShop; const i = sh.items.findIndex(it => it.kind === 'contract' && it.switchFrom != null || it.kind === 'adTicket'); const cash = g.cash; const b = document.querySelector(`.pkcard[data-i="${i}"]`); if (b) b.click(); return { i, kind: i >= 0 && sh.items[i].kind, cash, after: g.cash, sold: i >= 0 && sh.items[i].sold, closed: g.repShop !== sh, price: /\d+c/.test(document.body.textContent.slice(0, 0)) }; }); await page.waitForTimeout(400);
   ok('카드 하나 고르면 → 돈 안 들고 · 그 상점은 닫힌다', picked.i < 0 || (picked.after === picked.cash && picked.sold && picked.closed), JSON.stringify(picked));

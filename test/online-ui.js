@@ -31,7 +31,7 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name); console.log
   const modalText = page => page.evaluate(() => (document.querySelector('#modal') || {}).textContent || '');
   const A = await open('A'), B = await open('B');
   ok('타이틀에 온라인 난투 버튼', !!(await A.$('#t-online')));
-  const pickChr = async (pg, id) => { await pg.waitForTimeout(300); await pg.evaluate(id => { const cs = [...document.querySelectorAll('#modal .pkcard.chr')]; const c = cs.find(x => x.dataset.id === id) || cs[0]; if (c) c.click(); }, id); };
+  const pickChr = async (pg, id) => { await pg.waitForTimeout(300); await pg.evaluate(id => { const cs = [...document.querySelectorAll('#modal .pkcard.chr')]; const c = cs.find(x => x.dataset.id === id) || cs[0]; if (c) c.click(); }, id); await pg.waitForTimeout(300); await pg.evaluate(() => { if (document.querySelector('#modal .mfam')) { const b = [...document.querySelectorAll('#modal .foot .btn')].pop(); if (b) b.click(); } }); };   // 셋업 화면은 그대로 출발
   await A.click('#t-online'); await pickChr(A, 'dawn'); await A.waitForTimeout(2500);
   let t = await modalText(A);
   ok('A 큐: 대기 화면(대기 1명 · 등급)', /상대를 찾는 중/.test(t) && /대기 1명/.test(t) && /견습 기사/.test(t), t.slice(0, 80));

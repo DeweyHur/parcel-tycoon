@@ -15,7 +15,25 @@
   function hash(s) { let h = 2166136261; for (const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; }
   // 테마: 시드가 정한다(넷이 같다) — 폭염·성수기·장마… 시작 화면에서 알려 주고 규칙에 얹는다
   function themeOf(seed) { const T = Object.keys((M.MULTI && M.MULTI.THEMES) || {}); return T.length ? T[(seed >>> 0) % T.length] : null; }
-  function mkGame(seed, name, pid, chr) { return new Game({ multi: true, seed, scenario: SCENARIO, company: 'local', perks: [], prep: false, companyName: name, pid, mtheme: themeOf(seed), mchar: chr || null }); }   // mchar: 캐릭터 패시브(META.MULTI.CHARS)   // 준비 마켓도 없다(유저: "기본 상점은 없애달라고") — 시작 화면 → 곧장 D+1
+  // ----- 셋업(loadout): 계열 둘 + 계열마다 트레잇 둘 -----
+  const LO = () => (M.MULTI && M.MULTI.LOADOUT) || { fams: 2, slots: 2, famType: {}, unlock: [] };
+  const poolOf = type => ((M.MULTI.TYPE_TRAITS || {})[type] || []).filter(t => (M.MULTI.TRAITS || {})[t]);
+  // 숙련 과제: { k:'ship'|'fire'|'play', key, n } — 첫 트레잇은 null(처음부터)
+  function unlockReq(type, trait) { const L = LO(), pool = poolOf(type), i = pool.indexOf(trait), u = i >= 0 ? L.unlock[i] : null; if (!u) return null; const fam = Object.keys(L.famType).find(f => L.famType[f] === type); return { k: u.k, n: u.n, key: u.k === 'ship' ? type : u.k === 'fire' ? pool[0] : fam }; }
+  function unlockProgress(stats, type, trait) { const r = unlockReq(type, trait); if (!r) return { done: true, have: 0, need: 0, req: null }; const have = ((stats || {})[r.k] || {})[r.key] || 0; return { done: have >= r.n, have: Math.min(have, r.n), need: r.n, req: r }; }
+  function unlocked(stats, type, trait) { return poolOf(type).includes(trait) && unlockProgress(stats, type, trait).done; }
+  // 받은 셋업을 규칙에 맞게 다듬는다(서버 검증도 같은 함수) — 계열 둘, 계열마다 트레잇 slots 개(없으면 첫 트레잇)
+  function cleanLoad(load) {
+    const L = LO(), all = Object.keys(L.famType), fams = [];
+    for (const f of (load && load.fams) || []) if (all.includes(f) && !fams.includes(f) && fams.length < L.fams) fams.push(f);
+    for (const f of all) if (fams.length < L.fams && !fams.includes(f)) fams.push(f);
+    const traits = {};
+    for (const f of fams) { const ty = L.famType[f], pool = poolOf(ty), pick = []; for (const t of ((load && load.traits) || {})[ty] || []) if (pool.includes(t) && !pick.includes(t) && pick.length < L.slots) pick.push(t); if (!pick.length && pool.length) pick.push(pool[0]); traits[ty] = pick; }
+    return { fams, traits };
+  }
+  // 봇의 셋업: 시드와 자리에서 정해진다(호스트·재실행이 같은 값을 얻는다) — 계열 둘, 첫 트레잇 + 하나 더
+  function botLoad(seed, pid) { const L = LO(), r = new (root.Rng || require('./game.js').Rng)(hash(seed + ':load:' + pid)), fams = r.shuffle(Object.keys(L.famType)).slice(0, L.fams), traits = {}; for (const f of fams) { const pool = poolOf(L.famType[f]); traits[L.famType[f]] = pool.length > 1 ? [pool[0], pool[1 + r.int(pool.length - 1)]] : pool.slice(0, 1); } return cleanLoad({ fams, traits }); }
+  function mkGame(seed, name, pid, chr, load) { return new Game({ multi: true, seed, scenario: SCENARIO, company: 'local', perks: [], prep: false, companyName: name, pid, mtheme: themeOf(seed), mchar: chr || null, mload: M.MULTI.LOADOUT ? cleanLoad(load) : null }); }   // mchar: 캐릭터 패시브(META.MULTI.CHARS)   // 준비 마켓도 없다(유저: "기본 상점은 없애달라고") — 시작 화면 → 곧장 D+1
   function alive(g) { return g.phase !== 'over'; }
   function finished(g) { return g.phase === 'over' || g.phase === 'win'; }
   // 지난 영업일 수(장 본 날 포함) — 시계가 다르니 이게 있어야 "저 사람은 벌써 끝나간다"가 읽힌다
@@ -33,8 +51,8 @@
     const pool = rng.shuffle(ids.filter(x => x !== chr)); const pick = i => pool.length ? pool.shift() : null;
     const bots = o.bots != null ? o.bots : (M.MULTI.PLAYERS - 1);
     const faces = rng.shuffle(FACES);
-    const players = [{ id: 0, name: o.name || 'You', human: true, face: faces[0], chr, game: mkGame(seed, o.name, 0, chr) }];
-    for (let i = 0; i < bots; i++) { const c = pick(i); players.push({ id: i + 1, name: c ? charName(c, o) : (o.botNames || ['Bot'])[i % (o.botNames || ['Bot']).length], human: false, face: faces[(i + 1) % faces.length], chr: c, strat: STRATS[i % STRATS.length], speed: SPEEDS[i % SPEEDS.length], acc: 0, game: mkGame(seed, null, i + 1, c) }); }
+    const players = [{ id: 0, name: o.name || 'You', human: true, face: faces[0], chr, game: mkGame(seed, o.name, 0, chr, o.load) }];
+    for (let i = 0; i < bots; i++) { const c = pick(i); players.push({ id: i + 1, name: c ? charName(c, o) : (o.botNames || ['Bot'])[i % (o.botNames || ['Bot']).length], human: false, face: faces[(i + 1) % faces.length], chr: c, strat: STRATS[i % STRATS.length], speed: SPEEDS[i % SPEEDS.length], acc: 0, game: mkGame(seed, null, i + 1, c, botLoad(seed, i + 1)) }); }
     return { v: 2, seed, players, started: Date.now(), rng: hash('route' + seed), news: [], cycleDrops: 0 };
   }
   // ----- 온라인 매치 (3단계, www/api/match.js) -----
@@ -44,8 +62,8 @@
       const me = p.pid === mypid, host = sm.players[0].pid === mypid;
       const bn = o && o.botNames; const name = p.bot ? (p.chr ? charName(p.chr, o) : bn && bn.length ? bn[(p.nid || 0) % bn.length] : p.name) : p.name;   // 봇 이름은 내 언어로(캐릭터 이름)
       const base = { id: p.pid, name, face: p.face || 'park', chr: p.chr || null, human: !p.bot, remote: !me && !p.bot, bot: !!p.bot, strat: p.strat, elo: p.elo, speed: p.bot ? SPEEDS[(+p.pid.replace(/\D/g, '') || 1) % SPEEDS.length] : 1, snap: null };
-      if (me) base.game = mkGame(sm.seed, o && o.name || p.name, p.pid, p.chr);
-      else if (p.bot && host) base.game = mkGame(sm.seed, null, p.pid, p.chr);
+      if (me) base.game = mkGame(sm.seed, o && o.name || p.name, p.pid, p.chr, o && o.load);
+      else if (p.bot && host) base.game = mkGame(sm.seed, null, p.pid, p.chr, botLoad(sm.seed, p.pid));
       return base;
     });
     // 내 자리를 맨 앞으로 (화면은 맨 왼쪽이 나)
@@ -223,6 +241,6 @@
   function fromJSON(o) { return { v: o.v, seed: o.seed, started: o.started, rng: o.rng || hash('route' + o.seed), cycleDrops: o.cycleDrops || 0, firstFinish: o.firstFinish || null, news: [], online: o.online ? Object.assign({ pending: [], results: {}, settled: null }, o.online) : null, players: o.players.map((p, i) => ({ face: FACES[i % FACES.length], ...p, game: p.game ? Game.fromJSON(p.game) : null })) }; }
 
   const MULTI = {
-    themeOf, SCENARIO, FACES, aimOf, fillOf, stockOf, CHAR_IDS, charName, finishDump, replay, fingerprint, verify, noteFinish, penaltyOf, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
+    themeOf, SCENARIO, FACES, cleanLoad, botLoad, unlockReq, unlockProgress, unlocked, aimOf, fillOf, stockOf, CHAR_IDS, charName, finishDump, replay, fingerprint, verify, noteFinish, penaltyOf, stateOf, snapOf, newOnline, owned, applyServer, outgoing, newMatch, tick, route, cycleDrop, takeNews, finishAll, allDone, standings, botDay, dayOf, totalDays, toJSON, fromJSON };
   if (typeof module !== 'undefined') module.exports = MULTI; else root.MULTI = MULTI;
 })(typeof window !== 'undefined' ? window : globalThis);

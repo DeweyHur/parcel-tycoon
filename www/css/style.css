@@ -1269,3 +1269,20 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 .ptile.comp i { background: linear-gradient(135deg, var(--c) 0 50%, var(--c2) 50% 100%) !important; }
 .ptile .tb small { font-size: 8px; margin-left: 1px; }
 .money-chip.fire { letter-spacing: 1px; border-color: var(--gold, #ffd166); }
+/* 난투 셋업 · 도감 */
+.mcx { display: flex; flex-direction: column; gap: 8px; max-height: 60vh; overflow-y: auto; }
+.mfam { border: 2px solid #3a375c; background: #26233f; padding: 6px 8px; }
+.mfam.sel { border-color: var(--gold, #ffd166); }
+.mfam .mfh { display: flex; align-items: baseline; gap: 6px; font-size: 13px; cursor: pointer; }
+.mfam .mfh small { color: var(--dim, #aaa); font-size: 10px; flex: 1; }
+.mfam .mfd { font-size: 10px; color: var(--dim, #aaa); margin: 2px 0 4px; }
+.mfam .chk { font-style: normal; width: 16px; height: 16px; border: 1px solid #6b678f; text-align: center; line-height: 14px; font-size: 11px; color: var(--gold, #ffd166); flex: none; }
+.mtr { display: flex; align-items: center; gap: 8px; padding: 4px 4px; border-top: 1px solid #0003; }
+.mtr .ic { width: 22px; text-align: center; font-size: 16px; flex: none; }
+.mtr .tx { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.mtr .tx b { font-size: 12px; } .mtr.attack .tx b { color: #ff9a8f; } .mtr.bonus .tx b { color: var(--gold, #ffd166); }
+.mtr .tx small { font-size: 10px; color: #c8c3e8; line-height: 1.3; }
+.mtr .tx em { font-style: normal; font-size: 10px; color: #8fd0ff; }
+.mtr.lock .tx b, .mtr.lock .tx small { opacity: .5; }
+.mtr.on { background: rgba(255,209,102,.1); }
+.mfam.sel .mtr:not(.lock) { cursor: pointer; }
