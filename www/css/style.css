@@ -1286,3 +1286,8 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 .mtr.lock .tx b, .mtr.lock .tx small { opacity: .5; }
 .mtr.on { background: rgba(255,209,102,.1); }
 .mfam.sel .mtr:not(.lock) { cursor: pointer; }
+.mfam { border-color: #3a375c; cursor: pointer; } .mfam.sel { border-color: var(--fc, #ffd166); box-shadow: inset 6px 0 0 var(--fc, #ffd166); }
+.mfam .mfh .sw { width: 10px; height: 10px; background: var(--fc); flex: none; align-self: center; box-shadow: 1px 1px 0 #000; }
+.mtr .rar, .mfam .rar { font-style: normal; font-size: 9px; padding: 0 4px; margin-right: 5px; color: #1b1a2e; background: #c9c4dc; vertical-align: 1px; }
+.rar.rar-rare { background: #6fb8ff; } .rar.rar-epic { background: #d59bff; } .rar.rar-legend { background: linear-gradient(90deg, #ffd166, #ff9f6b); } .rar.base { background: #8fe3a0; }
+.pkcard .fromto { color: #fff; font-weight: normal; }

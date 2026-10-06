@@ -127,10 +127,10 @@
     m.querySelector('#t-new').onclick = () => { SFX.resume(); SFX.select(); if (save) { askConfirm(T('title.confirmNew'), () => { Store.remove(SAVE_KEY); showTitle(); $('#t-new').click(); }, T('title.newShort'), showTitle); return; }   /* 취소하면 타이틀로 — closeModal 만 하면 뒤에 판이 없어 까만 화면이 남았다 */ showScenarioSelect(); };
     // 인수인계는 캠페인으로 강제된다 — 끝낸 뒤 타이틀에는 다시 보이지 않는다
     const dm = m.querySelector('#t-demo'); if (dm) dm.onclick = () => { SFX.click(); showDemoGate(showTitle); };
-    m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); showCharPick(chr => showLoadout(() => startMulti(chr))); };
+    m.querySelector('#t-multi').onclick = () => { SFX.resume(); SFX.select(); showLoadout(() => startMulti()); };
     { const cx = m.querySelector('#t-mcodex'); if (cx) cx.onclick = () => { SFX.resume(); SFX.select(); showMultiCodex(showTitle); }; }
-    const iv = m.querySelector('#t-invite'); if (iv) iv.onclick = () => { SFX.resume(); SFX.select(); showCharPick(chr => showLoadout(() => showInvite(chr))); };
-    const on = m.querySelector('#t-online'); if (on) on.onclick = () => { SFX.resume(); SFX.select(); showCharPick(chr => showLoadout(() => showQueue(chr))); };
+    const iv = m.querySelector('#t-invite'); if (iv) iv.onclick = () => { SFX.resume(); SFX.select(); showLoadout(() => showInvite()); };
+    const on = m.querySelector('#t-online'); if (on) on.onclick = () => { SFX.resume(); SFX.select(); showLoadout(() => showQueue()); };
     m.querySelector('#t-codex').onclick = () => { SFX.click(); showCodex(companiesHidden() ? 'carriers' : 'companies', showTitle); };
     m.querySelector('#t-help').onclick = () => { SFX.click(); showHelp(showTitle); };
     m.querySelector('#t-rec').onclick = () => { SFX.click(); showRecords(showTitle); };
@@ -585,16 +585,18 @@
   function allTraitIds() { const out = []; for (const f of Object.keys(LOAD().famType)) { const ty = LOAD().famType[f]; for (const id of M.MULTI.TYPE_TRAITS[ty] || []) out.push({ fam: f, type: ty, id }); } return out; }
   function reqText(pr) { const r = pr.req; if (!r) return ''; const what = r.k === 'ship' ? T('mcx.reqShip', { type: D.PARCEL_TYPES[r.key].name, n: r.n }) : r.k === 'fire' ? T('mcx.reqFire', { icon: M.MULTI.TRAITS[r.key].icon, name: M.MULTI.TRAITS[r.key].name, n: r.n }) : T('mcx.reqPlay', { fam: D.FAMILIES[r.key].name, n: r.n }); return `${what} <b>${pr.have}/${pr.need}</b>`; }
   // 계열 한 장: 규칙 + 트레잇 넷(잠긴 것은 🔒 과 과제·진행도). pick 이면 장착 칩이 눌린다
+  const famColor = f => f === 'bulk' ? D.PARCEL_TYPES.normal.css : (D.PARCEL_TYPES[(LOAD() && LOAD().famType[f]) || 'normal'] || D.PARCEL_TYPES.normal).css;   // 계열의 대표색 = 그 화물 색
+  const rarTag = r => `<i class="rar rar-${r}">${T('rar.' + r)}</i>`;
+  // 계열 한 장: 대표색 테두리 · 규칙 · 트레잇 넷(첫 장은 기본, 나머지는 상점에서 — 레어도)
   function famBlock(f, opts) {
-    const st = multiStats(), ty = LOAD().famType[f], FR = (M.MULTI.FAM_RULES || {})[f] || {}, tk = game ? null : null, eq = (opts && opts.eq) || [];
-    const rows = (M.MULTI.TYPE_TRAITS[ty] || []).map(id => { const tr = M.MULTI.TRAITS[id], pr = MULTI.unlockProgress(st, ty, id), on = eq.includes(id);
-      return `<div class="mtr ${pr.done ? '' : 'lock'} ${on ? 'on' : ''} ${tr.kind}" data-fam="${f}" data-t="${id}"><span class="ic">${pr.done ? tr.icon : '🔒'}</span><span class="tx"><b>${tr.icon} ${esc(tr.name)}</b><small>${esc(tr.desc || '')}</small>${pr.done ? '' : `<em>${reqText(pr)}</em>`}</span>${opts && opts.pick && pr.done ? `<i class="chk">${on ? '✔' : ''}</i>` : ''}</div>`; }).join('');
-    return `<div class="mfam ${opts && opts.sel ? 'sel' : ''}" data-fam="${f}"><div class="mfh"><b>${FR.icon || ''} ${esc(D.FAMILIES[f].name)}</b> <small>${esc(D.PARCEL_TYPES[ty].name)} · ${esc(FR.name || '')}</small>${opts && opts.pick ? `<i class="chk big">${opts.sel ? '✔' : ''}</i>` : ''}</div><div class="mfd">${esc(FR.desc || '')}</div>${opts && opts.sel === false ? '' : rows}</div>`;
+    const L = LOAD(), ty = L.famType[f], FR = (M.MULTI.FAM_RULES || {})[f] || {};
+    const rows = (M.MULTI.TYPE_TRAITS[ty] || []).map((id, i) => { const tr = M.MULTI.TRAITS[id], r = (L.traitRarity || [])[i] || 'rare';
+      return `<div class="mtr ${tr.kind}"><span class="ic">${tr.icon}</span><span class="tx"><b>${i === 0 ? `<i class="rar base">${T('mload.base')}</i>` : rarTag(r)}${esc(tr.name)}</b><small>${esc(tr.desc || '')}</small></span></div>`; }).join('');
+    return `<div class="mfam ${opts && opts.sel ? 'sel' : ''}" data-fam="${f}" style="--fc:${famColor(f)}"><div class="mfh"><i class="sw"></i><b>${FR.icon || ''} ${esc(D.FAMILIES[f].name)}</b> <small>${esc(D.PARCEL_TYPES[ty].name)} · ${esc(FR.name || '')}</small>${opts && opts.pick ? `<i class="chk big">${opts.sel ? '✔' : ''}</i>` : ''}</div><div class="mfd">${esc(FR.desc || '')}</div>${rows}</div>`;
   }
   // 도감: 계열마다 트레잇 넷 — 연 것 / 뭘 더 하면 열리는지
   function showMultiCodex(back) {
-    const st = multiStats(), all = allTraitIds(), have = all.filter(x => MULTI.unlocked(st, x.type, x.id)).length;
-    const body = `<div class="d" style="margin-bottom:6px">${T('mcx.sub', { have, all: all.length })}</div><div class="mcx">${Object.keys(LOAD().famType).map(f => famBlock(f, {})).join('')}</div>`;
+    const body = `<div class="mcx">${Object.keys(LOAD().famType).map(f => famBlock(f, {})).join('')}</div>`;
     modal(T('title.mcodex'), body, [{ label: T('btn.close'), onClick: back || closeModal }]);
   }
   // 셋업: 특수 계열 둘 + 계열마다 트레잇 둘 — 고른 계열만 트레잇이 펼쳐진다
@@ -603,15 +605,15 @@
     let cur = myLoad();
     const draw = () => {
       const ok = cur.fams.length === L.fams;
-      const body = `<div class="d" style="margin-bottom:6px">${T('mload.sub', { n: L.fams, k: L.slots })}</div><div class="mcx">${Object.keys(L.famType).map(f => { const sel = cur.fams.includes(f); return famBlock(f, { pick: true, sel, eq: cur.traits[L.famType[f]] || [] }); }).join('')}</div>`;
+      const body = `<div class="mcx">${Object.keys(L.famType).map(f => famBlock(f, { pick: true, sel: cur.fams.includes(f) })).join('')}</div>`;
       const m = modal(T('mload.title'), body, [{ label: T('btn.cancel'), onClick: showTitle }, { label: `${T('mload.go')} ${cur.fams.length}/${L.fams}`, cls: 'primary', disabled: !ok, onClick: () => { P.multi.load = cur; Profile.save(); closeModal(); done(); } }]);
       const keep = m.querySelector('.body'), top = showLoadout._top || 0; keep.scrollTop = top;
       const redraw = () => { showLoadout._top = m.querySelector('.body').scrollTop; draw(); };
-      m.querySelectorAll('.mfam .mfh').forEach(h => h.onclick = () => { SFX.select(); const f = h.parentNode.dataset.fam, ty = L.famType[f]; if (cur.fams.includes(f)) { cur.fams = cur.fams.filter(x => x !== f); delete cur.traits[ty]; } else { if (cur.fams.length >= L.fams) { const out = cur.fams.shift(); delete cur.traits[L.famType[out]]; } cur.fams.push(f); cur.traits[ty] = [M.MULTI.TYPE_TRAITS[ty][0]]; } redraw(); });
-      m.querySelectorAll('.mfam.sel .mtr:not(.lock)').forEach(r => r.onclick = () => { SFX.select(); const ty = L.famType[r.dataset.fam], id = r.dataset.t, eq = cur.traits[ty] = cur.traits[ty] || []; if (eq.includes(id)) { if (eq.length > 1) cur.traits[ty] = eq.filter(x => x !== id); } else { if (eq.length >= L.slots) eq.shift(); eq.push(id); } redraw(); });
+      m.querySelectorAll('.mfam').forEach(h => h.onclick = () => { SFX.select(); const f = h.dataset.fam, ty = L.famType[f]; if (cur.fams.includes(f)) { cur.fams = cur.fams.filter(x => x !== f); delete cur.traits[ty]; } else { if (cur.fams.length >= L.fams) { const out = cur.fams.shift(); delete cur.traits[L.famType[out]]; } cur.fams.push(f); cur.traits[ty] = [M.MULTI.TYPE_TRAITS[ty][0]]; } redraw(); });
     };
     showLoadout._top = 0; draw();
   }
+  function famIcons(p, names) { const fs = MULTI.stateOf(p).fams || []; return fs.map(f => { const FR = (M.MULTI.FAM_RULES || {})[f] || {}; return (FR.icon || '') + (names ? ' ' + esc((D.FAMILIES[f] || {}).name || f) : ''); }).join(names ? ' · ' : ''); }
   function showCharPick(done) {
     const P = Profile.get(), last = P.multi && P.multi.chr;
     const cards = MULTI.CHAR_IDS().map(id => { const c = M.MULTI.CHARS[id]; return `<button class="btn pkcard chr ${id === last ? 'last' : ''}" data-id="${id}"><span class="ic">${c.icon}</span><b>${esc(c.name || id)}</b><small>${esc(c.desc || '')}</small></button>`; }).join('');
@@ -630,7 +632,7 @@
     const old = document.getElementById('mintro'); if (old) old.remove();
     const on = match.online, P = Profile.get();
     // 카드 밑줄: 캐릭터 패시브 한 줄 (사람이면 등급도) — 봇은 캐릭터 그 자체라 성향 대신 능력이 붙는다
-    const chrLine = p => { const c = p.chr && M.MULTI.CHARS[p.chr]; return c ? `${c.icon} ${esc(c.desc || c.name || p.chr)}` : ''; };
+    const chrLine = p => famIcons(p, true);   // 상대가 들고 온 계열 — 무엇이 날아올지 읽힌다
     const sub = p => { const cl = chrLine(p);
       if (p.id === ME()) { const r = on && P.multi && P.multi.rank != null ? T('multi.rankName.' + P.multi.rank) : ''; return cl ? (r ? `${r} · ${cl}` : cl) : (r || T('multi.introMe')); }
       if (p.bot || !p.human) return cl || T('multi.strat.' + (p.strat || 'balanced'));
@@ -638,7 +640,7 @@
     const layer = document.createElement('div'); layer.id = 'mintro';
     const th = game && game.cfg.mtheme && M.MULTI.THEMES[game.cfg.mtheme];
     const themeHtml = th ? `<div class="theme"><span class="tic">${th.icon}</span><b>${esc(th.name || game.cfg.mtheme)}</b><small>${esc(th.desc || '')}</small></div>` : '';
-    layer.innerHTML = `<div class="ttl">⚔ ${esc(T('multi.introTitle'))}</div>${themeHtml}<div class="grid">${match.players.map((p, i) => `<div class="ic ${p.id === ME() ? 'me' : ''}" style="animation-delay:${0.25 + i * 0.38}s"><img src="${window.Story ? Story.sprite(p.face === 'park' ? 'park' : p.face, p.id === ME() ? 'smile' : 'neutral') : ''}" alt=""><b>${p.chr && M.MULTI.CHARS[p.chr] ? `${M.MULTI.CHARS[p.chr].icon} ` : ''}${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span>${sub(p)}</span></div>`).join('')}<div class="vs">VS</div></div><div class="tap">${esc(T('multi.introTap'))}</div>`;
+    layer.innerHTML = `<div class="ttl">⚔ ${esc(T('multi.introTitle'))}</div>${themeHtml}<div class="grid">${match.players.map((p, i) => `<div class="ic ${p.id === ME() ? 'me' : ''}" style="animation-delay:${0.25 + i * 0.38}s"><img src="${window.Story ? Story.sprite(p.face === 'park' ? 'park' : p.face, p.id === ME() ? 'smile' : 'neutral') : ''}" alt=""><b>${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span>${sub(p)}</span></div>`).join('')}<div class="vs">VS</div></div><div class="tap">${esc(T('multi.introTap'))}</div>`;
     document.body.appendChild(layer);
     const timers = match.players.map((p, i) => setTimeout(() => { SFX.thud(); if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { /* no-op */ } }, 250 + i * 380 + 220));
     let over = false;
@@ -845,7 +847,7 @@
       return `<div class="mp ${p.human ? 'me' : ''} ${duel && !p.human ? 'opp' : ''} ${aimP && !duel ? 'aimed' : ''} ${dead ? 'dead' : ''} ${done ? 'done' : ''} ${r.rank === 1 && r.alive ? 'top' : ''}" data-id="${p.id}">
         <img class="face" src="${faceOf(p, r)}" alt="">
         <span class="stamp">${dead ? esc(T('multi.closed')) : done ? esc(T('multi.done')) : ''}</span>
-        ${p.chr && M.MULTI.CHARS[p.chr] ? `<span class="cic">${M.MULTI.CHARS[p.chr].icon}</span>` : ''}<b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
+        ${famIcons(p) ? `<span class="cic">${famIcons(p)}</span>` : ''}<b class="nm">${esc(p.id === ME() ? T('multi.you') : p.name)}</b><span class="rk">${dead ? '' : T('multi.rank', { n: r.rank })}</span>
         <div class="sat ${heat}" style="grid-column:1 / -1"><i style="width:${Math.min(100, pct)}%"></i><em>${pct}%</em></div>
         <span class="stock" style="grid-column:1 / -1">${stock}${def ? `<span class="def">${def}</span>` : ''}</span>
         ${aimP && !duel ? `<span class="aim ${match.aim === p.id ? 'lock' : ''}">🎯</span>` : ''}
@@ -1048,20 +1050,20 @@
     const isFirst = sh.items.every(it => it.kind === 'contract' && it.switchFrom == null && g.rules.multi && g.trackOf(it.carrier));
     const card = (it, i) => {
       const price = it.kind === 'contract' ? g.contractPrice(it) : it.price, can = !it.sold && g.cash >= price && !(it.kind === 'enh' && slotFor(it) < 0);   // 붙일 계약이 없는 강화는 눌리지 않는다
-      let icon, name, desc = '', fam = '', nw = '', tag = '';
+      let icon, name, desc = '', fam = '', nw = '', tag = '', col = '';
       if (it.kind === 'perk') { const pk = M.MULTI.PERKS[it.perk]; icon = pk.icon; name = pk.name; desc = pk.desc; fam = 'fam-' + pk.family; nw = now(it.perk); }
       else if (it.kind === 'contract') { const car = D.CARRIERS[it.carrier]; const from = it.switchFrom != null && g.contracts.find(c => c && c.id === it.switchFrom); const tk = g.rules.multi && g.trackOf(it.carrier), TK = tk && M.MULTI.TRACKS[tk];
-        icon = TK ? TK.icon : it.switchFrom != null ? '⬆' : '📄'; name = car.name; desc = `${from ? '⬆ ' : ''}🚚 ${T('fmt.cells', { n: g.vehicleCap({ carrier: it.carrier, grade: it.grade, enh: { cap: 0, capDelta: 0 }, opts: [] }) })} ${(car.caps || []).map(a => D.ATTRS[a] ? D.ATTRS[a].icon : '').join('')}`; fam = 'fam-' + (tk ? TRACK_CLS[tk] : 'eco');
+        icon = TK ? TK.icon : it.switchFrom != null ? '⬆' : '📄'; name = car.name; col = famColor(D.familyOf(it.carrier)); desc = `${from ? `<b class="fromto">${esc(g.contractName(from))} → ${esc(car.short || car.name)}</b><br>` : ''}🚚 ${T('fmt.cells', { n: g.vehicleCap({ carrier: it.carrier, grade: it.grade, enh: { cap: 0, capDelta: 0 }, opts: [] }) })} ${(car.caps || []).map(a => D.ATTRS[a] ? D.ATTRS[a].icon : '').join('')}`; fam = 'fam-' + (tk ? TRACK_CLS[tk] : 'eco');
         const FR = g.rules.famRules && (M.MULTI.FAM_RULES || {})[D.familyOf(it.carrier)]; if (FR && !from) desc += `<br><b class="frule">${FR.icon} ${esc(FR.name || '')}</b><br>${esc(FR.desc || '')}`;
         { const fm = D.familyOf(it.carrier), U = g.rules.famRules && M.MULTI.FAM_UP && M.MULTI.FAM_UP[fm]; if (U && !U.trustOnly && from) { const st0 = g.famStep(fm), st1 = Math.max(st0, (car.tier || 0) + g.trustLevel(from ? from.carrier : it.carrier)), v0 = st0 < 0 ? null : g.famUp(fm, st0), v1 = g.famUp(fm, st1); desc += `<br><b class="fup">${v0 != null && v0 !== v1 ? '⬆ ' : ''}${famUpText(fm, v1)}</b>`; } }
         if (TK) { const gain = (car.tier || 0) + 1 - (from ? (D.CARRIERS[from.carrier].tier || 0) + 1 : 0), after = g.trackLv(tk) + gain; nw = familyTraits(D.familyOf(it.carrier)); tag = `${T('track.' + tk)} · ${trackFx(g, tk, after)}`; } }
       else if (it.kind === 'shopUp') { icon = it.up === 'vip' ? '💳' : it.up === 'pass' ? '🎟' : '🗄'; name = T('shopUp.' + it.up); desc = T('shopUp.' + it.up + '.d'); fam = 'fam-eco'; }
       else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.kind === 'trust' && g.rules.multi ? T('multi.sealDesc') : E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}` : T('mk.enhNoTarget'); }
-      else if (it.kind === 'traitUp') { const tr = M.MULTI.TRAITS[it.trait] || {}, lv = (g.traitLv || {})[it.trait] || 0; icon = tr.icon || '🎴'; name = T('multi.upCard', { name: tr.name || '', n: lv + 1 }); desc = `${esc(tr.desc || '')}<br>${T(tr.cd ? 'multi.upDescCd' : 'multi.upDesc')}`; nw = `Lv${lv} → Lv${lv + 1}`; fam = 'fam-' + (tr.kind === 'attack' ? 'atk' : 'def'); }
-      else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn, name: tr.name || '' }); const own = g.ownedTraits(it.ptype), all = g.traitPool(it.ptype).length; desc = `${esc(tr.desc || '')}<br>${T('multi.traitHave', { have: own.length + 1, all })}${own.length + 1 === 3 ? ' — ' + T('multi.traitSet3') : own.length + 1 === all ? ' — ' + T('multi.traitSet4') : ''}`; nw = own.map(id => (M.MULTI.TRAITS[id] || {}).icon || '').join('') + ' ＋ ' + (tr.icon || ''); const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
+      else if (it.kind === 'traitUp') { const tr = M.MULTI.TRAITS[it.trait] || {}, lv = (g.traitLv || {})[it.trait] || 0; col = D.PARCEL_TYPES[it.ptype].css; icon = tr.icon || '🎴'; name = T('multi.upCard', { name: tr.name || '', n: lv + 1 }); desc = `${esc(tr.desc || '')}<br>${T(tr.cd ? 'multi.upDescCd' : 'multi.upDesc')}`; nw = `Lv${lv} → Lv${lv + 1}`; fam = 'fam-' + (tr.kind === 'attack' ? 'atk' : 'def'); }
+      else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; col = D.PARCEL_TYPES[it.ptype].css; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn, name: tr.name || '' }); const own = g.ownedTraits(it.ptype), all = g.traitPool(it.ptype).length; desc = `${esc(tr.desc || '')}<br>${T('multi.traitHave', { have: own.length + 1, all })}${own.length + 1 === 3 ? ' — ' + T('multi.traitSet3') : own.length + 1 === all ? ' — ' + T('multi.traitSet4') : ''}`; nw = own.map(id => (M.MULTI.TRAITS[id] || {}).icon || '').join('') + ' ＋ ' + (tr.icon || ''); const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
       else if (it.kind === 'adTicket') { const A = D.AD_MEDIA[it.media]; icon = A ? A.icon : '📣'; name = it.name || T('media.ticket', { name: T('media.' + it.media) }); desc = T('media.ticketOnce'); fam = 'fam-atk'; }
       else { icon = '🎁'; name = it.name || it.kind; }
-      return `<button class="btn pkcard ${fam} ${it.rarity && (it.milestone || it.kind === 'contract' || it.kind === 'traitUp') && !isFirst ? 'rar-' + it.rarity : ''} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><span class="pbody"><b>${it.rarity && (it.milestone || it.kind === 'contract' || it.kind === 'traitUp') && !isFirst ? `<i class="rar">${T('rar.' + it.rarity)}</i>` : ''}${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${tag ? `<em>${esc(tag)}</em>` : ''}</span>${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
+      return `<button ${col ? `style="border-color:${col};box-shadow:inset 6px 0 0 ${col}"` : ''} class="btn pkcard ${fam} ${it.rarity && (it.milestone || it.kind === 'contract' || it.kind === 'traitUp' || it.kind === 'traitUnlock') && !isFirst ? 'rar-' + it.rarity : ''} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><span class="pbody"><b>${it.rarity && (it.milestone || it.kind === 'contract' || it.kind === 'traitUp' || it.kind === 'traitUnlock') && !isFirst ? `<i class="rar">${T('rar.' + it.rarity)}</i>` : ''}${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${tag ? `<em>${esc(tag)}</em>` : ''}</span>${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
     const body = `<div class="pkrow hlist">${sh.items.map(card).join('')}</div>${g.rules.noMoney ? '' : `<div class="d" style="text-align:right;color:var(--gold)">${g.cash}c</div>`}`;
     const first = sh.items.every(it => it.kind === 'contract' && it.switchFrom == null && g.rules.multi && g.trackOf(it.carrier)), SC = !sh.bonus && !first && g.rules.multi && g.repShopCat && M.MULTI.SHOPS ? M.MULTI.SHOPS[g.repShopCat] : null;
     const m = modal(sh.bonus ? T('multi.bonusShopTitle', { n: sh.items.length }) : first ? T('multi.firstShopTitle') : SC ? `${SC.icon} ${T('shop.' + g.repShopCat)}` : T('multi.repShopTitle', { n: sh.items.length }), body, g.rules.noMoney && sh.items.some(it => !it.sold && !(it.kind === 'enh' && slotFor(it) < 0)) ? null : [{ label: T('btn.close'), cls: 'primary', onClick: () => { g.closeRepShop(); closeModal(); game.takeEvents(); saveGame(); renderAll(); checkPhase(); } }]);   // 난투: 닫기 없음 — 하나는 꼭 고른다(고를 게 없을 때만 닫기) (유저)

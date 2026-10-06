@@ -175,7 +175,7 @@
       if (c.noHolidays) mods.push({ noHolidays: true });   // 테스트·시뮬레이터: 공휴일 없이 돌리기
       for (const p of c.perks) if (M.PERKS[p]) mods.push(M.PERKS[p].mods);
       // 멀티 「난투」: 시나리오·회사 위에 멀티 규칙 셋을 덮고, 런 중에 고른 퍽(3택1)을 그 위에 얹는다
-      if (c.multi && M.MULTI) { mods.push(M.MULTI.mods); if (c.mtheme && M.MULTI.THEMES && M.MULTI.THEMES[c.mtheme]) mods.push(M.MULTI.THEMES[c.mtheme].mods || {}); if (c.mchar && M.MULTI.CHARS && M.MULTI.CHARS[c.mchar]) mods.push(M.MULTI.CHARS[c.mchar].mods || {}); for (const p of c.mperks || []) if (M.MULTI.PERKS[p] && M.MULTI.PERKS[p].mods) mods.push(M.MULTI.PERKS[p].mods); }
+      if (c.multi && M.MULTI) { mods.push(M.MULTI.mods); if (c.mtheme && M.MULTI.THEMES && M.MULTI.THEMES[c.mtheme]) mods.push(M.MULTI.THEMES[c.mtheme].mods || {}); if (c.mchar && M.MULTI.CHAR_PASSIVE !== false && M.MULTI.CHARS && M.MULTI.CHARS[c.mchar]) mods.push(M.MULTI.CHARS[c.mchar].mods || {}); for (const p of c.mperks || []) if (M.MULTI.PERKS[p] && M.MULTI.PERKS[p].mods) mods.push(M.MULTI.PERKS[p].mods); }
       this.rules = mergeMods(mods);
       this.scenario = sc; this.company = co;
     }
@@ -759,7 +759,7 @@
     shopCards() { const S = M.MULTI && M.MULTI.TRACKS && M.MULTI.TRACKS.shop; return S && this.rules.multi ? Math.min(S.cardsMax + 2, Math.min(S.cardsMax, 3 + Math.floor(this.trackLv('shop') / S.cardsPer)) + (this.shopExtra || 0)) : 3; }
     traitPool(type) { const TT = M.MULTI.TYPE_TRAITS || {}; const key = type === 'normal' ? null : type; const pool = key && TT[key]; return pool ? pool.filter(t => this.traitDef(t)) : []; }
     // 모은 트레잇 — 첫 장은 처음부터, 나머지는 상점에서 (traitSet). 그 종류를 보내면 모은 것이 전부 터진다
-    ownedTraits(type) { const pool = this.traitPool(type); if (!pool.length) return []; if (this.cfg.mload) { const eq = (this.cfg.mload.traits || {})[type]; return eq ? pool.filter(t => eq.includes(t)) : []; } const own = (this.traitSet && this.traitSet[type]) || []; return pool.filter((t, i) => i === 0 || own.includes(t)); }
+    ownedTraits(type) { const pool = this.traitPool(type); if (!pool.length) return []; if (this.cfg.mload && !Object.keys(this.cfg.mload.traits || {}).includes(type)) return []; const own = (this.traitSet && this.traitSet[type]) || []; return pool.filter((t, i) => i === 0 || own.includes(t)); }
     traitMaster(type) { const pool = this.traitPool(type); return pool.length > 1 && this.ownedTraits(type).length >= pool.length; }
     typesOf(p) { return p.type2 ? [p.type, p.type2] : [p.type]; }
     // 트레잇 세기: 🔗 조합 배수 × (넷 다 모으면 +1) × (🧊 숙성 +일수) × 만차
@@ -768,7 +768,7 @@
     firePlan(chosen, full) {
       const byType = {}; for (const p of chosen) if (p && p.trait && !p.overdue && p.type !== 'normal') for (const t of this.typesOf(p)) if (this.traitPool(t).length) (byType[t] = byType[t] || []).push(p);
       const kinds = Object.keys(byType), S = (M.MULTI && M.MULTI.SET) || {};
-      return kinds.map(t => { const solo = !!full && kinds.length === 1 && chosen.every(p => p.type === t && !p.type2); const own = this.ownedTraits(t); const big = this.cfg.mload ? own.length > 0 && own.every(id => (this.traitLv[id] || 0) >= 1) : own.length >= (S.fullAt || 3); return { type: t, traits: own, ps: byType[t], full: solo, mult: solo ? (big ? (S.fullMult || 3) : (M.MULTI.FULL_MULT || 2)) : 1 }; });
+      return kinds.map(t => { const solo = !!full && kinds.length === 1 && chosen.every(p => p.type === t && !p.type2); const own = this.ownedTraits(t); const big = own.length >= (S.fullAt || 3); return { type: t, traits: own, ps: byType[t], full: solo, mult: solo ? (big ? (S.fullMult || 3) : (M.MULTI.FULL_MULT || 2)) : 1 }; });
     }
     // 트레잇은 호출마다 종류당 한 번(traitPerCall) — 몇 개를 실었든. 그 종류로 모은 트레잇이 전부 터진다. 한 종류로만 꽉 채운 차(만차)면 ×2, 셋 모았으면 ×3
     _fireTraitsPerCall(chosen, full) {
@@ -1565,11 +1565,11 @@
       this.repShopCat = cat;
       if (cat === 'auction') { const sh = this.rng.shuffle(pool.slice()); sh.sort((x, y) => this.rarityRank(y.rarity) - this.rarityRank(x.rarity)); const out = this.rng.shuffle(sh.slice(0, n)); for (const it of out) it.milestone = true; return out; }   // 경매장: 지금 나올 수 있는 것 중 가장 귀한 것부터
       const list = byCat[cat] || [];
-      if (cat === 'broker') { const W = { common: 6, rare: 3, epic: 1.5, legend: 0.7 }, left = list.slice(), out = []; while (out.length < n && left.length) { const w = {}; left.forEach((it, i) => { w[i] = W[it.rarity] || 1; }); out.push(left.splice(+this.rng.weighted(w), 1)[0]); } return out; }   // 윗급일수록 드물게
+      if (cat === 'broker' || cat === 'garage') { const W = { common: 6, rare: 3, epic: 1.5, legend: 0.7 }, left = list.slice(), out = []; while (out.length < n && left.length) { const w = {}; left.forEach((it, i) => { w[i] = W[it.rarity] || 1; }); out.push(left.splice(+this.rng.weighted(w), 1)[0]); } return out; }   // 윗급일수록 드물게
       return this.rng.shuffle(list.length ? list : pool).slice(0, n);
     }
     // 계약은 윗급일수록 귀하다 (유저: "계약을 늘리는 것과 윗급으로 올리는 건 같은 상점 · 윗급으로 갈수록 레어도가 올라가게")
-    itemRarity(it) { if (it.kind === 'shopUp') return 'epic'; if (it.kind === 'traitUp') return ['common', 'rare', 'epic'][Math.min(2, (this.traitLv || {})[it.trait] || 0)]; if (it.kind === 'contract') return ['common', 'rare', 'epic', 'legend'][Math.min(3, D.CARRIERS[it.carrier].tier || 0)]; return it.kind === 'traitUnlock' ? 'rare' : 'common'; }
+    itemRarity(it) { if (it.kind === 'shopUp') return 'epic'; if (it.kind === 'traitUnlock') { const i = this.traitPool(it.ptype).indexOf(it.trait), R4 = (M.MULTI.LOADOUT && M.MULTI.LOADOUT.traitRarity) || []; return R4[i] || 'rare'; } if (it.kind === 'traitUp') return ['common', 'rare', 'epic'][Math.min(2, (this.traitLv || {})[it.trait] || 0)]; if (it.kind === 'contract') return ['common', 'rare', 'epic', 'legend'][Math.min(3, D.CARRIERS[it.carrier].tier || 0)]; return 'common'; }
     rarityRank(r) { return ['common', 'rare', 'epic', 'legend'].indexOf(r); }
     shopMilestone() { const k = Math.max(2, ((M.MULTI && M.MULTI.SHOP_MILESTONE) || 3) - (this.shopVip ? 1 : 0)); return this.rules.multi && this.repTier > 0 && this.repTier % k === 0; }
     _shopUpItems() { if (!this.rules.multi) return []; const out = []; if ((this.shopExtra || 0) < 2) out.push({ kind: 'shopUp', up: 'shelf', price: 0, sold: false }); if (!this.shopVip) out.push({ kind: 'shopUp', up: 'vip', price: 0, sold: false }); if (!this.nextPremium) out.push({ kind: 'shopUp', up: 'pass', price: 0, sold: false }); return out; }
@@ -2903,7 +2903,7 @@
     _traitUnlockItems() {
       const TT = M.MULTI.TYPE_TRAITS || {}; if (!this.rules.typeTraits) return [];
       const out = [];
-      if (this.cfg.mload) { const mx = (M.MULTI.LOADOUT || {}).upMax || 3; for (const ty of Object.keys(this.cfg.mload.traits || {})) { const cand = this.ownedTraits(ty).filter(id => (this.traitLv[id] || 0) < mx); if (cand.length) out.push({ kind: 'traitUp', ptype: ty, trait: cand[this.rng.int(cand.length)], price: 0, name: ty, sold: false }); } return out; }   // 셋업: 상점은 장착한 트레잇의 강화만
+      if (this.cfg.mload) { const mx = (M.MULTI.LOADOUT || {}).upMax || 3; for (const ty of Object.keys(this.cfg.mload.traits || {})) { const own = this.ownedTraits(ty), left = this.traitPool(ty).filter(t => !own.includes(t)); for (const t of left) out.push({ kind: 'traitUnlock', ptype: ty, trait: t, price: 0, name: ty, sold: false }); for (const id of own) if ((this.traitLv[id] || 0) < mx) out.push({ kind: 'traitUp', ptype: ty, trait: id, price: 0, name: ty, sold: false }); } return out; }   // 셋업: 내 계열의 트레잇 — 아직 없는 것은 언락, 가진 것은 강화
       for (const k of Object.keys(TT)) { if (!this.typeOpen(k)) continue; const own = this.ownedTraits(k), left = this.traitPool(k).filter(t => !own.includes(t)); if (!left.length) continue; out.push({ kind: 'traitUnlock', ptype: k, trait: left[this.rng.int(left.length)], price: 0, name: k, sold: false }); }   // 연 종류마다 아직 없는 트레잇 한 장
       return out;
     }

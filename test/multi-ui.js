@@ -25,9 +25,9 @@ const ok = (name, cond, extra) => { (cond ? pass : fail).push(name + (extra ? ` 
   await page.screenshot({ path: `${OUT}/M-00-title.png` });
   await page.click('#t-multi'); await page.waitForTimeout(300);
   const chrPick = await page.evaluate(() => { const cs = [...document.querySelectorAll('#modal .pkcard.chr')]; const c = cs.find(x => x.dataset.id === 'dock') || cs[0]; if (c) c.click(); return cs.length; });
-  await page.waitForTimeout(300); const loadPick = await page.evaluate(() => { const fams = document.querySelectorAll('#modal .mfam').length, sel = document.querySelectorAll('#modal .mfam.sel').length, locks = document.querySelectorAll('#modal .mtr.lock').length; const b = [...document.querySelectorAll('#modal .foot .btn')].pop(); if (b) b.click(); return { fams, sel, locks }; });   // 셋업: 계열 둘 + 트레잇 — 그대로 출발
-  ok('캐릭터 고르기: 6장 중 하나 (도크)', chrPick === 6, String(chrPick));
-  ok('셋업: 계열 다섯 중 둘 고름 · 잠긴 트레잇은 🔒', loadPick.fams === 5 && loadPick.sel === 2 && loadPick.locks >= 6, JSON.stringify(loadPick));
+  await page.waitForTimeout(300); const loadPick = await page.evaluate(() => { const fams = document.querySelectorAll('#modal .mfam').length, sel = document.querySelectorAll('#modal .mfam.sel').length, rars = document.querySelectorAll('#modal .mtr .rar').length; const b = [...document.querySelectorAll('#modal .foot .btn')].pop(); if (b) b.click(); return { fams, sel, rars }; });   // 셋업: 계열 둘 + 트레잇 — 그대로 출발
+  ok('캐릭터 고르기 화면은 없다 — 곧장 셋업', chrPick === 0, String(chrPick));
+  ok('셋업: 계열 다섯 중 둘 고름 · 트레잇엔 레어도', loadPick.fams === 5 && loadPick.sel === 2 && loadPick.rars >= 15, JSON.stringify(loadPick));
   const introT0 = Date.now(); let introSeen = false; for (let k = 0; k < 40 && !introSeen; k++) { introSeen = await page.evaluate(() => !!document.querySelector('#mintro')); if (!introSeen) await page.waitForTimeout(100); } console.log('intro after', Date.now() - introT0, 'ms', introSeen); await page.waitForTimeout(300);
   const intro = await page.evaluate(() => ({ on: !!document.querySelector('#mintro'), cards: document.querySelectorAll('#mintro .ic').length, vs: !!document.querySelector('#mintro .vs'), theme: !!document.querySelector('#mintro .theme'), me: document.querySelector('#mintro .ic.me b') && document.querySelector('#mintro .ic.me b').textContent }));
   await page.screenshot({ path: `${OUT}/M-00b-intro.png` });

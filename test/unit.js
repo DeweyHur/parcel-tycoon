@@ -1115,7 +1115,7 @@ t('멀티: 매치 — 봇 3명이 각자 시계로 따라오고, 순위는 생�
   assert.equal(m.players[0].game.phase, 'play'); assert.ok(m.players[0].game.cfg.mtheme, '준비 마켓 없이 곧장 · 테마는 시드가 정한다');
   assert.ok(m.players.every(p => p.game.cfg.mtheme === m.players[0].game.cfg.mtheme), '넷이 같은 테마');
   for (let i = 0; i < 10; i++) { BOT.multiDay(m.players[0].game, 'balanced'); MULTI.tick(m); }
-  const days = m.players.map(p => MULTI.dayOf(p.game)); assert.equal(days[0], 11, '첫날이 D+1'); assert.ok(days[1] >= 12 && days[2] === 11 && days[3] === 9, days.join(','));
+  const days = m.players.map(p => MULTI.dayOf(p.game)); assert.ok(days[0] >= 9 && days[0] <= 11, '첫날이 D+1 (🌅 새벽 출발은 하루를 안 쓴다) ' + days[0]); assert.ok(days[1] >= days[3], '빠른 봇이 앞선다 ' + days.join(','));
   const j = JSON.parse(JSON.stringify(MULTI.toJSON(m))), m2 = MULTI.fromJSON(j);
   assert.deepEqual(m2.players.map(p => MULTI.dayOf(p.game)), days); assert.equal(m2.players[1].strat, m.players[1].strat);
   m.players[2].game.phase = 'over'; m.players[3].game.rep = 60; m.players[0].game.rep = 30; m.players[1].game.rep = 30; m.players[1].game.cash = m.players[0].game.cash + 500;
@@ -1200,19 +1200,18 @@ t('멀티 계열 단계: 등급 + 신뢰 Lv 마다 계열 규칙이 세진다 �
   for (let k = 0; k < 3; k++) { const p = mk(); assert.ok(g.dawnReady(g.contracts[1], [p]), '새벽 ' + (k + 1) + '번째'); g.callCarrier(1, [p.id]); }
   const q = mk(); assert.ok(!g.dawnReady(g.contracts[1], [q]), '네 번째는 없다');
 });
-t('멀티 셋업: 한길 + 고른 계열 둘로 시작 · 장착한 트레잇만 터진다 · 판 중엔 새 계약 없음 · 상점은 강화(세기 +1 · 쿨다운 −1) · 숙련 과제로 언락', () => {
-  const load = MULTI.cleanLoad({ fams: ['cold', 'large', 'intl', 'nope'], traits: { fresh: ['t_road', 't_hurry', 't_flood'], large: ['zzz'] } });
-  assert.deepEqual(load.fams, ['cold', 'large']); assert.deepEqual(load.traits.fresh, ['t_road', 't_hurry'], '둘까지'); assert.deepEqual(load.traits.large, ['t_clear'], '없으면 첫 트레잇');
-  assert.equal(MULTI.cleanLoad(null).fams.length, 2); assert.deepEqual(MULTI.botLoad(5, 'bot1'), MULTI.botLoad(5, 'bot1'), '봇 셋업은 시드로 정해진다');
+t('멀티 셋업: 한길 + 고른 계열 둘로 시작 · 판 중엔 새 계약 없음 · 트레잇은 상점에서 연다(풀 순서 = 레어도) · 가진 트레잇은 강화(세기 +1 · 쿨다운 −1)', () => {
+  const load = MULTI.cleanLoad({ fams: ['cold', 'large', 'intl', 'nope'] });
+  assert.deepEqual(load.fams, ['cold', 'large']); assert.equal(MULTI.cleanLoad(null).fams.length, 2); assert.deepEqual(MULTI.botLoad(5, 'bot1'), MULTI.botLoad(5, 'bot1'), '봇 셋업은 시드로 정해진다');
   const m = MULTI.newMatch({ seed: 91, name: 'H', bots: 1, load }), g = m.players[0].game;
   assert.deepEqual(g.contracts.filter(Boolean).map(c => D.familyOf(c.carrier)), ['bulk', 'cold', 'large']);
-  assert.deepEqual(g.ownedTraits('fresh').sort(), ['t_hurry', 't_road']); assert.deepEqual(g.ownedTraits('intl'), [], '안 고른 계열은 없다');
-  g.repTier = 1; for (let k = 0; k < 6; k++) { g.repTier = k % 3 === 2 ? k + 2 : k + 1; assert.ok(g._drawRepShop().every(it => !(it.kind === 'contract' && it.switchFrom == null) && it.kind !== 'traitUnlock'), '새 계약·수집 카드는 안 뜬다'); }
-  const up = g._traitUnlockItems(); assert.ok(up.length && up.every(x => x.kind === 'traitUp' && g.ownedTraits(x.ptype).includes(x.trait)));
+  assert.deepEqual(g.ownedTraits('fresh'), ['t_hurry'], '첫 트레잇만 들고 시작'); assert.deepEqual(g.ownedTraits('intl'), [], '안 고른 계열은 없다');
+  for (let k = 0; k < 6; k++) { g.repTier = k % 3 === 2 ? k + 2 : k + 1; assert.ok(g._drawRepShop().every(it => !(it.kind === 'contract' && it.switchFrom == null)), '새 계약은 안 뜬다'); }
+  const it = g._traitUnlockItems(); assert.equal(it.filter(x => x.kind === 'traitUnlock').length, 6, '두 계열 × 아직 없는 셋'); assert.deepEqual(it.filter(x => x.kind === 'traitUp').map(x => x.trait).sort(), ['t_clear', 't_hurry'], '가진 것은 강화');
+  assert.deepEqual(['t_hurry', 't_road', 't_flood', 't_extend'].map(t => g.itemRarity({ kind: 'traitUnlock', ptype: 'fresh', trait: t })), ['common', 'rare', 'epic', 'legend']);
+  g.repShop = { items: [{ kind: 'traitUnlock', ptype: 'fresh', trait: 't_road', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.deepEqual(g.ownedTraits('fresh'), ['t_hurry', 't_road']);
   g.repShop = { items: [{ kind: 'traitUp', ptype: 'fresh', trait: 't_road', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.equal(g.traitLv.t_road, 1); assert.equal(g.traitPower({ type: 'fresh', trait: 't_road' }), 2, '세기 +1');
-  const st = {}; assert.ok(MULTI.unlocked(st, 'fresh', 't_hurry'), '첫 트레잇은 처음부터'); assert.ok(!MULTI.unlocked(st, 'fresh', 't_road'));
-  assert.deepEqual(MULTI.unlockProgress({ ship: { fresh: 12 } }, 'fresh', 't_road'), { done: false, have: 12, need: 30, req: { k: 'ship', n: 30, key: 'fresh' } });
-  assert.ok(MULTI.unlocked({ ship: { fresh: 30 } }, 'fresh', 't_road')); assert.ok(MULTI.unlocked({ fire: { t_hurry: 15 } }, 'fresh', 't_flood')); assert.ok(MULTI.unlocked({ play: { cold: 3 } }, 'fresh', 't_extend'));
+  assert.equal(g.itemRarity({ kind: 'traitUp', trait: 't_road' }), 'rare', '강화는 단계마다 귀해진다');
   g.parcels = []; const p = g._spawnParcel({ type: 'fresh', size: 1, customer: 'anon', trait: 't_hurry' }); g.parcels.push(p); g._assignCold(); g.callCarrier(1, [p.id]); assert.equal(g.mstats.ship.fresh, 1); assert.ok(g.mstats.fire.t_hurry >= 1);
 });
 t('멀티 트레잇 수집: 계열마다 넷 · 첫 장은 처음부터 · 상점에서 모으면 그 종류를 보낼 때 전부 터진다 · 셋이면 만차 ×3 · 넷이면 세기 +1 · 센 것은 며칠에 한 번', () => {
@@ -1404,15 +1403,8 @@ t('멀티: 캐릭터 — 사람이 고르고 봇은 남은 것을 하나씩(겹�
   const m = MULTI.newMatch({ bots: 3, seed: 5, name: 'H', chr: 'dawn', charNames: { hangil: '한길', bigshot: '큰손', dawn: '새벽', dock: '도크', easy: '느긋', bolt: '번개' } });
   const chrs = m.players.map(p => p.chr); assert.equal(chrs[0], 'dawn'); assert.equal(new Set(chrs).size, 4, '넷이 다 다르다');
   for (const p of m.players.slice(1)) assert.equal(p.name, { hangil: '한길', bigshot: '큰손', dawn: '새벽', dock: '도크', easy: '느긋', bolt: '번개' }[p.chr]);
-  assert.ok(m.players[0].game.rules.freshNoSpoil); assert.equal(m.players[0].game.cfg.mchar, 'dawn');
-  const g = k => new (require('../www/js/game.js').Game)({ multi: true, seed: 5, scenario: 'kr_summer', company: 'local', perks: [], prep: false, mchar: k });
-  const base = g(null);
-  assert.equal(g('dock').warehouse.cap, base.warehouse.cap + 4); assert.equal(g('easy').rules.deadlineAll, base.rules.deadlineAll + 1);
-  assert.equal(g('bigshot').rules.pushMult, 2); assert.equal(g('bolt').rules.attackMult, base.rules.attackMult * 2);
-  assert.equal(g('hangil').rules.carrierCapDelta.bulk, (base.rules.carrierCapDelta.bulk || 0) + 1);
-  // 같은 cfg 로 다시 만들면 같은 판 (재실행 검증이 캐릭터를 잃지 않는다)
-  const j = MULTI.fromJSON(JSON.parse(JSON.stringify(MULTI.toJSON(m)))); assert.equal(j.players[0].chr, 'dawn'); assert.equal(j.players[0].game.cfg.mchar, 'dawn');
-  const rnd = MULTI.newMatch({ seed: 5, name: 'H' }); assert.ok(rnd.players[0].chr, '안 고르면 랜덤');
+  assert.ok(!m.players[0].game.rules.freshNoSpoil, '캐릭터 능력은 꺼졌다 — 셋업이 그 자리를 맡는다'); assert.equal(M.MULTI.CHAR_PASSIVE, false);
+  assert.equal(MULTI.stateOf(m.players[0]).fams.length, 2, '상대 카드엔 들고 온 계열'); assert.deepEqual(MULTI.snapOf(m.players[1].game).fams, m.players[1].game.cfg.mload.fams);
 });
 
 Promise.all(pending).then(() => { console.log(`\n${n} tests passed${fails.length ? `, ${fails.length} FAILED` : ''}`); if (fails.length) process.exit(1); });

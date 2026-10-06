@@ -388,7 +388,7 @@
     HOT: { at: 0.8, mult: 2 },
     REP: { perParcel: 1, rush: 4 }, CLEAR_N: 2, SHOP_MILESTONE: 3,
     SHOPS: {   // 평판 상점은 한 번에 한 종류 — 레어도는 상점의 것 (auction 은 마일스톤·우대권으로만)
-      garage:  { icon: '🔧', rarity: 'common', weight: 4 },
+      garage:  { icon: '🔧', rarity: 'common', weight: 6 },
       broker:  { icon: '🤝', rarity: 'rare', weight: 5 },   // 새 계약 + 윗급 재계약 — 카드마다 레어도(등급 0 일반 · 1 레어 · 2 에픽 · 3 전설)
       guild:   { icon: '🏪', rarity: 'epic', weight: 1 },
       auction: { icon: '🌙', rarity: 'rare' },   // 딱지는 그 안 가장 귀한 카드 (유저: "전설인데 레어·에픽만 보임")
@@ -407,7 +407,7 @@
     },
     // 셋업(판 전에 고른다): 한길 + 특수 계열 둘 · 계열마다 트레잇 둘 장착. 판 중엔 새 계약이 없고 상점은 강화만 (유저: "새 계약 체결을 없애고 내 셋업을 완료하고 들어가는 게 · 마켓에선 그 트레잇을 강화")
     //   famType: 그 계열이 여는 트레잇 종류 · unlock: 풀의 2·3·4번째 트레잇을 여는 숙련 과제(1번째는 처음부터) — 그 종류 배송 · 첫 트레잇 발동 · 그 계열로 완주
-    LOADOUT: { fams: 2, slots: 2, upMax: 3, famType: { cold: 'fresh', intl: 'intl', frozen: 'frozen', large: 'large', fragile: 'produce' }, unlock: [null, { k: 'ship', n: 30 }, { k: 'fire', n: 15 }, { k: 'play', n: 3 }] },
+    LOADOUT: { fams: 2, slots: 2, upMax: 3, famType: { cold: 'fresh', intl: 'intl', frozen: 'frozen', large: 'large', fragile: 'produce' }, unlock: [], traitRarity: ['common', 'rare', 'epic', 'legend'] },   // 트레잇은 판 안 상점에서 연다 — 풀의 순서가 레어도 (유저: "퍽을 고르니까 별로 · 계약만 고르고 아래 것들은 마켓에서 열린다 하고 레어도를")
     SET: { fullAt: 3, fullMult: 3 },   // 한 종류 트레잇을 셋 모으면 만차 ×3(둘까진 ×2) · 넷 다 모으면 그 종류 세기 +1
     FLOOD_N: 2, CUSTOMS_N: 2, CLAIM: 2, COMPOSITE: 0.5,   // 복합 화물: 연 종류가 둘 이상이면 내 몫 짐의 30% 가 두 종류를 겸한다
     // 난투에서 특수 물품을 '여는' 계열 — 능력으로 실을 수 있어도 이 계열 계약이 있어야 그 물품이 온다(없으면 일반으로).
@@ -464,6 +464,7 @@
     // 캐릭터 = 창고 성격. 넷이 같은 창고를 돌리면 "나"가 없다 — 사람은 고르고, 봇은 남은 것을 하나씩 받는다 (봇 이름 = 캐릭터 이름).
     // 패시브 하나씩, 규칙에 얹는다 (game.js cfg.mchar). 이름·설명은 locales meta.MULTI.CHARS[id]
     // 유저: "큰손은 밀어내기 ×2, 새벽은 신선이 안 상함, 도크는 트럭 한 대 더, 느긋은 기한 +1"
+    CHAR_PASSIVE: false,   // 캐릭터 능력은 껐다 — 셋업(계열·트레잇)이 그 자리를 맡는다 (유저: "이제 이 화면 없어야 돼"). 봇 이름·얼굴로만 남는다
     CHARS: {
       hangil:  { icon: '🚚', mods: { carrierCapDelta: { bulk: 1, cold: 1, fragile: 1, frozen: 1, intl: 1, large: 1 } } },   // 한길: 트럭 한 칸 더
       bigshot: { icon: '💰', mods: { pushMult: 2 } },                                            // 큰손: 만차 밀어내기 ×2
