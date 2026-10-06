@@ -1291,3 +1291,4 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 .mtr .rar, .mfam .rar { font-style: normal; font-size: 9px; padding: 0 4px; margin-right: 5px; color: #1b1a2e; background: #c9c4dc; vertical-align: 1px; }
 .rar.rar-rare { background: #6fb8ff; } .rar.rar-epic { background: #d59bff; } .rar.rar-legend { background: linear-gradient(90deg, #ffd166, #ff9f6b); } .rar.base { background: #8fe3a0; }
 .pkcard .fromto { color: #fff; font-weight: normal; }
+.mfam .mfi { font-size: 13px; letter-spacing: 2px; margin-top: 3px; opacity: .8; }

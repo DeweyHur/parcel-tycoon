@@ -592,7 +592,7 @@
     const L = LOAD(), ty = L.famType[f], FR = (M.MULTI.FAM_RULES || {})[f] || {};
     const rows = (M.MULTI.TYPE_TRAITS[ty] || []).map((id, i) => { const tr = M.MULTI.TRAITS[id], r = (L.traitRarity || [])[i] || 'rare';
       return `<div class="mtr ${tr.kind}"><span class="ic">${tr.icon}</span><span class="tx"><b>${i === 0 ? `<i class="rar base">${T('mload.base')}</i>` : rarTag(r)}${esc(tr.name)}</b><small>${esc(tr.desc || '')}</small></span></div>`; }).join('');
-    return `<div class="mfam ${opts && opts.sel ? 'sel' : ''}" data-fam="${f}" style="--fc:${famColor(f)}"><div class="mfh"><i class="sw"></i><b>${FR.icon || ''} ${esc(D.FAMILIES[f].name)}</b> <small>${esc(D.PARCEL_TYPES[ty].name)} · ${esc(FR.name || '')}</small>${opts && opts.pick ? `<i class="chk big">${opts.sel ? '✔' : ''}</i>` : ''}</div><div class="mfd">${esc(FR.desc || '')}</div>${rows}</div>`;
+    return `<div class="mfam ${opts && opts.sel ? 'sel' : ''}" data-fam="${f}" style="--fc:${famColor(f)}"><div class="mfh"><i class="sw"></i><b>${FR.icon || ''} ${esc(D.FAMILIES[f].name)}</b> <small>${esc(D.PARCEL_TYPES[ty].name)} · ${esc(FR.name || '')}</small>${opts && opts.pick ? `<i class="chk big">${opts.sel ? '✔' : ''}</i>` : ''}</div>${opts && opts.pick && !opts.sel ? `<div class="mfi">${(M.MULTI.TYPE_TRAITS[ty] || []).map(id => M.MULTI.TRAITS[id].icon).join(' ')}</div>` : `<div class="mfd">${esc(FR.desc || '')}</div>${rows}`}</div>`;   // 안 고른 계열은 접어 둔다 — 다섯이 한눈에 (유저)
   }
   // 도감: 계열마다 트레잇 넷 — 연 것 / 뭘 더 하면 열리는지
   function showMultiCodex(back) {
