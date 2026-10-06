@@ -1084,6 +1084,7 @@
       // 차 한 대에 −2 ~ +2 — 실은 택배 점수의 평균을 반올림 (여러 개 실었다고 한 번에 몇 단계씩 오르지 않게)
       const n = (parcels || []).length;
       let xp = n ? Math.max(-2, Math.min(2, Math.round(ts.xp / n))) : 0;
+      if (R.multi && n && xp < 1 && !ts.late) xp = 1;   // 난투: 기한 안에만 보내면 호출마다 최소 +1 — 급한 것부터 보내는데 신뢰가 안 오르던 것 (유저: "왜 경험치가 안 오르지")
       if (xp > 0 && c.carrier === 'cold' && R.coldTrustBonus) xp += R.coldTrustBonus;
       if (xp > 0) xp = Math.round((xp + R.trustXpDelta) * R.trustXpMult);
       return { xp, early: ts.early, half: ts.half, late: ts.late };
