@@ -228,6 +228,7 @@
     'log.ticket': '{icon} {name}',
     'log.hold': '✋ 입고 보류',
     'why.ticket': '{icon}',
+    'tix.button': '권',
     'pd.rush': '⚡ 긴급 화물(새벽배송): 기한은 들어온 날 하루. 그날 내보내면 보상 ×{a}, 놓치면 벌점 없이 ×{b} — 반송 유예가 끝나면 여느 택배처럼 반송(벌점·배상).',
     'value.delivered.3': '프리미엄 잭팟!',
     'mission.amount': "이번 보름 목표 {now}/{target}c",

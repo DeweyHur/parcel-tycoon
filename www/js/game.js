@@ -2599,13 +2599,14 @@
     // 광고 매체(새 계약 1 · 강화 1)와 성장 투자(D.GROWTH_OFFERS 개). 투자가 열린 판에서만
     _adAndGrowthItems(mult) {
       const out = []; if (!this.shows('invest') || !this.campaignOpen()) return out;
-      if (this.adTicketMode()) {
+      if (this.adTicketMode() && !(this.rules.multi && M.MULTI.TICKETS)) {   // 난투엔 캠페인이 없다 — 그 자리는 권(소모품) (유저)
         // 1회성 캠페인권 두 장(서로 다른 매체). 값에 집행비가 들어 있다
         for (const id of this.rng.shuffle(Object.keys(D.AD_MEDIA)).slice(0, 2)) out.push({ kind: 'adTicket', media: id, price: Math.round(D.AD_MEDIA[id].cost * D.AD_TICKET_MULT * mult), name: T('media.ticket', { name: T('media.' + id) }), sold: false });
         const kinds = ['fleet', 'automation', 'branding'].filter(k => { const pl = this.growthPlan(k); return pl && pl.cost != null && !pl.locked; });
         for (const k of this.rng.shuffle(kinds).slice(0, D.GROWTH_OFFERS)) { const pl = this.growthPlan(k); out.push({ kind: 'growth', growth: k, price: pl.cost, name: T('growth.' + k) + ' Lv.' + (pl.level + 1), sold: false }); }
         return out;
       }
+      if (this.rules.multi && M.MULTI.TICKETS) return out;   // 난투: 광고 매체도 없다
       const fresh = Object.keys(D.AD_MEDIA).filter(id => !((this.media || {})[id] > 0));
       if (fresh.length) { const id = this.rng.pick(fresh); out.push({ kind: 'media', media: id, price: Math.round(D.AD_MEDIA[id].price * mult), name: T('media.' + id), sold: false }); }
       const up = this.ownedMedia().filter(id => this.media[id] < D.AD_MEDIA[id].max).sort((a, b) => this.media[a] - this.media[b]);

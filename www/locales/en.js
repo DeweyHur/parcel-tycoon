@@ -228,6 +228,7 @@
     'log.ticket': '{icon} {name}',
     'log.hold': '✋ Arrivals held',
     'why.ticket': '{icon}',
+    'tix.button': 'Passes',
     'pd.rush': '⚡ Rush cargo (dawn delivery): due the day it arrives. Ship it that day for ×{a}; miss it and it pays ×{b} with no penalty — once the grace runs out it is returned like any parcel (penalty and damages).',
     'value.delivered.3': 'PREMIUM JACKPOT!',
     'mission.amount': "This fortnight {now}/{target}c",

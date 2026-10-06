@@ -621,6 +621,13 @@
   function showTip(title, html) { modal(title, `<div class="tipbody">${html}</div>`, [{ label: T('btn.close'), onClick: closeModal }]); }
   function tipAttr(id, title, html) { TIPS[id] = { title, html }; return `data-tip="${id}"`; }
   document.addEventListener('click', e => { const el = e.target.closest && e.target.closest('[data-tip]'); if (!el || !TIPS[el.dataset.tip]) return; e.stopPropagation(); SFX.select(); showTip(TIPS[el.dataset.tip].title, TIPS[el.dataset.tip].html); }, true);
+  // 권: 아래 버튼(캠페인 자리)에서 꺼내 쓴다 — 가진 것은 「사용」, 없는 것은 흐리게
+  function showTickets() {
+    const g = game, TK = M.MULTI.TICKETS;
+    const rows = Object.keys(TK).map(k => { const n = (g.tickets || {})[k] || 0; return `<button class="btn pkcard ${n ? '' : 'sold'}" data-tix="${k}" ${n && g.phase === 'play' ? '' : 'disabled'}><span class="ic">${TK[k].icon}</span><span class="pbody"><b>${esc(T('tix.' + k))} ×${n}</b><small>${T('tix.' + k + '.d', { n: TK[k].n })}</small></span></button>`; }).join('');
+    const m = modal(`🎟 ${T('tix.button')}`, `<div class="pkrow hlist">${rows}</div>`, [{ label: T('btn.close'), onClick: closeModal }]);
+    m.querySelectorAll('[data-tix]').forEach(b => b.onclick = () => { const k = b.dataset.tix, r = game.useTicket(k); if (!r.ok) return; closeModal(); SFX.buy(); mnotice(ME(), TK[k].icon, T('tix.' + k + '.s', { n: r.n }), 'me'); game.takeEvents(); scene.sync(game, { animate: true }); renderAll(); saveGame(); if (match && match.online) netSync(true); });
+  }
   function showCharPick(done) {
     const P = Profile.get(), last = P.multi && P.multi.chr;
     const cards = MULTI.CHAR_IDS().map(id => { const c = M.MULTI.CHARS[id]; return `<button class="btn pkcard chr ${id === last ? 'last' : ''}" data-id="${id}"><span class="ic">${c.icon}</span><b>${esc(c.name || id)}</b><small>${esc(c.desc || '')}</small></button>`; }).join('');
@@ -877,11 +884,8 @@
     // 내가 장착한 퍽 — 아이콘으로 늘 보인다 (유저: "장착한 퍽들은 화면에 아이콘으로")
     // 난투엔 퍽이 없다 — 그 자리에 내 전문화 트랙 레벨(🛒 장사 · ⚔ 공격 · 🛡 방어). 누르면 지금 패시브
     const pkEl = $('#mperks'); if (pkEl) { const ids = game.mperks || [], tks = M.MULTI.TRACKS ? Object.keys(M.MULTI.TRACKS).filter(k => game.trackLv(k) > 0) : [];
-      const tix = Object.keys(M.MULTI.TICKETS || {}).filter(k => (game.tickets || {})[k] > 0);
-      pkEl.hidden = !ids.length && !tks.length && !tix.length;
+      pkEl.hidden = !ids.length && !tks.length;
       pkEl.innerHTML = tks.map(k => `<a class="pk ${TRACK_CLS[k]}" data-track="${k}">${M.MULTI.TRACKS[k].icon}<small>${game.trackLv(k)}</small></a>`).join('') + [...new Set(ids)].map(id => { const pk = M.MULTI.PERKS[id]; const n = ids.filter(x => x === id).length; return `<a class="pk ${pk.family}" data-mperk="${id}">${pk.icon}${n > 1 ? `<small>×${n}</small>` : ''}</a>`; }).join('');
-      pkEl.insertAdjacentHTML('beforeend', tix.map(k => `<a class="pk tix" data-tix="${k}">${M.MULTI.TICKETS[k].icon}<small>${game.tickets[k]}</small></a>`).join(''));
-      pkEl.querySelectorAll('[data-tix]').forEach(a => a.onclick = () => { const k = a.dataset.tix, TK = M.MULTI.TICKETS[k]; modal(`${TK.icon} ${T('tix.' + k)}`, `<div class="tipbody"><p>${T('tix.' + k + '.d', { n: TK.n })}</p></div>`, [{ label: T('btn.cancel'), onClick: closeModal }, { label: T('tix.use'), cls: 'primary', onClick: () => { closeModal(); const r = game.useTicket(k); if (!r.ok) return; SFX.buy(); mnotice(ME(), TK.icon, T('tix.' + k + '.s', { n: r.n }), 'me'); game.takeEvents(); scene.sync(game, { animate: true }); renderAll(); saveGame(); netSync && netSync(); } }]); });
       pkEl.querySelectorAll('[data-track]').forEach(a => a.onclick = () => { const k = a.dataset.track; SFX.click(); toast(`${M.MULTI.TRACKS[k].icon} ${T('track.' + k)} ${game.trackLv(k)} — ${trackFx(game, k, game.trackLv(k))}`, 2400); });
       pkEl.querySelectorAll('[data-mperk]').forEach(a => a.onclick = () => { const pk = M.MULTI.PERKS[a.dataset.mperk]; SFX.click(); toast(`${pk.icon} ${pk.name} — ${pk.desc}`, 2400); }); }
     const st = $('#multi-status'); if (st) { const parts = myStatusLine(game); st.hidden = !parts.length; st.innerHTML = parts.map(x => `<span>${esc(x)}</span>`).join(''); }   // 항목마다 한 덩어리 — 줄이 바뀌어도 아이콘과 설명이 갈라지지 않게 (유저: "아이콘 설명 좀 라인 맞춰서")
@@ -1288,12 +1292,13 @@
     const g = game, R = g.rules;
     // 재고는 늘 펼쳐져 있다 — 상자 격자가 곧 창고이고, 차를 부르면 그대로 고르는 판이 된다
     const pk = ensurePick();
-    $('#invest-btn').hidden = !(g.shows('invest') && g.campaignOpen()) || (g.rules.multi && !g.ownedMedia().length && !(g.campaignRuns || []).length);   // 난투: 광고권이 있을 때만 (유저: "정산마켓에서 살 수 있는 거 아님 · 쓸데없는 설명")   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다
+    const mtix = !!(g.rules.multi && M.MULTI.TICKETS); $('#invest-btn').hidden = mtix ? false : !(g.shows('invest') && g.campaignOpen());   // 난투: 광고권이 있을 때만 (유저: "정산마켓에서 살 수 있는 거 아님 · 쓸데없는 설명")   // 2장 · 창고가 빈 날 이틀 뒤 박 반장이 연다
     // 돌고 있는 캠페인은 버튼에 매체 아이콘 + 남은 날(물량이 아직 들어오는 날 수)로 — 📰2 📻3
     { const act = (g.campaignRuns || []).filter(r => r.m === g.month && r.end > g.turn), ib = $('#invest-btn');
       ib.classList.toggle('active', act.length > 0);
       // 돌고 있는 캠페인이 없는데 지금 걸 수 있는 매체가 있으면 반짝 — 창고가 빌 때 쓰는 버튼이라는 걸 잊지 않게
       ib.classList.toggle('ready', !act.length && g.phase === 'play' && g.ownedMedia().some(id => g.campaignPlan(id).ready));
+      if (mtix) { const n = Object.values(g.tickets || {}).reduce((x, y) => x + y, 0); ib.classList.remove('active'); ib.classList.toggle('ready', n > 0 && g.phase === 'play'); ib.innerHTML = `🎟 ${esc(T('tix.button'))}<small class="camp-act">${Object.keys(M.MULTI.TICKETS).filter(k => (g.tickets || {})[k] > 0).map(k => `${M.MULTI.TICKETS[k].icon}${g.tickets[k]}`).join(' ')}</small>`; } else
       ib.innerHTML = `${esc(T('camp.button'))}${act.length ? `<small class="camp-act">${act.map(r => `<span title="${esc(T('camp.activeTip', { name: T('media.' + r.media), n: r.end - g.turn }))}">${(D.AD_MEDIA[r.media] || {}).icon || '📣'}${r.end - g.turn}${esc(T('media.fx.dayUnit'))}</span>`).join(' ')}</small>` : ''}`; }
     $('#app').classList.toggle('calling', !!pk);
     updateMusic();
@@ -3049,7 +3054,7 @@
     $('#cself').onclick = () => onContractTap(SELF);
     $('#hud-cash-box').onclick = () => { SFX.click(); hudDueOpen = !hudDueOpen; renderAll(); };
     $('#wait-btn').onclick = () => { if (busy) return; if (pickAction && pickAction.on) { SFX.click(); pickAction.on(); } else doWait(null); };
-    $('#invest-btn').onclick = () => { if (game) { SFX.click(); showGrowth(); } };
+    $('#invest-btn').onclick = () => { if (game) { SFX.click(); if (game.rules.multi && M.MULTI.TICKETS) showTickets(); else showGrowth(); } };
     $('#shop-btn').onclick = () => { if (!game || busy || game.phase !== 'play') return; SFX.click(); const r = game.openShop(); if (!r.ok) return toast(r.msg); saveGame(); showMarket(); };
     $('#menu-btn').onclick = () => { if (game) { SFX.click(); showMenu(); } };
     $('#hud-month').onclick = () => { if (game) { SFX.click(); showCalendar(closeModal); } };
