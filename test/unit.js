@@ -1100,7 +1100,7 @@ t('멀티: 전문화 트랙 — 첫 상점은 트랙마다 새 계약(계열이 
 t('멀티: 평판 사다리 — 상한에 닿으면 상한 +6 · 등급 +1 · 평판 상점 3장(장 매물만, 값 없음) · 하나 고르면 닫힌다', () => {
   const g = MG(9); g.firstShopDone = true; const cap0 = g.repCap(); g.cash = 0; g.addRep(99);   // 첫 상점(트랙 셋)은 아래 검사에서
   assert.equal(g.repTier, 1); assert.equal(g.repCap(), cap0 + M.MULTI.mods.repStep); assert.equal(g.rep, cap0); assert.ok(g.repShop && g.repShop.items.length === 3 && !g.perkOffer);
-  assert.ok(g.repShop.items.every(it => ['contract', 'enh', 'ticket', 'traitUp', 'shopUp', 'traitUnlock'].includes(it.kind) && it.price === 0), '퍽·시설·충전은 없고 값도 없다(돈 없는 규칙));
+  assert.ok(g.repShop.items.every(it => ['contract', 'enh', 'ticket', 'traitUp', 'shopUp', 'traitUnlock'].includes(it.kind) && it.price === 0), '퍽·시설·충전은 없고 값도 없다(돈 없는 규칙)');
   g.addRep(99); assert.equal(g.repTier, 1, '상점이 떠 있는 동안은 또 오르지 않는다');
   const sh = g.repShop; const it0 = sh.items.find(it => it.kind === 'enh' && D.ENHANCEMENTS[it.enh].kind !== 'opt') || sh.items.find(it => it.kind === 'contract' && it.switchFrom != null) || sh.items.find(it => it.kind === 'adTicket');
   assert.ok(it0, '고를 수 있는 카드'); const i = sh.items.indexOf(it0);
