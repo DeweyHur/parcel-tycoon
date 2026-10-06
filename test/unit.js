@@ -1003,7 +1003,8 @@ t('멀티: 정산은 자동 — 사이클이 끝나면 팝업(summary)도 장도
 t('멀티: 🪞 반사 — 다음 공격을 보낸 사람에게 되돌린다 · 트레잇은 두 개 다 처음부터 · 강화 카드는 세기 +1', () => {
   const g = MG(95); g.schedule = g.schedule.map(() => []); g.parcels = []; g.shields = 0;
   assert.deepEqual(g.traitPool('frozen'), M.MULTI.TYPE_TRAITS.frozen, '처음부터 둘 다');
-  g.reflectNext = 1; g.receiveAttack({ trait: 't_seal', mult: 1, from: 7, fromName: 'X' }); const cap = g.warehouse.cap; g.wait([]);
+  assert.deepEqual([0, 1, 2].map(l => g.traitVal('t_reflect', l)), [25, 50, 75], '반사 확률 25 · 50 · 75%'); const rn = g.rng.next.bind(g.rng); g.rng.next = () => 0;   // 확률 통과
+  g.reflectNext = 1; g.receiveAttack({ trait: 't_seal', mult: 1, from: 7, fromName: 'X' }); const cap = g.warehouse.cap; g.wait([]); g.rng.next = rn;
   assert.equal(g.warehouse.cap, cap, '맞지 않았다'); assert.ok(g.outbox.some(o => o.type === 'attackOut' && o.trait === 't_seal' && o.to === 7 && o.reflected), '보낸 사람(7)에게 되돌린다');
   const p = g._spawnParcel({ type: 'fresh', size: 1, customer: 'anon', trait: 't_hurry' }); assert.equal(g.traitPower(p), 1); g.traitUnlocks.push('fresh'); assert.equal(g.traitPower(p), 2, '강화 카드 = 세기 +1');
 });
@@ -1210,8 +1211,9 @@ t('멀티 셋업: 한길 + 고른 계열 둘로 시작 · 판 중엔 새 계약 
   const it = g._traitUnlockItems(); assert.equal(it.filter(x => x.kind === 'traitUnlock').length, 6, '두 계열 × 아직 없는 셋'); assert.deepEqual(it.filter(x => x.kind === 'traitUp').map(x => x.trait).sort(), ['t_clear', 't_hurry'], '가진 것은 강화');
   assert.deepEqual(['t_hurry', 't_road', 't_flood', 't_extend'].map(t => g.itemRarity({ kind: 'traitUnlock', ptype: 'fresh', trait: t })), ['common', 'rare', 'epic', 'legend']);
   g.repShop = { items: [{ kind: 'traitUnlock', ptype: 'fresh', trait: 't_road', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.deepEqual(g.ownedTraits('fresh'), ['t_hurry', 't_road']);
-  g.repShop = { items: [{ kind: 'traitUp', ptype: 'fresh', trait: 't_road', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.equal(g.traitLv.t_road, 1); assert.equal(g.traitPower({ type: 'fresh', trait: 't_road' }), 2, '세기 +1');
-  assert.equal(g.itemRarity({ kind: 'traitUp', trait: 't_road' }), 'rare', '강화는 단계마다 귀해진다');
+  g.repShop = { items: [{ kind: 'traitUp', ptype: 'fresh', trait: 't_hurry', price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); assert.equal(g.traitLv.t_hurry, 1); assert.equal(g.traitVal('t_hurry'), 4, '독촉 3 → 4개'); assert.equal(g.traitCdNow('t_hurry'), M.MULTI.TRAITS.t_hurry.cd - 1, '쿨다운 −1일'); assert.equal(g.traitPower({ type: 'fresh', trait: 't_hurry' }), 1, '세기는 그대로 — 제 수치가 오른다');
+  assert.equal(g.traitUpMax('t_reflect'), 2); assert.ok(g.traitUpMax('t_road') >= 1, '수치 없는 것은 쿨다운만');
+  assert.equal(g.itemRarity({ kind: 'traitUp', trait: 't_hurry' }), 'rare', '강화는 단계마다 귀해진다');
   g.parcels = []; const p = g._spawnParcel({ type: 'fresh', size: 1, customer: 'anon', trait: 't_hurry' }); g.parcels.push(p); g._assignCold(); g.callCarrier(1, [p.id]); assert.equal(g.mstats.ship.fresh, 1); assert.ok(g.mstats.fire.t_hurry >= 1);
 });
 t('멀티 트레잇 수집: 계열마다 넷 · 첫 장은 처음부터 · 상점에서 모으면 그 종류를 보낼 때 전부 터진다 · 셋이면 만차 ×3 · 넷이면 세기 +1 · 센 것은 며칠에 한 번', () => {

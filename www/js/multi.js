@@ -83,7 +83,7 @@
     const mine = new Set(owned(match));
     const nameOf = e => { const p = match.players.find(x => x.id === e.from); return (p && p.name) || e.fromName || ''; };   // 이름은 내 언어의 것으로 (서버의 봇 이름은 캐릭터 id)
     for (const e of res.events || []) {
-      if (e.type === 'attack') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receiveAttack({ trait: e.trait, mult: e.mult, from: e.from, fromName: nameOf(e) });
+      if (e.type === 'attack') { const t = match.players.find(p => p.id === e.to[0]); if (t && t.game && mine.has(t.id)) t.game.receiveAttack({ trait: e.trait, mult: e.mult, val: e.val, from: e.from, fromName: nameOf(e) });
         match.news.push({ type: 'attack', from: e.from, to: e.to, trait: e.trait, focus: !!e.focus, remote: true }); }
       else if (e.type === 'repair') { const t = match.players.find(p => p.id === e.to[0]); let blast = false; if (t && t.game && mine.has(t.id)) { const r = t.game.receiveRepair(Object.assign({}, e.repair, { back: !!e.back })); blast = !!(r && r.blast); }
         match.news.push({ type: 'repair', from: e.from, to: e.to, blast, back: !!e.back, drop: !!e.drop, size: e.repair && e.repair.size, remote: true }); }
@@ -137,7 +137,7 @@
             const r = t.game.receiveRepair({ size: o.size || M.MULTI.REPAIR.size, days: M.MULTI.REPAIR.days, hops: 0, from: p.id });
             match.news.push({ type: 'repair', from: p.id, to: [t.id], blast: !!r.blast, size: o.size || M.MULTI.REPAIR.size }); continue;
           }
-          for (const t of tg) t.game.receiveAttack({ trait: o.trait, mult: o.mult, from: p.id, fromName: p.name });
+          for (const t of tg) t.game.receiveAttack({ trait: o.trait, mult: o.mult, val: o.val, from: p.id, fromName: p.name });
           match.news.push({ type: 'attack', from: p.id, to: tg.map(t => t.id), trait: o.trait, focus: !!o.focus });
         } else if (o.type === 'push') {   // 만차 밀어내기: 랜덤 상대 한 명
           const tg = targetsOf(match, p.id); if (!tg.length) continue;

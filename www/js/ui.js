@@ -591,7 +591,7 @@
   function famBlock(f, opts) {
     const L = LOAD(), ty = L.famType[f], FR = (M.MULTI.FAM_RULES || {})[f] || {};
     const rows = (M.MULTI.TYPE_TRAITS[ty] || []).map((id, i) => { const tr = M.MULTI.TRAITS[id], r = (L.traitRarity || [])[i] || 'rare';
-      return `<div class="mtr ${tr.kind}"><span class="ic">${tr.icon}</span><span class="tx"><b>${i === 0 ? `<i class="rar base">${T('mload.base')}</i>` : rarTag(r)}${esc(tr.name)}</b><small>${esc(tr.desc || '')}</small></span></div>`; }).join('');
+      return `<div class="mtr ${tr.kind}"><span class="ic">${tr.icon}</span><span class="tx"><b>${i === 0 ? `<i class="rar base">${T('mload.base')}</i>` : rarTag(r)}${esc(tr.name)}</b><small>${tdesc(id, 0)}</small></span></div>`; }).join('');
     return `<div class="mfam ${opts && opts.sel ? 'sel' : ''}" data-fam="${f}" style="--fc:${famColor(f)}"><div class="mfh"><i class="sw"></i><b>${FR.icon || ''} ${esc(D.FAMILIES[f].name)}</b> <small>${esc(D.PARCEL_TYPES[ty].name)} · ${esc(FR.name || '')}</small>${opts && opts.pick ? `<i class="chk big">${opts.sel ? '✔' : ''}</i>` : ''}</div>${opts && opts.pick && !opts.sel ? `<div class="mfi">${(M.MULTI.TYPE_TRAITS[ty] || []).map(id => M.MULTI.TRAITS[id].icon).join(' ')}</div>` : `<div class="mfd">${esc(FR.desc || '')}</div>${rows}`}</div>`;   // 안 고른 계열은 접어 둔다 — 다섯이 한눈에 (유저)
   }
   // 도감: 계열마다 트레잇 넷 — 연 것 / 뭘 더 하면 열리는지
@@ -615,6 +615,8 @@
   }
   function famIcons(p, names) { const fs = MULTI.stateOf(p).fams || []; return fs.map(f => { const FR = (M.MULTI.FAM_RULES || {})[f] || {}; return (FR.icon || '') + (names ? ' ' + esc((D.FAMILIES[f] || {}).name || f) : ''); }).join(names ? ' · ' : ''); }
   // 눌러서 보는 설명 — 화면엔 숫자·아이콘만 두고, 뜻은 누르면 (유저: "×3 은 뭔지, 번개는 뭔지 클릭하면 알 수 있게")
+  // 트레잇 설명: 지금 내 강화 단계의 수치({n})와 쿨다운을 넣어서
+  function tdesc(id, lv) { const tr = M.MULTI.TRAITS[id] || {}, g = game && game.rules && game.rules.multi ? game : null, up = (M.MULTI.TRAIT_UP || {})[id]; const l = lv != null ? lv : g ? (g.traitLv || {})[id] || 0 : 0; const n = up ? up[Math.min(up.length - 1, l)] : ''; const cd = tr.cd ? Math.max(1, tr.cd - l) : 0; return esc(String(tr.desc || '').replace('{n}', n)) + (cd ? ` · ${T('tup.cd', { n: cd })}` : ''); }
   const TIPS = {};
   function showTip(title, html) { modal(title, `<div class="tipbody">${html}</div>`, [{ label: T('btn.close'), onClick: closeModal }]); }
   function tipAttr(id, title, html) { TIPS[id] = { title, html }; return `data-tip="${id}"`; }
@@ -931,25 +933,25 @@
     const p = match && match.players.find(x => x.id === pid);
     const el = document.createElement('div'); el.className = 'mnote ' + (cls || '');
     el.innerHTML = `${p && window.Story ? `<img src="${Story.sprite(p.face === 'park' ? 'park' : p.face, 'neutral')}" alt="">` : ''}${p ? `<b class="nm">${esc(pid === ME() ? T('multi.you') : p.name)}</b>` : ''}<i class="ic">${icon}</i>${text ? `<span>${esc(text)}</span>` : ''}`;
-    box.appendChild(el); while (box.children.length > 3) box.firstChild.remove();
-    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 2200);
+    box.appendChild(el); while (box.children.length > 1) box.firstChild.remove();   // 한 번에 하나 — 1초마다 넘어간다
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 200); }, 950);
   }
   const shortDetail = d => d && d.k ? I18n.text({ k: d.k.replace('trait.d.', 'trait.s.'), p: d.p }) : '';
   // 사람 판의 이벤트(내가 쏜 것·맞은 것·보수공사) + 매치 소식(봇끼리 · 봇이 나에게) → 화면
   function multiFx(events, news) {
     if (!match) return;
     let k = 0;
+    const steps = [];   // 내가 쏜 것·터진 트레잇·맞은 것 전부 한 줄로 세워 1초에 하나씩 (유저: "이펙트 노티가 겹치는데 1초에 하나씩")
     for (const n of news) {
-      if (n.type === 'attack') { for (const to of n.to) flyIcon(traitIcon(n.trait), n.from, to, k * 90, () => { const m = portraitEl(to) && portraitEl(to).querySelector('.mini'); if (m) { m.classList.add('fx-bad'); setTimeout(() => m.classList.remove('fx-bad'), 1000); } }); k++;
-        if (n.from === ME()) mnotice(ME(), traitIcon(n.trait), n.focus ? `🎯 ${n.to.map(pname).join('·')} ×3` : T('multi.toAll'), 'me'); }
+      if (n.type === 'attack') { const fly = d => { for (const to of n.to) flyIcon(traitIcon(n.trait), n.from, to, d, () => { const m = portraitEl(to) && portraitEl(to).querySelector('.mini'); if (m) { m.classList.add('fx-bad'); setTimeout(() => m.classList.remove('fx-bad'), 1000); } }); };
+        if (n.from === ME()) steps.push({ from: ME(), icon: traitIcon(n.trait), text: `${mtName(n.trait)} → ${n.to.map(pname).join('·')}`, cls: 'me', run: () => fly(0) }); else { fly(k * 90); k++; } }
       if (n.type === 'note') { bubble(n.from, n.text); if (n.from !== ME()) mnotice(n.from, n.text, ''); }
-      if (n.type === 'push') { for (const to of n.to) flyIcon('📦', n.from, to, k * 90, () => landOn(to, n.n, 'p')); k++;
-        if (n.from === ME()) mnotice(ME(), '📦', `${n.n} → ${n.to.map(pname).join('·')}`, 'me'); }
-      if (n.type === 'repair') { for (const to of n.to) flyIcon('🏗', n.from, to, k * 90, () => { if (to === ME()) scene.shake(.5); landOn(to, n.size || M.MULTI.REPAIR.size, 'b'); }); k++;
-        if (n.from === ME()) mnotice(ME(), '🏗', T(n.back ? 'multi.repairBackToast' : 'multi.repairOutToast', { name: n.to.map(pname).join('·') }), 'me'); }
+      if (n.type === 'push') { const fly = d => { for (const to of n.to) flyIcon('📦', n.from, to, d, () => landOn(to, n.n, 'p')); };
+        if (n.from === ME()) steps.push({ from: ME(), icon: '📦', text: `${n.n} → ${n.to.map(pname).join('·')}`, cls: 'me', run: () => fly(0) }); else { fly(k * 90); k++; } }
+      if (n.type === 'repair') { const fly = d => { for (const to of n.to) flyIcon('🏗', n.from, to, d, () => { if (to === ME()) scene.shake(.5); landOn(to, n.size || M.MULTI.REPAIR.size, 'b'); }); };
+        if (n.from === ME()) steps.push({ from: ME(), icon: '🏗', text: T(n.back ? 'multi.repairBackToast' : 'multi.repairOutToast', { name: n.to.map(pname).join('·') }), cls: 'me', run: () => fly(0) }); else { fly(k * 90); k++; } }
     }
     // 나에게 온 공격·보수공사·밀어내기는 **한 번에 하나씩** 1초 간격으로 — 누가 쐈고(포트레잇이 번쩍) 무엇이 바뀌었는지(바뀐 곳이 빛난다) 보이게 (유저)
-    const steps = [];
     for (const e of events) {
       if (e.type === 'attackIn') steps.push(e.blocked
         ? { from: e.from, icon: traitIcon(e.trait), text: `→ ${T('multi.you')} · ${T('trait.blk.' + e.blocked)}`, cls: 'ok', run: () => { if (e.blocked === 'shield') shieldFx(ME()); SFX.select(); } }
@@ -957,8 +959,8 @@
       if (e.type === 'pushIn') steps.push({ from: e.from, icon: e.dump ? '🏁' : '📦', text: `${e.dump ? '🏁 ' : ''}+${e.n} → ${T('multi.you')}${e.hot ? ' 🔥×2' : ''}`, cls: 'bad', run: () => { SFX.thud(); scene.shake(.2); glow(e.ids.map(id => `.ptile[data-id="${id}"]`).join(','), 'fx-new'); } });
       if (e.type === 'repairIn') steps.push({ from: e.from, icon: '🏗', text: T('multi.repairInToast', { size: e.storage.vol, days: e.storage.turns }), cls: 'bad', run: () => { SFX.thud(); scene.shake(.45); glow('#multi-status', 'fx-bad'); } });
       if (e.type === 'repairBlast') steps.push({ from: ME(), icon: '🏗', text: T('multi.repairBlastToast', { n: e.stolen }), cls: 'bad', run: () => { SFX.discard(); scene.shake(.6); scene.mope(); } });
-      if (e.type === 'fullTrait') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${T('burst.full', { n: e.mult || 2 })}`, 2); }
-      if (e.type === 'traitBonus') { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); }
+      if (e.type === 'fullTrait') steps.unshift({ from: ME(), icon: traitIcon(e.trait), text: T('burst.full', { n: e.mult || 2 }), cls: 'me', run: () => { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${T('burst.full', { n: e.mult || 2 })}`, 2); } });
+      if (e.type === 'traitBonus') steps.push({ from: ME(), icon: traitIcon(e.trait), text: mtName(e.trait), cls: 'me', run: () => { SFX.select(); rewardBurst(`${traitIcon(e.trait)} ${mtName(e.trait)}`, 1); } });
     }
     if (steps.length) playSteps(steps);
   }
@@ -1064,8 +1066,8 @@
         if (TK) { const gain = (car.tier || 0) + 1 - (from ? (D.CARRIERS[from.carrier].tier || 0) + 1 : 0), after = g.trackLv(tk) + gain; nw = familyTraits(D.familyOf(it.carrier)); tag = `${T('track.' + tk)} · ${trackFx(g, tk, after)}`; } }
       else if (it.kind === 'shopUp') { icon = it.up === 'vip' ? '💳' : it.up === 'pass' ? '🎟' : '🗄'; name = T('shopUp.' + it.up); const mk = Math.max(2, (M.MULTI.SHOP_MILESTONE || 3) - (g.shopVip ? 1 : 0)); desc = it.up === 'shelf' ? T('shopUp.shelf.n', { a: g.shopCards(), b: g.shopCards() + 1 }) : it.up === 'vip' ? T('shopUp.vip.n', { a: mk, b: Math.max(2, mk - 1) }) : T('shopUp.' + it.up + '.d'); fam = 'fam-eco'; }
       else if (it.kind === 'enh') { const E = D.ENHANCEMENTS[it.enh]; icon = enhIcon(it.enh); name = E.name; desc = E.kind === 'trust' && g.rules.multi ? T('multi.sealDesc') : E.desc; fam = 'fam-def'; const s = slotFor(it); nw = s >= 0 ? `→ ${g.contractName(g.contracts[s])}${E.kind === 'trust' && g.rules.multi ? ` Lv${g.trustLevel(g.contracts[s].carrier)} → Lv${g.trustLevel(g.contracts[s].carrier) + 1}` : ''}` : T('mk.enhNoTarget'); }
-      else if (it.kind === 'traitUp') { const tr = M.MULTI.TRAITS[it.trait] || {}, lv = (g.traitLv || {})[it.trait] || 0; col = D.PARCEL_TYPES[it.ptype].css; icon = tr.icon || '🎴'; name = T('multi.upCard', { name: tr.name || '', n: lv + 1 }); { const pw = g.traitPower({ type: it.ptype, trait: it.trait }), cd0 = tr.cd ? Math.max(1, tr.cd - lv) : 0, cd1 = tr.cd ? Math.max(1, tr.cd - lv - 1) : 0; desc = `${esc(tr.desc || '')}<br><b class="fup">${T('multi.upPow', { a: pw, b: pw + 1 })}${cd0 && cd0 !== cd1 ? ' · ' + T('multi.upCd', { a: cd0, b: cd1 }) : ''}</b>`; } nw = `Lv${lv} → Lv${lv + 1}`; fam = 'fam-' + (tr.kind === 'attack' ? 'atk' : 'def'); }
-      else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; col = D.PARCEL_TYPES[it.ptype].css; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn, name: tr.name || '' }); const own = g.ownedTraits(it.ptype), all = g.traitPool(it.ptype).length; desc = `${esc(tr.desc || '')}<br>${T('multi.traitHave', { have: own.length + 1, all })}${own.length + 1 === 3 ? ' — ' + T('multi.traitSet3') : own.length + 1 === all ? ' — ' + T('multi.traitSet4') : ''}`; nw = own.map(id => (M.MULTI.TRAITS[id] || {}).icon || '').join('') + ' ＋ ' + (tr.icon || ''); const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
+      else if (it.kind === 'traitUp') { const tr = M.MULTI.TRAITS[it.trait] || {}, lv = (g.traitLv || {})[it.trait] || 0; col = D.PARCEL_TYPES[it.ptype].css; icon = tr.icon || '🎴'; name = T('multi.upCard', { name: tr.name || '', n: lv + 1 }); { const v0 = g.traitVal(it.trait, lv), v1 = g.traitVal(it.trait, lv + 1), cd0 = g.traitCdNow(it.trait, lv), cd1 = g.traitCdNow(it.trait, lv + 1); const base = String(tr.desc || ''); desc = `<b class="fup">${esc(base.replace('{n}', v0 != null && v0 !== v1 ? `${v0} → ${v1}` : (v0 != null ? v0 : '')))}${cd0 ? ` · ${cd0 !== cd1 ? T('multi.upCd', { a: cd0, b: cd1 }) : T('tup.cd', { n: cd0 })}` : ''}</b>`; } nw = `Lv${lv} → Lv${lv + 1}`; fam = 'fam-' + (tr.kind === 'attack' ? 'atk' : 'def'); }
+      else if (it.kind === 'traitUnlock') { const tr = M.MULTI.TRAITS[it.trait] || {}; col = D.PARCEL_TYPES[it.ptype].css; const tn = D.PARCEL_TYPES[it.ptype].name; icon = tr.icon || '🎴'; name = T('multi.unlockCard', { type: tn, name: tr.name || '' }); const own = g.ownedTraits(it.ptype), all = g.traitPool(it.ptype).length; desc = `${tdesc(it.trait)}<br>${T('multi.traitHave', { have: own.length + 1, all })}${own.length + 1 === 3 ? ' — ' + T('multi.traitSet3') : own.length + 1 === all ? ' — ' + T('multi.traitSet4') : ''}`; nw = own.map(id => (M.MULTI.TRAITS[id] || {}).icon || '').join('') + ' ＋ ' + (tr.icon || ''); const tf = ((M.MULTI.TYPE_FAMILIES || {})[it.ptype] || [])[0], tk = tf && g.trackOf(D.centerFor(tf, 0)); fam = 'fam-' + (tk ? TRACK_CLS[tk] : tr.kind === 'attack' ? 'atk' : 'def'); }
       else if (it.kind === 'adTicket') { const A = D.AD_MEDIA[it.media]; icon = A ? A.icon : '📣'; name = it.name || T('media.ticket', { name: T('media.' + it.media) }); desc = T('media.ticketOnce'); fam = 'fam-atk'; }
       else { icon = '🎁'; name = it.name || it.kind; }
       return `<button ${col ? `style="border-color:${col};box-shadow:inset 6px 0 0 ${col}"` : ''} class="btn pkcard ${fam} ${it.rarity && (it.milestone || it.kind === 'contract' || it.kind === 'traitUp' || it.kind === 'traitUnlock') && !isFirst ? 'rar-' + it.rarity : ''} ${it.sold ? 'sold' : ''}" data-i="${i}" ${can ? '' : 'disabled'}><span class="ic">${icon}</span><span class="pbody"><b>${it.rarity && (it.milestone || it.kind === 'contract' || it.kind === 'traitUp' || it.kind === 'traitUnlock') && !isFirst ? `<i class="rar">${T('rar.' + it.rarity)}</i>` : ''}${esc(name)}</b><small>${desc}</small>${nw ? `<u class="now">${esc(nw)}</u>` : ''}${tag ? `<em>${esc(tag)}</em>` : ''}</span>${g.rules.noMoney ? '' : `<em class="price ${g.cash >= price ? '' : 'no'}">${it.sold ? '✔' : price + 'c'}</em>`}</button>`; };
@@ -1547,7 +1549,7 @@
   }
   // 이 택배를 보내면 터지는 트레잇 — 그 종류로 모은 것 전부 (복합 화물은 두 종류 다) + 모은 수 / 세트 효과
   function traitLines(g, p) {
-    const TR = M.MULTI.TRAITS, line = id => `<div class="d" style="color:${TR[id].kind === 'attack' ? 'var(--red)' : 'var(--gold)'}">${T('multi.traitLine', { icon: TR[id].icon, name: esc(TR[id].name), desc: esc(TR[id].desc) })}</div>`;
+    const TR = M.MULTI.TRAITS, line = id => `<div class="d" style="color:${TR[id].kind === 'attack' ? 'var(--red)' : 'var(--gold)'}">${T('multi.traitLine', { icon: TR[id].icon, name: esc(TR[id].name), desc: tdesc(id) })}</div>`;
     if (!p.trait || !TR[p.trait]) return '';
     if (!g.rules.multi || p.type === 'normal') return line(p.trait);
     let out = p.type2 ? `<div class="d" style="color:var(--gold)">${T('pd.composite')}</div>` : '';
@@ -2039,7 +2041,7 @@
     const tbtn = '';
     // 난투(noMoney): 수익·비용·순수익 대신 평판 한 줄 — 돈은 없다, 평판만 (유저: "배차비 순수익 이런 거 다 없애고 평판 관리만")
     const repD = game.rules.noMoney ? (game.rules.repPerParcel ? game.callRep(selP, false) : game.repDeltaFor(selP)) : 0, ctag = game.callTags ? game.callTags(selP, cap) : {};
-    const gauge = game.rules.noMoney ? `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip net">★<b>${repD >= 0 ? '+' : ''}${repD}</b></span>${game.dawnReady(c, selP) ? `<span class="money-chip dawn">${T('call.dawn')}</span>` : ''}${ctag.rushSolo ? `<span ${tipAttr('rush', '⚡', T('tip.rush', { n: M.MULTI.REP.perParcel + M.MULTI.REP.rush }))} class="money-chip good">${T('call.rushSolo')}</span>` : ''}${ctag.rushMixed ? `<span ${tipAttr('rush', '⚡', T('tip.rush', { n: M.MULTI.REP.perParcel + M.MULTI.REP.rush }))} class="money-chip cost">${T('call.rushMixed')}</span>` : ''}${(() => { if (!game.rules.traitPerCall) return ''; const pl = game.firePlan(selP, vol >= cap); if (!pl.length) return ''; const TR = M.MULTI.TRAITS; const tip = pl.map(x => `<p><b>${esc(D.PARCEL_TYPES[x.type].name)}</b>${x.mult > 1 ? ` <b class="gold">×${x.mult}</b> — ${T('tip.fullMult', { n: x.mult })}` : ''}</p>` + x.traits.map(id => `<p>${TR[id].icon} <b>${esc(TR[id].name)}</b> — ${esc(TR[id].desc || '')}</p>`).join('')).join(''); return `<span class="money-chip fire" ${tipAttr('fire', T('tip.fireTitle'), tip)}>${pl.map(x => x.traits.map(id => (TR[id] || {}).icon || '').join('') + (x.mult > 1 ? `×${x.mult}` : '')).join(' ')}</span>`; })()}${ctag.full ? `<span ${tipAttr('full', T('tip.fireTitle'), T('tip.full'))} class="money-chip good">${T('call.full', { i: (() => { const tp = selP.find(p => p.trait); return tp ? traitIcon(tp.trait) : '' })() })}</span>` : ''}</div></div>` : `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
+    const gauge = game.rules.noMoney ? `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip net">★<b>${repD >= 0 ? '+' : ''}${repD}</b></span>${game.dawnReady(c, selP) ? `<span class="money-chip dawn">${T('call.dawn')}</span>` : ''}${ctag.rushSolo ? `<span ${tipAttr('rush', '⚡', T('tip.rush', { n: M.MULTI.REP.perParcel + M.MULTI.REP.rush }))} class="money-chip good">${T('call.rushSolo')}</span>` : ''}${ctag.rushMixed ? `<span ${tipAttr('rush', '⚡', T('tip.rush', { n: M.MULTI.REP.perParcel + M.MULTI.REP.rush }))} class="money-chip cost">${T('call.rushMixed')}</span>` : ''}${(() => { if (!game.rules.traitPerCall) return ''; const pl = game.firePlan(selP, vol >= cap); if (!pl.length) return ''; const TR = M.MULTI.TRAITS; const tip = pl.map(x => `<p><b>${esc(D.PARCEL_TYPES[x.type].name)}</b>${x.mult > 1 ? ` <b class="gold">×${x.mult}</b> — ${T('tip.fullMult', { n: x.mult })}` : ''}</p>` + x.traits.map(id => `<p>${TR[id].icon} <b>${esc(TR[id].name)}</b> — ${tdesc(id)}</p>`).join('')).join(''); return `<span class="money-chip fire" ${tipAttr('fire', T('tip.fireTitle'), tip)}>${pl.map(x => x.traits.map(id => (TR[id] || {}).icon || '').join('') + (x.mult > 1 ? `×${x.mult}` : '')).join(' ')}</span>`; })()}${ctag.full ? `<span ${tipAttr('full', T('tip.fireTitle'), T('tip.full'))} class="money-chip good">${T('call.full', { i: (() => { const tp = selP.find(p => p.trait); return tp ? traitIcon(tp.trait) : '' })() })}</span>` : ''}</div></div>` : `<div class="load-visual mini"><div class="truck-stack${trucks >= 3 ? ' many' : ''}">${shells}</div><div class="load-money"><span class="money-chip">${ko ? '수익' : 'EARN'}<b>+${income}c</b></span><span class="money-chip cost">${ko ? '비용' : 'COST'}<b>−${callFee}c</b></span><span class="money-chip net">${ko ? '순수익' : 'NET'}<b>${net >= 0 ? '+' : ''}${net}c</b></span></div></div>`;
     const hint = '';   // '4/4 · 100% · 아래 상자를 눌러…' 줄은 뺐다 — 차 그림이 같은 말을 한다
     const mp = game.mixPreview(selP);   // 🔗 조합 미리보기: 두 종류 이상이면 합쳐진 한 방
     const tgt = game.rules.multi && match ? MULTI.aimOf(match, ME()) : null, fires = selP.some(p => p.trait && !p.overdue && (M.MULTI.TRAITS[p.trait] || {}).kind === 'attack') || (mp && mp.mult);

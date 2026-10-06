@@ -654,24 +654,24 @@
     _fireTrait(p) {
       const tr = p.trait && this.traitDef(p.trait); if (!tr || p.overdue) return;
       const R = this.rules;
-      if (tr.cd) { if ((this.traitCd[p.trait] || 0) > this.totalTurn) return; this.traitCd[p.trait] = this.totalTurn + Math.max(1, tr.cd - ((this.traitLv || {})[p.trait] || 0)); }
+      if (tr.cd) { if ((this.traitCd[p.trait] || 0) > this.totalTurn) return; this.traitCd[p.trait] = this.totalTurn + this.traitCdNow(p.trait); }
       if (this.mstats) this.mstats.fire[p.trait] = (this.mstats.fire[p.trait] || 0) + 1;   // 센 것은 며칠에 한 번
       if (tr.kind === 'bonus') {
-        if (p.trait === 't_buzz') this.addRep((M.MULTI.BUZZ || 1) * this.traitPower(p), MSG('why.trait', { icon: tr.icon }));
+        if (p.trait === 't_buzz') this.addRep((this.traitVal('t_buzz') || M.MULTI.BUZZ || 1) * this.traitPower(p), MSG('why.trait', { icon: tr.icon }));
         else if (p.trait === 't_reflect') this.reflectNext = Math.min(2, (this.reflectNext || 0) + 1);
-        else if (p.trait === 't_shield') this.shields = Math.min(M.MULTI.SHIELD_MAX, this.shields + 1);
-        else if (p.trait === 't_ice') this.freshFreezeUntil = this.totalTurn + M.MULTI.TEMP_DAYS;
+        else if (p.trait === 't_shield') this.shields = Math.max(this.shields, Math.min(this.traitVal('t_shield') || M.MULTI.SHIELD_MAX, this.shields + 1));
+        else if (p.trait === 't_ice') this.freshFreezeUntil = this.totalTurn + (this.traitVal('t_ice') || M.MULTI.TEMP_DAYS);
         else if (p.trait === 't_clear') {   // 🧹 뒷정리: 대형 트럭이 나가며 일반 상자를 같이 싣고 간다 — 밀려온 것부터 (유저: "압축 3일은 이상하고 테마에 안 맞음")
-          const n = (this.famUp('large') || M.MULTI.CLEAR_N || 2) * this.traitPower(p), pick = this.parcels.filter(x => x.type === 'normal' && !x.trait && !x.rush).sort((a, b) => (b.pushed ? 1 : 0) - (a.pushed ? 1 : 0) || a.deadline - b.deadline).slice(0, n);
+          const n = ((this.famUp('large') || M.MULTI.CLEAR_N || 2) + ((this.traitVal('t_clear') || 2) - 2)) * this.traitPower(p), pick = this.parcels.filter(x => x.type === 'normal' && !x.trait && !x.rush).sort((a, b) => (b.pushed ? 1 : 0) - (a.pushed ? 1 : 0) || a.deadline - b.deadline).slice(0, n);
           if (pick.length) { this.parcels = this.parcels.filter(x => !pick.includes(x)); if (R.repPerParcel) this.addRep(pick.length * M.MULTI.REP.perParcel, MSG('why.trait', { icon: tr.icon })); this.emit('traitClear', { n: pick.length, ids: pick.map(x => x.id) }); }
         }
         else if (p.trait === 't_truck') this.freeTruckNext = true;
-        else if (p.trait === 't_return') { const b = this.storage.find(x => x.kind === 'repair'); if (b) { this.storage.splice(this.storage.indexOf(b), 1); this.outbox.push({ type: 'repairMove', repair: this._repairNext(b), to: b.from, back: true }); this._assignCold(); } }
-        else if (p.trait === 't_focus') this.focusNext = true;
-        else if (p.trait === 't_fort') { this.warehouse.cap += this.traitPower(p); this._assignCold(); }   // 🏰 증축(영구)
-        else if (p.trait === 't_extend') { const ps = this.parcels.filter(x => !x.overdue && !x.noDeadline).sort((a, b) => a.deadline - b.deadline).slice(0, 2 * this.traitPower(p)); for (const x of ps) x.deadline += 1; }
-        else if (p.trait === 't_regular') { for (const c of this.contracts) if (c) this._addTrust(c.carrier, this.traitPower(p), true); }
-        else if (p.trait === 't_tip') this.tipNext = true;
+        else if (p.trait === 't_return') { for (let rk = 0; rk < (this.traitVal('t_return') || 1); rk++) { const b = this.storage.find(x => x.kind === 'repair'); if (b) { this.storage.splice(this.storage.indexOf(b), 1); this.outbox.push({ type: 'repairMove', repair: this._repairNext(b), to: b.from, back: true }); this._assignCold(); } } }
+        else if (p.trait === 't_focus') this.focusNext = this.traitVal('t_focus') || 3;
+        else if (p.trait === 't_fort') { this.warehouse.cap += (this.traitVal('t_fort') || 1) * this.traitPower(p); this._assignCold(); }   // 🏰 증축(영구)
+        else if (p.trait === 't_extend') { const ps = this.parcels.filter(x => !x.overdue && !x.noDeadline).sort((a, b) => a.deadline - b.deadline).slice(0, (this.traitVal('t_extend') || 2) * this.traitPower(p)); for (const x of ps) x.deadline += 1; }
+        else if (p.trait === 't_regular') { for (const c of this.contracts) if (c) this._addTrust(c.carrier, (this.traitVal('t_regular') || 1) * this.traitPower(p), true); }
+        else if (p.trait === 't_tip') this.tipNext = this.traitVal('t_tip') || 2;
         else if (p.trait === 't_deal') this.openBonusShop();
         this.say('log.traitBonus', { icon: tr.icon, name: tr.name });
         this.emit('traitBonus', { trait: p.trait, parcel: p });
@@ -681,7 +681,7 @@
       const echo = this.trackEcho(), n = 1 + (echo && this.rng.next() < echo ? 1 : 0);   // ⚔ 공격 트랙: 메아리
       for (let i = 0; i < n; i++) {
         const clr = this.clearedToday(p) ? (this.famUp('intl') || M.MULTI.FAM_RULES.intl.clearMult || 2) : 1;   // 🛃 통관 끝난 날: ×2
-        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? 3 : 1) * clr * this.traitPower(p), focus: this.focusNext, size: p.trait === 't_repair' ? Math.min(M.MULTI.REPAIR.maxSize, M.MULTI.REPAIR.size + R.repairGrow + this.repairProgressBonus() + (clr > 1 ? 2 : 0)) : 0, cleared: clr > 1 };
+        const atk = { type: 'attackOut', trait: p.trait, mult: R.attackMult * (this.focusNext ? (+this.focusNext > 1 ? +this.focusNext : 3) : 1) * clr * this.traitPower(p), val: this.traitVal(p.trait), focus: !!this.focusNext, size: p.trait === 't_repair' ? Math.min(M.MULTI.REPAIR.maxSize, M.MULTI.REPAIR.size + ((this.traitVal('t_repair') || 3) - 3) + R.repairGrow + this.repairProgressBonus() + (clr > 1 ? 2 : 0)) : 0, cleared: clr > 1 };
         this.outbox.push(atk); this.emit('attackOut', atk);
       }
       this.focusNext = false;
@@ -691,7 +691,7 @@
     capFloor() { const base = this.warehouse.cap - this.capMods.reduce((a, m) => a + m.delta, 0); return Math.ceil(base * (M.MULTI.CAP_FLOOR || 0.7)); }
     _capMod(delta, days, why) { this.capMods.push({ delta, until: this.totalTurn + days, why }); this.warehouse.cap += delta; this._assignCold(); }
     // 상대가 보낸 공격 — 큐에 쌓였다가 내가 다음 날로 넘길 때 적용된다. 마감·폐업한 창고에는 못 넣는다
-    receiveAttack(a) { if (this.phase === 'over' || this.phase === 'win') return false; this._act('atk', { a: { trait: a.trait, mult: a.mult, from: a.from, fromName: a.fromName } }); this.inbox.push(a); return true; }
+    receiveAttack(a) { if (this.phase === 'over' || this.phase === 'win') return false; this._act('atk', { a: { trait: a.trait, mult: a.mult, val: a.val, from: a.from, fromName: a.fromName } }); this.inbox.push(a); return true; }
     _multiDay() {
       const R = this.rules;
       for (const m of this.capMods.slice()) if (this.totalTurn >= m.until) { this.warehouse.cap -= m.delta; this.capMods.splice(this.capMods.indexOf(m), 1); }
@@ -705,28 +705,28 @@
       const k = Math.max(1, Math.round(a.mult || 1));
       let blocked = null;
       if (R.dodgeProb && this.rng.next() < R.dodgeProb) blocked = 'dodge';
-      else if (this.reflectNext > 0 && a.from != null && !a.reflected) { this.reflectNext--; blocked = 'reflect'; this.outbox.push({ type: 'attackOut', trait: a.trait, mult: a.mult || 1, to: a.from, reflected: true }); }   // 🪞 반사: 보낸 사람에게 그대로
+      else if (this.reflectNext > 0 && a.from != null && !a.reflected && this.rng.next() < (this.traitVal('t_reflect') || 100) / 100) { this.reflectNext--; blocked = 'reflect'; this.outbox.push({ type: 'attackOut', trait: a.trait, mult: a.mult || 1, val: a.val, to: a.from, reflected: true }); }   // 🪞 반사: 보낸 사람에게 그대로
       else if (this.shields > 0) { this.shields--; blocked = 'shield'; }
       else if (a.trait === 't_rain' && R.rainImmune) blocked = 'roof';
       let detail = '';
       if (!blocked) {
         if (a.trait === 't_rain') { let n = 0; for (const p of this.outdoorParcels()) { if (!p.wet) { p.wet = true; n++; } p.deadline = Math.max(0, p.deadline - k); } detail = MSG('trait.d.rain', { n }); }
-        else if (a.trait === 't_claim') { this.addRep(-(M.MULTI.CLAIM || 1) * Math.min(3, k), MSG('why.attack', { icon: tr.icon })); detail = MSG('trait.d.claim', { n: (M.MULTI.CLAIM || 1) * Math.min(3, k) }); }
+        else if (a.trait === 't_claim') { this.addRep(-(a.val || M.MULTI.CLAIM || 1) * Math.min(3, k), MSG('why.attack', { icon: tr.icon })); detail = MSG('trait.d.claim', { n: (a.val || M.MULTI.CLAIM || 1) * Math.min(3, k) }); }
         else if (a.trait === 't_rat') { let n = 0; for (const p of this.parcels.filter(x => this._attrs(x).includes('cold')).slice(0, k)) { this._discardParcel(p, MSG('why.attack', { icon: tr.icon }), 1, 'discard'); n++; } detail = MSG('trait.d.rat', { n }); }
         else if (a.trait === 't_hurry') {   // ⏱ 독촉: 전부가 아니라 몇 개만 — 오늘 안에 보내야 한다(기한 1) (유저: "기한 줄이는 것도 치명적, 하나당 몇 개만 바로 보내게")
-          if (this.hurryDay !== this.totalTurn) { this.hurryDay = this.totalTurn; this.hurryN = 0; } const n = Math.max(0, (M.MULTI.HURRY_N || 3) * Math.min(2, k) - this.hurryN); const cand = this.rng.shuffle(this.parcels.filter(p => !p.overdue && !p.noDeadline && p.deadline > 1)).slice(0, n);
+          if (this.hurryDay !== this.totalTurn) { this.hurryDay = this.totalTurn; this.hurryN = 0; } const n = Math.max(0, (a.val || M.MULTI.HURRY_N || 3) * Math.min(2, k) - this.hurryN); const cand = this.rng.shuffle(this.parcels.filter(p => !p.overdue && !p.noDeadline && p.deadline > 1)).slice(0, n);
           for (const p of cand) { p.deadline = 1; p.hurried = this.totalTurn; } this.hurryN += cand.length;   // 하루에 독촉 받는 택배는 최대 3개(×2 한 방이면 6) — 여러 명이 쏴도 겹치지 않는다
           detail = MSG('trait.d.hurry', { n: cand.length }); }
-        else if (a.trait === 't_flood') { this._applyPush({ n: (M.MULTI.FLOOD_N || 2) * Math.min(2, k), from: a.from, fromName: a.fromName }); detail = MSG('trait.d.flood', { n: (M.MULTI.FLOOD_N || 2) * Math.min(2, k) }); }
-        else if (a.trait === 't_crush') { this._applyPush({ n: Math.min(2, k), big: true, from: a.from, fromName: a.fromName }); detail = MSG('trait.d.crush', { n: Math.min(2, k) }); }
-        else if (a.trait === 't_customs') { const cand = this.rng.shuffle(this.parcels.filter(p => !p.overdue && !(p.customs > 0))).slice(0, (M.MULTI.CUSTOMS_N || 2) * Math.min(2, k)); for (const p of cand) { p.customs = 2; p.held = this.totalTurn; } detail = MSG('trait.d.customs', { n: cand.length }); }
+        else if (a.trait === 't_flood') { this._applyPush({ n: (a.val || M.MULTI.FLOOD_N || 2) * Math.min(2, k), from: a.from, fromName: a.fromName }); detail = MSG('trait.d.flood', { n: (a.val || M.MULTI.FLOOD_N || 2) * Math.min(2, k) }); }
+        else if (a.trait === 't_crush') { this._applyPush({ n: Math.min(3, (a.val || 1) * Math.min(2, k)), big: true, from: a.from, fromName: a.fromName }); detail = MSG('trait.d.crush', { n: Math.min(3, (a.val || 1) * Math.min(2, k)) }); }
+        else if (a.trait === 't_customs') { const cand = this.rng.shuffle(this.parcels.filter(p => !p.overdue && !(p.customs > 0))).slice(0, (a.val || M.MULTI.CUSTOMS_N || 2) * Math.min(2, k)); for (const p of cand) { p.customs = 2; p.held = this.totalTurn; } detail = MSG('trait.d.customs', { n: cand.length }); }
         else if (a.trait === 't_road') {   // 🚧 계약 하나만 막힌다(랜덤). 계약이 하나뿐이면 무효 — 전부 막히면 치명적 (유저)
           const slots = this.contracts.map((c, i) => c ? i : -1).filter(i => i >= 0);
           if (slots.length >= 2) { this.roadblockDay = this.totalTurn; this.roadblockSlot = slots[this.rng.int(slots.length)]; detail = MSG('trait.d.road', { name: this.contractName(this.contracts[this.roadblockSlot]) }); }
           else { blocked = 'void'; }
         }
         else if (a.trait === 't_refund') { const ps = this.parcels.slice().sort((x, y) => x.arrivalTurn - y.arrivalTurn).slice(0, k); for (const p of ps) this._discardParcel(p, MSG('why.attack', { icon: tr.icon }), 1, 'returned'); detail = MSG('trait.d.refund', { n: ps.length }); }
-        else if (a.trait === 't_seal') { const n = Math.min(M.MULTI.SEAL || 3, Math.max(0, this.warehouse.cap - this.capFloor())), on = this.capMods.find(x => x.why === 't_seal'); if (on) { on.until = this.totalTurn + M.MULTI.TEMP_DAYS; if (-on.delta < n) { this.warehouse.cap -= n + on.delta; on.delta = -n; this._assignCold(); } } else this._capMod(-n, M.MULTI.TEMP_DAYS, 't_seal'); detail = MSG('trait.d.seal', { n, d: M.MULTI.TEMP_DAYS }); }   // 🔒 봉인은 겹치지 않는다 — 걸려 있으면 기간만 새로(창고가 0 아래로 내려가던 것)
+        else if (a.trait === 't_seal') { const n = Math.min(a.val || M.MULTI.SEAL || 3, Math.max(0, this.warehouse.cap - this.capFloor())), on = this.capMods.find(x => x.why === 't_seal'); if (on) { on.until = this.totalTurn + M.MULTI.TEMP_DAYS; if (-on.delta < n) { this.warehouse.cap -= n + on.delta; on.delta = -n; this._assignCold(); } } else this._capMod(-n, M.MULTI.TEMP_DAYS, 't_seal'); detail = MSG('trait.d.seal', { n, d: M.MULTI.TEMP_DAYS }); }   // 🔒 봉인은 겹치지 않는다 — 걸려 있으면 기간만 새로(창고가 0 아래로 내려가던 것)
       }
       this.say(blocked ? 'log.attackBlocked' : 'log.attackIn', { icon: tr.icon, name: tr.name, from: a.fromName || '', detail, how: blocked ? MSG('trait.blk.' + blocked) : '' });
       this.emit('attackIn', { trait: a.trait, from: a.from, fromName: a.fromName, blocked, detail, mult: a.mult });
@@ -763,7 +763,11 @@
     traitMaster(type) { const pool = this.traitPool(type); return pool.length > 1 && this.ownedTraits(type).length >= pool.length; }
     typesOf(p) { return p.type2 ? [p.type, p.type2] : [p.type]; }
     // 트레잇 세기: 🔗 조합 배수 × (넷 다 모으면 +1) × (🧊 숙성 +일수) × 만차
-    traitPower(p) { let k = 1 + (this.traitMaster(p.type) || this.traitUnlocks.includes(p.type) ? 1 : 0) + ((this.traitLv || {})[p.trait] || 0) + (p.aged || 0); return k * (this._mixMult || 1) * (this._fullMult || 1); }
+    // 강화 단계의 수치(TRAIT_UP) · 더 올릴 수 있나 · 지금 쿨다운
+    traitVal(id, lv) { const v = (M.MULTI.TRAIT_UP || {})[id]; if (!v) return null; const l = lv != null ? lv : ((this.traitLv || {})[id] || 0); return v[Math.min(v.length - 1, l)]; }
+    traitUpMax(id) { const v = (M.MULTI.TRAIT_UP || {})[id], tr = this.traitDef(id) || {}; return v ? v.length - 1 : tr.cd ? Math.min(3, tr.cd - 1) : 0; }
+    traitCdNow(id, lv) { const tr = this.traitDef(id) || {}; return tr.cd ? Math.max(1, tr.cd - (lv != null ? lv : ((this.traitLv || {})[id] || 0))) : 0; }
+    traitPower(p) { let k = 1 + (this.traitMaster(p.type) || this.traitUnlocks.includes(p.type) ? 1 : 0) + (p.aged || 0); return k * (this._mixMult || 1) * (this._fullMult || 1); }
     // 이 짐을 보내면 무엇이 터지나 — [{ type, traits[], full, mult }] (호출 미리보기와 실제 발동이 같은 판단을 쓴다)
     firePlan(chosen, full) {
       const byType = {}; for (const p of chosen) if (p && p.trait && !p.overdue && p.type !== 'normal') for (const t of this.typesOf(p)) if (this.traitPool(t).length) (byType[t] = byType[t] || []).push(p);
@@ -2098,7 +2102,7 @@
       xp = this.trustGainPreview(c, chosen).xp;
       this._addTrust(c.carrier, xp);
       let repD = this.callRep(chosen, false);
-      if (this.tipNext) { this.tipNext = false; if (repD > 0) repD *= 2; }   // 💝 웃돈: 지난 호출이 걸어 둔 것
+      if (this.tipNext) { const tm = +this.tipNext > 1 ? +this.tipNext : 2; this.tipNext = false; if (repD > 0) repD *= tm; }   // 💝 웃돈: 지난 호출이 걸어 둔 것
       if (repD > 0 && R.earlyRepBonus) repD += R.earlyRepBonus;   // 멀티 퍽: 일찍 보낸 호출의 평판 보너스
       if (repD > 0 && R.rushRepBonus && this.month >= R.months) repD += R.rushRepBonus;   // 멀티 퍽: 마지막 보름 호출 평판 보너스
       if (repD) this.addRep(repD, MSG(repD > 0 ? 'why.repEarly' : 'why.repLate'));
@@ -2903,7 +2907,7 @@
     _traitUnlockItems() {
       const TT = M.MULTI.TYPE_TRAITS || {}; if (!this.rules.typeTraits) return [];
       const out = [];
-      if (this.cfg.mload) { const mx = (M.MULTI.LOADOUT || {}).upMax || 3; for (const ty of Object.keys(this.cfg.mload.traits || {})) { const own = this.ownedTraits(ty), left = this.traitPool(ty).filter(t => !own.includes(t)); for (const t of left) out.push({ kind: 'traitUnlock', ptype: ty, trait: t, price: 0, name: ty, sold: false }); for (const id of own) if ((this.traitLv[id] || 0) < mx) out.push({ kind: 'traitUp', ptype: ty, trait: id, price: 0, name: ty, sold: false }); } return out; }   // 셋업: 내 계열의 트레잇 — 아직 없는 것은 언락, 가진 것은 강화
+      if (this.cfg.mload) { const mx = (M.MULTI.LOADOUT || {}).upMax || 3; for (const ty of Object.keys(this.cfg.mload.traits || {})) { const own = this.ownedTraits(ty), left = this.traitPool(ty).filter(t => !own.includes(t)); for (const t of left) out.push({ kind: 'traitUnlock', ptype: ty, trait: t, price: 0, name: ty, sold: false }); for (const id of own) if ((this.traitLv[id] || 0) < this.traitUpMax(id)) out.push({ kind: 'traitUp', ptype: ty, trait: id, price: 0, name: ty, sold: false }); } return out; }   // 셋업: 내 계열의 트레잇 — 아직 없는 것은 언락, 가진 것은 강화
       for (const k of Object.keys(TT)) { if (!this.typeOpen(k)) continue; const own = this.ownedTraits(k), left = this.traitPool(k).filter(t => !own.includes(t)); if (!left.length) continue; out.push({ kind: 'traitUnlock', ptype: k, trait: left[this.rng.int(left.length)], price: 0, name: k, sold: false }); }   // 연 종류마다 아직 없는 트레잇 한 장
       return out;
     }

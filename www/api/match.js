@@ -165,7 +165,7 @@ async function route(S, m, from, ev, snaps) {
       const t = tg[0];
       return [{ type: 'repair', from, to: [t.pid], repair: { size: ev.size || M.MULTI.REPAIR.size, days: M.MULTI.REPAIR.days, hops: 0, from } }];
     }
-    for (const t of tg) out.push({ type: 'attack', from, to: [t.pid], trait: ev.trait, mult: ev.mult || 1, focus: !!ev.focus, fromName: (m.players.find(p => p.pid === from) || {}).name });
+    for (const t of tg) out.push({ type: 'attack', from, to: [t.pid], trait: ev.trait, mult: ev.mult || 1, val: ev.val != null ? +ev.val || 0 : undefined, focus: !!ev.focus, fromName: (m.players.find(p => p.pid === from) || {}).name });
     return out;
   }
   if (ev.type === 'push') {   // 만차 밀어내기: 랜덤 상대 한 명
