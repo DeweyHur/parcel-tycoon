@@ -110,7 +110,7 @@
       this.mperks = (cfg.mperks || []).slice(); this.perkOffer = null; this.repShop = null;   // 난투: 평판 상한에 닿으면 3장 랜덤 상점(repShop) — 퍽·계약·강화를 돈으로   // 멀티: 평판 등급업마다 3택1로 고른 퍽 · 지금 떠 있는 카드 3장
       // 멀티 2단계: 상대에게서 온 공격 큐(다음 날로 넘길 때 적용) · 나가는 것(공격·보수공사 이사, multi.js 가 라우팅) · 방패 · 임시 칸 · 한 방 · 덤 트럭
       this.actLog = [];   // 멀티 3단계: 입력 로그 — 서버가 같은 시드로 다시 돌려 검증한다 (MULTI.replay)
-      this.inbox = []; this.outbox = []; this.shields = 0; this.capMods = []; this.focusNext = false; this.freeTruckNext = false; this.freshFreezeUntil = 0; this.roadblockDay = 0; this.roadblockSlot = -1; this.traitUnlocks = []; this.traitSet = {}; this.traitCd = {}; this.traitLv = {}; this.mstats = { ship: {}, fire: {} }; if (this.cfg.mload) this.firstShopDone = true;   // 난투: 산 트레잇 언락(물품 종류별 두 번째 트레잇)
+      this.inbox = []; this.outbox = []; this.shields = 0; this.capMods = []; this.focusNext = false; this.freeTruckNext = false; this.freshFreezeUntil = 0; this.roadblockDay = 0; this.roadblockSlot = -1; this.traitUnlocks = []; this.traitSet = {}; this.traitCd = {}; this.tickets = {}; this.heldSpecs = null; this.holdNext = false; this.traitLv = {}; this.mstats = { ship: {}, fire: {} }; if (this.cfg.mload) this.firstShopDone = true;   // 난투: 산 트레잇 언락(물품 종류별 두 번째 트레잇)
       this.month = 0; this.turn = 0;
       // 런의 해. 시나리오(rules.year)나 cfg 가 지정하면 그 해, 아니면 시작한 해를 찍어 세이브에 고정한다.
       // 로그라이크라 해마다 요일·영업일 수가 달라지는 건 그대로 받는다 — 인수인계(대본)만 해를 고정한다.
@@ -1551,7 +1551,7 @@
       // 첫 상점은 트랙마다 새 계약 한 장씩 — 계열이 모두 다르다 (유저: "첫 마켓은 모두 계열이 다른 걸로")
       if (this.rules.multi && M.MULTI.TRACKS && !this.firstShopDone) { this.firstShopDone = true; const first = this._trackContractItems(); if (first.length >= 2) { if (this.rules.noMoney) for (const it of first) it.price = 0; return first; } }
       // 퍽 카드는 없다(유저: "그 이상한 퍽들도 없애고 그냥 마켓 아이템들이 평판 올라가면 뜨는 거야") — 장 매물에서 랜덤 3장. 돈이 없는 규칙이면 값 0 · 하나만 고른다
-      const pool = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill' && (it.kind !== 'enh' || this.enhTarget(it.enh) >= 0) && (it.kind !== 'enh' || this._optUseful(it.enh)) && !(it.kind === 'enh' && it.enh === 'seal' && this.rules.multi && !this.contracts.some(c => c && this.trustLevel(c.carrier) < 3))).concat(this._traitUnlockItems(), this._shopUpItems()));   // 붙일 계약이 없는 강화는 안 뜬다
+      const pool = this.rng.shuffle(this._shopItems().filter(it => !it.sold && it.kind !== 'refill' && (it.kind !== 'enh' || this.enhTarget(it.enh) >= 0) && (it.kind !== 'enh' || this._optUseful(it.enh)) && !(it.kind === 'enh' && it.enh === 'seal' && this.rules.multi && !this.contracts.some(c => c && this.trustLevel(c.carrier) < 3))).concat(this._traitUnlockItems(), this._shopUpItems(), this._ticketItems()));   // 붙일 계약이 없는 강화는 안 뜬다
       const goods = this.rules.multi ? this._themedShop(pool, this.shopCards()) : pool.slice(0, this.shopCards());
       if (this.rules.noMoney) for (const it of goods) it.price = 0;
       return goods;
@@ -1574,7 +1574,7 @@
       return this.rng.shuffle(list.length ? list : pool).slice(0, n);
     }
     // 계약은 윗급일수록 귀하다 (유저: "계약을 늘리는 것과 윗급으로 올리는 건 같은 상점 · 윗급으로 갈수록 레어도가 올라가게")
-    itemRarity(it) { if (it.kind === 'shopUp') return 'epic'; if (it.kind === 'traitUnlock') { const i = this.traitPool(it.ptype).indexOf(it.trait), R4 = (M.MULTI.LOADOUT && M.MULTI.LOADOUT.traitRarity) || []; return R4[i] || 'rare'; } if (it.kind === 'traitUp') return ['common', 'rare', 'epic'][Math.min(2, (this.traitLv || {})[it.trait] || 0)]; if (it.kind === 'contract') return ['common', 'rare', 'epic', 'legend'][Math.min(3, D.CARRIERS[it.carrier].tier || 0)]; return 'common'; }
+    itemRarity(it) { if (it.kind === 'shopUp') return 'epic'; if (it.kind === 'ticket') return ((M.MULTI.TICKETS || {})[it.tix] || {}).rarity || 'common'; if (it.kind === 'traitUnlock') { const i = this.traitPool(it.ptype).indexOf(it.trait), R4 = (M.MULTI.LOADOUT && M.MULTI.LOADOUT.traitRarity) || []; return R4[i] || 'rare'; } if (it.kind === 'traitUp') return ['common', 'rare', 'epic'][Math.min(2, (this.traitLv || {})[it.trait] || 0)]; if (it.kind === 'contract') return ['common', 'rare', 'epic', 'legend'][Math.min(3, D.CARRIERS[it.carrier].tier || 0)]; return 'common'; }
     rarityRank(r) { return ['common', 'rare', 'epic', 'legend'].indexOf(r); }
     shopMilestone() { const k = Math.max(2, ((M.MULTI && M.MULTI.SHOP_MILESTONE) || 3) - (this.shopVip ? 1 : 0)); return this.rules.multi && this.repTier > 0 && this.repTier % k === 0; }
     _shopUpItems() { if (!this.rules.multi) return []; const out = []; if ((this.shopExtra || 0) < 2) out.push({ kind: 'shopUp', up: 'shelf', price: 0, sold: false }); if (!this.shopVip) out.push({ kind: 'shopUp', up: 'vip', price: 0, sold: false }); if (!this.nextPremium) out.push({ kind: 'shopUp', up: 'pass', price: 0, sold: false }); return out; }
@@ -1584,6 +1584,7 @@
       if (this.cash < (it.kind === 'perk' ? it.price : this.contractPrice ? (it.kind === 'contract' ? this.contractPrice(it) : it.price) : it.price)) return { ok: false, msg: T('err.noCash') };
       this._act('rbuy', { i, s: target == null ? null : target });
       if (it.kind === 'shopUp') { it.sold = true; sh.bought++; if (it.up === 'shelf') this.shopExtra = (this.shopExtra || 0) + 1; else if (it.up === 'vip') this.shopVip = true; else if (it.up === 'pass') this.nextPremium = true; this.say('log.shopUp', { name: T('shopUp.' + it.up) }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, shopUp: it.up }; }
+      if (it.kind === 'ticket') { it.sold = true; sh.bought++; this.tickets[it.tix] = (this.tickets[it.tix] || 0) + 1; if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, ticket: it.tix }; }
       if (it.kind === 'traitUp') { it.sold = true; sh.bought++; this.traitLv[it.trait] = (this.traitLv[it.trait] || 0) + 1; this.say('log.traitUp', { icon: (this.traitDef(it.trait) || {}).icon || '', name: (this.traitDef(it.trait) || {}).name || '', n: this.traitLv[it.trait] }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, traitUp: it.trait }; }
       if (it.kind === 'traitUnlock') { it.sold = true; sh.bought++; { const set = this.traitSet[it.ptype] = this.traitSet[it.ptype] || []; if (!set.includes(it.trait)) set.push(it.trait); } this.say('log.traitUnlock', { type: D.PARCEL_TYPES[it.ptype].name, icon: (this.traitDef(it.trait) || {}).icon || '' }); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, unlock: it.ptype }; }
       if (it.kind === 'perk') { this.cash -= it.price; this.run.spent += it.price; it.sold = true; sh.bought++; this._applyPerk(it.perk); if (this.rules.noMoney) this.closeRepShop(true); return { ok: true, perk: it.perk }; }
@@ -1926,6 +1927,7 @@
     _startTurn() {
       this.turn++;
       let specs = this.schedule[this.turn - 1] || [];
+      if (this.holdNext) { this.holdNext = false; this.heldSpecs = (this.heldSpecs || []).concat(specs); specs = []; this.say('log.hold'); } else if (this.heldSpecs) { specs = this.heldSpecs.concat(specs); this.heldSpecs = null; }   // ✋ 입고 보류권: 오늘 올 짐이 내일 같이 온다
       // 난투: 받아 주는 계약이 없는 특수 물품은 일반으로 온다(트레잇도 없이) — 계약을 사야 그 물품과 그 트레잇이 열린다 (유저)
       const R = this.rules;
       if (R.typeTraits) specs = specs.map(sp => sp.trait || (R.traitAll && sp.type !== 'normal') ? Object.assign({}, sp, { trait: this._resolveTrait(sp) }) : sp);   // traitAll: 특수 물품은 전부 제 트레잇을 단다(트레잇은 호출마다 종류당 한 번이라 개수가 아니다)   // 대본의 트레잇은 '붙었다'는 표시 — 무엇이 붙는지는 물품 종류(와 내 언락)가 정한다
@@ -2905,6 +2907,17 @@
       this.emit('repTier', { tier: this.repTier, cap: this.repCap(), customers: [], shop: this.repShop.items.length, bonus: true });
     }
     // 트레잇 언락 카드: 내가 받는 물품 종류 중 아직 안 연 것 (유저: "마켓에 해당 특수 물품에 붙는 트레잇을 언락하는 것도")
+    _ticketItems() { const TK = M.MULTI.TICKETS; if (!this.rules.multi || !TK) return []; return Object.keys(TK).map(id => ({ kind: 'ticket', tix: id, price: 0, sold: false })); }
+    // 권 쓰기 — 하루를 쓰지 않는다. 입력 로그(tix)에 남아 재실행 검증이 그대로 통한다
+    useTicket(id) {
+      const TK = (M.MULTI.TICKETS || {})[id]; if (!TK || !(this.tickets[id] > 0) || this.phase !== 'play') return { ok: false };
+      let n = 0;
+      if (id === 'extend') { for (const p of this.parcels) if (!p.overdue && !p.noDeadline) { p.deadline += TK.n; n++; } }
+      else if (id === 'express') { const ps = this.parcels.filter(p => !p.overdue && !(p.customs > 0)).sort((a, b) => a.deadline - b.deadline).slice(0, TK.n); if (!ps.length) return { ok: false }; this.parcels = this.parcels.filter(p => !ps.includes(p)); const d = this.callRep(ps, true); if (d) this.addRep(d, MSG('why.ticket', { icon: TK.icon })); this._assignCold(); n = ps.length; this.emit('ticketShip', { ids: ps.map(p => p.id), n }); }
+      else if (id === 'hold') { if (this.holdNext) return { ok: false }; this.holdNext = true; n = 1; }
+      this.tickets[id]--; this._act('tix', { id }); this.say('log.ticket', { icon: TK.icon, name: T('tix.' + id) }); this.emit('ticket', { id, n });
+      return { ok: true, n };
+    }
     _traitUnlockItems() {
       const TT = M.MULTI.TYPE_TRAITS || {}; if (!this.rules.typeTraits) return [];
       const out = [];

@@ -1293,3 +1293,4 @@ body.mhit #app::after { content: ''; position: fixed; inset: 0; z-index: 55; poi
 .pkcard .fromto { color: #fff; font-weight: normal; }
 .mfam .mfi { font-size: 13px; letter-spacing: 2px; margin-top: 3px; opacity: .8; }
 .tipbody p { margin: 4px 0; font-size: 12px; line-height: 1.45; } .tipbody .gold { color: var(--gold, #ffd166); } [data-tip], #chain-meter.mix { cursor: pointer; }
+#mperks .pk.tix { border-color: var(--gold, #ffd166); background: #3a3210; cursor: pointer; }

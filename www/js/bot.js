@@ -173,6 +173,7 @@ function urgency(g) {
   function multiDay(g, strat) {
     if (g.phase === 'market') { shopBot(g); g.closeMarket(); return true; }   // 준비 마켓(시작) · 사이클 끝 장(있는 규칙이면)
     if (g.phase !== 'play') return false;
+    if (g.tickets) { if (g.tickets.extend > 0 && g.parcels.filter(p => !p.overdue && p.deadline <= 1).length >= 3) g.useTicket('extend'); if (g.tickets.hold > 0 && g.usage() >= 0.8) g.useTicket('hold'); if (g.tickets.express > 0 && g.usage() >= 0.7) g.useTicket('express'); }   // 봇도 권을 쓴다
     if (g.repShop) repShopBot(g);
     if (g.perkOffer) pickPerkBot(g);
     if (g.offer) g.declineOffer();

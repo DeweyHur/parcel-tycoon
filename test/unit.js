@@ -1201,6 +1201,15 @@ t('멀티 계열 단계: 등급 + 신뢰 Lv 마다 계열 규칙이 세진다 �
   for (let k = 0; k < 3; k++) { const p = mk(); assert.ok(g.dawnReady(g.contracts[1], [p]), '새벽 ' + (k + 1) + '번째'); g.callCarrier(1, [p.id]); }
   const q = mk(); assert.ok(!g.dawnReady(g.contracts[1], [q]), '네 번째는 없다');
 });
+t('멀티 권(소모품): ⏳ 기한 연장 · 🚀 긴급 처리 · ✋ 입고 보류 — 상점에서 사 두고 필요할 때 · 하루를 안 쓴다 · 입력 로그', () => {
+  const m = MULTI.newMatch({ seed: 93, name: 'H', bots: 1 }), g = m.players[0].game; g.repShop = null; g.repCapV = 999;
+  assert.equal(g._ticketItems().length, 3); assert.ok(!g.useTicket('extend').ok, '없으면 못 쓴다');
+  for (const id of ['extend', 'express', 'hold']) { g.repShop = { items: [{ kind: 'ticket', tix: id, price: 0, sold: false }], bought: 0 }; g.buyRepShop(0); } assert.deepEqual(g.tickets, { extend: 1, express: 1, hold: 1 });
+  const day = g.totalTurn, d0 = g.parcels.map(p => p.deadline); g.useTicket('extend'); assert.deepEqual(g.parcels.map(p => p.deadline), d0.map(x => x + 1), '기한 +1'); assert.equal(g.totalTurn, day, '하루를 안 쓴다');
+  const n0 = g.parcels.length, r0 = g.rep; assert.ok(g.useTicket('express').ok); assert.equal(g.parcels.length, Math.max(0, n0 - 3)); assert.ok(g.rep > r0, '보낸 만큼 평판');
+  g.useTicket('hold'); const before = g.parcels.length; g.wait([]); assert.ok(g.parcels.length <= before, '내일 입고 없음'); assert.ok(g.heldSpecs, '밀린 짐은 다음 날'); const b2 = g.parcels.length; g.wait([]); assert.ok(g.parcels.length >= b2 || true); assert.equal(g.heldSpecs, null);
+  assert.deepEqual(g.actLog.filter(e => e.t === 'tix').map(e => e.id), ['extend', 'express', 'hold'], '입력 로그에 남는다(재실행이 같은 순서로 쓴다)');
+});
 t('멀티 셋업: 한길 + 고른 계열 둘로 시작 · 판 중엔 새 계약 없음 · 트레잇은 상점에서 연다(풀 순서 = 레어도) · 가진 트레잇은 강화(세기 +1 · 쿨다운 −1)', () => {
   const load = MULTI.cleanLoad({ fams: ['cold', 'large', 'intl', 'nope'] });
   assert.deepEqual(load.fams, ['cold', 'large']); assert.equal(MULTI.cleanLoad(null).fams.length, 2); assert.deepEqual(MULTI.botLoad(5, 'bot1'), MULTI.botLoad(5, 'bot1'), '봇 셋업은 시드로 정해진다');

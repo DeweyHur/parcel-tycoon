@@ -175,7 +175,7 @@
       if (e.t === 'wait') g.wait(e.ids); else if (e.t === 'call') g.callCarrier(e.i, e.ids, e.n || undefined); else if (e.t === 'self') g.selfShip(e.ids);
       else if (e.t === 'shop') g.openShop(); else if (e.t === 'buy') g.buy(e.i, e.s, e.m || undefined); else if (e.t === 'close') g.closeMarket();
       else if (e.t === 'perk') g.pickPerk(e.id); else if (e.t === 'atk') g.receiveAttack(e.a); else if (e.t === 'repair') g.receiveRepair(e.b); else if (e.t === 'push') g.receivePush(e.x);
-      else if (e.t === 'rbuy') g.buyRepShop(e.i, e.s); else if (e.t === 'rclose') g.closeRepShop();
+      else if (e.t === 'tix') g.useTicket(e.id); else if (e.t === 'rbuy') g.buyRepShop(e.i, e.s); else if (e.t === 'rclose') g.closeRepShop();
       g.takeEvents();
     }
     return g;
