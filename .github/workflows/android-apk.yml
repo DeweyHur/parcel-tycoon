@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # latest 는 2026-10-19 부터 Ubuntu 26 으로 바뀐다 — 안드로이드 SDK·JDK 구성을 고정
     timeout-minutes: 30
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
@@ -46,7 +46,7 @@ jobs:
           cache: npm
 
       # Capacitor 6 / AGP 8 은 JDK 17 필요
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
