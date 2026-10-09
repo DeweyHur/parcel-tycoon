@@ -88,6 +88,8 @@ npm run web
 bash build-apk.sh
 ```
 
+GitHub Actions 에서도 빌드됩니다(`.github/workflows/android-apk.yml`). main 푸시 또는 Actions 탭의 *Run workflow* 로 실행하면 디버그 APK 가 아티팩트로 올라가고, 서명키 시크릿(`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`)을 등록하면 서명된 릴리스 APK 와 Play 업로드용 AAB 도 함께 나옵니다.
+
 처음 직접 구성할 때는 다음 순서로 Capacitor 프로젝트를 준비할 수 있습니다.
 
 ```bash

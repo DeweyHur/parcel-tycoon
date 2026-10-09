@@ -1,0 +1,132 @@
+# 안드로이드 APK 빌드 (Capacitor). android/ 는 저장소에 없고 매번 cap add 로 만든다 — build-apk.sh 와 같은 순서.
+#
+#   항상            : 디버그 APK  (dist/parcel-tycoon-debug.apk — 폰에 바로 설치해서 테스트)
+#   서명키 시크릿이 있으면 : 서명된 릴리스 APK + AAB (Play 업로드용 AAB)
+#
+# 서명키를 쓰려면 저장소 Settings → Secrets and variables → Actions 에 다음을 등록:
+#   ANDROID_KEYSTORE_BASE64    keystore 파일을 base64 한 문자열 (base64 -i release.keystore | pbcopy)
+#   ANDROID_KEYSTORE_PASSWORD  keystore 비밀번호
+#   ANDROID_KEY_ALIAS          키 별칭
+#   ANDROID_KEY_PASSWORD       키 비밀번호 (keystore 와 같으면 생략 가능)
+#
+# versionCode 는 실행 번호(run number)를 쓴다 — Play 는 올릴 때마다 커져야 하므로 이 파일 이름을 바꾸면 번호가 1부터 다시 시작한다.
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - 'test/**'
+      - 'audio-src/**'
+      - 'Claude outputs/**'
+      - 'www/api/**'     # 서버리스 함수는 Vercel 쪽 — 앱에 들어가지 않는다
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Capacitor 6 / AGP 8 은 JDK 17 필요
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 의존성 설치
+        run: |
+          npm ci --no-audit --no-fund
+          pip install pillow
+
+      - name: 유닛 테스트
+        run: node test/unit.js
+
+      - name: 안드로이드 프로젝트 생성 (세로 고정 · 아이콘 · 버전)
+        run: |
+          npx cap add android
+          python3 tools/android-prepare.py \
+            --version-code "$GITHUB_RUN_NUMBER" \
+            --version-name "$(node -p "require('./package.json').version")"
+
+      - name: 웹 에셋 동기화
+        run: |
+          npx cap sync android
+          rm -rf android/app/src/main/assets/public/api
+
+      - name: Gradle 캐시
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: 디버그 APK 빌드
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: 산출물 모으기 (디버그)
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/parcel-tycoon-debug.apk
+
+      - name: 릴리스 APK · AAB 빌드와 서명
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KS="$RUNNER_TEMP/release.keystore"
+          export KEY_PASS="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KS"
+
+          (cd android && ./gradlew assembleRelease bundleRelease --no-daemon)
+
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/zipalign" -p -f 4 \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" sign --ks "$KS" --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD --key-pass env:KEY_PASS \
+            --out dist/parcel-tycoon-release.apk "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" verify dist/parcel-tycoon-release.apk
+
+          cp android/app/build/outputs/bundle/release/app-release.aab dist/parcel-tycoon-release.aab
+          jarsigner -keystore "$KS" -storepass:env ANDROID_KEYSTORE_PASSWORD -keypass:env KEY_PASS \
+            dist/parcel-tycoon-release.aab "$ANDROID_KEY_ALIAS"
+
+      - name: 키스토어 정리
+        if: always() && env.HAS_KEYSTORE == 'true'
+        run: rm -f "$RUNNER_TEMP/release.keystore" "$RUNNER_TEMP/aligned.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parcel-tycoon-android-${{ github.run_number }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30

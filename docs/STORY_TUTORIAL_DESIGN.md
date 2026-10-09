@@ -2881,3 +2881,7 @@ marketing: { costs: [...], parcels: 3, campaign: { days: 3, per: 4, cost: 50 } }
 
 유저: **"한길도 농산품은 배송해야지"**, **"조심운송으로 보내는데 무사고 100프로가 아니야? 왜 그게 트레잇이지?"**, **"한길도 파손은 보내지만 파손이 되는 거지 왜 한길이 완전 바보로 바뀌었지. 조심은 냉장이나 관세의 파손 위험을 극도로 줄여 주는 걸로"**
 → 난투에서 한길(대량)도 🌾 농산물을 싣는다(`CARRY_OWN.bulk`). ⚠ 파손품은 한길·냉장·관세·냉동·거인 어느 차든 싣되 깨질 수 있고(기본 25%, 완충 능력만 있으면 ×0.4), 조심(파손 계열)만 깨지지 않는다(`fragileAnywhere`). 파손 계열 규칙은 이름을 「파손 전문」으로 — 조심 차를 쓴 보상(개당 평판)이라는 걸 드러냈다. 자세한 건 MULTIPLAYER_DESIGN.md 피드백 표.
+
+## 덧. GitHub Actions APK 빌드 (2026-10-08)
+
+유저: **"이제 앱을 올릴 수 있으니 GitHub Action을 통해서 APK를 빌드하자"** — `.github/workflows/android-apk.yml`. main 푸시(코드·에셋 변경)와 수동 실행마다 유닛 테스트 → `cap add android` → `tools/android-prepare.py`(세로 고정·아이콘·versionCode=실행 번호) → 디버그 APK를 아티팩트로 올린다. 서명키 시크릿(`ANDROID_KEYSTORE_BASE64` 등)이 있으면 서명된 릴리스 APK + Play 업로드용 AAB도 만든다. `android/` 는 계속 저장소 밖(`.gitignore`), 맥 로컬 빌드(`build-apk.sh`)는 그대로.
